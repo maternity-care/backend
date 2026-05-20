@@ -93,4 +93,7 @@ export enum PermissionEnum {
   REPORT_VIEW = 'report.view',
   REPORT_EXPORT = 'report.export',
   AUDIT_LOG_VIEW = 'audit_log.view',
+
+  SETTING_VIEW = 'setting.view',
+  SETTING_UPDATE = 'setting.update',
 }
