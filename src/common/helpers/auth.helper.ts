@@ -1,0 +1,28 @@
+import { UnauthorizedException } from '@nestjs/common';
+import { PermissionEnum } from '../constants/permission.enum';
+import { RoleEnum } from '../constants/role.enum';
+import { AuthenticatedUser } from '../../modules/auth/interfaces/authenticated-user.interface';
+
+export function checkAuth(user?: AuthenticatedUser): AuthenticatedUser {
+  if (!user) {
+    throw new UnauthorizedException('Authentication is required');
+  }
+
+  return user;
+}
+
+export function getUserRoles(user: AuthenticatedUser): string[] {
+  return user.roles.map((role) => role.name);
+}
+
+export function getUserPermissions(user: AuthenticatedUser): string[] {
+  return user.roles.flatMap((role) => role.permissions.map((permission) => permission.name));
+}
+
+export function checkRole(user: AuthenticatedUser, roleName: RoleEnum): boolean {
+  return getUserRoles(user).includes(roleName);
+}
+
+export function checkPermission(user: AuthenticatedUser, permissionName: PermissionEnum): boolean {
+  return getUserPermissions(user).includes(permissionName);
+}
