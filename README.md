@@ -233,23 +233,6 @@ S3_FORCE_PATH_STYLE=true
 CDN_BASE_URL=https://your-cdn-domain
 ```
 
-## Queue/Job Test
-
-```http
-POST /management/jobs/test
-Authorization: Bearer <access_token>
-Content-Type: application/json
-```
-
-```json
-{
-  "message": "hello",
-  "payload": {}
-}
-```
-
-Response tra ve `jobId`. Processor xu ly async, log message/payload, retry 3 lan voi exponential backoff.
-
 ## Troubleshooting
 
 Khong connect duoc DB:

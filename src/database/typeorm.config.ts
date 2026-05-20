@@ -5,8 +5,10 @@ import { User } from '../modules/users/entities/user.entity';
 import { Role } from '../modules/roles/entities/role.entity';
 import { Permission } from '../modules/permissions/entities/permission.entity';
 import { RefreshToken } from '../modules/auth/entities/refresh-token.entity';
+import { Setting } from '../modules/settings/entities/setting.entity';
 import { CreateRbacTables1710000000000 } from './migrations/1710000000000-CreateRbacTables';
 import { CreateRefreshTokensTable1720000000000 } from './migrations/1720000000000-CreateRefreshTokensTable';
+import { CreateSettingsTable1730000000000 } from './migrations/1730000000000-CreateSettingsTable';
 
 config();
 
@@ -20,8 +22,12 @@ export const typeOrmConfig: DataSourceOptions = {
   synchronize: false,
   migrationsRun: false,
   logging: process.env.NODE_ENV === 'development',
-  entities: [User, Role, Permission, RefreshToken],
-  migrations: [CreateRbacTables1710000000000, CreateRefreshTokensTable1720000000000],
+  entities: [User, Role, Permission, RefreshToken, Setting],
+  migrations: [
+    CreateRbacTables1710000000000,
+    CreateRefreshTokensTable1720000000000,
+    CreateSettingsTable1730000000000,
+  ],
   charset: 'utf8mb4_unicode_ci',
 };
 

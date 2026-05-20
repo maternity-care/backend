@@ -24,7 +24,8 @@
     "seed": "ts-node -r tsconfig-paths/register src/database/seeders/seed.ts",
     "db:seed": "npm run seed",
     "seed:roles-permissions": "npm run seed -- --class=RolesAndPermissionsSeeder",
-    "seed:users": "npm run seed -- --class=UsersSeeder"
+    "seed:users": "npm run seed -- --class=UsersSeeder",
+    "seed:settings": "npm run seed -- --class=SettingsSeeder"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.967.0",

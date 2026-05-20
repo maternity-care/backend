@@ -6,9 +6,14 @@ import { PermissionEnum } from '../../common/constants/permission.enum';
 import { RoleEnum } from '../../common/constants/role.enum';
 import { Permission } from '../../modules/permissions/entities/permission.entity';
 import { Role } from '../../modules/roles/entities/role.entity';
+import { Setting } from '../../modules/settings/entities/setting.entity';
 import { User } from '../../modules/users/entities/user.entity';
 
-type SeederClass = 'DatabaseSeeder' | 'RolesAndPermissionsSeeder' | 'UsersSeeder';
+type SeederClass =
+  | 'DatabaseSeeder'
+  | 'RolesAndPermissionsSeeder'
+  | 'UsersSeeder'
+  | 'SettingsSeeder';
 
 interface SeedUser {
   name: string;
@@ -110,6 +115,45 @@ const seedUsers: SeedUser[] = [
   { name: 'Partner Demo', email: 'partner@example.com', role: RoleEnum.PARTNER },
 ];
 
+const seedSettings: Array<Pick<Setting, 'key' | 'value' | 'group' | 'isPublic'>> = [
+  {
+    key: 'site.name',
+    value: 'Maternity Care',
+    group: 'general',
+    isPublic: 1,
+  },
+  {
+    key: 'site.description',
+    value: 'Maternity care management system',
+    group: 'general',
+    isPublic: 1,
+  },
+  {
+    key: 'contact.email',
+    value: 'support@example.com',
+    group: 'contact',
+    isPublic: 1,
+  },
+  {
+    key: 'contact.phone',
+    value: '',
+    group: 'contact',
+    isPublic: 1,
+  },
+  {
+    key: 'appointment.reminder_hours',
+    value: 24,
+    group: 'appointment',
+    isPublic: 0,
+  },
+  {
+    key: 'upload.max_file_size_mb',
+    value: 10,
+    group: 'upload',
+    isPublic: 0,
+  },
+];
+
 class RolesAndPermissionsSeeder {
   constructor(private readonly connection: DataSource) {}
 
@@ -198,12 +242,37 @@ class UsersSeeder {
   }
 }
 
+class SettingsSeeder {
+  constructor(private readonly connection: DataSource) {}
+
+  async run(): Promise<void> {
+    const settingRepository = this.connection.getRepository(Setting);
+
+    for (const seedSetting of seedSettings) {
+      let setting = await settingRepository.findOne({
+        where: { key: seedSetting.key },
+      });
+
+      if (!setting) {
+        setting = settingRepository.create(seedSetting);
+      }
+
+      setting.value = seedSetting.value;
+      setting.group = seedSetting.group;
+      setting.isPublic = seedSetting.isPublic;
+
+      await settingRepository.save(setting);
+    }
+  }
+}
+
 class DatabaseSeeder {
   constructor(private readonly connection: DataSource) {}
 
   async run(): Promise<void> {
     await new RolesAndPermissionsSeeder(this.connection).run();
     await new UsersSeeder(this.connection).run();
+    await new SettingsSeeder(this.connection).run();
   }
 }
 
@@ -228,6 +297,8 @@ function resolveSeederClass(): SeederClass {
     users: 'UsersSeeder',
     'admin-user': 'UsersSeeder',
     UsersSeeder: 'UsersSeeder',
+    settings: 'SettingsSeeder',
+    SettingsSeeder: 'SettingsSeeder',
   };
 
   const seederClass = aliases[requestedSeeder];
@@ -249,6 +320,11 @@ async function runSeeder(seederClass: SeederClass): Promise<void> {
 
   if (seederClass === 'UsersSeeder') {
     await new UsersSeeder(dataSource).run();
+    return;
+  }
+
+  if (seederClass === 'SettingsSeeder') {
+    await new SettingsSeeder(dataSource).run();
     return;
   }
 

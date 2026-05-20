@@ -10,8 +10,17 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
+  const nodeEnv = configService.get<string>('app.nodeEnv') ?? 'development';
+  const corsOrigins = configService.get<string[]>('app.corsOrigins') ?? [];
 
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
+
+  app.enableCors({
+    origin: nodeEnv === 'development' ? true : corsOrigins,
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
