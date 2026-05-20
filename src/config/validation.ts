@@ -65,6 +65,62 @@ class EnvironmentVariables {
   @Min(4)
   @Max(15)
   BCRYPT_SALT_ROUNDS: number;
+
+  @IsString()
+  @IsOptional()
+  STORAGE_DRIVER?: string;
+
+  @IsString()
+  @IsOptional()
+  S3_BUCKET?: string;
+
+  @IsString()
+  @IsOptional()
+  S3_REGION?: string;
+
+  @IsString()
+  @IsOptional()
+  S3_ENDPOINT?: string;
+
+  @IsString()
+  @IsOptional()
+  S3_ACCESS_KEY_ID?: string;
+
+  @IsString()
+  @IsOptional()
+  S3_SECRET_ACCESS_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  AWS_ACCESS_KEY_ID?: string;
+
+  @IsString()
+  @IsOptional()
+  AWS_SECRET_ACCESS_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  CDN_BASE_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  S3_FORCE_PATH_STYLE?: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  @IsOptional()
+  UPLOAD_MAX_FILE_SIZE_MB?: number;
+
+  @IsString()
+  @IsOptional()
+  UPLOAD_ALLOWED_MIME_TYPES?: string;
+
+  @IsInt()
+  @Min(60)
+  @Max(3600)
+  @IsOptional()
+  UPLOAD_PRESIGN_EXPIRES_IN?: number;
 }
 
 export function validate(config: Record<string, unknown>) {

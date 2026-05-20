@@ -9,6 +9,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { RolesModule } from './modules/roles/roles.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
 import { UsersModule } from './modules/users/users.module';
 
 @Module({
@@ -37,6 +38,7 @@ import { UsersModule } from './modules/users/users.module';
     RolesModule,
     PermissionsModule,
     JobsModule,
+    UploadsModule,
   ],
 })
 export class AppModule {}
