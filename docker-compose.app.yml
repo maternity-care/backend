@@ -1,0 +1,17 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: maternity-api
+    restart: unless-stopped
+    ports:
+      - "84:84"
+    env_file:
+      - .env
+    networks:
+      - maternity_care_system_g44
+
+networks:
+  maternity_care_system_g44:
+    external: true
