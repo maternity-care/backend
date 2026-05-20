@@ -15,7 +15,6 @@ Backend NestJS production-ready cho he thong phan mem cham soc thai san. Project
 - class-validator, class-transformer
 - Docker multi-stage build
 
-
 ## Cai Dat Local
 
 ```bash
