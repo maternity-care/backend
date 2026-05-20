@@ -9,7 +9,7 @@ export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get public website settings' })
+  @ApiOperation({ summary: 'Get all public website settings' })
   @ApiResponse({ status: 200 })
   findPublic() {
     return this.settingsService.findPublic();
