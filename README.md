@@ -10,6 +10,7 @@ Backend NestJS production-ready cho he thong phan mem cham soc thai san. Project
 - RBAC roles/permissions
 - BullMQ + Redis
 - Redis cache cho users
+- Upload file len AWS S3 hoac Vietnix S3
 - Swagger OpenAPI
 - class-validator, class-transformer
 - Docker multi-stage build
@@ -41,6 +42,17 @@ REDIS_HOST=maternity-redis
 REDIS_PORT=6379
 REDIS_PASSWORD=password
 BCRYPT_SALT_ROUNDS=10
+STORAGE_DRIVER=s3
+S3_BUCKET=maternity-care
+S3_REGION=ap-southeast-1
+S3_ENDPOINT=
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+S3_FORCE_PATH_STYLE=false
+CDN_BASE_URL=
+UPLOAD_MAX_FILE_SIZE_MB=10
+UPLOAD_PRESIGN_EXPIRES_IN=300
+UPLOAD_ALLOWED_MIME_TYPES=image/jpeg,image/png,image/webp,application/pdf
 ```
 
 ## Migration
@@ -192,6 +204,34 @@ partner@example.com    / password
 ## Redis Cache
 
 Backend dung Redis cho BullMQ queue va cache. Cac endpoint users cache danh sach/detail trong 300 giay, tu clear cache khi create/update/delete user.
+
+## Upload CDN S3
+
+Ho tro AWS S3 va S3-compatible provider nhu Vietnix S3.
+
+AWS S3:
+
+```env
+S3_BUCKET=maternity-care
+S3_REGION=ap-southeast-1
+S3_ENDPOINT=
+S3_ACCESS_KEY_ID=your_access_key
+S3_SECRET_ACCESS_KEY=your_secret_key
+S3_FORCE_PATH_STYLE=false
+CDN_BASE_URL=https://cdn.example.com
+```
+
+Vietnix S3:
+
+```env
+S3_BUCKET=maternity-care
+S3_REGION=us-east-1
+S3_ENDPOINT=https://your-vietnix-s3-endpoint
+S3_ACCESS_KEY_ID=your_access_key
+S3_SECRET_ACCESS_KEY=your_secret_key
+S3_FORCE_PATH_STYLE=true
+CDN_BASE_URL=https://your-cdn-domain
+```
 
 ## Queue/Job Test
 

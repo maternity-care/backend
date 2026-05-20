@@ -27,6 +27,8 @@
     "seed:users": "npm run seed -- --class=UsersSeeder"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.967.0",
+    "@aws-sdk/s3-request-presigner": "^3.967.0",
     "@nestjs/bullmq": "^10.2.3",
     "@nestjs/common": "^10.4.20",
     "@nestjs/config": "^3.3.0",
