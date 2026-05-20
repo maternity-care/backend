@@ -1,23 +1,22 @@
 # =============================================================================
-# CI/CD — Build Docker image, push to GHCR, deploy to VPS via SSH
+# CI/CD Pipeline — Maternity Care Backend
 # =============================================================================
-# Trigger: push to main, or run manually from Actions tab.
+# Flow:
+#   1. Push code lên nhánh main (hoặc bấm Run workflow thủ công)
+#   2. GitHub Actions build Docker image và push lên GHCR (ghcr.io)
+#   3. SSH vào VPS, pull image mới và restart container
 #
-# Required GitHub repository secrets (Settings -> Secrets and variables -> Actions):
-#   SSH_HOST          - VPS IP or hostname (e.g. 1.2.3.4)
-#   SSH_USER          - SSH username (e.g. deploy, ubuntu)
-#   SSH_PRIVATE_KEY   - Private SSH key (paste full content, including BEGIN/END lines)
-#   SSH_PORT          - (optional) SSH port, defaults to 22
-#   DEPLOY_PATH       - Absolute path on VPS where compose file lives (e.g. /opt/maternity/backend)
+# GitHub Secrets cần thiết (Settings > Secrets and variables > Actions):
+#   SERVER_HOST       IP hoặc hostname VPS         (vd: 1.2.3.4)
+#   SERVER_USER       User SSH                     (vd: root)
+#   SERVER_SSH_KEY    Private SSH key (paste cả khối BEGIN/END)
 #
-# Prerequisites:
-#   - The GHCR package (ghcr.io/maternity-care/backend) MUST be set to PUBLIC
-#     so the VPS can pull without credentials. After the first successful push,
-#     go to https://github.com/orgs/maternity-care/packages -> backend ->
-#     Package settings -> Change visibility -> Public.
-#   - The VPS must already have: Docker, Docker Compose plugin, the external
-#     network `maternity_care_system_g44` (created by the infrastructure stack),
-#     and a `.env` file in DEPLOY_PATH.
+# Yêu cầu trên VPS (làm 1 lần):
+#   - Cài Docker + Docker Compose plugin
+#   - Tạo network: docker network create maternity_care_system_g44
+#   - Tạo thư mục /opt/maternity/backend và đặt file .env trong đó
+#   - Sau lần build đầu, set GHCR package visibility = Public
+#     (https://github.com/orgs/maternity-care/packages)
 # =============================================================================
 
 name: CI/CD
@@ -30,19 +29,24 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  DEPLOY_PATH: /opt/maternity/backend
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Build TypeScript, build Docker image, push lên GHCR
+  # ---------------------------------------------------------------------------
   build:
     name: Build & Push Image
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+
     steps:
-      - name: Checkout
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -51,33 +55,29 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npx eslint "{src,test}/**/*.ts" --max-warnings=0
-        continue-on-error: true
-
-      - name: Build (verify TypeScript compiles)
+      - name: Build TypeScript (verify compile)
         run: npm run build
 
-      - name: Set up Docker Buildx
+      - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to GitHub Container Registry
+      - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
+      - name: Extract image metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=sha,format=short
             type=raw,value=latest
+            type=sha,format=short
 
-      - name: Build and push Docker image
+      - name: Build & push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -87,34 +87,36 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # ---------------------------------------------------------------------------
+  # Job 2: SSH vào VPS, pull image mới, restart container
+  # ---------------------------------------------------------------------------
   deploy:
     name: Deploy to VPS
     needs: build
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout (need compose file)
+      - name: Checkout (cần file docker-compose.prod.yml)
         uses: actions/checkout@v4
 
-      - name: Copy docker-compose.prod.yml to VPS
+      - name: Copy compose file lên VPS
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
           source: docker-compose.prod.yml
-          target: ${{ secrets.DEPLOY_PATH }}
+          target: ${{ env.DEPLOY_PATH }}
 
-      - name: Pull image and restart container on VPS
+      - name: Pull image mới và restart container
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             set -e
-            cd "${{ secrets.DEPLOY_PATH }}"
+            cd ${{ env.DEPLOY_PATH }}
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d
             docker image prune -f
