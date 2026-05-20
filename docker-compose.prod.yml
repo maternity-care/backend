@@ -1,0 +1,18 @@
+# Production compose file used on the VPS by the CI/CD workflow.
+# This file is uploaded to the server by the deploy job.
+# The VPS must have a `.env` file in the same directory.
+services:
+  app:
+    image: ghcr.io/maternity-care/backend:latest
+    container_name: maternity-api
+    restart: unless-stopped
+    ports:
+      - "84:84"
+    env_file:
+      - .env
+    networks:
+      - maternity_care_system_g44
+
+networks:
+  maternity_care_system_g44:
+    external: true
