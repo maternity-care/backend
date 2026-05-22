@@ -73,7 +73,7 @@ export class SettingsService {
     await this.clearCache();
     return savedSetting;
   }
-  
+
   private toKeyValue(settings: Setting[]): Record<string, unknown> {
     return settings.reduce<Record<string, unknown>>((result, setting) => {
       result[setting.key] = setting.value;
