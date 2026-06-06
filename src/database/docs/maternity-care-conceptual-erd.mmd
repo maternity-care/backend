@@ -1,0 +1,79 @@
+erDiagram
+  USER ||--|| USER_PROFILE : has
+  USER ||--o| DOCTOR : can_be
+  USER ||--o| STAFF_PROFILE : can_be
+  USER ||--o{ PREGNANCY_PROFILE : owns
+  USER ||--o{ ORDER : places
+  USER ||--o{ APPOINTMENT : books
+  USER ||--o{ CHAT_CONVERSATION : starts
+
+  ROLE }o--o{ USER : assigned_to
+  ROLE }o--o{ PERMISSION : grants
+
+  FACILITY ||--o{ ROOM : has
+  FACILITY ||--o{ FACILITY_SERVICE : offers
+  FACILITY ||--o{ DOCTOR_SHIFT : schedules
+  FACILITY }o--o{ DOCTOR : assigns
+  FACILITY }o--o{ STAFF_PROFILE : assigns
+
+  SERVICE ||--o{ FACILITY_SERVICE : configured_at
+  SERVICE ||--o{ PACKAGE_SERVICE : included_as
+  SERVICE ||--o{ APPOINTMENT : booked_for
+
+  DOCTOR ||--o{ DOCTOR_SHIFT : works
+  DOCTOR ||--o{ APPOINTMENT : handles
+  ROOM ||--o{ APPOINTMENT : hosts
+
+  MATERNITY_PACKAGE ||--o{ PACKAGE_SERVICE : includes
+  MATERNITY_PACKAGE ||--o{ PATIENT_PACKAGE : purchased_as
+  PACKAGE_SERVICE ||--o{ PACKAGE_SERVICE_FACILITY : limited_to
+  FACILITY ||--o{ PACKAGE_SERVICE_FACILITY : applies
+
+  USER ||--o{ PATIENT_PACKAGE : buys
+  PREGNANCY_PROFILE ||--o{ PATIENT_PACKAGE : linked_to
+  PATIENT_PACKAGE ||--o{ PATIENT_PACKAGE_BENEFIT : grants
+  PATIENT_PACKAGE ||--o{ PATIENT_EXTRA_SERVICE : may_add
+  SERVICE ||--o{ PATIENT_PACKAGE_BENEFIT : tracked_as
+  SERVICE ||--o{ PATIENT_EXTRA_SERVICE : added_as
+
+  PREGNANCY_PROFILE ||--o{ PREGNANCY_HISTORY_EVENT : records
+  PREGNANCY_PROFILE ||--o{ HEALTH_METRIC : tracks
+  PREGNANCY_PROFILE ||--o{ APPOINTMENT : used_in
+  PREGNANCY_PROFILE ||--o{ MEDICAL_RECORD : has
+
+  FACILITY ||--o{ APPOINTMENT : receives
+  PATIENT_PACKAGE ||--o{ APPOINTMENT : pays_by_benefit
+  PATIENT_EXTRA_SERVICE ||--o{ APPOINTMENT : pays_extra
+  APPOINTMENT ||--o{ APPOINTMENT_STATUS_LOG : audits
+  APPOINTMENT ||--o{ APPOINTMENT_REMINDER : reminds
+  APPOINTMENT ||--o| MEDICAL_RECORD : produces
+
+  ORDER ||--o{ ORDER_ITEM : contains
+  ORDER ||--o{ PAYMENT : paid_by
+  ORDER ||--o| INVOICE : issued_as
+  ORDER ||--o{ REFUND : refunded_by
+  PAYMENT ||--o{ REFUND : source
+
+  PRODUCT_CATEGORY ||--o{ PRODUCT : groups
+  USER ||--o| CART : owns
+  CART ||--o{ CART_ITEM : contains
+  PRODUCT ||--o{ CART_ITEM : selected
+  ORDER ||--o| PRODUCT_ORDER : ships_as
+  FACILITY ||--o{ INVENTORY : stocks
+  PRODUCT ||--o{ INVENTORY : stored_as
+  INVENTORY ||--o{ INVENTORY_TRANSACTION : changes
+
+  MEDICAL_RECORD ||--o{ MEDICAL_FILE : attaches
+  MEDICAL_RECORD ||--o{ PRESCRIPTION : creates
+  PRESCRIPTION ||--o{ PRESCRIPTION_ITEM : contains
+  PRESCRIPTION ||--o{ PRESCRIPTION_HISTORY : audits
+  PRESCRIPTION_ITEM ||--o{ MEDICATION_TAKEN_LOG : tracked_by
+
+  CHAT_CONVERSATION ||--o{ CHAT_MESSAGE : contains
+  FACILITY ||--o{ CHAT_CONVERSATION : routes
+
+  USER ||--o{ ARTICLE : writes
+  USER ||--o{ FORUM_POST : posts
+  FORUM_POST ||--o{ FORUM_COMMENT : has
+  FORUM_COMMENT ||--o{ FORUM_COMMENT : replies
+  USER ||--o{ CONTENT_REPORT : reports
