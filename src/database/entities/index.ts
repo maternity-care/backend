@@ -1,13 +1,13 @@
 export { UserProfile } from './user-profiles.entity';
 export { Doctor } from './doctors.entity';
 export { StaffProfile } from './staff-profiles.entity';
-export { Facility } from './facilities.entity';
+export { Facility } from '../../modules/facilities/entities/facilities.entity';
 export { Room } from './rooms.entity';
-export { FacilityDoctor } from './facility-doctors.entity';
-export { FacilityStaff } from './facility-staff.entity';
+export { FacilityDoctor } from '../../modules/facilities/entities/facility-doctors.entity';
+export { FacilityStaff } from '../../modules/facilities/entities/facility-staff.entity';
 export { DoctorShift } from './doctor-shifts.entity';
 export { Service } from './services.entity';
-export { FacilityService } from './facility-services.entity';
+export { FacilityService } from '../../modules/facilities/entities/facility-services.entity';
 export { MaternityPackage } from './maternity-packages.entity';
 export { PackageService } from './package-services.entity';
 export { PackageServiceFacility } from './package-service-facilities.entity';
