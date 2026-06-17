@@ -1,14 +1,18 @@
 import 'reflect-metadata';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { config } from 'dotenv';
+import { join } from 'path';
 import { User } from '../modules/users/entities/user.entity';
 import { Role } from '../modules/roles/entities/role.entity';
 import { Permission } from '../modules/permissions/entities/permission.entity';
+import { UserPermission } from '../modules/permissions/entities/user-permission.entity';
 import { RefreshToken } from '../modules/auth/entities/refresh-token.entity';
 import { Setting } from '../modules/settings/entities/setting.entity';
 import { CreateRbacTables1710000000000 } from './migrations/1710000000000-CreateRbacTables';
 import { CreateRefreshTokensTable1720000000000 } from './migrations/1720000000000-CreateRefreshTokensTable';
 import { CreateSettingsTable1730000000000 } from './migrations/1730000000000-CreateSettingsTable';
+import { CreateMaternityDomainTables1740000000000 } from './migrations/1740000000000-CreateMaternityDomainTables';
+import { CreateUserPermissionsTable1740100000000 } from './migrations/1740100000000-CreateUserPermissionsTable';
 
 config();
 
@@ -22,11 +26,21 @@ export const typeOrmConfig: DataSourceOptions = {
   synchronize: false,
   migrationsRun: false,
   logging: process.env.NODE_ENV === 'development',
-  entities: [User, Role, Permission, RefreshToken, Setting],
+  entities: [
+    User,
+    Role,
+    Permission,
+    UserPermission,
+    RefreshToken,
+    Setting,
+    join(__dirname, 'entities', '*.entity{.ts,.js}'),
+  ],
   migrations: [
     CreateRbacTables1710000000000,
     CreateRefreshTokensTable1720000000000,
     CreateSettingsTable1730000000000,
+    CreateMaternityDomainTables1740000000000,
+    CreateUserPermissionsTable1740100000000,
   ],
   charset: 'utf8mb4_unicode_ci',
 };

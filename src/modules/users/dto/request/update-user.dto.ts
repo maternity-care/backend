@@ -1,5 +1,16 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsEmail, IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsEmail,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
+import { UserPermissionOverrideDto } from './user-permission-override.dto';
 
 export class UpdateUserDto {
   @ApiPropertyOptional()
@@ -29,4 +40,11 @@ export class UpdateUserDto {
   @IsString({ each: true })
   @IsOptional()
   roleIds?: string[];
+
+  @ApiPropertyOptional({ type: [UserPermissionOverrideDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UserPermissionOverrideDto)
+  @IsOptional()
+  permissionOverrides?: UserPermissionOverrideDto[];
 }

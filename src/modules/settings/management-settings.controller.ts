@@ -7,8 +7,8 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { SettingResponseDto } from './dto/setting-response.dto';
-import { UpdateSettingDto, UpsertSettingDto } from './dto/update-setting.dto';
+import { SettingResponseDto } from './dto/response/setting-response.dto';
+import { UpdateSettingDto, UpsertSettingDto } from './dto/request/update-setting.dto';
 import { SettingsService } from './settings.service';
 
 @ApiTags('Management - Settings')

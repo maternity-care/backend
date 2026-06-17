@@ -1,6 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { IRedisCacheService, REDIS_CACHE_SERVICE } from '../../common/cache/redis-cache.interface';
-import { UpdateSettingDto, UpsertSettingDto } from './dto/update-setting.dto';
+import { UpdateSettingDto, UpsertSettingDto } from './dto/request/update-setting.dto';
 import { Setting } from './entities/setting.entity';
 import {
   ISettingsRepository,

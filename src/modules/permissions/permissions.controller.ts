@@ -7,9 +7,9 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { CreatePermissionDto } from './dto/create-permission.dto';
-import { UpdatePermissionDto } from './dto/update-permission.dto';
-import { PermissionResponseDto } from './dto/permission-response.dto';
+import { CreatePermissionDto } from './dto/request/create-permission.dto';
+import { UpdatePermissionDto } from './dto/request/update-permission.dto';
+import { PermissionResponseDto } from './dto/response/permission-response.dto';
 import { PermissionsService } from './permissions.service';
 
 @ApiTags('Management - Permissions')

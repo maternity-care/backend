@@ -1,5 +1,5 @@
-import { CreateRoleDto } from '../dto/create-role.dto';
-import { UpdateRoleDto } from '../dto/update-role.dto';
+import { CreateRoleDto } from '../dto/request/create-role.dto';
+import { UpdateRoleDto } from '../dto/request/update-role.dto';
 import { Role } from '../entities/role.entity';
 
 export const ROLES_SERVICE = Symbol('ROLES_SERVICE');

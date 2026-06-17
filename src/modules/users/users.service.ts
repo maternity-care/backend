@@ -1,10 +1,15 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
+import { Repository } from 'typeorm';
 import { IRedisCacheService, REDIS_CACHE_SERVICE } from '../../common/cache/redis-cache.interface';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateProfileDto } from './dto/update-profile.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { PERMISSIONS_SERVICE, IPermissionsService } from '../permissions/interfaces/permissions-service.interface';
+import { UserPermission } from '../permissions/entities/user-permission.entity';
+import { CreateUserDto } from './dto/request/create-user.dto';
+import { UpdateProfileDto } from './dto/request/update-profile.dto';
+import { UpdateUserDto } from './dto/request/update-user.dto';
+import { UserPermissionOverrideDto } from './dto/request/user-permission-override.dto';
 import { User } from './entities/user.entity';
 import { IUsersRepository, USERS_REPOSITORY } from './interfaces/users-repository.interface';
 import { IUsersService } from './interfaces/users-service.interface';
@@ -17,8 +22,12 @@ export class UsersService implements IUsersService {
     private readonly usersRepository: IUsersRepository,
     @Inject(ROLES_SERVICE)
     private readonly rolesService: IRolesService,
+    @Inject(PERMISSIONS_SERVICE)
+    private readonly permissionsService: IPermissionsService,
     @Inject(REDIS_CACHE_SERVICE)
     private readonly cacheService: IRedisCacheService,
+    @InjectRepository(UserPermission)
+    private readonly userPermissionsRepository: Repository<UserPermission>,
     private readonly configService: ConfigService,
   ) {}
 
@@ -37,8 +46,9 @@ export class UsersService implements IUsersService {
     });
 
     const savedUser = await this.usersRepository.save(user);
+    await this.syncPermissionOverrides(savedUser.id, dto.permissionOverrides);
     await this.clearUsersCache();
-    return savedUser;
+    return this.findById(savedUser.id);
   }
 
   async findAll(): Promise<User[]> {
@@ -103,8 +113,9 @@ export class UsersService implements IUsersService {
     user.status = dto.status ?? user.status;
 
     const savedUser = await this.usersRepository.save(user);
+    await this.syncPermissionOverrides(savedUser.id, dto.permissionOverrides);
     await this.clearUsersCache(id);
-    return savedUser;
+    return this.findById(savedUser.id);
   }
 
   async updateProfile(id: string, dto: UpdateProfileDto): Promise<User> {
@@ -134,5 +145,41 @@ export class UsersService implements IUsersService {
     if (userId) {
       await this.cacheService.del(`users:${userId}`);
     }
+  }
+
+  private async syncPermissionOverrides(
+    userId: string,
+    overrides?: UserPermissionOverrideDto[],
+  ): Promise<void> {
+    if (overrides === undefined) {
+      return;
+    }
+
+    const uniqueOverrides = Array.from(
+      new Map(overrides.map((override) => [override.permissionId, override])).values(),
+    );
+    const permissions = await this.permissionsService.findByIds(
+      uniqueOverrides.map((override) => override.permissionId),
+    );
+
+    if (permissions.length !== uniqueOverrides.length) {
+      throw new NotFoundException('One or more permissions were not found');
+    }
+
+    await this.userPermissionsRepository.delete({ userId });
+
+    if (uniqueOverrides.length === 0) {
+      return;
+    }
+
+    await this.userPermissionsRepository.save(
+      uniqueOverrides.map((override) =>
+        this.userPermissionsRepository.create({
+          userId,
+          permissionId: override.permissionId,
+          effect: override.effect,
+        }),
+      ),
+    );
   }
 }

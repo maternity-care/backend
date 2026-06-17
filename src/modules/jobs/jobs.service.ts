@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { CreateTestJobDto } from './dto/create-test-job.dto';
+import { CreateTestJobDto } from './dto/request/create-test-job.dto';
 
 export const EXAMPLE_QUEUE = 'example';
 export const TEST_JOB = 'test';
