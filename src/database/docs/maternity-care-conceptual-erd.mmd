@@ -9,6 +9,8 @@ erDiagram
 
   ROLE }o--o{ USER : assigned_to
   ROLE }o--o{ PERMISSION : grants
+  USER ||--o{ USER_PERMISSION : overrides
+  PERMISSION ||--o{ USER_PERMISSION : overridden_by
 
   FACILITY ||--o{ ROOM : has
   FACILITY ||--o{ FACILITY_SERVICE : offers
@@ -59,9 +61,6 @@ erDiagram
   CART ||--o{ CART_ITEM : contains
   PRODUCT ||--o{ CART_ITEM : selected
   ORDER ||--o| PRODUCT_ORDER : ships_as
-  FACILITY ||--o{ INVENTORY : stocks
-  PRODUCT ||--o{ INVENTORY : stored_as
-  INVENTORY ||--o{ INVENTORY_TRANSACTION : changes
 
   MEDICAL_RECORD ||--o{ MEDICAL_FILE : attaches
   MEDICAL_RECORD ||--o{ PRESCRIPTION : creates

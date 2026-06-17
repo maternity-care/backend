@@ -9,9 +9,9 @@ import { RoleEnum } from '../../common/constants/role.enum';
 import { IRolesService, ROLES_SERVICE } from '../roles/interfaces/roles-service.interface';
 import { USERS_REPOSITORY, IUsersRepository } from '../users/interfaces/users-repository.interface';
 import { User } from '../users/entities/user.entity';
-import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
-import { AuthResponseDto } from './dto/auth-response.dto';
+import { LoginDto } from './dto/request/login.dto';
+import { RegisterDto } from './dto/request/register.dto';
+import { AuthResponseDto } from './dto/response/auth-response.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { RefreshToken } from './entities/refresh-token.entity';
 

@@ -1,5 +1,5 @@
-import { CreatePermissionDto } from '../dto/create-permission.dto';
-import { UpdatePermissionDto } from '../dto/update-permission.dto';
+import { CreatePermissionDto } from '../dto/request/create-permission.dto';
+import { UpdatePermissionDto } from '../dto/request/update-permission.dto';
 import { Permission } from '../entities/permission.entity';
 
 export const PERMISSIONS_SERVICE = Symbol('PERMISSIONS_SERVICE');

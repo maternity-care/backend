@@ -16,10 +16,11 @@ Tool: draw.io | File: `MaternityCare_ERD.drawio`
 | User | Represents any account that can authenticate or be referenced by system workflows. | User -- UserProfile; User --< PregnancyProfile; User --< Appointment; User --< Order; User --< ChatConversation; User --< Article; User --< ForumPost | RTW.xlsx Sheet 5 |
 | Role | Represents a group of permissions assigned to users. | User >--< Role; Role >--< Permission | RTW.xlsx Sheet 5 |
 | Permission | Represents a system-level authorization capability. | Role >--< Permission | RTW.xlsx Sheet 5 |
+| UserPermission | Represents a per-user permission override. | User --< UserPermission; Permission --< UserPermission | RTW.xlsx Sheet 5 |
 | UserProfile | Represents extended personal information for a user. | User -- UserProfile | RTW.xlsx Sheet 5 |
 | Doctor | Represents a user's medical professional profile. | User -- Doctor; Doctor >--< Facility; Doctor --< DoctorShift; Doctor --< Appointment; Doctor --< MedicalRecord | RTW.xlsx Sheet 5 |
 | StaffProfile | Represents a user's operational staff profile. | User -- StaffProfile; StaffProfile >--< Facility | RTW.xlsx Sheet 5 |
-| Facility | Represents a clinic branch or examination facility. | Facility --< Room; Facility >--< Doctor; Facility >--< StaffProfile; Facility --< FacilityService; Facility --< Appointment; Facility --< Inventory | RTW.xlsx Sheet 5 |
+| Facility | Represents a clinic branch or examination facility. | Facility --< Room; Facility >--< Doctor; Facility >--< StaffProfile; Facility --< FacilityService; Facility --< Appointment | RTW.xlsx Sheet 5 |
 | Room | Represents a room inside a facility. | Facility --< Room; Room --< Appointment; Room --< DoctorShift | RTW.xlsx Sheet 5 |
 | DoctorShift | Represents a doctor's working slot at a facility. | Doctor --< DoctorShift; Facility --< DoctorShift; Room --< DoctorShift | RTW.xlsx Sheet 5 |
 | Service | Represents a standardized medical service offered by the system. | Service --< FacilityService; Service --< PackageService; Service --< Appointment | RTW.xlsx Sheet 5 |
@@ -42,12 +43,10 @@ Tool: draw.io | File: `MaternityCare_ERD.drawio`
 | Invoice | Represents an invoice issued for a paid order. | Order -- Invoice | RTW.xlsx Sheet 5 |
 | Refund | Represents a refund request and its processing state. | Order --< Refund; Payment --< Refund; User --< Refund | RTW.xlsx Sheet 5 |
 | ProductCategory | Represents a product classification. | ProductCategory --< ProductCategory; ProductCategory --< Product | RTW.xlsx Sheet 5 |
-| Product | Represents a sellable product. | ProductCategory --< Product; Product --< CartItem; Product --< Inventory | RTW.xlsx Sheet 5 |
+| Product | Represents a sellable product. | ProductCategory --< Product; Product --< CartItem | RTW.xlsx Sheet 5 |
 | Cart | Represents a user's active shopping cart. | User -- Cart; Cart --< CartItem | RTW.xlsx Sheet 5 |
 | CartItem | Represents a product selected in a cart. | Cart --< CartItem; Product --< CartItem | RTW.xlsx Sheet 5 |
 | ProductOrder | Represents shipping information for a product order. | Order -- ProductOrder | RTW.xlsx Sheet 5 |
-| Inventory | Represents product stock at a facility. | Facility --< Inventory; Product --< Inventory; Inventory --< InventoryTransaction | RTW.xlsx Sheet 5 |
-| InventoryTransaction | Represents an auditable inventory movement. | Inventory --< InventoryTransaction; User --< InventoryTransaction | RTW.xlsx Sheet 5 |
 | MedicalRecord | Represents doctor's conclusion after an appointment. | Appointment -- MedicalRecord; PregnancyProfile --< MedicalRecord; Doctor --< MedicalRecord; MedicalRecord --< MedicalFile; MedicalRecord --< Prescription | RTW.xlsx Sheet 5 |
 | MedicalFile | Represents uploaded medical result files. | MedicalRecord --< MedicalFile; Appointment --< MedicalFile; User --< MedicalFile | RTW.xlsx Sheet 5 |
 | Prescription | Represents an electronic prescription. | MedicalRecord --< Prescription; User --< Prescription; Doctor --< Prescription; Prescription --< PrescriptionItem; Prescription --< PrescriptionHistory | RTW.xlsx Sheet 5 |
@@ -69,28 +68,28 @@ Tool: draw.io | File: `MaternityCare_ERD.drawio`
 | --- | --- | --- | --- |
 | DC-01 | Email must be unique across all user accounts. | User | Reject registration/update with HTTP 409 and duplicate email message. |
 | DC-02 | A user cannot reference a non-existent role, and a role cannot reference a non-existent permission. | User, Role, Permission | Reject assignment with HTTP 400/404; no partial mapping is created. |
-| DC-03 | Doctor and staff profiles must reference an existing user and must be unique per user. | Doctor, StaffProfile, User | Reject duplicate profile creation with HTTP 409. |
-| DC-04 | A room must belong to an existing facility. | Room, Facility | Reject room creation/update with HTTP 404 for invalid facility. |
-| DC-05 | A facility-service pair must be unique. | FacilityService, Facility, Service | Reject duplicate configuration with HTTP 409. |
-| DC-06 | A package-service pair must be unique. | PackageService, MaternityPackage, Service | Reject duplicate package benefit configuration with HTTP 409. |
-| DC-07 | Patient package benefits cannot have `used_quantity` greater than `total_quantity` or negative remaining quantity. | PatientPackageBenefit | Reject consumption transaction with HTTP 422; appointment/package usage is not updated. |
-| DC-08 | Appointment must reference available facility service and a valid doctor shift when doctor is selected. | Appointment, FacilityService, DoctorShift | Reject booking with HTTP 422 and reason such as unavailable service or unavailable slot. |
-| DC-09 | Appointment status changes must follow the transition table in section 4.4. | Appointment, AppointmentStatusLog | Reject invalid transition with HTTP 409; no status log is written. |
-| DC-10 | Appointment check-in time cannot be set when appointment is cancelled or no-show. | Appointment | Reject update with HTTP 409. |
-| DC-11 | Order total must equal item subtotal minus discount and must not be negative. | Order, OrderItem | Reject order creation/update with HTTP 422. |
-| DC-12 | Payment amount cannot exceed unpaid order balance unless order type supports overpayment handling. | Payment, Order | Reject payment update with HTTP 422. |
-| DC-13 | Paid order financial snapshot fields are immutable except refund-related status fields. | Order, OrderItem, Payment, Invoice | Reject mutation with HTTP 409; user must create adjustment/refund flow. |
-| DC-14 | Invoice can be issued only once per order. | Invoice, Order | Reject duplicate invoice creation with HTTP 409. |
-| DC-15 | Refund amount cannot exceed refundable paid amount. | Refund, Order, Payment | Reject refund request with HTTP 422. |
-| DC-16 | Cart cannot contain duplicate product rows for the same product. | Cart, CartItem, Product | Merge quantity or reject duplicate row with HTTP 409, depending API contract. |
-| DC-17 | Inventory reserved quantity cannot exceed quantity on hand. | Inventory, InventoryTransaction | Reject reserve/export operation with HTTP 422. |
+| DC-03 | A user permission override must reference an existing user and permission, and only one override may exist for a user-permission pair. | UserPermission, User, Permission | Reject invalid override with HTTP 404 or duplicate override with HTTP 409. |
+| DC-04 | Doctor and staff profiles must reference an existing user and must be unique per user. | Doctor, StaffProfile, User | Reject duplicate profile creation with HTTP 409. |
+| DC-05 | A room must belong to an existing facility. | Room, Facility | Reject room creation/update with HTTP 404 for invalid facility. |
+| DC-06 | A facility-service pair must be unique. | FacilityService, Facility, Service | Reject duplicate configuration with HTTP 409. |
+| DC-07 | A package-service pair must be unique. | PackageService, MaternityPackage, Service | Reject duplicate package benefit configuration with HTTP 409. |
+| DC-08 | Patient package benefits cannot have `used_quantity` greater than `total_quantity` or negative remaining quantity. | PatientPackageBenefit | Reject consumption transaction with HTTP 422; appointment/package usage is not updated. |
+| DC-09 | Appointment must reference available facility service and a valid doctor shift when doctor is selected. | Appointment, FacilityService, DoctorShift | Reject booking with HTTP 422 and reason such as unavailable service or unavailable slot. |
+| DC-10 | Appointment status changes must follow the transition table in section 4.4. | Appointment, AppointmentStatusLog | Reject invalid transition with HTTP 409; no status log is written. |
+| DC-11 | Appointment check-in time cannot be set when appointment is cancelled or no-show. | Appointment | Reject update with HTTP 409. |
+| DC-12 | Order total must equal item subtotal minus discount and must not be negative. | Order, OrderItem | Reject order creation/update with HTTP 422. |
+| DC-13 | Payment amount cannot exceed unpaid order balance unless order type supports overpayment handling. | Payment, Order | Reject payment update with HTTP 422. |
+| DC-14 | Paid order financial snapshot fields are immutable except refund-related status fields. | Order, OrderItem, Payment, Invoice | Reject mutation with HTTP 409; user must create adjustment/refund flow. |
+| DC-15 | Invoice can be issued only once per order. | Invoice, Order | Reject duplicate invoice creation with HTTP 409. |
+| DC-16 | Refund amount cannot exceed refundable paid amount. | Refund, Order, Payment | Reject refund request with HTTP 422. |
+| DC-17 | Cart cannot contain duplicate product rows for the same product. | Cart, CartItem, Product | Merge quantity or reject duplicate row with HTTP 409, depending API contract. |
 | DC-18 | Medical record can be created only for an existing appointment and one appointment can have at most one primary medical record. | MedicalRecord, Appointment | Reject duplicate or orphan medical record with HTTP 409/404. |
 | DC-19 | Prescription items must belong to an existing prescription; prescription history snapshots are append-only. | Prescription, PrescriptionItem, PrescriptionHistory | Reject orphan item with HTTP 404; reject history modification with HTTP 409. |
 | DC-20 | Medical files must reference an existing appointment and medical record when linked after examination. | MedicalFile, Appointment, MedicalRecord | Reject upload linking with HTTP 404/422. |
 | DC-21 | Chat messages cannot be added to closed conversations unless the conversation is reopened through a valid transition. | ChatConversation, ChatMessage | Reject send with HTTP 409. |
 | DC-22 | Published content slugs must be unique. | Article, Product, ProductCategory | Reject duplicate slug with HTTP 409. |
 | DC-23 | Forum comments must reference an existing post, and nested comments must reference comments from the same post. | ForumPost, ForumComment | Reject comment creation with HTTP 422. |
-| DC-24 | State transition logs and audit histories are append-only. | AppointmentStatusLog, PrescriptionHistory, InventoryTransaction, PregnancyHistoryEvent | Reject update/delete through normal APIs with HTTP 403/409. |
+| DC-24 | State transition logs and audit histories are append-only. | AppointmentStatusLog, PrescriptionHistory, PregnancyHistoryEvent | Reject update/delete through normal APIs with HTTP 403/409. |
 
 ## 4.3 Data Retention & Ownership Policy
 
@@ -98,6 +97,7 @@ Tool: draw.io | File: `MaternityCare_ERD.drawio`
 | --- | --- | --- | --- | --- |
 | Account and authentication data | Until account deletion request is approved or legal/accounting obligations require retention | User / System | System admin can deactivate; hard delete only by approved privacy process | Account security and privacy policy |
 | RBAC configuration | Until replaced or system decommissioned | System | System admin only | Access control policy |
+| User permission overrides | Until override is removed or user account is deleted | System | System admin or authorized account manager | Access control exception policy |
 | Facility, room, staff assignment data | Until facility/staff record is archived; historical links retained while referenced by appointments/orders | System | System admin or facility admin can deactivate; hard delete only if unreferenced | Operational audit policy |
 | Doctor professional profile | Until doctor account is deactivated; historical references retained for medical records | System / Doctor | System admin can deactivate; hard delete only if legally allowed and unreferenced | Medical accountability policy |
 | Pregnancy profile and health metrics | Medical retention policy / until legal expiry | Patient | Patient may request export; deletion requires privacy/legal approval and may be denied for medical/legal retention | Medical record retention policy |
@@ -106,7 +106,6 @@ Tool: draw.io | File: `MaternityCare_ERD.drawio`
 | Orders, payments, invoices, refunds | Accounting retention policy | System / Customer | Finance/system admin can void/refund through workflow; hard delete prohibited during retention period | Accounting and tax policy |
 | Product catalog | Until product is discontinued and no active orders depend on it | Shop | Shop/admin can deactivate; hard delete only if unreferenced | Commerce operation policy |
 | Cart data | Until checkout, cart cleared, or inactivity purge threshold | User | User can clear cart; system can purge abandoned carts | User convenience and storage policy |
-| Inventory and inventory transactions | Inventory records retained while product/facility active; transactions retained for audit period | Shop / System | Inventory manager can adjust through transaction; transaction deletion prohibited | Stock audit policy |
 | Medical records, medical files, prescriptions | Medical retention policy / until legal expiry | Patient / Care provider | Doctor can amend through controlled workflow; hard delete requires legal/privacy approval | Medical record retention policy |
 | Medication taken logs | Until related prescription retention expires or approved privacy deletion | Patient | Patient can add logs; deletion follows health-data policy | Patient health tracking policy |
 | Chat conversation and messages | Until conversation archive/delete policy; medical advice chats may follow medical retention | Patient / System | User may request deletion; staff/admin may close/archive; legal hold overrides deletion | Support and medical advice policy |
@@ -367,13 +366,13 @@ Valid State Transitions:
 
 | From State | Trigger Event | Guard Condition | To State | System Action |
 | --- | --- | --- | --- | --- |
-| pending | Order paid | Product order is paid and stock can be reserved | packing | Reserve inventory and notify warehouse/staff. |
+| pending | Order paid | Product order is paid and shipping information is valid | packing | Notify warehouse/staff to prepare shipment. |
 | packing | Staff hands to carrier | Required shipping info present | shipping | Update shipping status and store carrier info if available. |
 | shipping | Delivery confirmed | Carrier/customer confirmation received | delivered | Mark order fulfilled. |
-| pending | Customer/admin cancels | Order not shipped | cancelled | Release inventory reservation and trigger refund if paid. |
-| packing | Customer/admin cancels | Order not handed to carrier and policy allows | cancelled | Release inventory reservation and trigger refund if paid. |
+| pending | Customer/admin cancels | Order not shipped | cancelled | Cancel shipment preparation and trigger refund if paid. |
+| packing | Customer/admin cancels | Order not handed to carrier and policy allows | cancelled | Cancel shipment preparation and trigger refund if paid. |
 
-Invalid Transitions (must be rejected - DC-17):
+Invalid Transitions (must be rejected):
 
 | From State | Attempted Transition | Why Invalid | System Response |
 | --- | --- | --- | --- |
@@ -397,7 +396,5 @@ QA should cover:
 - Concurrent appointment booking for the same doctor shift and room slot.
 - Concurrent package benefit consumption from multiple appointments.
 - Reschedule and cancellation flows after payment, including refund side effects.
-- Inventory reservation race conditions when multiple product orders target the same stock.
-- Audit immutability for status logs, inventory transactions, prescription histories, and pregnancy timeline events.
+- Audit immutability for status logs, prescription histories, and pregnancy timeline events.
 - Role-based authorization for every state transition, especially finance, doctor, staff, moderator, and system job transitions.
-

@@ -4,7 +4,7 @@ import { RoleEnum } from '../../common/constants/role.enum';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CreateTestJobDto } from './dto/create-test-job.dto';
+import { CreateTestJobDto } from './dto/request/create-test-job.dto';
 import { JobsService } from './jobs.service';
 
 @ApiTags('Management - Jobs')

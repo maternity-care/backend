@@ -4,8 +4,8 @@ import { RoleEnum } from '../../common/constants/role.enum';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CreateManagementPresignedUploadDto } from './dto/create-presigned-upload.dto';
-import { PresignedUploadResponseDto } from './dto/presigned-upload-response.dto';
+import { CreateManagementPresignedUploadDto } from './dto/request/create-presigned-upload.dto';
+import { PresignedUploadResponseDto } from './dto/response/presigned-upload-response.dto';
 import { UploadsService } from './uploads.service';
 
 @ApiTags('Management - Uploads')

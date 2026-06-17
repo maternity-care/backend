@@ -1,6 +1,6 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { CreateRoleDto } from './dto/create-role.dto';
-import { UpdateRoleDto } from './dto/update-role.dto';
+import { CreateRoleDto } from './dto/request/create-role.dto';
+import { UpdateRoleDto } from './dto/request/update-role.dto';
 import { Role } from './entities/role.entity';
 import { IRolesRepository, ROLES_REPOSITORY } from './interfaces/roles-repository.interface';
 import { IRolesService } from './interfaces/roles-service.interface';

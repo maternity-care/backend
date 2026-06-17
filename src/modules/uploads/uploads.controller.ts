@@ -3,8 +3,8 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
-import { CreatePresignedUploadDto } from './dto/create-presigned-upload.dto';
-import { PresignedUploadResponseDto } from './dto/presigned-upload-response.dto';
+import { CreatePresignedUploadDto } from './dto/request/create-presigned-upload.dto';
+import { PresignedUploadResponseDto } from './dto/response/presigned-upload-response.dto';
 import { UploadsService } from './uploads.service';
 
 @ApiTags('User - Uploads')

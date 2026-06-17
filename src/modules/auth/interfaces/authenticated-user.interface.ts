@@ -9,10 +9,16 @@ export interface AuthenticatedRole {
   permissions: AuthenticatedPermission[];
 }
 
+export interface AuthenticatedPermissionOverride {
+  permission: AuthenticatedPermission;
+  effect: 'allow' | 'deny';
+}
+
 export interface AuthenticatedUser {
   id: string;
   name: string;
   email: string;
   status: number;
   roles: AuthenticatedRole[];
+  permissionOverrides: AuthenticatedPermissionOverride[];
 }

@@ -39,6 +39,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           name: permission.name,
         })),
       })),
+      permissionOverrides: (user.permissionOverrides ?? []).map((permissionOverride) => ({
+        effect: permissionOverride.effect,
+        permission: {
+          id: permissionOverride.permission.id,
+          name: permissionOverride.permission.name,
+        },
+      })),
     };
   }
 }

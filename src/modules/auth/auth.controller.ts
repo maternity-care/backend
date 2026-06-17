@@ -3,11 +3,11 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from './interfaces/authenticated-user.interface';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { AuthResponseDto } from './dto/auth-response.dto';
-import { LoginDto } from './dto/login.dto';
-import { LogoutDto } from './dto/logout.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { RegisterDto } from './dto/register.dto';
+import { AuthResponseDto } from './dto/response/auth-response.dto';
+import { LoginDto } from './dto/request/login.dto';
+import { LogoutDto } from './dto/request/logout.dto';
+import { RefreshTokenDto } from './dto/request/refresh-token.dto';
+import { RegisterDto } from './dto/request/register.dto';
 import { AuthService } from './auth.service';
 
 @ApiTags('User - Auth')

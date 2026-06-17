@@ -3,10 +3,12 @@ import {
   CreateDateColumn,
   Entity,
   ManyToMany,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { Role } from '../../roles/entities/role.entity';
+import { UserPermission } from './user-permission.entity';
 
 @Entity('permissions')
 export class Permission {
@@ -21,6 +23,9 @@ export class Permission {
 
   @ManyToMany(() => Role, (role) => role.permissions)
   roles: Role[];
+
+  @OneToMany(() => UserPermission, (permissionOverride) => permissionOverride.permission)
+  userOverrides: UserPermission[];
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;

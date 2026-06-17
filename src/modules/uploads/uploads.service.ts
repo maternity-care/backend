@@ -5,7 +5,7 @@ import { randomBytes } from 'crypto';
 import {
   CreateManagementPresignedUploadDto,
   CreatePresignedUploadDto,
-} from './dto/create-presigned-upload.dto';
+} from './dto/request/create-presigned-upload.dto';
 import {
   IStorageService,
   PresignedUploadResult,

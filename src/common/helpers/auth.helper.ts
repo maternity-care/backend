@@ -16,7 +16,21 @@ export function getUserRoles(user: AuthenticatedUser): string[] {
 }
 
 export function getUserPermissions(user: AuthenticatedUser): string[] {
-  return user.roles.flatMap((role) => role.permissions.map((permission) => permission.name));
+  const rolePermissions = user.roles.flatMap((role) =>
+    role.permissions.map((permission) => permission.name),
+  );
+  const allowedOverrides = (user.permissionOverrides ?? [])
+    .filter((permissionOverride) => permissionOverride.effect === 'allow')
+    .map((permissionOverride) => permissionOverride.permission.name);
+  const deniedOverrides = new Set(
+    (user.permissionOverrides ?? [])
+      .filter((permissionOverride) => permissionOverride.effect === 'deny')
+      .map((permissionOverride) => permissionOverride.permission.name),
+  );
+
+  return Array.from(new Set([...rolePermissions, ...allowedOverrides])).filter(
+    (permissionName) => !deniedOverrides.has(permissionName),
+  );
 }
 
 export function checkRole(user: AuthenticatedUser, roleName: RoleEnum): boolean {

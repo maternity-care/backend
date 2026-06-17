@@ -21,7 +21,7 @@ export class UsersRepository implements IUsersRepository {
 
   findAll(): Promise<User[]> {
     return this.repository.find({
-      relations: { roles: { permissions: true } },
+      relations: { roles: { permissions: true }, permissionOverrides: { permission: true } },
       order: { id: 'ASC' },
     });
   }
@@ -29,14 +29,14 @@ export class UsersRepository implements IUsersRepository {
   findById(id: string): Promise<User | null> {
     return this.repository.findOne({
       where: { id },
-      relations: { roles: { permissions: true } },
+      relations: { roles: { permissions: true }, permissionOverrides: { permission: true } },
     });
   }
 
   findByEmail(email: string): Promise<User | null> {
     return this.repository.findOne({
       where: { email },
-      relations: { roles: { permissions: true } },
+      relations: { roles: { permissions: true }, permissionOverrides: { permission: true } },
     });
   }
 
@@ -46,6 +46,8 @@ export class UsersRepository implements IUsersRepository {
       .addSelect('user.password')
       .leftJoinAndSelect('user.roles', 'role')
       .leftJoinAndSelect('role.permissions', 'permission')
+      .leftJoinAndSelect('user.permissionOverrides', 'permissionOverride')
+      .leftJoinAndSelect('permissionOverride.permission', 'overridePermission')
       .where('user.email = :email', { email })
       .getOne();
   }
