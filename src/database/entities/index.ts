@@ -2,7 +2,7 @@ export { UserProfile } from './user-profiles.entity';
 export { Doctor } from './doctors.entity';
 export { StaffProfile } from './staff-profiles.entity';
 export { Facility } from '../../modules/facilities/entities/facilities.entity';
-export { Room } from './rooms.entity';
+export { Room } from '../../modules/rooms/entities/rooms.entity';
 export { FacilityDoctor } from '../../modules/facilities/entities/facility-doctors.entity';
 export { FacilityStaff } from '../../modules/facilities/entities/facility-staff.entity';
 export { DoctorShift } from './doctor-shifts.entity';
