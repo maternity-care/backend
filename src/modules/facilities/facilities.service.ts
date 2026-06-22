@@ -9,6 +9,15 @@ import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
 export class FacilitiesService {
   constructor(
     @InjectRepository(Facility)
+    //typeORM là thư viện ORM (Object-Relational Mapping) 
+    // phổ biến trong Node.js, 
+    // giúp kết nối và tương tác với cơ sở dữ liệu 
+    // một cách dễ dàng. 
+    // Nó cung cấp các phương thức để thực hiện các thao tác CRUD (Create, Read, Update, Delete) 
+    // trên các bảng trong cơ sở dữ liệu thông qua các entity 
+    // (thực thể) được định nghĩa trong ứng dụng.
+
+    // Inject the TypeORM repository for the Facility entity
     private readonly facilityRepository: Repository<Facility>,
   ) {}
 
