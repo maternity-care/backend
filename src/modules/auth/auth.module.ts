@@ -7,6 +7,7 @@ import { RolesModule } from '../roles/roles.module';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
@@ -15,7 +16,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     UsersModule,
     RolesModule,
     PassportModule,
-    TypeOrmModule.forFeature([RefreshToken]),
+    TypeOrmModule.forFeature([RefreshToken, PasswordResetToken]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

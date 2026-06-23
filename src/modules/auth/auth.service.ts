@@ -1,4 +1,10 @@
-import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -12,8 +18,12 @@ import { User } from '../users/entities/user.entity';
 import { LoginDto } from './dto/request/login.dto';
 import { RegisterDto } from './dto/request/register.dto';
 import { AuthResponseDto } from './dto/response/auth-response.dto';
+import { ForgotPasswordResponseDto } from './dto/response/forgot-password-response.dto';
+import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { RefreshToken } from './entities/refresh-token.entity';
+
+const PASSWORD_RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
 
 @Injectable()
 export class AuthService {
@@ -24,6 +34,8 @@ export class AuthService {
     private readonly rolesService: IRolesService,
     @InjectRepository(RefreshToken)
     private readonly refreshTokenRepository: Repository<RefreshToken>,
+    @InjectRepository(PasswordResetToken)
+    private readonly passwordResetTokenRepository: Repository<PasswordResetToken>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
@@ -60,6 +72,67 @@ export class AuthService {
     }
 
     return this.buildAuthResponse(user);
+  }
+
+  async forgotPassword(email: string): Promise<ForgotPasswordResponseDto> {
+    const user = await this.usersRepository.findByEmail(email);
+
+    if (!user || user.status !== 1) {
+      return { reset_token: null, reset_url: null };
+    }
+
+    await this.passwordResetTokenRepository.update(
+      { userId: user.id, usedAt: IsNull() },
+      { usedAt: new Date() },
+    );
+
+    const resetToken = this.generateResetToken();
+    const tokenHash = this.hashResetToken(resetToken);
+    await this.passwordResetTokenRepository.save(
+      this.passwordResetTokenRepository.create({
+        userId: user.id,
+        tokenHash,
+        expiresAt: new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS),
+        usedAt: null,
+      }),
+    );
+
+    const frontendUrl =
+      this.configService.get<string>('app.frontendUrl') ?? 'http://localhost:3000';
+    return {
+      reset_token: resetToken,
+      reset_url: `${frontendUrl.replace(/\/$/, '')}/reset-password?token=${resetToken}`,
+    };
+  }
+
+  async resetPassword(token: string, password: string): Promise<void> {
+    const tokenHash = this.hashResetToken(token);
+    const storedToken = await this.passwordResetTokenRepository.findOne({
+      where: {
+        tokenHash,
+        usedAt: IsNull(),
+      },
+      relations: { user: { roles: true } },
+    });
+
+    if (
+      !storedToken ||
+      storedToken.expiresAt.getTime() <= Date.now() ||
+      storedToken.user.status !== 1
+    ) {
+      throw new BadRequestException('Invalid or expired password reset token');
+    }
+
+    const saltRounds = this.configService.getOrThrow<number>('bcrypt.saltRounds');
+    storedToken.user.password = await bcrypt.hash(password, saltRounds);
+    storedToken.usedAt = new Date();
+
+    await this.usersRepository.save(storedToken.user);
+    await this.passwordResetTokenRepository.save(storedToken);
+    await this.refreshTokenRepository.update(
+      { userId: storedToken.userId, revokedAt: IsNull() },
+      { revokedAt: new Date() },
+    );
   }
 
   async me(userId: string): Promise<User> {
@@ -149,8 +222,16 @@ export class AuthService {
     return randomBytes(64).toString('hex');
   }
 
+  private generateResetToken(): string {
+    return randomBytes(32).toString('hex');
+  }
+
   private hashRefreshToken(refreshToken: string): string {
     return createHash('sha256').update(refreshToken).digest('hex');
+  }
+
+  private hashResetToken(resetToken: string): string {
+    return createHash('sha256').update(resetToken).digest('hex');
   }
 
   private getRefreshTokenExpiresAt(): Date {
