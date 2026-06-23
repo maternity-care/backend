@@ -92,18 +92,18 @@ export class RoomsController {
     }
   }
 
-  @Get('facility/rooms/:facilityId')
-  @ApiOperation({ summary: 'Get rooms by facility'})
-  @ApiResponse({ status : 200, description: 'Rooms found', type: RoomResponseDto })
-  async findRoomsByFacility(@Param('facilityId') id: string) {
-    try {
-      const rooms = await this.roomsService.findByFacilityId(id);
-      return {
-        message: 'Lấy danh sách phòng theo cơ sở thành công',
-        data: rooms,
-      };
-    } catch (error) {
-      this.handleError(error);
-    }
-  }
+  // @Get('facility/rooms/:facilityId')
+  // @ApiOperation({ summary: 'Get rooms by facility'})
+  // @ApiResponse({ status : 200, description: 'Rooms found', type: RoomResponseDto })
+  // async findRoomsByFacility(@Param('facilityId') id: string) {
+  //   try {
+  //     const rooms = await this.roomsService.findByFacilityId(id);
+  //     return {
+  //       message: 'Lấy danh sách phòng theo cơ sở thành công',
+  //       data: rooms,
+  //     };
+  //   } catch (error) {
+  //     this.handleError(error);
+  //   }
+  // }
 }
