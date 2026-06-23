@@ -13,6 +13,7 @@ import { CreateRefreshTokensTable1720000000000 } from './migrations/172000000000
 import { CreateSettingsTable1730000000000 } from './migrations/1730000000000-CreateSettingsTable';
 import { CreateMaternityDomainTables1740000000000 } from './migrations/1740000000000-CreateMaternityDomainTables';
 import { CreateUserPermissionsTable1740100000000 } from './migrations/1740100000000-CreateUserPermissionsTable';
+import { AddSoftDeleteToRbacTables1750700000000 } from './migrations/1750700000000-AddSoftDeleteToRbacTables';
 
 config();
 
@@ -41,6 +42,7 @@ export const typeOrmConfig: DataSourceOptions = {
     CreateSettingsTable1730000000000,
     CreateMaternityDomainTables1740000000000,
     CreateUserPermissionsTable1740100000000,
+    AddSoftDeleteToRbacTables1750700000000,
   ],
   charset: 'utf8mb4_unicode_ci',
 };

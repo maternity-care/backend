@@ -53,6 +53,6 @@ export class UsersRepository implements IUsersRepository {
   }
 
   async remove(user: User): Promise<void> {
-    await this.repository.remove(user);
+    await this.repository.softRemove(user);
   }
 }

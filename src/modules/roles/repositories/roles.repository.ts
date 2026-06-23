@@ -52,6 +52,6 @@ export class RolesRepository implements IRolesRepository {
   }
 
   async remove(role: Role): Promise<void> {
-    await this.repository.remove(role);
+    await this.repository.softRemove(role);
   }
 }

@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PermissionEnum } from '../../common/constants/permission.enum';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { RoleEnum } from '../../common/constants/role.enum';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -58,6 +59,6 @@ export class ManagementUsersController {
   @ApiResponse({ status: 200 })
   async remove(@Param('id') id: string) {
     await this.usersService.remove(id);
-    return { message: 'User deleted', data: null };
+    return { message: RESPONSE_MESSAGES.USER_DELETED, data: null };
   }
 }
