@@ -3,19 +3,21 @@ import { CreateRoomDto } from './dto/requests/create-room.dto';
 import { UpdateRoomDto } from './dto/requests/update-room.dto';
 import { Room } from './entities/rooms.entity';
 import { IRoomsRepository, ROOMS_REPOSITORY } from './interfaces/rooms-repository.interface';
+import { FacilitiesService } from '../facilities/facilities.service';
 
 @Injectable()
 export class RoomsService {
   constructor(
     @Inject(ROOMS_REPOSITORY)
     private readonly roomsRepository: IRoomsRepository,
+    private readonly facilitiesService: FacilitiesService,
   ) {}
 
   async create(dto: CreateRoomDto): Promise<Room> {
+    await this.facilitiesService.findById(dto.facilityId);
+
     const existing = await this.findByName(dto.name);
-    if (existing) {
-      throw new ConflictException('Room name already exists');
-    }
+    
 
     const room = this.roomsRepository.create(dto);
     return this.roomsRepository.save(room);
