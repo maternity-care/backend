@@ -1,5 +1,6 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { RoleEnum } from '../../common/constants/role.enum';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -19,7 +20,8 @@ export class ManagementUploadsController {
   @Post('presign')
   @ApiOperation({ summary: 'Create management presigned upload URL' })
   @ApiResponse({ status: 201, type: PresignedUploadResponseDto })
-  createPresignedUpload(@Body() dto: CreateManagementPresignedUploadDto) {
-    return this.uploadsService.createManagementPresignedUpload(dto);
+  async createPresignedUpload(@Body() dto: CreateManagementPresignedUploadDto) {
+    const data = await this.uploadsService.createManagementPresignedUpload(dto);
+    return { message: RESPONSE_MESSAGES.MANAGEMENT_UPLOAD_PRESIGN_CREATED, data };
   }
 }
