@@ -25,32 +25,36 @@ export class ManagementUsersController {
   @Permissions(PermissionEnum.USER_VIEW)
   @ApiOperation({ summary: 'Management list users' })
   @ApiResponse({ status: 200, type: [UserResponseDto] })
-  findAll() {
-    return this.usersService.findAll();
+  async findAll() {
+    const data = await this.usersService.findAll();
+    return { message: RESPONSE_MESSAGES.USERS_RETRIEVED, data };
   }
 
   @Post()
   @Permissions(PermissionEnum.USER_CREATE)
   @ApiOperation({ summary: 'Management create user' })
   @ApiResponse({ status: 201, type: UserResponseDto })
-  create(@Body() dto: CreateUserDto) {
-    return this.usersService.create(dto);
+  async create(@Body() dto: CreateUserDto) {
+    const data = await this.usersService.create(dto);
+    return { message: RESPONSE_MESSAGES.USER_CREATED, data };
   }
 
   @Get(':id')
   @Permissions(PermissionEnum.USER_VIEW)
   @ApiOperation({ summary: 'Management get user detail' })
   @ApiResponse({ status: 200, type: UserResponseDto })
-  findOne(@Param('id') id: string) {
-    return this.usersService.findById(id);
+  async findOne(@Param('id') id: string) {
+    const data = await this.usersService.findById(id);
+    return { message: RESPONSE_MESSAGES.USER_RETRIEVED, data };
   }
 
   @Patch(':id')
   @Permissions(PermissionEnum.USER_UPDATE)
   @ApiOperation({ summary: 'Management update user' })
   @ApiResponse({ status: 200, type: UserResponseDto })
-  update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
-    return this.usersService.update(id, dto);
+  async update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
+    const data = await this.usersService.update(id, dto);
+    return { message: RESPONSE_MESSAGES.USER_UPDATED, data };
   }
 
   @Delete(':id')

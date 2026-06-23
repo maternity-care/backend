@@ -22,15 +22,17 @@ export class AuthController {
   @Post('register')
   @ApiOperation({ summary: 'Register user' })
   @ApiResponse({ status: 201, type: AuthResponseDto })
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  async register(@Body() dto: RegisterDto) {
+    const data = await this.authService.register(dto);
+    return { message: RESPONSE_MESSAGES.AUTH_REGISTERED, data };
   }
 
   @Post('login')
   @ApiOperation({ summary: 'Login user' })
   @ApiResponse({ status: 200, type: AuthResponseDto })
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(@Body() dto: LoginDto) {
+    const data = await this.authService.login(dto);
+    return { message: RESPONSE_MESSAGES.AUTH_LOGGED_IN, data };
   }
 
   @Post('forgot-password')
@@ -52,8 +54,9 @@ export class AuthController {
   @Post('refresh')
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiResponse({ status: 200, type: AuthResponseDto })
-  refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refresh(dto.refresh_token);
+  async refresh(@Body() dto: RefreshTokenDto) {
+    const data = await this.authService.refresh(dto.refresh_token);
+    return { message: RESPONSE_MESSAGES.AUTH_REFRESHED, data };
   }
 
   @Post('logout')
@@ -69,7 +72,8 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get current user' })
   @ApiResponse({ status: 200 })
-  me(@CurrentUser() user: AuthenticatedUser) {
-    return this.authService.me(user.id);
+  async me(@CurrentUser() user: AuthenticatedUser) {
+    const data = await this.authService.me(user.id);
+    return { message: RESPONSE_MESSAGES.AUTH_PROFILE_RETRIEVED, data };
   }
 }
