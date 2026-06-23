@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PermissionEnum } from '../../common/constants/permission.enum';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { RoleEnum } from '../../common/constants/role.enum';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -23,31 +24,35 @@ export class ManagementSettingsController {
   @Permissions(PermissionEnum.SETTING_VIEW)
   @ApiOperation({ summary: 'List all settings' })
   @ApiResponse({ status: 200, type: [SettingResponseDto] })
-  findAll() {
-    return this.settingsService.findAll();
+  async findAll() {
+    const data = await this.settingsService.findAll();
+    return { message: RESPONSE_MESSAGES.SETTINGS_RETRIEVED, data };
   }
 
   @Get(':key')
   @Permissions(PermissionEnum.SETTING_VIEW)
   @ApiOperation({ summary: 'Get setting by key' })
   @ApiResponse({ status: 200, type: SettingResponseDto })
-  findOne(@Param('key') key: string) {
-    return this.settingsService.findByKey(key);
+  async findOne(@Param('key') key: string) {
+    const data = await this.settingsService.findByKey(key);
+    return { message: RESPONSE_MESSAGES.SETTING_RETRIEVED, data };
   }
 
   @Post()
   @Permissions(PermissionEnum.SETTING_UPDATE)
   @ApiOperation({ summary: 'Create or update setting' })
   @ApiResponse({ status: 201, type: SettingResponseDto })
-  upsert(@Body() dto: UpsertSettingDto) {
-    return this.settingsService.upsert(dto);
+  async upsert(@Body() dto: UpsertSettingDto) {
+    const data = await this.settingsService.upsert(dto);
+    return { message: RESPONSE_MESSAGES.SETTING_UPSERTED, data };
   }
 
   @Patch(':key')
   @Permissions(PermissionEnum.SETTING_UPDATE)
   @ApiOperation({ summary: 'Update setting by key' })
   @ApiResponse({ status: 200, type: SettingResponseDto })
-  update(@Param('key') key: string, @Body() dto: UpdateSettingDto) {
-    return this.settingsService.update(key, dto);
+  async update(@Param('key') key: string, @Body() dto: UpdateSettingDto) {
+    const data = await this.settingsService.update(key, dto);
+    return { message: RESPONSE_MESSAGES.SETTING_UPDATED, data };
   }
 }

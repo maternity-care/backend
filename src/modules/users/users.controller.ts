@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -17,14 +18,16 @@ export class UsersController {
   @Get('me')
   @ApiOperation({ summary: 'Get my profile' })
   @ApiResponse({ status: 200, type: UserResponseDto })
-  me(@CurrentUser() user: AuthenticatedUser) {
-    return this.usersService.findById(user.id);
+  async me(@CurrentUser() user: AuthenticatedUser) {
+    const data = await this.usersService.findById(user.id);
+    return { message: RESPONSE_MESSAGES.PROFILE_RETRIEVED, data };
   }
 
   @Patch('me')
   @ApiOperation({ summary: 'Update my profile' })
   @ApiResponse({ status: 200, type: UserResponseDto })
-  updateMe(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateProfileDto) {
-    return this.usersService.updateProfile(user.id, dto);
+  async updateMe(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateProfileDto) {
+    const data = await this.usersService.updateProfile(user.id, dto);
+    return { message: RESPONSE_MESSAGES.PROFILE_UPDATED, data };
   }
 }
