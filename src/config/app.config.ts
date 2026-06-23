@@ -3,6 +3,7 @@ export default () => ({
     name: process.env.APP_NAME ?? 'Maternity Care API',
     nodeEnv: process.env.NODE_ENV ?? 'development',
     port: Number(process.env.PORT ?? 3000),
+    frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:3000',
     corsOrigins: (process.env.CORS_ORIGINS ?? '')
       .split(',')
       .map((origin) => origin.trim())

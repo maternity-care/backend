@@ -10,6 +10,10 @@ class EnvironmentVariables {
   @IsOptional()
   NODE_ENV?: string;
 
+  @IsString()
+  @IsOptional()
+  FRONTEND_URL?: string;
+
   @IsInt()
   @Min(1)
   @Max(65535)
