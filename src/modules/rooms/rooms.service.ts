@@ -63,7 +63,12 @@ export class RoomsService {
     await this.roomsRepository.remove(room);
   }
 
-  findByFacilityId(facilityId: string): Promise<Room[]> {
+  async findByFacilityId(facilityId: string): Promise<Room[]> {
+    const facility = await this.facilitiesService.findById(facilityId);
+    if (!facility) {
+      throw new NotFoundException('không tìm thấy cơ sở');
+    }
+    
     return this.roomsRepository.findByFacilityId(facilityId);
   }
 }
