@@ -1,24 +1,14 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Facility } from './entities/facilities.entity';
+import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateFacilityDto } from './dto/requests/create-facility.dto';
 import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
+import { Facility } from './entities/facilities.entity';
+import { FACILITIES_REPOSITORY, IFacilitiesRepository } from './interfaces/facility-repository.interface';
 
 @Injectable()
 export class FacilitiesService {
   constructor(
-    @InjectRepository(Facility)
-    //typeORM là thư viện ORM (Object-Relational Mapping) 
-    // phổ biến trong Node.js, 
-    // giúp kết nối và tương tác với cơ sở dữ liệu 
-    // một cách dễ dàng. 
-    // Nó cung cấp các phương thức để thực hiện các thao tác CRUD (Create, Read, Update, Delete) 
-    // trên các bảng trong cơ sở dữ liệu thông qua các entity 
-    // (thực thể) được định nghĩa trong ứng dụng.
-
-    // Inject the TypeORM repository for the Facility entity
-    private readonly facilityRepository: Repository<Facility>,
+    @Inject(FACILITIES_REPOSITORY)
+    private readonly facilitiesRepository: IFacilitiesRepository,
   ) {}
 
   async create(dto: CreateFacilityDto): Promise<Facility> {
@@ -27,16 +17,20 @@ export class FacilitiesService {
       throw new ConflictException('Facility code already exists');
     }
 
-    const facility = this.facilityRepository.create(dto);
-    return this.facilityRepository.save(facility);
+    const facility = this.facilitiesRepository.create(dto);
+    return this.facilitiesRepository.save(facility);
   }
 
-  findAll(): Promise<Facility[]> {
-    return this.facilityRepository.find({ order: { createdAt: 'DESC' } });
+  async findAll(): Promise<Facility[]> {
+    const facilities = await this.facilitiesRepository.findAll();
+    if (!facilities || facilities.length === 0) {
+      throw new NotFoundException('No facilities found');
+    }
+    return facilities;
   }
 
   async findById(id: string): Promise<Facility> {
-    const facility = await this.facilityRepository.findOne({ where: { id } });
+    const facility = await this.facilitiesRepository.findById(id);
     if (!facility) {
       throw new NotFoundException('Facility not found');
     }
@@ -45,11 +39,11 @@ export class FacilitiesService {
   }
 
   findByCode(code: string): Promise<Facility | null> {
-    return this.facilityRepository.findOne({ where: { code } });
+    return this.facilitiesRepository.findByCode(code);
   }
 
   async findByName(name: string): Promise<Facility | null> {
-    return this.facilityRepository.findOne({ where: { name } });
+    return this.facilitiesRepository.findByName(name);
   }
 
   async update(id: string, dto: UpdateFacilityDto): Promise<Facility> {
@@ -63,11 +57,11 @@ export class FacilitiesService {
     }
 
     Object.assign(facility, dto);
-    return this.facilityRepository.save(facility);
+    return this.facilitiesRepository.save(facility);
   }
 
   async remove(id: string): Promise<void> {
     const facility = await this.findById(id);
-    await this.facilityRepository.remove(facility);
+    await this.facilitiesRepository.remove(facility);
   }
 }

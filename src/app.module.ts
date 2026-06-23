@@ -13,6 +13,7 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { UsersModule } from './modules/users/users.module';
 import {FacilitiesModule} from "./modules/facilities/facilities.module";
+import { RoomsModule } from './modules/rooms/rooms.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -42,6 +43,7 @@ import {FacilitiesModule} from "./modules/facilities/facilities.module";
     UploadsModule,
     SettingsModule,
     FacilitiesModule,
+    RoomsModule,
   ],
 })
 export class AppModule {}

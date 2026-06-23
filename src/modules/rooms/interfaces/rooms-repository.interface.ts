@@ -10,4 +10,5 @@ export interface IRoomsRepository {
   findById(id: string): Promise<Room | null>;
   findByName(name: string): Promise<Room | null>;
   remove(room: Room): Promise<void>;
+  findByFacilityId(facilityId: string): Promise<Room[]>;
 }

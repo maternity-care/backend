@@ -1,15 +1,14 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Room } from './entities/rooms.entity';
+import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateRoomDto } from './dto/requests/create-room.dto';
 import { UpdateRoomDto } from './dto/requests/update-room.dto';
+import { Room } from './entities/rooms.entity';
+import { IRoomsRepository, ROOMS_REPOSITORY } from './interfaces/rooms-repository.interface';
 
 @Injectable()
 export class RoomsService {
   constructor(
-    @InjectRepository(Room)
-    private readonly roomRepository: Repository<Room>,
+    @Inject(ROOMS_REPOSITORY)
+    private readonly roomsRepository: IRoomsRepository,
   ) {}
 
   async create(dto: CreateRoomDto): Promise<Room> {
@@ -18,16 +17,20 @@ export class RoomsService {
       throw new ConflictException('Room name already exists');
     }
 
-    const room = this.roomRepository.create(dto);
-    return this.roomRepository.save(room);
+    const room = this.roomsRepository.create(dto);
+    return this.roomsRepository.save(room);
   }
 
-  findAll(): Promise<Room[]> {
-    return this.roomRepository.find({ order: { createdAt: 'DESC' } });
+  async findAll(): Promise<Room[]> {
+    const rooms = await this.roomsRepository.findAll();
+    if (!rooms || rooms.length === 0) {
+      throw new NotFoundException('No rooms found');
+    }
+    return rooms;
   }
 
   async findById(id: string): Promise<Room> {
-    const room = await this.roomRepository.findOne({ where: { id } });
+    const room = await this.roomsRepository.findById(id);
     if (!room) {
       throw new NotFoundException('Room not found');
     }
@@ -36,7 +39,7 @@ export class RoomsService {
   }
 
   findByName(name: string): Promise<Room | null> {
-    return this.roomRepository.findOne({ where: { name } });
+    return this.roomsRepository.findByName(name);
   }
 
   async update(id: string, dto: UpdateRoomDto): Promise<Room> {
@@ -50,11 +53,15 @@ export class RoomsService {
     }
 
     Object.assign(room, dto);
-    return this.roomRepository.save(room);
+    return this.roomsRepository.save(room);
   }
 
   async remove(id: string): Promise<void> {
     const room = await this.findById(id);
-    await this.roomRepository.remove(room);
+    await this.roomsRepository.remove(room);
+  }
+
+  findByFacilityId(facilityId: string): Promise<Room[]> {
+    return this.roomsRepository.findByFacilityId(facilityId);
   }
 }
