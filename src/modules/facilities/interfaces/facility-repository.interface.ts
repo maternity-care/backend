@@ -12,5 +12,7 @@ export interface IFacilitiesRepository {
   findByCode(code: string): Promise<Facility | null>;
   findByName(name: string): Promise<Facility | null>;
   remove(facility: Facility): Promise<void>;
+  updateStatus(id: string, status: string): Promise<Facility>;
+  
 }
 

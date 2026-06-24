@@ -5,6 +5,7 @@ import { RoomsService } from './rooms.service';
 import { CreateRoomDto } from './dto/requests/create-room.dto';
 import { UpdateRoomDto } from './dto/requests/update-room.dto';
 import { RoomResponseDto } from './dto/responds/room-response.dto';
+import { RoomsWithFacilityResponseDto } from './dto/responds/rooms-with-facility-response.dto';
 
 @ApiTags('Management - Rooms')
 @ApiBearerAuth()
@@ -29,6 +30,21 @@ export class RoomsController {
       return {
         message: 'Lấy danh sách phòng thành công',
         data: rooms,
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Get('all/by-facilities')
+  @ApiOperation({ summary: 'Get all rooms grouped by facilities' })
+  @ApiResponse({ status: 200, description: 'All rooms grouped by facilities', type: [RoomsWithFacilityResponseDto] })
+  async findAllWithFacilities() {
+    try {
+      const data = await this.roomsService.findAllWithRooms();
+      return {
+        message: 'Lấy danh sách phòng theo cơ sở thành công',
+        data: data,
       };
     } catch (error) {
       this.handleError(error);

@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RoomsService } from './rooms.service';
 import { CreateRoomDto } from './dto/requests/create-room.dto';
 import { UpdateRoomDto } from './dto/requests/update-room.dto';
-import { RoomResponseDto } from './dto/responds/room-response.dto';
+import { RoomsWithFacilityResponseDto } from './dto/responds/rooms-with-facility-response.dto';
 
 @ApiTags('Management - Rooms')
 @ApiBearerAuth()
@@ -24,13 +24,13 @@ export class RoomsFacilityController {
 
   @Get('rooms/:facilityId')
   @ApiOperation({ summary: 'Get rooms by facility'})
-  @ApiResponse({ status : 200, description: 'Rooms found', type: RoomResponseDto })
+  @ApiResponse({ status : 200, description: 'Rooms and facility found', type: RoomsWithFacilityResponseDto })
   async findRoomsByFacility(@Param('facilityId') id: string) {
     try {
-      const rooms = await this.roomsService.findByFacilityId(id);
+      const result = await this.roomsService.findByFacilityId(id);
       return {
         message: 'Lấy danh sách phòng theo cơ sở thành công',
-        data: rooms,
+        data: result,
       };
     } catch (error) {
       this.handleError(error);

@@ -35,12 +35,14 @@ export class RoomsRepository implements IRoomsRepository {
     await this.repository.remove(room);
   }
 
-  findByFacilityId(facilityId: string): Promise<Room[]> {
-
-    const query = this.repository.find({ where: { facilityId } });
-    if (!query) {
-      throw new NotFoundException('No rooms found for the given facility ID');
+  async findByFacilityId(facilityId: string): Promise<Room[]> {
+    const rooms = await this.repository.find({
+      where: { facilityId },
+      select: ['id', 'name', 'roomType', 'floor', 'status', 'createdAt', 'updatedAt'],
+    });
+    if (!rooms || rooms.length === 0) {
+      throw new NotFoundException('Không tìm thấy phòng');
     }
-    return query;
+    return rooms;
   }
 }
