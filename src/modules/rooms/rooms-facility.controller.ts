@@ -1,15 +1,13 @@
-import { Body, Controller, Delete, Get, HttpException, InternalServerErrorException, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, HttpException, InternalServerErrorException, Param, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RoomsService } from './rooms.service';
-import { CreateRoomDto } from './dto/requests/create-room.dto';
-import { UpdateRoomDto } from './dto/requests/update-room.dto';
-import { RoomsWithFacilityResponseDto } from './dto/responds/rooms-with-facility-response.dto';
+import { RoomResponseDto } from './dto/responds/room-response.dto';
+import { SearchRoomsDto } from './dto/requests/search-rooms.dto';
 
 @ApiTags('Management - Rooms')
 @ApiBearerAuth()
 //@UseGuards(JwtAuthGuard)
-@Controller('management/facility/')
+@Controller('management/facility')
 
 export class RoomsFacilityController {
   constructor(private readonly roomsService: RoomsService) {}
@@ -24,13 +22,13 @@ export class RoomsFacilityController {
 
   @Get('rooms/:facilityId')
   @ApiOperation({ summary: 'Get rooms by facility'})
-  @ApiResponse({ status : 200, description: 'Rooms and facility found', type: RoomsWithFacilityResponseDto })
-  async findRoomsByFacility(@Param('facilityId') id: string) {
+  @ApiResponse({ status : 200, description: 'Rooms found', type: [RoomResponseDto] })
+  async findRoomsByFacility(@Param('facilityId') facilityId: string, @Query() filters: SearchRoomsDto) {
     try {
-      const result = await this.roomsService.findByFacilityId(id);
+      const rooms = await this.roomsService.findByFacilityId(facilityId, filters);
       return {
         message: 'Lấy danh sách phòng theo cơ sở thành công',
-        data: result,
+        data: rooms,
       };
     } catch (error) {
       this.handleError(error);

@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository } from 'typeorm';
 import { Room } from '../entities/rooms.entity';
 import { IRoomsRepository } from '../interfaces/rooms-repository.interface';
-
+import { SearchRoomsDto } from '../dto/requests/search-rooms.dto';
 @Injectable()
 export class RoomsRepository implements IRoomsRepository {
   constructor(
@@ -35,14 +35,25 @@ export class RoomsRepository implements IRoomsRepository {
     await this.repository.remove(room);
   }
 
-  async findByFacilityId(facilityId: string): Promise<Room[]> {
-    const rooms = await this.repository.find({
-      where: { facilityId },
-      select: ['id', 'name', 'roomType', 'floor', 'status', 'createdAt', 'updatedAt'],
-    });
-    if (!rooms || rooms.length === 0) {
-      throw new NotFoundException('Không tìm thấy phòng');
+  findByFacilityId(facilityId: string, filters?: SearchRoomsDto): Promise<Room[]> {
+    const query = this.repository.createQueryBuilder('room').where('room.facilityId = :facilityId', { facilityId })
+    .select(['room.id', 'room.name', 'room.floor', 'room.status', 'room.createdAt', 'room.updatedAt']);
+
+    if (filters?.search) {
+      query.andWhere(
+        'LOWER(room.name) LIKE LOWER(:search)',
+        { search: `%${filters.search}%` },
+      );
     }
-    return rooms;
+
+    if (filters?.floor) {
+      query.andWhere('room.floor = :floor', { floor: filters.floor });
+    }
+
+    if (filters?.status) {
+      query.andWhere('room.status = :status', { status: filters.status });
+    }
+
+    return query.getMany();
   }
 }

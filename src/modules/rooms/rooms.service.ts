@@ -5,6 +5,7 @@ import { Room } from './entities/rooms.entity';
 import { Facility } from '../facilities/entities/facilities.entity';
 import { IRoomsRepository, ROOMS_REPOSITORY } from './interfaces/rooms-repository.interface';
 import { FacilitiesService } from '../facilities/facilities.service';
+import { SearchRoomsDto } from './dto/requests/search-rooms.dto';
 
 @Injectable()
 export class RoomsService {
@@ -16,7 +17,6 @@ export class RoomsService {
 
   async create(dto: CreateRoomDto): Promise<Room> {
     await this.facilitiesService.findById(dto.facilityId);
-
     const room = this.roomsRepository.create(dto);
     return this.roomsRepository.save(room);
   }
@@ -60,14 +60,18 @@ export class RoomsService {
     await this.roomsRepository.remove(room);
   }
 
-  async findByFacilityId(facilityId: string): Promise<{ facility: Facility; rooms: Room[] }> {
+  async findByFacilityId(facilityId: string, filters?: SearchRoomsDto): Promise<{ facility: Facility; rooms: Room[] }> {
     const facility = await this.facilitiesService.findById(facilityId);
     if (!facility) {
       throw new NotFoundException('không tìm thấy cơ sở');
     }
 
-    const rooms = await this.roomsRepository.findByFacilityId(facilityId);
+    const rooms = await this.roomsRepository.findByFacilityId(facilityId, filters);
     
+    if (!rooms || rooms.length === 0) {
+      throw new NotFoundException('Không tìm thấy phòng nào cho cơ sở này');
+    }
+
     return {
       facility,
       rooms,

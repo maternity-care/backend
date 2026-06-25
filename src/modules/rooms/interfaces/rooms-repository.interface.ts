@@ -1,6 +1,6 @@
 import { DeepPartial } from 'typeorm';
 import { Room } from '../entities/rooms.entity';
-
+import { SearchRoomsDto } from '../dto/requests/search-rooms.dto';
 export const ROOMS_REPOSITORY = Symbol('ROOMS_REPOSITORY');
 
 export interface IRoomsRepository {
@@ -10,5 +10,5 @@ export interface IRoomsRepository {
   findById(id: string): Promise<Room | null>;
   findByName(name: string): Promise<Room | null>;
   remove(room: Room): Promise<void>;
-  findByFacilityId(facilityId: string): Promise<Room[]>;
+  findByFacilityId(facilityId: string, filters?: SearchRoomsDto): Promise<Room[]>;
 }
