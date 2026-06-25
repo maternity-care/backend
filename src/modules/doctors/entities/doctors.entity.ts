@@ -6,19 +6,28 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity('staff_profiles')
-export class StaffProfile {
+@Entity('doctors')
+export class Doctor {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: string;
 
   @Column({ name: 'user_id', type: 'bigint', unique: true })
   userId: string;
 
-  @Column({ name: 'employee_code', type: 'varchar', length: 100, unique: true })
-  employeeCode: string;
+  @Column({ name: 'license_no', type: 'varchar', length: 100, unique: true })
+  licenseNo: string;
 
   @Column({ type: 'varchar', length: 100 })
-  position: string;
+  title: string;
+
+  @Column({ type: 'varchar', length: 150 })
+  specialty: string;
+
+  @Column({ name: 'years_of_experience', type: 'int', default: 0 })
+  yearsOfExperience: number;
+
+  @Column({ type: 'text', nullable: true })
+  bio: string;
 
   @Column({ type: 'varchar', length: 30 })
   status: string;
@@ -28,5 +37,4 @@ export class StaffProfile {
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
   updatedAt: Date;
-
 }
