@@ -12,5 +12,4 @@ export interface IUsersService {
   findByEmail(email: string): Promise<User | null>;
   updateProfile(id: string, dto: UpdateProfileDto): Promise<User>;
   update(id: string, dto: UpdateUserDto): Promise<User>;
-  remove(id: string): Promise<void>;
 }

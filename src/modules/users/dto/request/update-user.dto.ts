@@ -5,6 +5,7 @@ import {
   IsEmail,
   IsInt,
   IsOptional,
+  IsPhoneNumber,
   IsString,
   Min,
   MinLength,
@@ -22,6 +23,11 @@ export class UpdateUserDto {
   @IsEmail()
   @IsOptional()
   email?: string;
+
+  @ApiPropertyOptional()
+  @IsPhoneNumber()
+  @IsOptional()
+  phone?: string;
 
   @ApiPropertyOptional({ minLength: 6 })
   @IsString()

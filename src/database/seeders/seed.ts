@@ -18,6 +18,7 @@ type SeederClass =
 interface SeedUser {
   name: string;
   email: string;
+  phone: string;
   role: RoleEnum;
 }
 
@@ -106,13 +107,23 @@ const rolePermissionMap: Record<RoleEnum, PermissionEnum[]> = {
 };
 
 const seedUsers: SeedUser[] = [
-  { name: 'Super Administrator', email: 'superadmin@example.com', role: RoleEnum.SUPER_ADMIN },
-  { name: 'Administrator', email: 'admin@example.com', role: RoleEnum.ADMIN },
-  { name: 'Doctor Demo', email: 'doctor@example.com', role: RoleEnum.DOCTOR },
-  { name: 'Nurse Demo', email: 'nurse@example.com', role: RoleEnum.NURSE },
-  { name: 'Staff Demo', email: 'staff@example.com', role: RoleEnum.STAFF },
-  { name: 'Member Demo', email: 'member@example.com', role: RoleEnum.MEMBER },
-  { name: 'Partner Demo', email: 'partner@example.com', role: RoleEnum.PARTNER },
+  {
+    name: 'Super Administrator',
+    email: 'superadmin@example.com',
+    phone: '0987654321',
+    role: RoleEnum.SUPER_ADMIN,
+  },
+  { name: 'Administrator', email: 'admin@example.com', phone: '0987654322', role: RoleEnum.ADMIN },
+  { name: 'Doctor Demo', email: 'doctor@example.com', phone: '0987654323', role: RoleEnum.DOCTOR },
+  { name: 'Nurse Demo', email: 'nurse@example.com', phone: '0987654324', role: RoleEnum.NURSE },
+  { name: 'Staff Demo', email: 'staff@example.com', phone: '0987654325', role: RoleEnum.STAFF },
+  { name: 'Member Demo', email: 'member@example.com', phone: '0987654326', role: RoleEnum.MEMBER },
+  {
+    name: 'Partner Demo',
+    email: 'partner@example.com',
+    phone: '0987654327',
+    role: RoleEnum.PARTNER,
+  },
 ];
 
 const seedSettings: Array<Pick<Setting, 'key' | 'value' | 'group' | 'isPublic'>> = [
@@ -233,6 +244,7 @@ class UsersSeeder {
       const user = userRepository.create({
         name: seedUser.name,
         email: seedUser.email,
+        phone: seedUser.phone,
         password,
         status: 1,
         roles: [role],
