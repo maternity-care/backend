@@ -159,6 +159,11 @@ export class CreateMaternityDomainTables1740000000000 implements MigrationInterf
             type: 'bigint',
           },
           {
+            name: 'personal_email',
+            type: 'varchar',
+            length: '150',
+          },
+          {
             name: 'employee_code',
             type: 'varchar',
             length: '100',
@@ -266,6 +271,22 @@ export class CreateMaternityDomainTables1740000000000 implements MigrationInterf
             precision: 10,
             scale: 7,
             isNullable: true,
+          },
+          {
+            name: 'open_time',
+            type: 'time',
+            default: "'08:00:00'",
+          },
+          {
+            name: 'close_time',
+            type: 'time',
+            default: "'17:00:00'",
+          },
+          {
+            name: 'working_days',
+            type: 'varchar',
+            length: '100',
+            default: "'Monday,Tuesday,Wednesday,Thursday,Friday'",
           },
           {
             name: 'status',
