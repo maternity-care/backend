@@ -1,9 +1,10 @@
-import { Body, Controller, Delete, Get, InternalServerErrorException, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, InternalServerErrorException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FacilitiesService } from './facilities.service';
 import { CreateFacilityDto } from './dto/requests/create-facility.dto';
 import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
+import { SearchFacilityDto } from './dto/requests/search-facility.dto';
 import { FacilityResponseDto } from './dto/responds/facilities-respond';
 import { HttpException } from '@nestjs/common';
 
@@ -24,9 +25,9 @@ export class FacilitiesController {
   @Get()
   @ApiOperation({ summary: 'List facilities' })
   @ApiResponse({ status: 200, description: 'Facilities found', type: [FacilityResponseDto] })
-  async findAll() {
+  async findAll(@Query() query: SearchFacilityDto) {
     try {
-      const facilities = await this.facilitiesService.findAll();
+      const facilities = await this.facilitiesService.findAll(query);
       return {
         message: 'Lấy danh sách cơ sở thành công',
         data: facilities,
@@ -92,4 +93,6 @@ export class FacilitiesController {
       this.handleError(error);
     }
   }
+
+  
 }
