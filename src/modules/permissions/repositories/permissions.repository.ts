@@ -40,6 +40,6 @@ export class PermissionsRepository implements IPermissionsRepository {
   }
 
   async remove(permission: Permission): Promise<void> {
-    await this.repository.remove(permission);
+    await this.repository.softRemove(permission);
   }
 }

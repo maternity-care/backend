@@ -1,5 +1,6 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { RoleEnum } from '../../common/constants/role.enum';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -18,7 +19,8 @@ export class JobsController {
   @Post('test')
   @ApiOperation({ summary: 'Create test queue job' })
   @ApiResponse({ status: 201 })
-  createTestJob(@Body() dto: CreateTestJobDto) {
-    return this.jobsService.createTestJob(dto);
+  async createTestJob(@Body() dto: CreateTestJobDto) {
+    const data = await this.jobsService.createTestJob(dto);
+    return { message: RESPONSE_MESSAGES.TEST_JOB_CREATED, data };
   }
 }

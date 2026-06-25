@@ -1,5 +1,6 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
@@ -17,10 +18,11 @@ export class UploadsController {
   @Post('presign')
   @ApiOperation({ summary: 'Create user presigned upload URL' })
   @ApiResponse({ status: 201, type: PresignedUploadResponseDto })
-  createPresignedUpload(
+  async createPresignedUpload(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreatePresignedUploadDto,
   ) {
-    return this.uploadsService.createUserPresignedUpload(user.id, dto);
+    const data = await this.uploadsService.createUserPresignedUpload(user.id, dto);
+    return { message: RESPONSE_MESSAGES.USER_UPLOAD_PRESIGN_CREATED, data };
   }
 }

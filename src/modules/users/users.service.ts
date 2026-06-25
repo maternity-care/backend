@@ -27,6 +27,7 @@ import {
 import { AdminCreateUserDto } from './dto/request/admin-create-user.dto';
 import { SearchUserDto } from './dto/request/search-user.dto';
 import { SearchUserResponseDto } from './dto/response/search-user-response.dto';
+import { IMailService, MAIL_SERVICE } from '../mail/interfaces/mail-service.interface';
 
 @Injectable()
 export class UsersService implements IUsersService, IAdminManageService {
@@ -44,6 +45,8 @@ export class UsersService implements IUsersService, IAdminManageService {
     private readonly configService: ConfigService,
     @Inject(STAFF_PROFILE_REPOSITORY)
     private readonly staffProfileRepository: IStaffProfileRepository,
+    @Inject(MAIL_SERVICE)
+    private readonly mailService: IMailService,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
@@ -293,7 +296,12 @@ export class UsersService implements IUsersService, IAdminManageService {
     await this.staffProfileRepository.create(staffProfileData);
     await this.clearUsersCache(newUser.id);
     // Gửi tới personalEmail của nhân viên về thông tin email công ty và mật khẩu
-    // TODO: Gửi Email logic ở đây
+    await this.mailService.sendCreatedAccountEmail({
+      to: dto.personalEmail,
+      name: dto.name,
+      email: email,
+      password: password,
+    });
     return { ...newUser, email, password }; // trả về thông tin đăng nhập của người dùng mới cho admin
   }
 
