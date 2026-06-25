@@ -1,5 +1,6 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { Observable, map } from 'rxjs';
+import { RESPONSE_MESSAGES } from '../constants/response-message.constant';
 import { ApiSuccessResponse } from '../responses/api-response.interface';
 
 interface ResponseWithMessage<T> {
@@ -19,14 +20,14 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, ApiSuccessResp
         if (hasWrappedShape<T>(response)) {
           return {
             success: true,
-            message: response.message ?? 'Success',
+            message: response.message ?? RESPONSE_MESSAGES.SUCCESS,
             data: response.data as T,
           };
         }
 
         return {
           success: true,
-          message: 'Success',
+          message: RESPONSE_MESSAGES.SUCCESS,
           data: response,
         };
       }),

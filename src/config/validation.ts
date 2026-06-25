@@ -10,6 +10,10 @@ class EnvironmentVariables {
   @IsOptional()
   NODE_ENV?: string;
 
+  @IsString()
+  @IsOptional()
+  FRONTEND_URL?: string;
+
   @IsInt()
   @Min(1)
   @Max(65535)
@@ -26,6 +30,40 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   JWT_REFRESH_EXPIRES_IN?: string;
+
+  @IsString()
+  @IsOptional()
+  MAIL_ENABLED?: string;
+
+  @IsString()
+  @IsOptional()
+  MAIL_HOST?: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  @IsOptional()
+  MAIL_PORT?: number;
+
+  @IsString()
+  @IsOptional()
+  MAIL_SECURE?: string;
+
+  @IsString()
+  @IsOptional()
+  MAIL_USERNAME?: string;
+
+  @IsString()
+  @IsOptional()
+  MAIL_PASSWORD?: string;
+
+  @IsString()
+  @IsOptional()
+  MAIL_FROM_NAME?: string;
+
+  @IsString()
+  @IsOptional()
+  MAIL_FROM_ADDRESS?: string;
 
   @IsString()
   @IsNotEmpty()

@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PermissionEnum } from '../../common/constants/permission.enum';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { RoleEnum } from '../../common/constants/role.enum';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -24,32 +25,36 @@ export class RolesController {
   @Permissions(PermissionEnum.ROLE_VIEW)
   @ApiOperation({ summary: 'List roles' })
   @ApiResponse({ status: 200, type: [RoleResponseDto] })
-  findAll() {
-    return this.rolesService.findAll();
+  async findAll() {
+    const data = await this.rolesService.findAll();
+    return { message: RESPONSE_MESSAGES.ROLES_RETRIEVED, data };
   }
 
   @Post()
   @Permissions(PermissionEnum.ROLE_CREATE)
   @ApiOperation({ summary: 'Create role' })
   @ApiResponse({ status: 201, type: RoleResponseDto })
-  create(@Body() dto: CreateRoleDto) {
-    return this.rolesService.create(dto);
+  async create(@Body() dto: CreateRoleDto) {
+    const data = await this.rolesService.create(dto);
+    return { message: RESPONSE_MESSAGES.ROLE_CREATED, data };
   }
 
   @Get(':id')
   @Permissions(PermissionEnum.ROLE_VIEW)
   @ApiOperation({ summary: 'Get role detail' })
   @ApiResponse({ status: 200, type: RoleResponseDto })
-  findOne(@Param('id') id: string) {
-    return this.rolesService.findById(id);
+  async findOne(@Param('id') id: string) {
+    const data = await this.rolesService.findById(id);
+    return { message: RESPONSE_MESSAGES.ROLE_RETRIEVED, data };
   }
 
   @Patch(':id')
   @Permissions(PermissionEnum.ROLE_UPDATE)
   @ApiOperation({ summary: 'Update role' })
   @ApiResponse({ status: 200, type: RoleResponseDto })
-  update(@Param('id') id: string, @Body() dto: UpdateRoleDto) {
-    return this.rolesService.update(id, dto);
+  async update(@Param('id') id: string, @Body() dto: UpdateRoleDto) {
+    const data = await this.rolesService.update(id, dto);
+    return { message: RESPONSE_MESSAGES.ROLE_UPDATED, data };
   }
 
   @Delete(':id')
@@ -58,6 +63,6 @@ export class RolesController {
   @ApiResponse({ status: 200 })
   async remove(@Param('id') id: string) {
     await this.rolesService.remove(id);
-    return { message: 'Role deleted', data: null };
+    return { message: RESPONSE_MESSAGES.ROLE_DELETED, data: null };
   }
 }
