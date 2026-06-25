@@ -1,5 +1,6 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateFacilityDto } from './dto/requests/create-facility.dto';
+import { SearchFacilityDto } from './dto/requests/search-facility.dto';
 import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
 import { Facility } from './entities/facilities.entity';
 import { FACILITIES_REPOSITORY, IFacilitiesRepository } from './interfaces/facility-repository.interface';
@@ -21,8 +22,8 @@ export class FacilitiesService {
     return this.facilitiesRepository.save(facility);
   }
 
-  async findAll(): Promise<Facility[]> {
-    const facilities = await this.facilitiesRepository.findAll();
+  async findAll(query?: SearchFacilityDto): Promise<Facility[]> {
+    const facilities = await this.facilitiesRepository.findAll(query);
     if (!facilities || facilities.length === 0) {
       throw new NotFoundException('No facilities found');
     }
