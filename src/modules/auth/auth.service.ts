@@ -12,6 +12,7 @@ import { randomBytes, createHash } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { RoleEnum } from '../../common/constants/role.enum';
+import { IMailService, MAIL_SERVICE } from '../mail/interfaces/mail-service.interface';
 import { IRolesService, ROLES_SERVICE } from '../roles/interfaces/roles-service.interface';
 import { USERS_REPOSITORY, IUsersRepository } from '../users/interfaces/users-repository.interface';
 import { User } from '../users/entities/user.entity';
@@ -24,6 +25,7 @@ import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { RefreshToken } from './entities/refresh-token.entity';
 
 const PASSWORD_RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
+const PASSWORD_RESET_TOKEN_TTL_MINUTES = 30;
 
 @Injectable()
 export class AuthService {
@@ -32,6 +34,8 @@ export class AuthService {
     private readonly usersRepository: IUsersRepository,
     @Inject(ROLES_SERVICE)
     private readonly rolesService: IRolesService,
+    @Inject(MAIL_SERVICE)
+    private readonly mailService: IMailService,
     @InjectRepository(RefreshToken)
     private readonly refreshTokenRepository: Repository<RefreshToken>,
     @InjectRepository(PasswordResetToken)
@@ -99,9 +103,18 @@ export class AuthService {
 
     const frontendUrl =
       this.configService.get<string>('app.frontendUrl') ?? 'http://localhost:3000';
+    const resetUrl = `${frontendUrl.replace(/\/$/, '')}/reset-password?token=${resetToken}`;
+
+    await this.mailService.sendPasswordResetEmail({
+      to: user.email,
+      name: user.name,
+      resetUrl,
+      expiresInMinutes: PASSWORD_RESET_TOKEN_TTL_MINUTES,
+    });
+
     return {
       reset_token: resetToken,
-      reset_url: `${frontendUrl.replace(/\/$/, '')}/reset-password?token=${resetToken}`,
+      reset_url: resetUrl,
     };
   }
 
