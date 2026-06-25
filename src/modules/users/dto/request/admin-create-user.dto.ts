@@ -1,5 +1,4 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 import {
   IsArray,
   IsEmail,
@@ -7,12 +6,12 @@ import {
   IsOptional,
   IsPhoneNumber,
   IsString,
-  MinLength,
   ValidateNested,
 } from 'class-validator';
 import { UserPermissionOverrideDto } from './user-permission-override.dto';
+import { Type } from 'class-transformer';
 
-export class CreateUserDto {
+export class AdminCreateUserDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
@@ -20,23 +19,25 @@ export class CreateUserDto {
 
   @ApiProperty()
   @IsEmail()
-  email: string;
+  @IsNotEmpty()
+  personalEmail: string;
 
-  @ApiProperty({ minLength: 6 })
+  @ApiProperty()
   @IsString()
-  @MinLength(6)
-  password: string;
+  @IsPhoneNumber()
+  @IsNotEmpty()
+  phone: string;
 
-  @ApiPropertyOptional({ type: [String] })
+  @ApiProperty()
+  @IsString()
+  @IsOptional()
+  position: string;
+
+  @ApiProperty()
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   roleIds?: string[];
-
-  @ApiProperty()
-  @IsPhoneNumber()
-  @IsOptional()
-  phone?: string;
 
   @ApiPropertyOptional({ type: [UserPermissionOverrideDto] })
   @IsArray()

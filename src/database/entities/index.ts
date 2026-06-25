@@ -1,6 +1,6 @@
 export { UserProfile } from './user-profiles.entity';
-export { Doctor } from './doctors.entity';
-export { StaffProfile } from './staff-profiles.entity';
+export { Doctor } from '../../modules/doctors/entities/doctors.entity';
+export { StaffProfile } from '../../modules/staffs/entities/staff-profiles.entity';
 export { Facility } from '../../modules/facilities/entities/facilities.entity';
 export { Room } from '../../modules/rooms/entities/rooms.entity';
 export { FacilityDoctor } from '../../modules/facilities/entities/facility-doctors.entity';

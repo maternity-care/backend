@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { createTransport, Transporter } from 'nodemailer';
 import { IMailService, SendPasswordResetEmailInput } from './interfaces/mail-service.interface';
 import { passwordResetTemplate } from './templates/password-reset.template';
+import { createdAccountTemplate } from './templates/created-account.template';
+import { CreatedAccountInterface } from './interfaces/created-account.interface';
 
 interface MailPayload {
   to: string;
@@ -71,5 +73,16 @@ export class MailService implements IMailService {
     });
 
     return this.transporter;
+  }
+
+  async sendCreatedAccountEmail(input: CreatedAccountInterface): Promise<void> {
+    const template = createdAccountTemplate(input);
+
+    await this.sendMail({
+      to: input.to,
+      subject: template.subject,
+      text: template.text,
+      html: template.html,
+    });
   }
 }
