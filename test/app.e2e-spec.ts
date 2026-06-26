@@ -45,10 +45,11 @@ describe('Application routes (e2e)', () => {
     const usersService = {
       findById: jest.fn().mockResolvedValue(record),
       updateProfile: jest.fn().mockResolvedValue(record),
-      findAll: jest.fn().mockResolvedValue([record]),
-      create: jest.fn().mockResolvedValue(record),
-      update: jest.fn().mockResolvedValue(record),
-      remove: jest.fn().mockResolvedValue(undefined),
+      findAllUsers: jest.fn().mockResolvedValue({ data: [record], total: 1 }),
+      createUser: jest.fn().mockResolvedValue(record),
+      findUserById: jest.fn().mockResolvedValue(record),
+      updateUser: jest.fn().mockResolvedValue(record),
+      updateStatus: jest.fn().mockResolvedValue(undefined),
     };
     const rolesService = {
       findAll: jest.fn().mockResolvedValue([record]),

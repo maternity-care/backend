@@ -67,10 +67,11 @@ describe('module controllers', () => {
     const service = {
       findById: jest.fn().mockResolvedValue(record),
       updateProfile: jest.fn().mockResolvedValue(record),
-      findAll: jest.fn().mockResolvedValue([record]),
-      create: jest.fn().mockResolvedValue(record),
-      update: jest.fn().mockResolvedValue(record),
-      remove: jest.fn().mockResolvedValue(undefined),
+      findAllUsers: jest.fn().mockResolvedValue({ data: [record], total: 1 }),
+      createUser: jest.fn().mockResolvedValue(record),
+      findUserById: jest.fn().mockResolvedValue(record),
+      updateUser: jest.fn().mockResolvedValue(record),
+      updateStatus: jest.fn().mockResolvedValue(undefined),
     };
     const usersController = new UsersController(service as never);
     const managementController = new ManagementUsersController(service as never);
@@ -83,23 +84,28 @@ describe('module controllers', () => {
     ).resolves.toMatchObject({
       message: 'Profile updated successfully',
     });
-    await expect(managementController.findAll()).resolves.toMatchObject({
-      message: 'Users retrieved successfully',
+    await expect(managementController.findAll({})).resolves.toMatchObject({
+      message: 'Lấy danh sách người dùng thành công.',
     });
     await expect(
-      managementController.create({ name: 'A', email: 'a@test.com', password: 'secret1' }),
+      managementController.create({
+        name: 'A',
+        personalEmail: 'a@test.com',
+        phone: '+84900000000',
+        position: 'Staff',
+      }),
     ).resolves.toMatchObject({
-      message: 'User created successfully',
+      message: 'Tạo người dùng thành công.',
     });
     await expect(managementController.findOne('1')).resolves.toMatchObject({
-      message: 'User retrieved successfully',
+      message: 'Lấy thống tin người dùng thành công.',
     });
     await expect(managementController.update('1', { name: 'Updated' })).resolves.toMatchObject({
-      message: 'User updated successfully',
+      message: 'Cập nhật thông tin người dùng thành công.',
     });
     await expect(managementController.remove('1')).resolves.toEqual({
-      message: 'User deleted successfully',
-      data: null,
+      success: true,
+      message: 'Đã xóa mềm thông tin người dùng.',
     });
   });
 
