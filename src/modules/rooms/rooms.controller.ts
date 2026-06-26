@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpException, InternalServerErrorException, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpException, InternalServerErrorException, Param, Patch, Post, UseGuards, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RoomsService } from './rooms.service';
@@ -6,6 +6,8 @@ import { CreateRoomDto } from './dto/requests/create-room.dto';
 import { UpdateRoomDto } from './dto/requests/update-room.dto';
 import { RoomResponseDto } from './dto/responds/room-response.dto';
 import { RoomsWithFacilityResponseDto } from './dto/responds/rooms-with-facility-response.dto';
+import { SearchRoomsDto } from './dto/requests/search-rooms.dto';
+import { IsOptional } from 'class-validator';
 
 @ApiTags('Management - Rooms')
 @ApiBearerAuth()
@@ -24,9 +26,17 @@ export class RoomsController {
   @Get()
   @ApiOperation({ summary: 'List rooms' })
   @ApiResponse({ status: 200, description: 'Rooms found', type: [RoomResponseDto] })
-  async findAll() {
+  async findAll(@Query() query: SearchRoomsDto) {
     try {
-      const rooms = await this.roomsService.findAll();
+      if (query?.page) {
+        const paged = await this.roomsService.findAllPaginated(query);
+        return {
+          message: 'Lấy danh sách phòng thành công',
+          data: paged,
+        };
+      }
+
+      const rooms = await this.roomsService.findAll(query);
       return {
         message: 'Lấy danh sách phòng thành công',
         data: rooms,
@@ -36,20 +46,6 @@ export class RoomsController {
     }
   }
 
-  @Get('all/by-facilities')
-  @ApiOperation({ summary: 'Get all rooms grouped by facilities' })
-  @ApiResponse({ status: 200, description: 'All rooms grouped by facilities', type: [RoomsWithFacilityResponseDto] })
-  async findAllWithFacilities() {
-    try {
-      const data = await this.roomsService.findAllWithRooms();
-      return {
-        message: 'Lấy danh sách phòng theo cơ sở thành công',
-        data: data,
-      };
-    } catch (error) {
-      this.handleError(error);
-    }
-  }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get room details' })

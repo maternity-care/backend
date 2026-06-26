@@ -4,6 +4,8 @@ import { DeepPartial, Repository } from 'typeorm';
 import { Room } from '../entities/rooms.entity';
 import { IRoomsRepository } from '../interfaces/rooms-repository.interface';
 import { SearchRoomsDto } from '../dto/requests/search-rooms.dto';
+import { SearchRooms2Dto } from '../dto/requests/search-room-2';
+import { paginate } from '../../../common/helpers/pagination';
 @Injectable()
 export class RoomsRepository implements IRoomsRepository {
   constructor(
@@ -19,9 +21,67 @@ export class RoomsRepository implements IRoomsRepository {
     return this.repository.save(room);
   }
 
-  findAll(): Promise<Room[]> {
-    return this.repository.find({ order: { createdAt: 'DESC' } });
+  async findAll(filters?: SearchRoomsDto): Promise<Room[]> {
+    const query = this.repository.createQueryBuilder('room').select([
+      'room.id',
+      'room.name',
+      'room.floor',
+      'room.status',
+      'room.createdAt',
+      'room.updatedAt',
+    ]);
+
+    if (filters?.search) {
+      query.andWhere('LOWER(room.name) LIKE LOWER(:search)', { search: `%${filters.search}%` });
+    }
+
+    if (filters?.floor) {
+      query.andWhere('room.floor = :floor', { floor: filters.floor });
+    }
+
+    if (filters?.status) {
+      query.andWhere('room.status = :status', { status: filters.status });
+    }
+
+    if (filters?.facilityId) {
+      query.andWhere('room.facilityId = :facilityId', { facilityId: filters.facilityId });
+    }
+
+    query.orderBy('room.createdAt', 'DESC');
+
+    return query.getMany();
   }
+
+    async findAllPaginated(filters?: SearchRoomsDto) {
+      const query = this.repository.createQueryBuilder('room').select([
+        'room.id',
+        'room.name',
+        'room.floor',
+        'room.status',
+        'room.createdAt',
+        'room.updatedAt',
+      ]);
+
+      if (filters?.facilityId) {
+        query.where('room.facilityId = :facilityId', { facilityId: filters.facilityId });
+      }
+
+      if (filters?.search) {
+        query.andWhere('LOWER(room.name) LIKE LOWER(:search)', { search: `%${filters.search}%` });
+      }
+
+      if (filters?.floor) {
+        query.andWhere('room.floor = :floor', { floor: filters.floor });
+      }
+
+      if (filters?.status) {
+        query.andWhere('room.status = :status', { status: filters.status });
+      }
+
+      query.orderBy('room.createdAt', 'DESC');
+
+      return paginate(query, { page: filters?.page, limit: filters?.limit });
+    }
 
   findById(id: string): Promise<Room | null> {
     return this.repository.findOne({ where: { id } });
@@ -35,7 +95,7 @@ export class RoomsRepository implements IRoomsRepository {
     await this.repository.remove(room);
   }
 
-  findByFacilityId(facilityId: string, filters?: SearchRoomsDto): Promise<Room[]> {
+  findByFacilityId(facilityId: string, filters?: SearchRooms2Dto): Promise<Room[]> {
     const query = this.repository.createQueryBuilder('room').where('room.facilityId = :facilityId', { facilityId })
     .select(['room.id', 'room.name', 'room.floor', 'room.status', 'room.createdAt', 'room.updatedAt']);
 

@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class SearchFacilityDto {
   @ApiPropertyOptional({ description: 'Tìm kiếm theo tên hoặc địa chỉ' })
@@ -16,4 +17,18 @@ export class SearchFacilityDto {
   @IsString()
   @IsOptional()
   status?: string;
+
+  @ApiPropertyOptional({ description: 'Số trang (bắt đầu từ 1)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @ApiPropertyOptional({ description: 'Kích thước trang (mặc định 20)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
 }
