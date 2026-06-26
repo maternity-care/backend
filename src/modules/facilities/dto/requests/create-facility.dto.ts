@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDecimal, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { Time } from 'bullmq/dist/esm/interfaces/telemetry';
+import { IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
 
 export class CreateFacilityDto {
   @ApiProperty()
@@ -15,13 +16,31 @@ export class CreateFacilityDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  @Matches(/^(\+?\d{7,15})$/, {
+    message: 'Số điện thoại không hợp lệ. Vui lòng nhập 7-15 chữ số và có thể bắt đầu bằng +.',
+  })
   phone: string;
 
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   email?: string;
-
+  
+    @ApiPropertyOptional()
+    @IsString()
+    @IsOptional()
+    open_time?: Time;
+  
+    @ApiPropertyOptional()
+    @IsString()
+    @IsOptional()
+    close_time?: Time;
+  
+    @ApiPropertyOptional()
+    @IsString()
+    @IsOptional()
+    working_days?: string;
+    
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
