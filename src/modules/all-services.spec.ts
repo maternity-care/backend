@@ -80,7 +80,7 @@ describe('module services', () => {
       findByEmailWithPassword: jest.fn().mockResolvedValue(user),
       create: jest.fn((data) => data),
       save: jest.fn(async (data) => ({ ...user, ...data })),
-      remove: jest.fn().mockResolvedValue(undefined),
+      updateStatus: jest.fn().mockResolvedValue(undefined),
     };
     const cache = {
       get: jest.fn().mockResolvedValue(null),
@@ -93,13 +93,29 @@ describe('module services', () => {
       save: jest.fn().mockResolvedValue(undefined),
     };
     const config = { getOrThrow: jest.fn().mockReturnValue(10) };
+    const staffProfileRepository = {
+      checkPersonalEmailExists: jest.fn().mockResolvedValue(false),
+      generateStaffEmailFromName: jest.fn().mockResolvedValue('staff@example.com'),
+      generateStaffPassword: jest.fn().mockReturnValue('secret1'),
+      generateStaffEmployeeCode: jest.fn().mockResolvedValue('0001'),
+      create: jest.fn().mockResolvedValue(undefined),
+    };
+    const mailService = {
+      sendCreatedAccountEmail: jest.fn().mockResolvedValue(undefined),
+      sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
+    };
     const service = new UsersService(
       repo as never,
-      { findByIds: jest.fn().mockResolvedValue([]) } as never,
+      {
+        findByIds: jest.fn().mockResolvedValue([]),
+        findByName: jest.fn().mockResolvedValue({ id: 'role-1', name: 'staff', permissions: [] }),
+      } as never,
       { findByIds: jest.fn().mockResolvedValue([]) } as never,
       cache as never,
       userPermissionsRepository as never,
       config as never,
+      staffProfileRepository as never,
+      mailService as never,
     );
 
     await expect(service.findAll()).resolves.toEqual([user]);
@@ -107,7 +123,7 @@ describe('module services', () => {
     await expect(service.updateProfile('1', { name: 'Updated' })).resolves.toMatchObject({
       name: 'Updated',
     });
-    await expect(service.remove('1')).resolves.toBeUndefined();
+    await expect(service.updateStatus('1', 0 as never)).resolves.toBeUndefined();
 
     repo.findById.mockResolvedValueOnce(null);
     await expect(service.findById('missing')).rejects.toBeInstanceOf(NotFoundException);
