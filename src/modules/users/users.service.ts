@@ -19,7 +19,7 @@ import { IUsersService } from './interfaces/users-service.interface';
 import { IRolesService, ROLES_SERVICE } from '../roles/interfaces/roles-service.interface';
 import { UserStatusEnum } from './users.enum';
 import { IAdminManageService } from './interfaces/admin-manage-service.interface';
-import { RoleEnum } from 'src/common/constants/role.enum';
+import { RoleEnum } from '../../common/constants/role.enum';
 import {
   IStaffProfileRepository,
   STAFF_PROFILE_REPOSITORY,
