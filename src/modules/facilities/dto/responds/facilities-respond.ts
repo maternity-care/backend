@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Time } from 'bullmq';
 
 export class FacilityResponseDto {
   @ApiProperty()
@@ -15,6 +16,15 @@ export class FacilityResponseDto {
 
   @ApiPropertyOptional()
   email?: string;
+
+  @ApiPropertyOptional()
+  open_time?: Time;
+
+  @ApiPropertyOptional()
+  close_time?: Time;
+
+  @ApiPropertyOptional()
+  working_days?: string;
 
   @ApiProperty()
   address: string;

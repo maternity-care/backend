@@ -30,6 +30,14 @@ export class FacilitiesService {
     return facilities;
   }
 
+  async findAllPaginated(query?: SearchFacilityDto) {
+    const result = await this.facilitiesRepository.findAllPaginated!(query);
+    if (!result || !result.items || result.items.length === 0) {
+      throw new NotFoundException('No facilities found');
+    }
+    return result;
+  }
+
   async findById(id: string): Promise<Facility> {
     const facility = await this.facilitiesRepository.findById(id);
     if (!facility) {

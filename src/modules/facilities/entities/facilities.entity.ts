@@ -5,6 +5,8 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Time } from 'bullmq';
+
 
 @Entity('facilities')
 export class Facility {
@@ -22,6 +24,15 @@ export class Facility {
 
   @Column({ type: 'varchar', length: 190, nullable: true })
   email: string;
+
+  @Column({ type: 'time', nullable: true })
+  open_time: Time;
+
+  @Column({ type: 'time', nullable: true })
+  close_time: Time;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  working_days: string;
 
   @Column({ type: 'varchar', length: 500 })
   address: string;

@@ -2,7 +2,7 @@ import { Controller, Get, HttpException, InternalServerErrorException, Param, Qu
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RoomsService } from './rooms.service';
 import { RoomResponseDto } from './dto/responds/room-response.dto';
-import { SearchRoomsDto } from './dto/requests/search-rooms.dto';
+import { SearchRooms2Dto } from './dto/requests/search-room-2';
 
 @ApiTags('Management - Rooms')
 @ApiBearerAuth()
@@ -23,7 +23,9 @@ export class RoomsFacilityController {
   @Get('rooms/:facilityId')
   @ApiOperation({ summary: 'Get rooms by facility'})
   @ApiResponse({ status : 200, description: 'Rooms found', type: [RoomResponseDto] })
-  async findRoomsByFacility(@Param('facilityId') facilityId: string, @Query() filters: SearchRoomsDto) {
+  async findRoomsByFacility(@Param('facilityId') facilityId: string, 
+  // không cho facilityId optional vào đây vì facility bắt buộc
+  @Query() filters: SearchRooms2Dto  ) {
     try {
       const rooms = await this.roomsService.findByFacilityId(facilityId, filters);
       return {

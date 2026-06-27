@@ -2,7 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, IsInt, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class SearchRoomsDto {
+export class SearchRooms2Dto {
   @ApiPropertyOptional({ description: 'Tìm kiếm theo tên phòng' })
   @IsString()
   @IsOptional()
@@ -31,9 +31,4 @@ export class SearchRoomsDto {
   @IsInt()
   @Min(1)
   limit?: number;
-
-  @ApiPropertyOptional({ description: 'Lọc theo facilityId' })
-  @IsOptional()
-  @IsString()
-  facilityId?: string;
 }
