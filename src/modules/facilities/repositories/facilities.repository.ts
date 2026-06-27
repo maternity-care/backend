@@ -5,6 +5,8 @@ import { Facility } from '../entities/facilities.entity';
 import { IFacilitiesRepository } from '../interfaces/facility-repository.interface';
 import { SearchFacilityDto } from '../dto/requests/search-facility.dto';
 import { paginate } from '../../../common/helpers/pagination';
+import {FACILITY_CONSTANT} from '../../../common/constants/facility.constant';
+
 @Injectable()
 export class FacilitiesRepository implements IFacilitiesRepository {
   constructor(
@@ -121,7 +123,7 @@ export class FacilitiesRepository implements IFacilitiesRepository {
   async updateStatus(id: string, status: string): Promise<Facility> {
     const facility = await this.findById(id);
     if (!facility) {
-      throw new Error('Facility not found');
+      throw new Error(FACILITY_CONSTANT.FACILITY_NOT_FOUND);
     }
     facility.status = status;
     return this.repository.save(facility);

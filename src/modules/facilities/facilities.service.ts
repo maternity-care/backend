@@ -4,6 +4,7 @@ import { SearchFacilityDto } from './dto/requests/search-facility.dto';
 import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
 import { Facility } from './entities/facilities.entity';
 import { FACILITIES_REPOSITORY, IFacilitiesRepository } from './interfaces/facility-repository.interface';
+import { FACILITY_CONSTANT } from 'src/common/constants/facility.constant';
 
 @Injectable()
 export class FacilitiesService {
@@ -15,7 +16,7 @@ export class FacilitiesService {
   async create(dto: CreateFacilityDto): Promise<Facility> {
     const existing = await this.findByCode(dto.code);
     if (existing) {
-      throw new ConflictException('Facility code already exists');
+      throw new ConflictException(FACILITY_CONSTANT.FACILITY_ALREADY_EXISTS);
     }
 
     const facility = this.facilitiesRepository.create(dto);
@@ -25,7 +26,7 @@ export class FacilitiesService {
   async findAll(query?: SearchFacilityDto): Promise<Facility[]> {
     const facilities = await this.facilitiesRepository.findAll(query);
     if (!facilities || facilities.length === 0) {
-      throw new NotFoundException('No facilities found');
+      throw new NotFoundException(FACILITY_CONSTANT.FACILITY_NOT_FOUND);
     }
     return facilities;
   }
@@ -33,7 +34,7 @@ export class FacilitiesService {
   async findAllPaginated(query?: SearchFacilityDto) {
     const result = await this.facilitiesRepository.findAllPaginated!(query);
     if (!result || !result.items || result.items.length === 0) {
-      throw new NotFoundException('No facilities found');
+      throw new NotFoundException(FACILITY_CONSTANT.FACILITY_NOT_FOUND);
     }
     return result;
   }
@@ -41,7 +42,7 @@ export class FacilitiesService {
   async findById(id: string): Promise<Facility> {
     const facility = await this.facilitiesRepository.findById(id);
     if (!facility) {
-      throw new NotFoundException('Facility not found');
+      throw new NotFoundException(FACILITY_CONSTANT.FACILITY_NOT_FOUND);
     }
 
     return facility;
@@ -61,7 +62,7 @@ export class FacilitiesService {
     if (dto.code && dto.code !== facility.code) {
       const existing = await this.findByCode(dto.code);
       if (existing) {
-        throw new ConflictException('Facility code already exists');
+        throw new ConflictException(FACILITY_CONSTANT.FACILITY_ALREADY_EXISTS);
       }
     }
 
