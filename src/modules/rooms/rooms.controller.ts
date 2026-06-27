@@ -8,7 +8,7 @@ import { RoomResponseDto } from './dto/responds/room-response.dto';
 import { RoomsWithFacilityResponseDto } from './dto/responds/rooms-with-facility-response.dto';
 import { SearchRoomsDto } from './dto/requests/search-rooms.dto';
 import { IsOptional } from 'class-validator';
-
+import { ROOM_CONSTANT } from '../../common/constants/room.constant';
 @ApiTags('Management - Rooms')
 @ApiBearerAuth()
 //@UseGuards(JwtAuthGuard)
@@ -31,14 +31,14 @@ export class RoomsController {
       if (query?.page) {
         const paged = await this.roomsService.findAllPaginated(query);
         return {
-          message: 'Lấy danh sách phòng thành công',
+          message: ROOM_CONSTANT.ROOM_FOUND,
           data: paged,
         };
       }
 
       const rooms = await this.roomsService.findAll(query);
       return {
-        message: 'Lấy danh sách phòng thành công',
+        message: ROOM_CONSTANT.ROOM_FOUND,
         data: rooms,
       };
     } catch (error) {
@@ -54,7 +54,7 @@ export class RoomsController {
     try {
       const room = await this.roomsService.findById(id);
       return {
-        message: 'Lấy thông tin phòng thành công',
+        message: ROOM_CONSTANT.ROOM_DETAIL_FOUND,
         data: room,
       };
     } catch (error) {
@@ -69,7 +69,7 @@ export class RoomsController {
     try {
       const room = await this.roomsService.create(dto);
       return {
-        message: 'Tạo phòng thành công',
+        message: ROOM_CONSTANT.CREATED_SUCCESSFULLY,
         data: room,
       };
     } catch (error) {
@@ -84,7 +84,7 @@ export class RoomsController {
     try {
       const room = await this.roomsService.update(id, dto);
       return {
-        message: 'Cập nhật thông tin phòng thành công',
+        message: ROOM_CONSTANT.UPDATED_SUCCESSFULLY,
         data: room,
       };
     } catch (error) {
@@ -98,7 +98,7 @@ export class RoomsController {
   async remove(@Param('id') id: string) {
     try {
       await this.roomsService.remove(id);
-      return { message: 'Xoá phòng thành công', data: null };
+      return { message: ROOM_CONSTANT.DELETED_SUCCESSFULLY, data: null };
     } catch (error) {
       this.handleError(error);
     }
