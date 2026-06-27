@@ -4,7 +4,7 @@ import { SearchFacilityDto } from './dto/requests/search-facility.dto';
 import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
 import { Facility } from './entities/facilities.entity';
 import { FACILITIES_REPOSITORY, IFacilitiesRepository } from './interfaces/facility-repository.interface';
-import { FACILITY_CONSTANT } from 'src/common/constants/facility.constant';
+import { FACILITY_CONSTANT } from '../../common/constants/facility.constant';
 
 @Injectable()
 export class FacilitiesService {

@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Time } from 'bullmq/dist/esm/interfaces/telemetry';
-import { IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
 
 export class CreateFacilityDto {
   @ApiProperty()
@@ -24,23 +24,24 @@ export class CreateFacilityDto {
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
+  @IsEmail()
   email?: string;
-  
-    @ApiPropertyOptional()
-    @IsString()
-    @IsOptional()
-    open_time?: Time;
-  
-    @ApiPropertyOptional()
-    @IsString()
-    @IsOptional()
-    close_time?: Time;
-  
-    @ApiPropertyOptional()
-    @IsString()
-    @IsOptional()
-    working_days?: string;
-    
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  open_time?: Time;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  close_time?: Time;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  working_days?: string;
+
   @ApiProperty()
   @IsString()
   @IsNotEmpty()

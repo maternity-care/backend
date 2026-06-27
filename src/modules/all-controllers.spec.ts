@@ -219,7 +219,7 @@ describe('module controllers', () => {
     ).resolves.toMatchObject({
       message: 'Lấy danh sách cơ sở thành công',
     });
-    await expect(new RoomsController(roomsService as never).findAll()).resolves.toMatchObject({
+    await expect(new RoomsController(roomsService as never).findAll({})).resolves.toMatchObject({
       message: 'Lấy danh sách phòng thành công',
     });
     await expect(
