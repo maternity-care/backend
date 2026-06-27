@@ -27,6 +27,15 @@ export class FacilitiesController {
   @ApiResponse({ status: 200, description: 'Facilities found', type: [FacilityResponseDto] })
   async findAll(@Query() query: SearchFacilityDto) {
     try {
+      // nếu client gửi page => trả về kết quả phân trang
+      if (query?.page) {
+        const paged = await this.facilitiesService.findAllPaginated(query);
+        return {
+          message: 'Lấy danh sách cơ sở thành công',
+          data: paged,
+        };
+      }
+
       const facilities = await this.facilitiesService.findAll(query);
       return {
         message: 'Lấy danh sách cơ sở thành công',
