@@ -6,6 +6,8 @@ import { Facility } from '../facilities/entities/facilities.entity';
 import { IRoomsRepository, ROOMS_REPOSITORY } from './interfaces/rooms-repository.interface';
 import { FacilitiesService } from '../facilities/facilities.service';
 import { SearchRoomsDto } from './dto/requests/search-rooms.dto';
+import {ROOM_CONSTANT} from '../../common/constants/room.constant';
+import {FACILITY_CONSTANT} from '../../common/constants/facility.constant';
 
 @Injectable()
 export class RoomsService {
@@ -24,7 +26,7 @@ export class RoomsService {
   async findAll(filters?: SearchRoomsDto): Promise<Room[]> {
     const rooms = await this.roomsRepository.findAll(filters);
     if (!rooms || rooms.length === 0) {
-      throw new NotFoundException('Không tìm thấy phòng');
+      throw new NotFoundException(ROOM_CONSTANT.ROOM_NOT_FOUND);
     }
     return rooms;
   }
@@ -32,7 +34,7 @@ export class RoomsService {
   async findAllPaginated(filters: SearchRoomsDto) {
     const result = await this.roomsRepository.findAllPaginated!(filters);
     if (!result || !result.items || result.items.length === 0) {
-      throw new NotFoundException('Không tìm thấy phòng');
+      throw new NotFoundException(ROOM_CONSTANT.ROOM_NOT_FOUND);
     }
     return result;
   }
@@ -40,7 +42,7 @@ export class RoomsService {
   async findById(id: string): Promise<Room> {
     const room = await this.roomsRepository.findById(id);
     if (!room) {
-      throw new NotFoundException('Không tìm thấy phòng');
+      throw new NotFoundException(ROOM_CONSTANT.ROOM_NOT_FOUND);
     }
     return room;
   }
@@ -71,14 +73,14 @@ export class RoomsService {
   async findByFacilityId(facilityId: string, filters?: SearchRoomsDto): Promise<{ facility: Facility; rooms: Room[] }> {
     const facility = await this.facilitiesService.findById(facilityId);
     if (!facility) {
-      throw new NotFoundException('không tìm thấy cơ sở');
+      throw new NotFoundException(FACILITY_CONSTANT.FACILITY_NOT_FOUND);
     }
 
     // nếu client gửi page => trả về phân trang
     if (filters?.page) {
       const paged = await this.roomsRepository.findByFacilityIdPaginated!(facilityId, filters);
       if (!paged || !paged.items || paged.items.length === 0) {
-        throw new NotFoundException('Không tìm thấy phòng nào cho cơ sở này');
+        throw new NotFoundException(ROOM_CONSTANT.ROOM_NOT_FOUND);
       }
       return {
         facility,
@@ -89,7 +91,7 @@ export class RoomsService {
     const rooms = await this.roomsRepository.findByFacilityId(facilityId, filters);
 
     if (!rooms || rooms.length === 0) {
-      throw new NotFoundException('Không tìm thấy phòng nào cho cơ sở này');
+      throw new NotFoundException(ROOM_CONSTANT.ROOM_NOT_FOUND);
     }
 
     return {
@@ -122,7 +124,7 @@ export class RoomsService {
 
     const facilities = await this.facilitiesService.findAll();
     if (!facilities || facilities.length === 0) {
-      throw new NotFoundException('Không tìm thấy cơ sở nào');
+      throw new NotFoundException(FACILITY_CONSTANT.FACILITY_NOT_FOUND);
     }
 
     const result = await Promise.all(

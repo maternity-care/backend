@@ -7,7 +7,7 @@ import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
 import { SearchFacilityDto } from './dto/requests/search-facility.dto';
 import { FacilityResponseDto } from './dto/responds/facilities-respond';
 import { HttpException } from '@nestjs/common';
-
+import { FACILITY_CONSTANT } from '../../common/constants/facility.constant';
 @ApiTags('Management - Facilities')
 @ApiBearerAuth()
 //@UseGuards(JwtAuthGuard)
@@ -31,14 +31,14 @@ export class FacilitiesController {
       if (query?.page) {
         const paged = await this.facilitiesService.findAllPaginated(query);
         return {
-          message: 'Lấy danh sách cơ sở thành công',
+          message: FACILITY_CONSTANT.FACILITY_FOUND,
           data: paged,
         };
       }
 
       const facilities = await this.facilitiesService.findAll(query);
       return {
-        message: 'Lấy danh sách cơ sở thành công',
+        message: FACILITY_CONSTANT.FACILITY_FOUND,
         data: facilities,
       };
     } catch (error) {
@@ -53,7 +53,7 @@ export class FacilitiesController {
     try {
       const facility = await this.facilitiesService.findById(id);
       return {
-        message: 'Lấy thông tin cơ sở thành công',
+        message: FACILITY_CONSTANT.FACILITY_DETAIL_FOUND,
         data: facility,
       };
     } catch (error) {
@@ -68,7 +68,7 @@ export class FacilitiesController {
     try {
       const facility = await this.facilitiesService.create(dto);
       return {
-        message: 'Tạo cơ sở thành công',
+        message: FACILITY_CONSTANT.CREATED_SUCCESSFULLY,
         data: facility,
       };
     } catch (error) {
@@ -83,7 +83,7 @@ export class FacilitiesController {
     try {
       const data = await this.facilitiesService.update(id, dto);
       return {
-        message: 'Cập nhật thông tin cơ sở thành công',
+        message: FACILITY_CONSTANT.UPDATED_SUCCESSFULLY,
         data: data,
       };
     } catch (error) {
@@ -97,7 +97,7 @@ export class FacilitiesController {
   async remove(@Param('id') id: string) {
     try {
       await this.facilitiesService.remove(id);
-      return { message: 'Xoá cơ sở thành công', data: null };
+      return { message: FACILITY_CONSTANT.DELETED_SUCCESSFULLY, data: null };
     } catch (error) {
       this.handleError(error);
     }
