@@ -10,8 +10,8 @@ export class StaffProfileService implements IStaffProfileService {
     return this.staffProfileRepository.findById(id);
   }
 
-  async findByUserId(userId: string): Promise<StaffProfile | null> {
-    return this.staffProfileRepository.findByUserId(userId);
+  async findByEmail(email: string): Promise<StaffProfile | null> {
+    return this.staffProfileRepository.findByEmail(email);
   }
 
   async findByEmployeeCode(employeeCode: string): Promise<StaffProfile | null> {

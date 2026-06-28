@@ -1,5 +1,6 @@
 import { DeepPartial } from 'typeorm';
 import { Facility } from '../entities/facilities.entity';
+import { FacilityStatus } from '../../../common/constants/status.enum';
 import { SearchFacilityDto } from '../dto/requests/search-facility.dto';
 import {PaginationResult} from '../../../common/helpers/pagination';
 export const FACILITIES_REPOSITORY = Symbol('FACILITIES_REPOSITORY');
@@ -14,7 +15,6 @@ export interface IFacilitiesRepository {
   findByCode(code: string): Promise<Facility | null>;
   findByName(name: string): Promise<Facility | null>;
   remove(facility: Facility): Promise<void>;
-  updateStatus(id: string, status: string): Promise<Facility>;
+  updateStatus(id: string, status: FacilityStatus): Promise<Facility>;
   
 }
-

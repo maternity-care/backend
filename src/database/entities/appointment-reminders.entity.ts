@@ -4,6 +4,7 @@ import {
   Entity,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { ReminderStatus } from '../../common/constants/status.enum';
 
 @Entity('appointment_reminders')
 export class AppointmentReminder {
@@ -23,7 +24,7 @@ export class AppointmentReminder {
   sentAt: Date;
 
   @Column({ type: 'varchar', length: 30 })
-  status: string;
+  status: ReminderStatus;
 
   @Column({ name: 'error_message', type: 'text', nullable: true })
   errorMessage: string;

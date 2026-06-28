@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { ActiveStatus } from '../../../../common/constants/status.enum';
 
 export class CreateRoomDto {
   @ApiProperty()
@@ -22,8 +23,8 @@ export class CreateRoomDto {
   @IsOptional()
   floor?: string;
 
-  @ApiProperty()
-  @IsString()
+  @ApiProperty({ enum: ActiveStatus })
+  @IsEnum(ActiveStatus)
   @IsNotEmpty()
-  status: string;
+  status: ActiveStatus;
 }

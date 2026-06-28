@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Time } from 'bullmq';
+import { FacilityStatus } from '../../../../common/constants/status.enum';
 
 export class FacilityResponseDto {
   @ApiProperty()
@@ -45,7 +46,7 @@ export class FacilityResponseDto {
   longitude?: string;
 
   @ApiProperty()
-  status: string;
+  status: FacilityStatus;
 
   @ApiProperty()
   createdAt: Date;

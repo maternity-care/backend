@@ -2,14 +2,18 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsArray,
   IsEmail,
+  IsInt,
   IsNotEmpty,
   IsOptional,
-  IsPhoneNumber,
+  Matches,
   IsString,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { UserPermissionOverrideDto } from './user-permission-override.dto';
 import { Type } from 'class-transformer';
+import { RoleEnum } from '../../../../common/constants/role.enum';
+import { FacilityStaffAssignmentDto } from './facility-staff-assignment.dto';
 
 export class AdminCreateUserDto {
   @ApiProperty()
@@ -24,20 +28,53 @@ export class AdminCreateUserDto {
 
   @ApiProperty()
   @IsString()
-  @IsPhoneNumber()
+  @Matches(/^(?:\+84|0)[35789]\d{8}$/, {
+    message: 'phone phải là số điện thoại di động Việt Nam hợp lệ.',
+  })
   @IsNotEmpty()
   phone: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsOptional()
-  position: string;
 
   @ApiProperty()
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   roleIds?: string[];
+
+  @ApiProperty({ type: [FacilityStaffAssignmentDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => FacilityStaffAssignmentDto)
+  facilityAssignments: FacilityStaffAssignmentDto[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  licenseNo?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  title?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  specialty?: string;
+
+  @ApiPropertyOptional({ minimum: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  yearsOfExperience?: number;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  bio?: string;
 
   @ApiPropertyOptional({ type: [UserPermissionOverrideDto] })
   @IsArray()

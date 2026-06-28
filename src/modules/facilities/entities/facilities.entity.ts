@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Time } from 'bullmq';
+import { FacilityStatus } from '../../../common/constants/status.enum';
 
 
 @Entity('facilities')
@@ -53,7 +54,7 @@ export class Facility {
   longitude: string;
 
   @Column({ type: 'varchar', length: 30 })
-  status: string;
+  status: FacilityStatus;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
