@@ -9,6 +9,7 @@ import { RoomsService } from './rooms/rooms.service';
 import { SettingsService } from './settings/settings.service';
 import { UploadsService } from './uploads/uploads.service';
 import { UsersService } from './users/users.service';
+import { FacilityStatus } from '../common/constants/status.enum';
 
 describe('module services', () => {
   const entity = { id: '1', name: 'Test', code: 'TEST', email: 'test@example.com', status: 1 };
@@ -116,6 +117,17 @@ describe('module services', () => {
       config as never,
       staffProfileRepository as never,
       mailService as never,
+      {
+        delete: jest.fn().mockResolvedValue(undefined),
+        create: jest.fn((data) => data),
+        save: jest.fn().mockResolvedValue(undefined),
+      } as never,
+      { count: jest.fn().mockResolvedValue(1) } as never,
+      {
+        findOne: jest.fn().mockResolvedValue(null),
+        create: jest.fn((data) => data),
+        save: jest.fn(async (data) => ({ id: 'doctor-1', ...data })),
+      } as never,
     );
 
     await expect(service.findAll()).resolves.toEqual([user]);
@@ -201,7 +213,7 @@ describe('module services', () => {
         province: 'Province',
         district: 'District',
         ward: 'Ward',
-        status: 'active',
+        status: FacilityStatus.ACTIVE,
       }),
     ).resolves.toMatchObject({ code: 'MAIN' });
     await expect(facilitiesService.findAll()).resolves.toEqual([entity]);
@@ -237,6 +249,9 @@ describe('module services', () => {
   it('covers auth service invalid login branch', async () => {
     const service = new AuthService(
       { findByEmailWithPassword: jest.fn().mockResolvedValue(null) } as never,
+      {} as never,
+      {} as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,

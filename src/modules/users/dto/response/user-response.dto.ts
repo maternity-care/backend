@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { RoleResponseDto } from '../../../roles/dto/response/role-response.dto';
 import { PermissionResponseDto } from '../../../permissions/dto/response/permission-response.dto';
+import { AccountStatus } from '../../../../common/constants/status.enum';
 
 export class UserPermissionOverrideResponseDto {
   @ApiProperty({ type: PermissionResponseDto })
@@ -20,8 +21,8 @@ export class UserResponseDto {
   @ApiProperty()
   email: string;
 
-  @ApiProperty()
-  status: number;
+  @ApiProperty({ enum: AccountStatus })
+  status: AccountStatus;
 
   @ApiProperty({ type: [RoleResponseDto] })
   roles: RoleResponseDto[];

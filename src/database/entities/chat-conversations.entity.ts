@@ -5,6 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { ConversationStatus } from '../../common/constants/status.enum';
 
 @Entity('chat_conversations')
 export class ChatConversation {
@@ -27,7 +28,7 @@ export class ChatConversation {
   priority: number;
 
   @Column({ type: 'varchar', length: 30 })
-  status: string;
+  status: ConversationStatus;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;

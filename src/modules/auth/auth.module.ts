@@ -11,6 +11,12 @@ import { AuthService } from './auth.service';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { StaffProfile } from '../staffs/entities/staff-profiles.entity';
+import { FacilityStaff } from '../facilities/entities/facility-staff.entity';
+import { Facility } from '../facilities/entities/facilities.entity';
+import { StaffRefreshToken } from './entities/staff-refresh-token.entity';
+import { StaffPasswordResetToken } from './entities/staff-password-reset-token.entity';
+import { ManagementAuthController } from './management-auth.controller';
 
 @Module({
   imports: [
@@ -18,7 +24,15 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     RolesModule,
     MailModule,
     PassportModule,
-    TypeOrmModule.forFeature([RefreshToken, PasswordResetToken]),
+    TypeOrmModule.forFeature([
+      RefreshToken,
+      PasswordResetToken,
+      StaffProfile,
+      FacilityStaff,
+      Facility,
+      StaffRefreshToken,
+      StaffPasswordResetToken,
+    ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -30,7 +44,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       }),
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, ManagementAuthController],
   providers: [AuthService, JwtStrategy],
   exports: [AuthService],
 })

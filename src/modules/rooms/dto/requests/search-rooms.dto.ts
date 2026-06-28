@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsInt, Min } from 'class-validator';
+import { IsOptional, IsString, IsInt, IsEnum, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ActiveStatus } from '../../../../common/constants/status.enum';
 
 export class SearchRoomsDto {
   @ApiPropertyOptional({ description: 'Tìm kiếm theo tên phòng' })
@@ -13,10 +14,10 @@ export class SearchRoomsDto {
   @IsOptional()
   floor?: string;
 
-  @ApiPropertyOptional({ description: 'Lọc theo trạng thái phòng' })
-  @IsString()
+  @ApiPropertyOptional({ description: 'Lọc theo trạng thái phòng', enum: ActiveStatus })
+  @IsEnum(ActiveStatus)
   @IsOptional()
-  status?: string;
+  status?: ActiveStatus;
 
   @ApiPropertyOptional({ description: 'Số trang (bắt đầu từ 1)' })
   @IsOptional()

@@ -3,6 +3,7 @@ import {
   Entity,
   PrimaryColumn,
 } from 'typeorm';
+import { ShippingStatus } from '../../common/constants/status.enum';
 
 @Entity('product_orders')
 export class ProductOrder {
@@ -19,7 +20,7 @@ export class ProductOrder {
   shippingAddress: string;
 
   @Column({ name: 'shipping_status', type: 'varchar', length: 30 })
-  shippingStatus: string;
+  shippingStatus: ShippingStatus;
 
   @Column({ type: 'varchar', length: 500, nullable: true })
   note: string;

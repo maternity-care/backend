@@ -5,6 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { PrescriptionStatus } from '../../common/constants/status.enum';
 
 @Entity('prescriptions')
 export class Prescription {
@@ -21,7 +22,7 @@ export class Prescription {
   doctorId: string;
 
   @Column({ type: 'varchar', length: 30 })
-  status: string;
+  status: PrescriptionStatus;
 
   @Column({ type: 'text', nullable: true })
   notes: string;

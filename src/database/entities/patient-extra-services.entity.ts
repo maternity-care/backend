@@ -5,6 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { PatientExtraServiceStatus } from '../../common/constants/status.enum';
 
 @Entity('patient_extra_services')
 export class PatientExtraService {
@@ -27,7 +28,7 @@ export class PatientExtraService {
   price: string;
 
   @Column({ type: 'varchar', length: 30 })
-  status: string;
+  status: PatientExtraServiceStatus;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;

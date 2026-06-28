@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Time } from 'bullmq/dist/esm/interfaces/telemetry';
-import { IsEmail, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import { FacilityStatus } from '../../../../common/constants/status.enum';
 
 export class CreateFacilityDto {
   @ApiProperty()
@@ -72,8 +73,8 @@ export class CreateFacilityDto {
   @IsOptional()
   longitude?: string;
 
-  @ApiProperty()
-  @IsString()
+  @ApiProperty({ enum: FacilityStatus })
+  @IsEnum(FacilityStatus)
   @IsNotEmpty()
-  status: string;
+  status: FacilityStatus;
 }

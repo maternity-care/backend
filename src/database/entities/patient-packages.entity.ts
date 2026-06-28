@@ -5,6 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { PatientPackageStatus } from '../../common/constants/status.enum';
 
 @Entity('patient_packages')
 export class PatientPackage {
@@ -27,7 +28,7 @@ export class PatientPackage {
   endDate: string;
 
   @Column({ type: 'varchar', length: 30 })
-  status: string;
+  status: PatientPackageStatus;
 
   @Column({ name: 'upgraded_from_id', type: 'bigint', nullable: true })
   upgradedFromId: string;

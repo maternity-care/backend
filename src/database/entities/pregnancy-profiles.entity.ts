@@ -5,6 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { PregnancyProfileStatus } from '../../common/constants/status.enum';
 
 @Entity('pregnancy_profiles')
 export class PregnancyProfile {
@@ -45,7 +46,7 @@ export class PregnancyProfile {
   riskLevel: string;
 
   @Column({ type: 'varchar', length: 30 })
-  status: string;
+  status: PregnancyProfileStatus;
 
   @Column({ type: 'text', nullable: true })
   notes: string;

@@ -22,6 +22,7 @@ import { ManagementUploadsController } from '../src/modules/uploads/management-u
 import { UploadsController } from '../src/modules/uploads/uploads.controller';
 import { UploadsService } from '../src/modules/uploads/uploads.service';
 import { ManagementUsersController } from '../src/modules/users/management-users.controller';
+import { ManagementSystemUsersController } from '../src/modules/users/management-system-users.controller';
 import { UsersController } from '../src/modules/users/users.controller';
 import { UsersService } from '../src/modules/users/users.service';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
@@ -46,6 +47,7 @@ describe('Application routes (e2e)', () => {
       findById: jest.fn().mockResolvedValue(record),
       updateProfile: jest.fn().mockResolvedValue(record),
       findAllUsers: jest.fn().mockResolvedValue({ data: [record], total: 1 }),
+      searchUsers: jest.fn().mockResolvedValue({ users: [record], total: 1 }),
       createUser: jest.fn().mockResolvedValue(record),
       findUserById: jest.fn().mockResolvedValue(record),
       updateUser: jest.fn().mockResolvedValue(record),
@@ -95,6 +97,7 @@ describe('Application routes (e2e)', () => {
         AuthController,
         UsersController,
         ManagementUsersController,
+        ManagementSystemUsersController,
         RolesController,
         PermissionsController,
         SettingsController,
@@ -121,7 +124,14 @@ describe('Application routes (e2e)', () => {
       .overrideGuard(JwtAuthGuard)
       .useValue({
         canActivate: (context: ExecutionContext) => {
-          context.switchToHttp().getRequest().user = { id: '1', email: 'test@example.com' };
+          context.switchToHttp().getRequest().user = {
+            id: '1',
+            email: 'test@example.com',
+            roles: [{ id: '1', name: 'super_admin', permissions: [] }],
+            permissionOverrides: [],
+            facilities: [],
+            activeFacilityId: null,
+          };
           return true;
         },
       })

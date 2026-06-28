@@ -12,11 +12,17 @@ export function checkAuth(user?: AuthenticatedUser): AuthenticatedUser {
 }
 
 export function getUserRoles(user: AuthenticatedUser): string[] {
-  return user.roles.map((role) => role.name);
+  return [
+    ...user.roles.map((role) => role.name),
+    ...(user.facilityRoles ?? []).map((role) => role.name),
+  ];
 }
 
 export function getUserPermissions(user: AuthenticatedUser): string[] {
   const rolePermissions = user.roles.flatMap((role) =>
+    role.permissions.map((permission) => permission.name),
+  );
+  const facilityPermissions = (user.facilityRoles ?? []).flatMap((role) =>
     role.permissions.map((permission) => permission.name),
   );
   const allowedOverrides = (user.permissionOverrides ?? [])
@@ -28,7 +34,9 @@ export function getUserPermissions(user: AuthenticatedUser): string[] {
       .map((permissionOverride) => permissionOverride.permission.name),
   );
 
-  return Array.from(new Set([...rolePermissions, ...allowedOverrides])).filter(
+  return Array.from(
+    new Set([...rolePermissions, ...facilityPermissions, ...allowedOverrides]),
+  ).filter(
     (permissionName) => !deniedOverrides.has(permissionName),
   );
 }

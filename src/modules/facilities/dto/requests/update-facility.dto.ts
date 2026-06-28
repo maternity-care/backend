@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Time } from 'bullmq/dist/esm/interfaces/telemetry';
-import { IsOptional, IsString, Matches } from 'class-validator';
+import { IsEnum, IsOptional, IsString, Matches } from 'class-validator';
+import { FacilityStatus } from '../../../../common/constants/status.enum';
 
 export class UpdateFacilityDto {
   @ApiPropertyOptional()
@@ -71,8 +72,8 @@ export class UpdateFacilityDto {
   @IsOptional()
   longitude?: string;
 
-  @ApiPropertyOptional()
-  @IsString()
+  @ApiPropertyOptional({ enum: FacilityStatus })
+  @IsEnum(FacilityStatus)
   @IsOptional()
-  status?: string;
+  status?: FacilityStatus;
 }
