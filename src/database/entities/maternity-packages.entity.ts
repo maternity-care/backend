@@ -5,6 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { MaternityPackageStatus } from '../../common/constants/status.enum';
 
 @Entity('maternity_packages')
 export class MaternityPackage {
@@ -30,7 +31,7 @@ export class MaternityPackage {
   priorityLevel: number;
 
   @Column({ type: 'varchar', length: 30 })
-  status: string;
+  status: MaternityPackageStatus;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;

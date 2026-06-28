@@ -5,6 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { ArticleStatus } from '../../common/constants/status.enum';
 
 @Entity('articles')
 export class Article {
@@ -27,7 +28,7 @@ export class Article {
   content: string;
 
   @Column({ type: 'varchar', length: 30 })
-  status: string;
+  status: ArticleStatus;
 
   @Column({ name: 'approved_by', type: 'bigint', nullable: true })
   approvedBy: string;

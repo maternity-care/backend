@@ -5,6 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { PaymentStatus } from '../../common/constants/status.enum';
 
 @Entity('payments')
 export class Payment {
@@ -27,7 +28,7 @@ export class Payment {
   amount: string;
 
   @Column({ type: 'varchar', length: 30 })
-  status: string;
+  status: PaymentStatus;
 
   @Column({ name: 'paid_at', type: 'timestamp', nullable: true })
   paidAt: Date;
