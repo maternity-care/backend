@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
+import { AccountStatus } from '../../../common/constants/status.enum';
 import { IUsersRepository } from '../interfaces/users-repository.interface';
 import { SearchUserDto } from '../dto/request/search-user.dto';
 import { SearchUserResponseDto } from '../dto/response/search-user-response.dto';
@@ -54,7 +55,7 @@ export class UsersRepository implements IUsersRepository {
       .getOne();
   }
 
-  async updateStatus(id: string, status: number): Promise<void> {
+  async updateStatus(id: string, status: AccountStatus): Promise<void> {
     await this.repository.update(id, { status });
   }
 

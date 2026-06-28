@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
 import { Role } from '../../roles/entities/role.entity';
+import { AccountStatus } from '../../../common/constants/status.enum';
 import { UserPermission } from '../../permissions/entities/user-permission.entity';
 
 @Entity('users')
@@ -31,8 +32,8 @@ export class User {
   @Column({ type: 'varchar', length: 255, select: false })
   password: string;
 
-  @Column({ type: 'tinyint', default: 1 })
-  status: number;
+  @Column({ type: 'enum', enum: AccountStatus, default: AccountStatus.ACTIVE })
+  status: AccountStatus;
 
   @ManyToMany(() => Role, (role) => role.users, { cascade: false })
   @JoinTable({

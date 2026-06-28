@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional } from 'class-validator';
+import { IsEnum, IsString, IsOptional } from 'class-validator';
+import { AccountStatus } from '../../../../common/constants/status.enum';
 
 export class SearchUserDto {
   @ApiPropertyOptional()
@@ -22,10 +23,10 @@ export class SearchUserDto {
   @IsOptional()
   roleId?: string;
 
-  @ApiPropertyOptional()
-  @IsString()
+  @ApiPropertyOptional({ enum: AccountStatus })
+  @IsEnum(AccountStatus)
   @IsOptional()
-  status?: number;
+  status?: AccountStatus;
 
   @ApiPropertyOptional()
   @IsString()

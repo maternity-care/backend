@@ -5,14 +5,15 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { ActiveStatus } from '../../../common/constants/status.enum';
 
 @Entity('doctors')
 export class Doctor {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: string;
 
-  @Column({ name: 'user_id', type: 'bigint', unique: true })
-  userId: string;
+  @Column({ name: 'staff_id', type: 'bigint', unique: true })
+  staffId: string;
 
   @Column({ name: 'license_no', type: 'varchar', length: 100, unique: true })
   licenseNo: string;
@@ -30,7 +31,7 @@ export class Doctor {
   bio: string;
 
   @Column({ type: 'varchar', length: 30 })
-  status: string;
+  status: ActiveStatus;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;

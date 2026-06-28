@@ -8,9 +8,15 @@ import { SearchFacilityDto } from './dto/requests/search-facility.dto';
 import { FacilityResponseDto } from './dto/responds/facilities-respond';
 import { HttpException } from '@nestjs/common';
 import { FACILITY_CONSTANT } from '../../common/constants/facility.constant';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import {
+  assertFacilityAccess,
+  getActiveFacilityId,
+} from '../../common/helpers/facility-scope.helper';
 @ApiTags('Management - Facilities')
 @ApiBearerAuth()
-//@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('management/facilities')
 export class FacilitiesController {
   constructor(private readonly facilitiesService: FacilitiesService) {}
@@ -25,8 +31,22 @@ export class FacilitiesController {
   @Get()
   @ApiOperation({ summary: 'List facilities' })
   @ApiResponse({ status: 200, description: 'Facilities found', type: [FacilityResponseDto] })
-  async findAll(@Query() query: SearchFacilityDto) {
+  async findAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: SearchFacilityDto,
+  ) {
     try {
+      const activeFacilityId = getActiveFacilityId(user);
+      if (activeFacilityId) {
+        const facility = await this.facilitiesService.findById(activeFacilityId);
+        return {
+          message: FACILITY_CONSTANT.FACILITY_FOUND,
+          data: query?.page
+            ? { items: [facility], total: 1, page: Number(query.page), limit: 1 }
+            : [facility],
+        };
+      }
+
       // nếu client gửi page => trả về kết quả phân trang
       if (query?.page) {
         const paged = await this.facilitiesService.findAllPaginated(query);
@@ -49,8 +69,12 @@ export class FacilitiesController {
   @Get(':id')
   @ApiOperation({ summary: 'Get facility details' })
   @ApiResponse({ status: 200, type: FacilityResponseDto })
-  async findOne(@Param('id') id: string) {
+  async findOne(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
     try {
+      assertFacilityAccess(user, id);
       const facility = await this.facilitiesService.findById(id);
       return {
         message: FACILITY_CONSTANT.FACILITY_DETAIL_FOUND,
@@ -79,8 +103,13 @@ export class FacilitiesController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update facility' })
   @ApiResponse({ status: 200, type: FacilityResponseDto })
-  async update(@Param('id') id: string, @Body() dto: UpdateFacilityDto) {
+  async update(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateFacilityDto,
+  ) {
     try {
+      assertFacilityAccess(user, id);
       const data = await this.facilitiesService.update(id, dto);
       return {
         message: FACILITY_CONSTANT.UPDATED_SUCCESSFULLY,
@@ -94,8 +123,12 @@ export class FacilitiesController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete facility' })
   @ApiResponse({ status: 200 })
-  async remove(@Param('id') id: string) {
+  async remove(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
     try {
+      assertFacilityAccess(user, id);
       await this.facilitiesService.remove(id);
       return { message: FACILITY_CONSTANT.DELETED_SUCCESSFULLY, data: null };
     } catch (error) {

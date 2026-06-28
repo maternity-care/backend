@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository } from 'typeorm';
 import { Facility } from '../entities/facilities.entity';
+import { FacilityStatus } from '../../../common/constants/status.enum';
 import { IFacilitiesRepository } from '../interfaces/facility-repository.interface';
 import { SearchFacilityDto } from '../dto/requests/search-facility.dto';
 import { paginate } from '../../../common/helpers/pagination';
@@ -120,7 +121,7 @@ export class FacilitiesRepository implements IFacilitiesRepository {
 
   
 
-  async updateStatus(id: string, status: string): Promise<Facility> {
+  async updateStatus(id: string, status: FacilityStatus): Promise<Facility> {
     const facility = await this.findById(id);
     if (!facility) {
       throw new Error(FACILITY_CONSTANT.FACILITY_NOT_FOUND);

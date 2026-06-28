@@ -5,6 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { ProductStatus } from '../../common/constants/status.enum';
 
 @Entity('products')
 export class Product {
@@ -36,7 +37,7 @@ export class Product {
   askDoctorBeforeUse: number;
 
   @Column({ type: 'varchar', length: 30 })
-  status: string;
+  status: ProductStatus;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;

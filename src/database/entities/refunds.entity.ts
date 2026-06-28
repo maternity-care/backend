@@ -5,6 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { RefundStatus } from '../../common/constants/status.enum';
 
 @Entity('refunds')
 export class Refund {
@@ -24,7 +25,7 @@ export class Refund {
   reason: string;
 
   @Column({ type: 'varchar', length: 30 })
-  status: string;
+  status: RefundStatus;
 
   @Column({ name: 'requested_by', type: 'bigint' })
   requestedBy: string;

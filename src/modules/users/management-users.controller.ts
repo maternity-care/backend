@@ -24,12 +24,14 @@ import { UserStatusEnum } from './users.enum';
 import { AdminCreateUserDto } from './dto/request/admin-create-user.dto';
 import { SearchUserDto } from './dto/request/search-user.dto';
 import { SearchUserResponseDto } from './dto/response/search-user-response.dto';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 
-@ApiTags('Management - Users')
+@ApiTags('Management - Staffs')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.ADMIN)
-@Controller('management/users')
+@Controller('management/staffs')
 export class ManagementUsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -37,8 +39,11 @@ export class ManagementUsersController {
   @Permissions(PermissionEnum.USER_VIEW)
   @ApiOperation({ summary: 'Management list users' })
   @ApiResponse({ status: 200, type: [SearchUserResponseDto] })
-  async findAll(@Query() query: SearchUserDto) {
-    const data = await this.usersService.findAllUsers(query);
+  async findAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: SearchUserDto,
+  ) {
+    const data = await this.usersService.findAllUsers(query, user);
     return {
       data,
       success: true,
@@ -50,8 +55,11 @@ export class ManagementUsersController {
   @Permissions(PermissionEnum.USER_CREATE)
   @ApiOperation({ summary: 'Management create user' })
   @ApiResponse({ status: 201, type: UserResponseDto })
-  async create(@Body() dto: AdminCreateUserDto) {
-    const data = await this.usersService.createUser(dto);
+  async create(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: AdminCreateUserDto,
+  ) {
+    const data = await this.usersService.createUser(dto, user);
     return {
       data,
       success: true,
@@ -63,8 +71,11 @@ export class ManagementUsersController {
   @Permissions(PermissionEnum.USER_VIEW)
   @ApiOperation({ summary: 'Management get user detail' })
   @ApiResponse({ status: 200, type: UserResponseDto })
-  async findOne(@Param('id') id: string) {
-    const data = await this.usersService.findUserById(id);
+  async findOne(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    const data = await this.usersService.findUserById(id, user);
     return {
       data,
       success: true,
@@ -76,8 +87,12 @@ export class ManagementUsersController {
   @Permissions(PermissionEnum.USER_UPDATE)
   @ApiOperation({ summary: 'Management update user' })
   @ApiResponse({ status: 200, type: UserResponseDto })
-  async update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
-    const data = await this.usersService.updateUser(id, dto);
+  async update(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateUserDto,
+  ) {
+    const data = await this.usersService.updateUser(id, dto, user);
     return {
       data,
       success: true,
@@ -89,8 +104,15 @@ export class ManagementUsersController {
   @Permissions(PermissionEnum.USER_DELETE)
   @ApiOperation({ summary: 'Management delete user' })
   @ApiResponse({ status: 200 })
-  async remove(@Param('id') id: string) {
-    await this.usersService.updateStatus(id, UserStatusEnum.INACTIVE);
+  async remove(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    await this.usersService.updateUserStatus(
+      id,
+      UserStatusEnum.INACTIVE,
+      user,
+    );
     return { success: true, message: 'Đã xóa mềm thông tin người dùng.' };
   }
 }

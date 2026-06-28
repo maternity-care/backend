@@ -11,9 +11,17 @@ import { ManagementUploadsController } from './uploads/management-uploads.contro
 import { UploadsController } from './uploads/uploads.controller';
 import { ManagementUsersController } from './users/management-users.controller';
 import { UsersController } from './users/users.controller';
+import { RoleEnum } from '../common/constants/role.enum';
 
 describe('module controllers', () => {
-  const user = { id: '1' };
+  const user = {
+    id: '1',
+    name: 'Test',
+    roles: [{ id: '1', name: 'super_admin', permissions: [] }],
+    permissionOverrides: [],
+    facilities: [],
+    activeFacilityId: null,
+  };
   const record = { id: '1', name: 'Test' };
 
   it('wraps auth controller responses with explicit messages', async () => {
@@ -59,7 +67,7 @@ describe('module controllers', () => {
     });
     await expect(controller.me(user as never)).resolves.toMatchObject({
       message: 'Authenticated profile retrieved successfully',
-      data: record,
+      data: user,
     });
   });
 
@@ -71,7 +79,11 @@ describe('module controllers', () => {
       createUser: jest.fn().mockResolvedValue(record),
       findUserById: jest.fn().mockResolvedValue(record),
       updateUser: jest.fn().mockResolvedValue(record),
-      updateStatus: jest.fn().mockResolvedValue(undefined),
+      updateUserStatus: jest.fn().mockResolvedValue(undefined),
+      createStaffProfile: jest.fn().mockResolvedValue({
+        id: 'staff-1',
+        employeeCode: 'ST260001',
+      }),
     };
     const usersController = new UsersController(service as never);
     const managementController = new ManagementUsersController(service as never);
@@ -84,26 +96,28 @@ describe('module controllers', () => {
     ).resolves.toMatchObject({
       message: 'Profile updated successfully',
     });
-    await expect(managementController.findAll({})).resolves.toMatchObject({
+    await expect(managementController.findAll(user as never, {})).resolves.toMatchObject({
       message: 'Lấy danh sách người dùng thành công.',
     });
     await expect(
-      managementController.create({
+      managementController.create(user as never, {
         name: 'A',
         personalEmail: 'a@test.com',
         phone: '+84900000000',
-        position: 'Staff',
+        facilityAssignments: [
+          { facilityId: '1', roles: [RoleEnum.STAFF] },
+        ],
       }),
     ).resolves.toMatchObject({
       message: 'Tạo người dùng thành công.',
     });
-    await expect(managementController.findOne('1')).resolves.toMatchObject({
+    await expect(managementController.findOne(user as never, '1')).resolves.toMatchObject({
       message: 'Lấy thống tin người dùng thành công.',
     });
-    await expect(managementController.update('1', { name: 'Updated' })).resolves.toMatchObject({
+    await expect(managementController.update(user as never, '1', { name: 'Updated' })).resolves.toMatchObject({
       message: 'Cập nhật thông tin người dùng thành công.',
     });
-    await expect(managementController.remove('1')).resolves.toEqual({
+    await expect(managementController.remove(user as never, '1')).resolves.toEqual({
       success: true,
       message: 'Đã xóa mềm thông tin người dùng.',
     });
@@ -215,15 +229,21 @@ describe('module controllers', () => {
       message: 'Test job created successfully',
     });
     await expect(
-      new FacilitiesController(facilitiesService as never).findAll({}),
+      new FacilitiesController(facilitiesService as never).findAll(user as never, {}),
     ).resolves.toMatchObject({
       message: 'Lấy danh sách cơ sở thành công',
     });
-    await expect(new RoomsController(roomsService as never).findAll({})).resolves.toMatchObject({
+    await expect(
+      new RoomsController(roomsService as never).findAll(user as never, {}),
+    ).resolves.toMatchObject({
       message: 'Lấy danh sách phòng thành công',
     });
     await expect(
-      new RoomsFacilityController(roomsService as never).findRoomsByFacility('1', {}),
+      new RoomsFacilityController(roomsService as never).findRoomsByFacility(
+        user as never,
+        '1',
+        {},
+      ),
     ).resolves.toMatchObject({
       message: 'Lấy danh sách phòng theo cơ sở thành công',
     });
