@@ -5,8 +5,8 @@ export class RoomResponseDto {
   @ApiProperty()
   id: string;
 
-  // @ApiProperty()
-  // facilityId: string;
+  @ApiProperty()
+  facilityId: string;
 
   @ApiProperty()
   name: string;

@@ -17,6 +17,7 @@ import {
 import { Facility } from '../../modules/facilities/entities/facilities.entity';
 import { FacilityStaff } from '../../modules/facilities/entities/facility-staff.entity';
 import { Doctor } from '../../modules/doctors/entities/doctors.entity';
+import { Room } from '../../modules/rooms/entities/rooms.entity';
 
 type SeederClass =
   | 'DatabaseSeeder'
@@ -315,6 +316,14 @@ const seedFacilityStaff = [
   { role: RoleEnum.STAFF, name: 'Nhân viên', phone: '0901000004' },
 ];
 
+const seedRooms = [
+  { name: 'Phòng khám thai 01', roomType: 'exam', floor: '1' },
+  { name: 'Phòng siêu âm 01', roomType: 'ultrasound', floor: '1' },
+  { name: 'Phòng xét nghiệm 01', roomType: 'lab', floor: '2' },
+  { name: 'Phòng tư vấn 01', roomType: 'consultation', floor: '2' },
+  { name: 'Phòng cấp cứu 01', roomType: 'emergency', floor: '1' },
+];
+
 class FacilitiesAndStaffSeeder {
   constructor(private readonly connection: DataSource) {}
 
@@ -325,6 +334,7 @@ class FacilitiesAndStaffSeeder {
     const assignmentRepository = this.connection.getRepository(FacilityStaff);
     const roleRepository = this.connection.getRepository(Role);
     const doctorRepository = this.connection.getRepository(Doctor);
+    const roomRepository = this.connection.getRepository(Room);
     const password = await bcrypt.hash(
       'password',
       Number(process.env.BCRYPT_SALT_ROUNDS ?? 10),
@@ -394,6 +404,20 @@ class FacilitiesAndStaffSeeder {
             }),
           );
         }
+      }
+
+      for (const roomData of seedRooms) {
+        const existingRoom = await roomRepository.findOne({
+          where: { facilityId: facility.id, name: roomData.name },
+        });
+        await roomRepository.save(
+          roomRepository.create({
+            ...existingRoom,
+            ...roomData,
+            facilityId: facility.id,
+            status: ActiveStatus.ACTIVE,
+          }),
+        );
       }
     }
   }

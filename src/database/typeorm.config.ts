@@ -29,6 +29,7 @@ import { StaffPasswordResetToken } from '../modules/auth/entities/staff-password
 import { Facility } from '../modules/facilities/entities/facilities.entity';
 import { FacilityStaff } from '../modules/facilities/entities/facility-staff.entity';
 import { Doctor } from '../modules/doctors/entities/doctors.entity';
+import { Room } from '../modules/rooms/entities/rooms.entity';
 
 config();
 
@@ -56,6 +57,7 @@ export const typeOrmConfig: DataSourceOptions = {
     Facility,
     FacilityStaff,
     Doctor,
+    Room,
     join(__dirname, 'entities', '*.entity{.ts,.js}'),
   ],
   migrations: [

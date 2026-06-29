@@ -7,6 +7,7 @@ import { IFacilitiesRepository } from '../interfaces/facility-repository.interfa
 import { SearchFacilityDto } from '../dto/requests/search-facility.dto';
 import { paginate } from '../../../common/helpers/pagination';
 import {FACILITY_CONSTANT} from '../../../common/constants/facility.constant';
+import { searchBuilder } from '../../../common/helpers/search-builder';
 
 @Injectable()
 export class FacilitiesRepository implements IFacilitiesRepository {
@@ -22,12 +23,9 @@ export class FacilitiesRepository implements IFacilitiesRepository {
   async findAllPaginated(filters?: SearchFacilityDto) {
     const query = this.repository.createQueryBuilder('facility');
 
-    if (filters?.search) {
-      query.andWhere(
-        '(LOWER(facility.name) LIKE LOWER(:search) OR LOWER(facility.address) LIKE LOWER(:search))',
-        { search: `%${filters.search}%` },
-      );
-    }
+    searchBuilder(query, filters?.search, {
+      columns: ['name', 'code', 'address', 'province', 'district', 'status'],
+    });
 
     if (filters?.city) {
       query.andWhere(
@@ -54,12 +52,9 @@ export class FacilitiesRepository implements IFacilitiesRepository {
   findAll(filters?: SearchFacilityDto): Promise<Facility[]> {
     const query = this.repository.createQueryBuilder('facility');
 
-    if (filters?.search) {
-      query.andWhere(
-        '(LOWER(facility.name) LIKE LOWER(:search) OR LOWER(facility.address) LIKE LOWER(:search))',
-        { search: `%${filters.search}%` },
-      );
-    }
+    searchBuilder(query, filters?.search, {
+      columns: ['name', 'code', 'address', 'province', 'district', 'status'],
+    });
 
     if (filters?.city) {
       // Tìm theo tỉnh / thành phố, match cả province hoặc district nếu cần
