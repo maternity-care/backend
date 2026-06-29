@@ -33,6 +33,7 @@ import {
 } from '../staffs/interfaces/staff-profile-repository.interface';
 import { AdminCreateUserDto } from './dto/request/admin-create-user.dto';
 import { SearchUserDto } from './dto/request/search-user.dto';
+import { parseSearch } from '../../common/helpers/search-builder';
 import { SearchUserResponseDto } from './dto/response/search-user-response.dto';
 import { IMailService, MAIL_SERVICE } from '../mail/interfaces/mail-service.interface';
 import { FacilityStaff } from '../facilities/entities/facility-staff.entity';
@@ -271,13 +272,37 @@ export class UsersService implements IUsersService, IAdminManageService {
           ).map((assignment) => assignment.staffId),
         )
       : null;
-    const keyword = query.name?.toLowerCase();
+    const parsedFilters = parseSearch(query.search);
+    const parsedValue = (field: string) =>
+      parsedFilters.find((filter) => filter.field === field)?.values;
+    const keyword = (parsedValue('keyword')?.[0] ?? query.name)?.toLowerCase();
+    const statusFilter = parsedValue('status')?.[0] ?? query.status;
+    const roleFilter = parsedValue('role')?.[0];
+    const roleAllowedStaffIds = roleFilter
+      ? new Set(
+          (
+            await this.facilityStaffRepository.find({
+              where: {
+                role: { name: roleFilter },
+                status: ActiveStatus.ACTIVE,
+              },
+              select: { staffId: true },
+            })
+          ).map((assignment) => assignment.staffId),
+        )
+      : null;
     const staffs = allStaffs.filter((staff) => {
       if (allowedStaffIds && !allowedStaffIds.has(staff.id)) return false;
-      if (keyword && !staff.name.toLowerCase().includes(keyword)) return false;
+      if (roleAllowedStaffIds && !roleAllowedStaffIds.has(staff.id)) return false;
+      if (
+        keyword &&
+        ![staff.name, staff.email, staff.phone]
+          .filter(Boolean)
+          .some((value) => value!.toLowerCase().includes(keyword))
+      ) return false;
       if (query.email && !staff.email.toLowerCase().includes(query.email.toLowerCase())) return false;
       if (query.phone && !staff.phone?.includes(query.phone)) return false;
-      if (query.status !== undefined && staff.status !== query.status) return false;
+      if (statusFilter !== undefined && staff.status !== statusFilter) return false;
       return true;
     });
     const page = Number(query.page) || 1;

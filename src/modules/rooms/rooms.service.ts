@@ -24,18 +24,11 @@ export class RoomsService {
   }
 
   async findAll(filters?: SearchRoomsDto): Promise<Room[]> {
-    const rooms = await this.roomsRepository.findAll(filters);
-    if (!rooms || rooms.length === 0) {
-      throw new NotFoundException(ROOM_CONSTANT.ROOM_NOT_FOUND);
-    }
-    return rooms;
+    return this.roomsRepository.findAll(filters);
   }
 
   async findAllPaginated(filters: SearchRoomsDto) {
     const result = await this.roomsRepository.findAllPaginated!(filters);
-    if (!result || !result.items || result.items.length === 0) {
-      throw new NotFoundException(ROOM_CONSTANT.ROOM_NOT_FOUND);
-    }
     return result;
   }
 
@@ -89,10 +82,6 @@ export class RoomsService {
     }
 
     const rooms = await this.roomsRepository.findByFacilityId(facilityId, filters);
-
-    if (!rooms || rooms.length === 0) {
-      throw new NotFoundException(ROOM_CONSTANT.ROOM_NOT_FOUND);
-    }
 
     return {
       facility,

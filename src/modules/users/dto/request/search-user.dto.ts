@@ -3,6 +3,13 @@ import { IsEnum, IsString, IsOptional } from 'class-validator';
 import { AccountStatus } from '../../../../common/constants/status.enum';
 
 export class SearchUserDto {
+  @ApiPropertyOptional({
+    description: 'Shared search syntax, e.g. keyword=*an|status=active',
+  })
+  @IsString()
+  @IsOptional()
+  search?: string;
+
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
