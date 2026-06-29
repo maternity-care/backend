@@ -9,7 +9,7 @@ import { ManagementSettingsController } from './settings/management-settings.con
 import { SettingsController } from './settings/settings.controller';
 import { ManagementUploadsController } from './uploads/management-uploads.controller';
 import { UploadsController } from './uploads/uploads.controller';
-import { ManagementUsersController } from './users/management-users.controller';
+import { ManagementStaffsController } from './staffs/management-staffs.controller';
 import { UsersController } from './users/users.controller';
 import { RoleEnum } from '../common/constants/role.enum';
 
@@ -75,18 +75,17 @@ describe('module controllers', () => {
     const service = {
       findById: jest.fn().mockResolvedValue(record),
       updateProfile: jest.fn().mockResolvedValue(record),
-      findAllUsers: jest.fn().mockResolvedValue({ data: [record], total: 1 }),
-      createUser: jest.fn().mockResolvedValue(record),
-      findUserById: jest.fn().mockResolvedValue(record),
-      updateUser: jest.fn().mockResolvedValue(record),
-      updateUserStatus: jest.fn().mockResolvedValue(undefined),
+      findAll: jest.fn().mockResolvedValue({ users: [record], total: 1 }),
+      create: jest.fn().mockResolvedValue(record),
+      update: jest.fn().mockResolvedValue(record),
+      updateStatus: jest.fn().mockResolvedValue(undefined),
       createStaffProfile: jest.fn().mockResolvedValue({
         id: 'staff-1',
         employeeCode: 'ST260001',
       }),
     };
     const usersController = new UsersController(service as never);
-    const managementController = new ManagementUsersController(service as never);
+    const managementController = new ManagementStaffsController(service as never);
 
     await expect(usersController.me(user as never)).resolves.toMatchObject({
       message: 'Profile retrieved successfully',
@@ -97,7 +96,7 @@ describe('module controllers', () => {
       message: 'Profile updated successfully',
     });
     await expect(managementController.findAll(user as never, {})).resolves.toMatchObject({
-      message: 'Lấy danh sách người dùng thành công.',
+      message: 'Lấy danh sách nhân viên thành công.',
     });
     await expect(
       managementController.create(user as never, {
@@ -109,17 +108,17 @@ describe('module controllers', () => {
         ],
       }),
     ).resolves.toMatchObject({
-      message: 'Tạo người dùng thành công.',
+      message: 'Tạo nhân viên thành công.',
     });
     await expect(managementController.findOne(user as never, '1')).resolves.toMatchObject({
-      message: 'Lấy thống tin người dùng thành công.',
+      message: 'Lấy thông tin nhân viên thành công.',
     });
     await expect(managementController.update(user as never, '1', { name: 'Updated' })).resolves.toMatchObject({
-      message: 'Cập nhật thông tin người dùng thành công.',
+      message: 'Cập nhật nhân viên thành công.',
     });
     await expect(managementController.remove(user as never, '1')).resolves.toEqual({
-      success: true,
-      message: 'Đã xóa mềm thông tin người dùng.',
+      data: null,
+      message: 'Đã khóa tài khoản nhân viên.',
     });
   });
 

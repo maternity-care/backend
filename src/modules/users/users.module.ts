@@ -11,7 +11,6 @@ import { StaffProfileRepository } from '../staffs/repositories/staff-profile.rep
 import { User } from './entities/user.entity';
 import { USERS_REPOSITORY } from './interfaces/users-repository.interface';
 import { USERS_SERVICE } from './interfaces/users-service.interface';
-import { ManagementUsersController } from './management-users.controller';
 import { UsersRepository } from './repositories/users.repository';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
@@ -39,7 +38,6 @@ import { Doctor } from '../doctors/entities/doctors.entity';
   ],
   controllers: [
     UsersController,
-    ManagementUsersController,
     ManagementSystemUsersController,
   ],
   providers: [
