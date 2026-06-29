@@ -5,6 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { ForumContentStatus } from '../../common/constants/status.enum';
 
 @Entity('forum_posts')
 export class ForumPost {
@@ -21,7 +22,7 @@ export class ForumPost {
   content: string;
 
   @Column({ type: 'varchar', length: 30 })
-  status: string;
+  status: ForumContentStatus;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;

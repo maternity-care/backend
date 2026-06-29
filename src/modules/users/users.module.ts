@@ -11,22 +11,35 @@ import { StaffProfileRepository } from '../staffs/repositories/staff-profile.rep
 import { User } from './entities/user.entity';
 import { USERS_REPOSITORY } from './interfaces/users-repository.interface';
 import { USERS_SERVICE } from './interfaces/users-service.interface';
-import { ManagementUsersController } from './management-users.controller';
 import { UsersRepository } from './repositories/users.repository';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { MailService } from '../mail/mail.service';
 import { MAIL_SERVICE } from '../mail/interfaces/mail-service.interface';
+import { ManagementSystemUsersController } from './management-system-users.controller';
+import { FacilityStaff } from '../facilities/entities/facility-staff.entity';
+import { Facility } from '../facilities/entities/facilities.entity';
+import { Doctor } from '../doctors/entities/doctors.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, UserPermission, StaffProfile]),
+    TypeOrmModule.forFeature([
+      User,
+      UserPermission,
+      StaffProfile,
+      FacilityStaff,
+      Facility,
+      Doctor,
+    ]),
     RolesModule,
     PermissionsModule,
     MailModule,
     ConfigModule,
   ],
-  controllers: [UsersController, ManagementUsersController],
+  controllers: [
+    UsersController,
+    ManagementSystemUsersController,
+  ],
   providers: [
     UsersService,
     { provide: USERS_SERVICE, useExisting: UsersService },

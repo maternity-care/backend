@@ -4,6 +4,7 @@ import {
   Entity,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { ContentReportStatus } from '../../common/constants/status.enum';
 
 @Entity('content_reports')
 export class ContentReport {
@@ -23,7 +24,7 @@ export class ContentReport {
   reason: string;
 
   @Column({ type: 'varchar', length: 30 })
-  status: string;
+  status: ContentReportStatus;
 
   @Column({ name: 'resolved_by', type: 'bigint', nullable: true })
   resolvedBy: string;

@@ -32,9 +32,7 @@ export class StaffProfileRepository implements IStaffProfileRepository {
 
   findAll(): Promise<StaffProfile[]> {
     return this.repository.find({
-      relations: {
-        user: { roles: { permissions: true }, permissionOverrides: { permission: true } },
-      },
+      relations: { roles: { permissions: true } },
       order: { id: 'ASC' },
     });
   }
@@ -42,36 +40,38 @@ export class StaffProfileRepository implements IStaffProfileRepository {
   async findById(id: string): Promise<StaffProfile | null> {
     return this.repository.findOne({
       where: { id },
-      relations: {
-        user: { roles: { permissions: true }, permissionOverrides: { permission: true } },
-      },
+      relations: { roles: { permissions: true } },
     });
   }
 
-  async findByUserId(userId: string): Promise<StaffProfile | null> {
+  async findByEmail(email: string): Promise<StaffProfile | null> {
     return this.repository.findOne({
-      where: { userId },
-      relations: {
-        user: { roles: { permissions: true }, permissionOverrides: { permission: true } },
-      },
+      where: { email },
+      relations: { roles: { permissions: true } },
     });
+  }
+
+  async findByEmailWithPassword(email: string): Promise<StaffProfile | null> {
+    return this.repository
+      .createQueryBuilder('staff')
+      .addSelect('staff.password')
+      .leftJoinAndSelect('staff.roles', 'role')
+      .leftJoinAndSelect('role.permissions', 'permission')
+      .where('staff.email = :email', { email })
+      .getOne();
   }
 
   async findByEmployeeCode(employeeCode: string): Promise<StaffProfile | null> {
     return this.repository.findOne({
       where: { employeeCode },
-      relations: {
-        user: { roles: { permissions: true }, permissionOverrides: { permission: true } },
-      },
+      relations: { roles: { permissions: true } },
     });
   }
 
   async findByPersonalEmail(email: string): Promise<StaffProfile | null> {
     return this.repository.findOne({
       where: { personalEmail: email },
-      relations: {
-        user: { roles: { permissions: true }, permissionOverrides: { permission: true } },
-      },
+      relations: { roles: { permissions: true } },
     });
   }
 
@@ -113,7 +113,7 @@ export class StaffProfileRepository implements IStaffProfileRepository {
     ),
     0
   ) AS max_number
-  FROM users
+  FROM staffs
   WHERE email REGEXP ?
   `,
       [basePrefix, `^${basePrefix}[0-9]+@${EMAIL_DOMAIN.replace(/\./g, '\\.')}$`],
@@ -169,7 +169,7 @@ export class StaffProfileRepository implements IStaffProfileRepository {
     ),
     0
   ) AS max_number
-  FROM staff_profiles
+  FROM staffs
   WHERE employee_code LIKE ?
   `,
       [`__${year}%`],

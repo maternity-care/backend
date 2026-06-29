@@ -2,9 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
+import { AccountStatus } from '../../../common/constants/status.enum';
 import { IUsersRepository } from '../interfaces/users-repository.interface';
 import { SearchUserDto } from '../dto/request/search-user.dto';
 import { SearchUserResponseDto } from '../dto/response/search-user-response.dto';
+import { parseSearch, searchBuilder } from '../../../common/helpers/search-builder';
 
 @Injectable()
 export class UsersRepository implements IUsersRepository {
@@ -54,7 +56,7 @@ export class UsersRepository implements IUsersRepository {
       .getOne();
   }
 
-  async updateStatus(id: string, status: number): Promise<void> {
+  async updateStatus(id: string, status: AccountStatus): Promise<void> {
     await this.repository.update(id, { status });
   }
 
@@ -72,6 +74,20 @@ export class UsersRepository implements IUsersRepository {
       .leftJoinAndSelect('role.permissions', 'permission')
       .leftJoinAndSelect('user.permissionOverrides', 'permissionOverride')
       .leftJoinAndSelect('permissionOverride.permission', 'overridePermission');
+
+    const keyword = parseSearch(query.search).find(
+      (filter) => filter.field === 'keyword',
+    )?.values[0];
+    if (keyword) {
+      qb.andWhere(
+        '(user.name LIKE :keyword OR user.email LIKE :keyword OR user.phone LIKE :keyword)',
+        { keyword: `%${keyword}%` },
+      );
+    }
+    searchBuilder(qb, query.search, {
+      columns: ['name', 'email', 'phone', 'status'],
+      relations: { roles: ['id', 'name'] },
+    });
 
     if (query.name) {
       qb.andWhere('user.name LIKE :name', {

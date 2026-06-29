@@ -5,6 +5,9 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Time } from 'bullmq';
+import { FacilityStatus } from '../../../common/constants/status.enum';
+
 
 @Entity('facilities')
 export class Facility {
@@ -22,6 +25,15 @@ export class Facility {
 
   @Column({ type: 'varchar', length: 190, nullable: true })
   email: string;
+
+  @Column({ type: 'time', nullable: true })
+  open_time: Time;
+
+  @Column({ type: 'time', nullable: true })
+  close_time: Time;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  working_days: string;
 
   @Column({ type: 'varchar', length: 500 })
   address: string;
@@ -42,7 +54,7 @@ export class Facility {
   longitude: string;
 
   @Column({ type: 'varchar', length: 30 })
-  status: string;
+  status: FacilityStatus;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;

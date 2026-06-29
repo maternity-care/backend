@@ -14,6 +14,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
 import { UsersModule } from './modules/users/users.module';
 import { FacilitiesModule } from './modules/facilities/facilities.module';
 import { RoomsModule } from './modules/rooms/rooms.module';
+import { StaffsModule } from './modules/staffs/staffs.module';
 import { PregnancyProfileModule } from './modules/pregnancy-profile/pregnancy-profile.module';
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { PregnancyProfileModule } from './modules/pregnancy-profile/pregnancy-pr
     DatabaseModule,
     AuthModule,
     UsersModule,
+    StaffsModule,
     RolesModule,
     PermissionsModule,
     JobsModule,

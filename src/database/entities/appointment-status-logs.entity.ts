@@ -4,6 +4,7 @@ import {
   Entity,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { AppointmentStatus } from '../../common/constants/status.enum';
 
 @Entity('appointment_status_logs')
 export class AppointmentStatuLog {
@@ -14,10 +15,10 @@ export class AppointmentStatuLog {
   appointmentId: string;
 
   @Column({ name: 'old_status', type: 'varchar', length: 30, nullable: true })
-  oldStatus: string;
+  oldStatus: AppointmentStatus;
 
   @Column({ name: 'new_status', type: 'varchar', length: 30 })
-  newStatus: string;
+  newStatus: AppointmentStatus;
 
   @Column({ type: 'varchar', length: 500, nullable: true })
   reason: string;
