@@ -32,4 +32,10 @@ export const RESPONSE_MESSAGES = {
   LOGGED_OUT: 'Logged out successfully',
   PASSWORD_RESET_REQUESTED: 'Password reset instructions have been generated',
   PASSWORD_RESET_SUCCESS: 'Password reset successfully',
+  PREGNANCY_PROFILES: {
+    CREATED_SUCCESS: 'Pregnancy profile created successfully',
+    RETRIEVED: 'Pregnancy profile retrieved successfully',
+    UPDATED: 'Pregnancy profile updated successfully',
+    DELETED: 'Pregnancy profile deleted successfully',
+  },
 } as const;
