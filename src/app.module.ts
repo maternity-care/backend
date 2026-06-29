@@ -14,6 +14,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
 import { UsersModule } from './modules/users/users.module';
 import {FacilitiesModule} from "./modules/facilities/facilities.module";
 import { RoomsModule } from './modules/rooms/rooms.module';
+import { StaffsModule } from './modules/staffs/staffs.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -37,6 +38,7 @@ import { RoomsModule } from './modules/rooms/rooms.module';
     DatabaseModule,
     AuthModule,
     UsersModule,
+    StaffsModule,
     RolesModule,
     PermissionsModule,
     JobsModule,
