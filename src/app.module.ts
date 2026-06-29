@@ -12,8 +12,9 @@ import { RolesModule } from './modules/roles/roles.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { UsersModule } from './modules/users/users.module';
-import {FacilitiesModule} from "./modules/facilities/facilities.module";
+import { FacilitiesModule } from './modules/facilities/facilities.module';
 import { RoomsModule } from './modules/rooms/rooms.module';
+import { PregnancyProfileModule } from './modules/pregnancy-profile/pregnancy-profile.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -44,6 +45,7 @@ import { RoomsModule } from './modules/rooms/rooms.module';
     SettingsModule,
     FacilitiesModule,
     RoomsModule,
+    PregnancyProfileModule,
   ],
 })
 export class AppModule {}
