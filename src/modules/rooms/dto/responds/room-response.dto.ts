@@ -1,11 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ActiveStatus } from '../../../../common/constants/status.enum';
 
 export class RoomResponseDto {
   @ApiProperty()
   id: string;
 
-  // @ApiProperty()
-  // facilityId: string;
+  @ApiProperty()
+  facilityId: string;
 
   @ApiProperty()
   name: string;
@@ -17,7 +18,7 @@ export class RoomResponseDto {
   floor?: string;
 
   @ApiProperty()
-  status: string;
+  status: ActiveStatus;
 
   @ApiProperty()
   createdAt: Date;

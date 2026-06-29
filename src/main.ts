@@ -19,7 +19,12 @@ async function bootstrap(): Promise<void> {
     origin: nodeEnv === 'development' ? true : corsOrigins,
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Accept',
+      'X-Facility-Id',
+    ],
   });
 
   app.useGlobalPipes(

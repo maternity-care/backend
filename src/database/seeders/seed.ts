@@ -8,11 +8,22 @@ import { Permission } from '../../modules/permissions/entities/permission.entity
 import { Role } from '../../modules/roles/entities/role.entity';
 import { Setting } from '../../modules/settings/entities/setting.entity';
 import { User } from '../../modules/users/entities/user.entity';
+import { StaffProfile } from '../../modules/staffs/entities/staff-profiles.entity';
+import {
+  AccountStatus,
+  ActiveStatus,
+  FacilityStatus,
+} from '../../common/constants/status.enum';
+import { Facility } from '../../modules/facilities/entities/facilities.entity';
+import { FacilityStaff } from '../../modules/facilities/entities/facility-staff.entity';
+import { Doctor } from '../../modules/doctors/entities/doctors.entity';
+import { Room } from '../../modules/rooms/entities/rooms.entity';
 
 type SeederClass =
   | 'DatabaseSeeder'
   | 'RolesAndPermissionsSeeder'
   | 'UsersSeeder'
+  | 'FacilitiesAndStaffSeeder'
   | 'SettingsSeeder';
 
 interface SeedUser {
@@ -107,16 +118,6 @@ const rolePermissionMap: Record<RoleEnum, PermissionEnum[]> = {
 };
 
 const seedUsers: SeedUser[] = [
-  {
-    name: 'Super Administrator',
-    email: 'superadmin@example.com',
-    phone: '0987654321',
-    role: RoleEnum.SUPER_ADMIN,
-  },
-  { name: 'Administrator', email: 'admin@example.com', phone: '0987654322', role: RoleEnum.ADMIN },
-  { name: 'Doctor Demo', email: 'doctor@example.com', phone: '0987654323', role: RoleEnum.DOCTOR },
-  { name: 'Nurse Demo', email: 'nurse@example.com', phone: '0987654324', role: RoleEnum.NURSE },
-  { name: 'Staff Demo', email: 'staff@example.com', phone: '0987654325', role: RoleEnum.STAFF },
   { name: 'Member Demo', email: 'member@example.com', phone: '0987654326', role: RoleEnum.MEMBER },
   {
     name: 'Partner Demo',
@@ -220,6 +221,7 @@ class UsersSeeder {
 
     const roleRepository = this.connection.getRepository(Role);
     const userRepository = this.connection.getRepository(User);
+    const staffRepository = this.connection.getRepository(StaffProfile);
     const saltRounds = Number(process.env.BCRYPT_SALT_ROUNDS ?? 10);
     const password = await bcrypt.hash('password', saltRounds);
 
@@ -235,7 +237,7 @@ class UsersSeeder {
 
       if (existingUser) {
         existingUser.name = seedUser.name;
-        existingUser.status = 1;
+        existingUser.status = AccountStatus.ACTIVE;
         existingUser.roles = [role];
         await userRepository.save(existingUser);
         continue;
@@ -246,10 +248,177 @@ class UsersSeeder {
         email: seedUser.email,
         phone: seedUser.phone,
         password,
-        status: 1,
+        status: AccountStatus.ACTIVE,
         roles: [role],
       });
       await userRepository.save(user);
+    }
+
+    const superAdminRole = await roleRepository.findOneOrFail({
+      where: { name: RoleEnum.SUPER_ADMIN },
+      relations: { permissions: true },
+    });
+    let superAdmin = await staffRepository.findOne({
+      where: { email: 'superadmin@example.com' },
+      relations: { roles: true },
+    });
+    if (!superAdmin) {
+      superAdmin = staffRepository.create({
+        name: 'Super Administrator',
+        email: 'superadmin@example.com',
+        phone: '0987654321',
+        password,
+        personalEmail: 'superadmin@example.com',
+        employeeCode: 'SA00000001',
+        status: AccountStatus.ACTIVE,
+        roles: [superAdminRole],
+      });
+    } else {
+      superAdmin.password = password;
+      superAdmin.status = AccountStatus.ACTIVE;
+      superAdmin.roles = [superAdminRole];
+    }
+    await staffRepository.save(superAdmin);
+  }
+}
+
+const seedFacilities = [
+  {
+    code: 'DEMO-HN',
+    name: 'Maternity Care Hà Nội',
+    phone: '02473001234',
+    email: 'hanoi@maternity-care.local',
+    address: '123 Trần Duy Hưng',
+    province: 'Hà Nội',
+    district: 'Cầu Giấy',
+    ward: 'Trung Hòa',
+    latitude: '21.0075000',
+    longitude: '105.8019000',
+  },
+  {
+    code: 'DEMO-HCM',
+    name: 'Maternity Care Hồ Chí Minh',
+    phone: '02873001234',
+    email: 'hcm@maternity-care.local',
+    address: '456 Nguyễn Thị Minh Khai',
+    province: 'Hồ Chí Minh',
+    district: 'Quận 3',
+    ward: 'Phường 5',
+    latitude: '10.7756000',
+    longitude: '106.6871000',
+  },
+];
+
+const seedFacilityStaff = [
+  { role: RoleEnum.ADMIN, name: 'Admin', phone: '0901000001' },
+  { role: RoleEnum.DOCTOR, name: 'Bác sĩ', phone: '0901000002' },
+  { role: RoleEnum.NURSE, name: 'Điều dưỡng', phone: '0901000003' },
+  { role: RoleEnum.STAFF, name: 'Nhân viên', phone: '0901000004' },
+];
+
+const seedRooms = [
+  { name: 'Phòng khám thai 01', roomType: 'exam', floor: '1' },
+  { name: 'Phòng siêu âm 01', roomType: 'ultrasound', floor: '1' },
+  { name: 'Phòng xét nghiệm 01', roomType: 'lab', floor: '2' },
+  { name: 'Phòng tư vấn 01', roomType: 'consultation', floor: '2' },
+  { name: 'Phòng cấp cứu 01', roomType: 'emergency', floor: '1' },
+];
+
+class FacilitiesAndStaffSeeder {
+  constructor(private readonly connection: DataSource) {}
+
+  async run(): Promise<void> {
+    await new RolesAndPermissionsSeeder(this.connection).run();
+    const facilityRepository = this.connection.getRepository(Facility);
+    const staffRepository = this.connection.getRepository(StaffProfile);
+    const assignmentRepository = this.connection.getRepository(FacilityStaff);
+    const roleRepository = this.connection.getRepository(Role);
+    const doctorRepository = this.connection.getRepository(Doctor);
+    const roomRepository = this.connection.getRepository(Room);
+    const password = await bcrypt.hash(
+      'password',
+      Number(process.env.BCRYPT_SALT_ROUNDS ?? 10),
+    );
+
+    for (const [facilityIndex, facilityData] of seedFacilities.entries()) {
+      const existingFacility = await facilityRepository.findOne({
+        where: { code: facilityData.code },
+      });
+      const facility = await facilityRepository.save(
+        facilityRepository.create({
+          ...existingFacility,
+          ...facilityData,
+          status: FacilityStatus.ACTIVE,
+        }),
+      );
+
+      for (const [staffIndex, staffData] of seedFacilityStaff.entries()) {
+        const email =
+          `${staffData.role}.${facilityData.code.toLowerCase()}@example.com`;
+        const existingStaff = await staffRepository.findOne({
+          where: { email },
+          relations: { roles: true },
+        });
+        const staff = await staffRepository.save(
+          staffRepository.create({
+            ...existingStaff,
+            name: `${staffData.name} ${facility.name}`,
+            email,
+            phone:
+              `090${facilityIndex + 1}${String(staffIndex + 1).padStart(6, '0')}`,
+            password,
+            personalEmail: email,
+            employeeCode:
+              `DEMO${facilityIndex + 1}${String(staffIndex + 1).padStart(2, '0')}`,
+            status: AccountStatus.ACTIVE,
+            roles: [],
+          }),
+        );
+        const role = await roleRepository.findOneOrFail({
+          where: { name: staffData.role },
+        });
+        await assignmentRepository.save(
+          assignmentRepository.create({
+            facilityId: facility.id,
+            staffId: staff.id,
+            roleId: role.id,
+            status: ActiveStatus.ACTIVE,
+            assignedAt: new Date(),
+          }),
+        );
+
+        if (staffData.role === RoleEnum.DOCTOR) {
+          const doctor = await doctorRepository.findOne({
+            where: { staffId: staff.id },
+          });
+          await doctorRepository.save(
+            doctorRepository.create({
+              ...doctor,
+              staffId: staff.id,
+              licenseNo: `DEMO-LICENSE-${facilityIndex + 1}`,
+              title: 'Bác sĩ chuyên khoa I',
+              specialty: 'Sản phụ khoa',
+              yearsOfExperience: 8,
+              bio: `Bác sĩ mẫu tại ${facility.name}.`,
+              status: ActiveStatus.ACTIVE,
+            }),
+          );
+        }
+      }
+
+      for (const roomData of seedRooms) {
+        const existingRoom = await roomRepository.findOne({
+          where: { facilityId: facility.id, name: roomData.name },
+        });
+        await roomRepository.save(
+          roomRepository.create({
+            ...existingRoom,
+            ...roomData,
+            facilityId: facility.id,
+            status: ActiveStatus.ACTIVE,
+          }),
+        );
+      }
     }
   }
 }
@@ -284,6 +453,7 @@ class DatabaseSeeder {
   async run(): Promise<void> {
     await new RolesAndPermissionsSeeder(this.connection).run();
     await new UsersSeeder(this.connection).run();
+    await new FacilitiesAndStaffSeeder(this.connection).run();
     await new SettingsSeeder(this.connection).run();
   }
 }
@@ -309,6 +479,10 @@ function resolveSeederClass(): SeederClass {
     users: 'UsersSeeder',
     'admin-user': 'UsersSeeder',
     UsersSeeder: 'UsersSeeder',
+    facilities: 'FacilitiesAndStaffSeeder',
+    staff: 'FacilitiesAndStaffSeeder',
+    'facilities-staff': 'FacilitiesAndStaffSeeder',
+    FacilitiesAndStaffSeeder: 'FacilitiesAndStaffSeeder',
     settings: 'SettingsSeeder',
     SettingsSeeder: 'SettingsSeeder',
   };
@@ -317,7 +491,7 @@ function resolveSeederClass(): SeederClass {
 
   if (!seederClass) {
     throw new Error(
-      `Unknown seeder "${requestedSeeder}". Available seeders: DatabaseSeeder, RolesAndPermissionsSeeder, UsersSeeder`,
+      `Unknown seeder "${requestedSeeder}". Available seeders: DatabaseSeeder, RolesAndPermissionsSeeder, UsersSeeder, FacilitiesAndStaffSeeder, SettingsSeeder`,
     );
   }
 
@@ -337,6 +511,11 @@ async function runSeeder(seederClass: SeederClass): Promise<void> {
 
   if (seederClass === 'SettingsSeeder') {
     await new SettingsSeeder(dataSource).run();
+    return;
+  }
+
+  if (seederClass === 'FacilitiesAndStaffSeeder') {
+    await new FacilitiesAndStaffSeeder(dataSource).run();
     return;
   }
 

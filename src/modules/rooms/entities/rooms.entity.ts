@@ -2,9 +2,13 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { ActiveStatus } from '../../../common/constants/status.enum';
+import { Facility } from '../../facilities/entities/facilities.entity';
 
 @Entity('rooms')
 export class Room {
@@ -13,6 +17,10 @@ export class Room {
 
   @Column({ name: 'facility_id', type: 'bigint' })
   facilityId: string;
+
+  @ManyToOne(() => Facility, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'facility_id' })
+  facility: Facility;
 
   @Column({ type: 'varchar', length: 150 })
   name: string;
@@ -24,7 +32,7 @@ export class Room {
   floor: string;
 
   @Column({ type: 'varchar', length: 30 })
-  status: string;
+  status: ActiveStatus;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;

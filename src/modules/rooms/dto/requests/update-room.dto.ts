@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { ActiveStatus } from '../../../../common/constants/status.enum';
 
 export class UpdateRoomDto {
   @ApiPropertyOptional()
@@ -22,8 +23,8 @@ export class UpdateRoomDto {
   @IsOptional()
   floor?: string;
 
-  @ApiPropertyOptional()
-  @IsString()
+  @ApiPropertyOptional({ enum: ActiveStatus })
+  @IsEnum(ActiveStatus)
   @IsOptional()
-  status?: string;
+  status?: ActiveStatus;
 }

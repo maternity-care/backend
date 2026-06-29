@@ -5,6 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { AppointmentStatus } from '../../common/constants/status.enum';
 
 @Entity('appointments')
 export class Appointment {
@@ -48,7 +49,7 @@ export class Appointment {
   checkedInAt: Date;
 
   @Column({ type: 'varchar', length: 30 })
-  status: string;
+  status: AppointmentStatus;
 
   @Column({ name: 'cancel_reason', type: 'varchar', length: 500, nullable: true })
   cancelReason: string;

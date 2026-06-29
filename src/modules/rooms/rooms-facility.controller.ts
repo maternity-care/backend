@@ -1,12 +1,16 @@
-import { Controller, Get, HttpException, InternalServerErrorException, Param, Query } from '@nestjs/common';
+import { Controller, Get, HttpException, InternalServerErrorException, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RoomsService } from './rooms.service';
 import { RoomResponseDto } from './dto/responds/room-response.dto';
-import { SearchRoomsDto } from './dto/requests/search-rooms.dto';
+import { SearchRooms2Dto } from './dto/requests/search-room-2';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import { assertFacilityAccess } from '../../common/helpers/facility-scope.helper';
 
 @ApiTags('Management - Rooms')
 @ApiBearerAuth()
-//@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('management/facility')
 
 export class RoomsFacilityController {
@@ -23,8 +27,13 @@ export class RoomsFacilityController {
   @Get('rooms/:facilityId')
   @ApiOperation({ summary: 'Get rooms by facility'})
   @ApiResponse({ status : 200, description: 'Rooms found', type: [RoomResponseDto] })
-  async findRoomsByFacility(@Param('facilityId') facilityId: string, @Query() filters: SearchRoomsDto) {
+  async findRoomsByFacility(
+  @CurrentUser() user: AuthenticatedUser,
+  @Param('facilityId') facilityId: string,
+  // không cho facilityId optional vào đây vì facility bắt buộc
+  @Query() filters: SearchRooms2Dto  ) {
     try {
+      assertFacilityAccess(user, facilityId);
       const rooms = await this.roomsService.findByFacilityId(facilityId, filters);
       return {
         message: 'Lấy danh sách phòng theo cơ sở thành công',
