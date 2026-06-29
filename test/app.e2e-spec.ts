@@ -21,7 +21,8 @@ import { SettingsService } from '../src/modules/settings/settings.service';
 import { ManagementUploadsController } from '../src/modules/uploads/management-uploads.controller';
 import { UploadsController } from '../src/modules/uploads/uploads.controller';
 import { UploadsService } from '../src/modules/uploads/uploads.service';
-import { ManagementUsersController } from '../src/modules/users/management-users.controller';
+import { ManagementStaffsController } from '../src/modules/staffs/management-staffs.controller';
+import { StaffManagementService } from '../src/modules/staffs/staff-management.service';
 import { ManagementSystemUsersController } from '../src/modules/users/management-system-users.controller';
 import { UsersController } from '../src/modules/users/users.controller';
 import { UsersService } from '../src/modules/users/users.service';
@@ -51,6 +52,13 @@ describe('Application routes (e2e)', () => {
       createUser: jest.fn().mockResolvedValue(record),
       findUserById: jest.fn().mockResolvedValue(record),
       updateUser: jest.fn().mockResolvedValue(record),
+      updateStatus: jest.fn().mockResolvedValue(undefined),
+    };
+    const staffManagementService = {
+      findAll: jest.fn().mockResolvedValue({ users: [record], total: 1 }),
+      create: jest.fn().mockResolvedValue(record),
+      findById: jest.fn().mockResolvedValue(record),
+      update: jest.fn().mockResolvedValue(record),
       updateStatus: jest.fn().mockResolvedValue(undefined),
     };
     const rolesService = {
@@ -96,7 +104,7 @@ describe('Application routes (e2e)', () => {
       controllers: [
         AuthController,
         UsersController,
-        ManagementUsersController,
+        ManagementStaffsController,
         ManagementSystemUsersController,
         RolesController,
         PermissionsController,
@@ -112,6 +120,7 @@ describe('Application routes (e2e)', () => {
       providers: [
         { provide: AuthService, useValue: authService },
         { provide: UsersService, useValue: usersService },
+        { provide: StaffManagementService, useValue: staffManagementService },
         { provide: RolesService, useValue: rolesService },
         { provide: PermissionsService, useValue: permissionsService },
         { provide: SettingsService, useValue: settingsService },
