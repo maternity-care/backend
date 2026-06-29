@@ -6,6 +6,7 @@ import { IRoomsRepository } from '../interfaces/rooms-repository.interface';
 import { SearchRoomsDto } from '../dto/requests/search-rooms.dto';
 import { SearchRooms2Dto } from '../dto/requests/search-room-2';
 import { paginate } from '../../../common/helpers/pagination';
+import { searchBuilder } from '../../../common/helpers/search-builder';
 @Injectable()
 export class RoomsRepository implements IRoomsRepository {
   constructor(
@@ -24,16 +25,18 @@ export class RoomsRepository implements IRoomsRepository {
   async findAll(filters?: SearchRoomsDto): Promise<Room[]> {
     const query = this.repository.createQueryBuilder('room').select([
       'room.id',
+      'room.facilityId',
       'room.name',
+      'room.roomType',
       'room.floor',
       'room.status',
       'room.createdAt',
       'room.updatedAt',
     ]);
 
-    if (filters?.search) {
-      query.andWhere('LOWER(room.name) LIKE LOWER(:search)', { search: `%${filters.search}%` });
-    }
+    searchBuilder(query, filters?.search, {
+      columns: ['name', 'roomType', 'floor', 'status', 'facilityId'],
+    });
 
     if (filters?.floor) {
       query.andWhere('room.floor = :floor', { floor: filters.floor });
@@ -55,7 +58,9 @@ export class RoomsRepository implements IRoomsRepository {
     async findAllPaginated(filters?: SearchRoomsDto) {
       const query = this.repository.createQueryBuilder('room').select([
         'room.id',
+        'room.facilityId',
         'room.name',
+        'room.roomType',
         'room.floor',
         'room.status',
         'room.createdAt',
@@ -66,9 +71,9 @@ export class RoomsRepository implements IRoomsRepository {
         query.where('room.facilityId = :facilityId', { facilityId: filters.facilityId });
       }
 
-      if (filters?.search) {
-        query.andWhere('LOWER(room.name) LIKE LOWER(:search)', { search: `%${filters.search}%` });
-      }
+      searchBuilder(query, filters?.search, {
+        columns: ['name', 'roomType', 'floor', 'status', 'facilityId'],
+      });
 
       if (filters?.floor) {
         query.andWhere('room.floor = :floor', { floor: filters.floor });
@@ -97,14 +102,20 @@ export class RoomsRepository implements IRoomsRepository {
 
   findByFacilityId(facilityId: string, filters?: SearchRooms2Dto): Promise<Room[]> {
     const query = this.repository.createQueryBuilder('room').where('room.facilityId = :facilityId', { facilityId })
-    .select(['room.id', 'room.name', 'room.floor', 'room.status', 'room.createdAt', 'room.updatedAt']);
+    .select([
+      'room.id',
+      'room.facilityId',
+      'room.name',
+      'room.roomType',
+      'room.floor',
+      'room.status',
+      'room.createdAt',
+      'room.updatedAt',
+    ]);
 
-    if (filters?.search) {
-      query.andWhere(
-        'LOWER(room.name) LIKE LOWER(:search)',
-        { search: `%${filters.search}%` },
-      );
-    }
+    searchBuilder(query, filters?.search, {
+      columns: ['name', 'roomType', 'floor', 'status', 'facilityId'],
+    });
 
     if (filters?.floor) {
       query.andWhere('room.floor = :floor', { floor: filters.floor });

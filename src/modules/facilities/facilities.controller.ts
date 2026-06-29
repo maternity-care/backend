@@ -14,9 +14,13 @@ import {
   assertFacilityAccess,
   getActiveFacilityId,
 } from '../../common/helpers/facility-scope.helper';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { RoleEnum } from '../../common/constants/role.enum';
 @ApiTags('Management - Facilities')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(RoleEnum.SUPER_ADMIN, RoleEnum.ADMIN)
 @Controller('management/facilities')
 export class FacilitiesController {
   constructor(private readonly facilitiesService: FacilitiesService) {}
@@ -86,6 +90,7 @@ export class FacilitiesController {
   }
 
   @Post()
+  @Roles(RoleEnum.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create facility' })
   @ApiResponse({ status: 201, type: FacilityResponseDto })
   async create(@Body() dto: CreateFacilityDto) {
@@ -121,6 +126,7 @@ export class FacilitiesController {
   }
 
   @Delete(':id')
+  @Roles(RoleEnum.SUPER_ADMIN)
   @ApiOperation({ summary: 'Delete facility' })
   @ApiResponse({ status: 200 })
   async remove(
