@@ -17,6 +17,7 @@ import {
   ActiveStatus,
   FacilityStatus,
 } from '../../../common/constants/status.enum';
+import { RESPONSE_MESSAGES } from '../../../common/constants/response-message.constant';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -95,7 +96,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       relations: { role: { permissions: true } },
     });
     const facilities = await this.facilityRepository.find({
-      where: { id: In(assignments.map((item) => item.facilityId)) },
+      where: {
+        id: In(assignments.map((item) => item.facilityId)),
+        status: FacilityStatus.ACTIVE,
+      },
       select: { id: true, name: true, code: true, status: true },
       order: { name: 'ASC' },
     });
@@ -143,7 +147,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       !requestedFacilityId &&
       !isBootstrapRequest
     ) {
-      throw new ForbiddenException('Vui lòng chọn cơ sở làm việc.');
+      throw new ForbiddenException(
+        RESPONSE_MESSAGES.FACILITY_SELECTION_REQUIRED,
+      );
     }
     if (
       !isSuperAdmin &&
@@ -151,7 +157,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       !activeFacility &&
       !isBootstrapRequest
     ) {
-      throw new ForbiddenException('Bạn không thuộc cơ sở đã chọn.');
+      throw new ForbiddenException(RESPONSE_MESSAGES.FACILITY_NOT_ASSIGNED);
     }
 
     return {
@@ -171,7 +177,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       facilities: mappedFacilities,
       facilityRole: activeFacility?.role ?? null,
       facilityRoles: activeFacility?.roles ?? [],
-      activeFacilityId: requestedFacilityId,
+      activeFacilityId: isSuperAdmin ? null : requestedFacilityId,
     };
   }
 }
