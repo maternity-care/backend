@@ -12,6 +12,7 @@ import { UploadsController } from './uploads/uploads.controller';
 import { ManagementStaffsController } from './staffs/management-staffs.controller';
 import { UsersController } from './users/users.controller';
 import { RoleEnum } from '../common/constants/role.enum';
+import { RESPONSE_MESSAGES } from '../common/constants/response-message.constant';
 
 describe('module controllers', () => {
   const user = {
@@ -39,34 +40,34 @@ describe('module controllers', () => {
     await expect(
       controller.register({ name: 'A', email: 'a@test.com', password: 'secret1' }),
     ).resolves.toMatchObject({
-      message: 'Registered successfully',
+      message: RESPONSE_MESSAGES.AUTH_REGISTERED,
       data: record,
     });
     await expect(
       controller.login({ email: 'a@test.com', password: 'secret1' }),
     ).resolves.toMatchObject({
-      message: 'Logged in successfully',
+      message: RESPONSE_MESSAGES.AUTH_LOGGED_IN,
       data: record,
     });
     await expect(controller.forgotPassword({ email: 'a@test.com' })).resolves.toMatchObject({
-      message: 'Password reset instructions have been generated',
+      message: RESPONSE_MESSAGES.PASSWORD_RESET_REQUESTED,
     });
     await expect(
       controller.resetPassword({ token: 'token', password: 'secret1' }),
     ).resolves.toEqual({
-      message: 'Password reset successfully',
+      message: RESPONSE_MESSAGES.PASSWORD_RESET_SUCCESS,
       data: null,
     });
     await expect(controller.refresh({ refresh_token: 'refresh' })).resolves.toMatchObject({
-      message: 'Token refreshed successfully',
+      message: RESPONSE_MESSAGES.AUTH_REFRESHED,
       data: record,
     });
     await expect(controller.logout({ refresh_token: 'refresh' })).resolves.toEqual({
-      message: 'Logged out successfully',
+      message: RESPONSE_MESSAGES.LOGGED_OUT,
       data: null,
     });
     await expect(controller.me(user as never)).resolves.toMatchObject({
-      message: 'Authenticated profile retrieved successfully',
+      message: RESPONSE_MESSAGES.AUTH_PROFILE_RETRIEVED,
       data: user,
     });
   });
@@ -88,12 +89,12 @@ describe('module controllers', () => {
     const managementController = new ManagementStaffsController(service as never);
 
     await expect(usersController.me(user as never)).resolves.toMatchObject({
-      message: 'Profile retrieved successfully',
+      message: RESPONSE_MESSAGES.PROFILE_RETRIEVED,
     });
     await expect(
       usersController.updateMe(user as never, { name: 'Updated' }),
     ).resolves.toMatchObject({
-      message: 'Profile updated successfully',
+      message: RESPONSE_MESSAGES.PROFILE_UPDATED,
     });
     await expect(managementController.findAll(user as never, {})).resolves.toMatchObject({
       message: 'Lấy danh sách nhân viên thành công.',
@@ -135,36 +136,36 @@ describe('module controllers', () => {
     const permissionsController = new PermissionsController(permissionService as never);
 
     await expect(rolesController.findAll()).resolves.toMatchObject({
-      message: 'Roles retrieved successfully',
+      message: RESPONSE_MESSAGES.ROLES_RETRIEVED,
     });
     await expect(rolesController.create({ name: 'admin' })).resolves.toMatchObject({
-      message: 'Role created successfully',
+      message: RESPONSE_MESSAGES.ROLE_CREATED,
     });
     await expect(rolesController.findOne('1')).resolves.toMatchObject({
-      message: 'Role retrieved successfully',
+      message: RESPONSE_MESSAGES.ROLE_RETRIEVED,
     });
     await expect(rolesController.update('1', { name: 'admin' })).resolves.toMatchObject({
-      message: 'Role updated successfully',
+      message: RESPONSE_MESSAGES.ROLE_UPDATED,
     });
     await expect(rolesController.remove('1')).resolves.toEqual({
-      message: 'Role deleted successfully',
+      message: RESPONSE_MESSAGES.ROLE_DELETED,
       data: null,
     });
 
     await expect(permissionsController.findAll()).resolves.toMatchObject({
-      message: 'Permissions retrieved successfully',
+      message: RESPONSE_MESSAGES.PERMISSIONS_RETRIEVED,
     });
     await expect(permissionsController.create({ name: 'user.view' })).resolves.toMatchObject({
-      message: 'Permission created successfully',
+      message: RESPONSE_MESSAGES.PERMISSION_CREATED,
     });
     await expect(permissionsController.findOne('1')).resolves.toMatchObject({
-      message: 'Permission retrieved successfully',
+      message: RESPONSE_MESSAGES.PERMISSION_RETRIEVED,
     });
     await expect(permissionsController.update('1', { name: 'user.view' })).resolves.toMatchObject({
-      message: 'Permission updated successfully',
+      message: RESPONSE_MESSAGES.PERMISSION_UPDATED,
     });
     await expect(permissionsController.remove('1')).resolves.toEqual({
-      message: 'Permission deleted successfully',
+      message: RESPONSE_MESSAGES.PERMISSION_DELETED,
       data: null,
     });
   });
@@ -202,12 +203,12 @@ describe('module controllers', () => {
     await expect(
       new SettingsController(settingsService as never).findPublic(),
     ).resolves.toMatchObject({
-      message: 'Public settings retrieved successfully',
+      message: RESPONSE_MESSAGES.PUBLIC_SETTINGS_RETRIEVED,
     });
     await expect(
       new ManagementSettingsController(settingsService as never).findAll(),
     ).resolves.toMatchObject({
-      message: 'Settings retrieved successfully',
+      message: RESPONSE_MESSAGES.SETTINGS_RETRIEVED,
     });
     await expect(
       new UploadsController(uploadService as never).createPresignedUpload(
@@ -215,22 +216,22 @@ describe('module controllers', () => {
         {} as never,
       ),
     ).resolves.toMatchObject({
-      message: 'User presigned upload URL created successfully',
+      message: RESPONSE_MESSAGES.USER_UPLOAD_PRESIGN_CREATED,
     });
     await expect(
       new ManagementUploadsController(uploadService as never).createPresignedUpload({} as never),
     ).resolves.toMatchObject({
-      message: 'Management presigned upload URL created successfully',
+      message: RESPONSE_MESSAGES.MANAGEMENT_UPLOAD_PRESIGN_CREATED,
     });
     await expect(
       new JobsController(jobsService as never).createTestJob({ message: 'hello' }),
     ).resolves.toMatchObject({
-      message: 'Test job created successfully',
+      message: RESPONSE_MESSAGES.TEST_JOB_CREATED,
     });
     await expect(
       new FacilitiesController(facilitiesService as never).findAll(user as never, {}),
     ).resolves.toMatchObject({
-      message: 'Lấy danh sách cơ sở thành công',
+      message: RESPONSE_MESSAGES.FACILITIES_RETRIEVED,
     });
     await expect(
       new RoomsController(roomsService as never).findAll(user as never, {}),
