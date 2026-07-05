@@ -16,5 +16,4 @@ export interface IFacilitiesRepository {
   findByName(name: string): Promise<Facility | null>;
   remove(facility: Facility): Promise<void>;
   updateStatus(id: string, status: FacilityStatus): Promise<Facility>;
-  
 }
