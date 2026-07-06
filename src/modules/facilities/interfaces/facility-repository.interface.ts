@@ -7,7 +7,9 @@ export const FACILITIES_REPOSITORY = Symbol('FACILITIES_REPOSITORY');
 
 // truy cap db 
 export interface IFacilitiesRepository {
+  // tạo một facility
   create(data: DeepPartial<Facility>): Facility;
+  //
   save(facility: Facility): Promise<Facility>;
   findAll(filters?: SearchFacilityDto): Promise<Facility[]>;
   findAllPaginated?(filters?: SearchFacilityDto): Promise<PaginationResult<Facility>>;
@@ -16,4 +18,5 @@ export interface IFacilitiesRepository {
   findByName(name: string): Promise<Facility | null>;
   remove(facility: Facility): Promise<void>;
   updateStatus(id: string, status: FacilityStatus): Promise<Facility>;
+  deActivateFacility(id: string): Promise<Facility>;
 }

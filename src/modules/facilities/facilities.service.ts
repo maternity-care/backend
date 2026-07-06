@@ -74,4 +74,12 @@ export class FacilitiesService {
     const facility = await this.findById(id);
     await this.facilitiesRepository.remove(facility);
   }
+
+  async deActivateFacility(id: string): Promise<Facility> {
+    const facility = await this.facilitiesRepository.deActivateFacility(id);
+    return facility;
+  }
+
+
+  
 }
