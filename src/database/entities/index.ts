@@ -4,7 +4,7 @@ export { StaffProfile } from '../../modules/staffs/entities/staff-profiles.entit
 export { Facility } from '../../modules/facilities/entities/facilities.entity';
 export { Room } from '../../modules/rooms/entities/rooms.entity';
 export { FacilityStaff } from '../../modules/facilities/entities/facility-staff.entity';
-export { DoctorShift } from './doctor-shifts.entity';
+export { DoctorShift } from '../../modules/doctor-shifts/entities/doctor-shifts.entity';
 export { Service } from './services.entity';
 export { FacilityService } from '../../modules/facilities/entities/facility-services.entity';
 export { MaternityPackage } from './maternity-packages.entity';
