@@ -125,6 +125,8 @@ export class FacilitiesController {
     }
   }
 
+
+
   @Delete(':id')
   @Roles(RoleEnum.SUPER_ADMIN)
   @ApiOperation({ summary: 'Delete facility' })
@@ -137,6 +139,26 @@ export class FacilitiesController {
       assertFacilityAccess(user, id);
       await this.facilitiesService.remove(id);
       return { message: RESPONSE_MESSAGES.FACILITY_DELETED, data: null };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Patch(':id/deactivate')
+  @ApiOperation({ summary: 'Update facility' })
+  @ApiResponse({ status: 200, type: FacilityResponseDto })
+  async deActivateFacility(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateFacilityDto,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      const data = await this.facilitiesService.deActivateFacility(id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITY_STATUS_UPDATED,
+        data: data,
+      };
     } catch (error) {
       this.handleError(error);
     }
