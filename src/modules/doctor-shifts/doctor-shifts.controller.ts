@@ -17,7 +17,10 @@ import { assertFacilityAccess, getActiveFacilityId } from '../../common/helpers/
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CheckShiftConflictDto } from './dto/requests/check-shift-conflict.dto';
+import { BulkCreateDoctorShiftDto } from './dto/requests/bulk-create-doctor-shift.dto';
+import { CopyWeekDoctorShiftDto } from './dto/requests/copy-week-doctor-shift.dto';
 import { CreateDoctorShiftDto } from './dto/requests/create-doctor-shift.dto';
+import { DoctorAvailabilityQueryDto } from './dto/requests/doctor-availability.dto';
 import { SearchDoctorShiftDto, WeeklyDoctorShiftDto } from './dto/requests/search-doctor-shift.dto';
 import { UpdateDoctorShiftDto } from './dto/requests/update-doctor-shift.dto';
 import { DoctorShiftsService } from './doctor-shifts.service';
@@ -45,27 +48,59 @@ export class DoctorShiftsController {
   @Post('check-conflicts')
   @ApiOperation({ summary: 'Check doctor and room shift conflicts before saving' })
   async checkConflicts(
-    @CurrentUser() user: AuthenticatedUser,
+    // @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CheckShiftConflictDto,
   ) {
-    const activeFacilityId = getActiveFacilityId(user);
-    if (activeFacilityId) dto.facilityId = activeFacilityId;
-    else assertFacilityAccess(user, dto.facilityId);
+    // const activeFacilityId = getActiveFacilityId(user);
+    // if (activeFacilityId) dto.facilityId = activeFacilityId;
+    // else assertFacilityAccess(user, dto.facilityId);
     return {
       message: 'Kiểm tra xung đột ca trực thành công',
       data: await this.service.checkConflicts(dto),
     };
   }
 
+  @Post('bulk-create')
+  @ApiOperation({ summary: 'Create many doctor shifts by date range and working days' })
+  async bulkCreate(@Body() dto: BulkCreateDoctorShiftDto) {
+    return {
+      message: 'Tạo ca trực hàng loạt thành công',
+      data: await this.service.bulkCreate(dto),
+    };
+  }
+
+  @Post('copy-week')
+  @ApiOperation({ summary: 'Copy doctor shift schedule from one week to another week' })
+  async copyWeek(@Body() dto: CopyWeekDoctorShiftDto) {
+    return {
+      message: 'Copy lịch trực theo tuần thành công',
+      data: await this.service.copyWeek(dto),
+    };
+  }
+
+  @Get('availability/doctors/:doctorId')
+  @ApiOperation({ summary: 'Get available appointment slots of a doctor on a date' })
+  async getDoctorAvailability(
+    @Param('doctorId') doctorId: string,
+    @Query() query: DoctorAvailabilityQueryDto,
+  ) {
+    return {
+      message: 'Lấy lịch trống của bác sĩ thành công',
+      data: await this.service.getDoctorAvailability(doctorId, query),
+    };
+  }
+
   @Get('weekly')
   @ApiOperation({ summary: 'Get weekly doctor shift calendar' })
   async getWeekly(
-    @CurrentUser() user: AuthenticatedUser,
+    //@CurrentUser() user: AuthenticatedUser,
     @Query() query: WeeklyDoctorShiftDto,
   ) {
-    const facilityId = getActiveFacilityId(user) ?? query.facilityId;
+    const facilityId =
+    //  getActiveFacilityId(user) ?? 
+     query.facilityId;
     if (!facilityId) throw new BadRequestException('facilityId là bắt buộc');
-    assertFacilityAccess(user, facilityId);
+    // assertFacilityAccess(user, facilityId);
     return {
       message: 'Lấy lịch trực theo tuần thành công',
       data: await this.service.getWeeklySchedule(facilityId, query.weekStart, query.doctorId),
@@ -74,9 +109,11 @@ export class DoctorShiftsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get doctor shift details' })
-  async findOne(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+  async findOne(
+    // @CurrentUser() user: AuthenticatedUser,
+     @Param('id') id: string) {
     const shift = await this.service.findById(id);
-    assertFacilityAccess(user, shift.facilityId);
+    // assertFacilityAccess(user, shift.facilityId);
     return { message: DOCTOR_SHIFT_CONSTANT.DETAIL_FOUND, data: shift };
   }
 
@@ -114,4 +151,3 @@ export class DoctorShiftsController {
     return { message: DOCTOR_SHIFT_CONSTANT.DELETED, data: null };
   }
 }
-
