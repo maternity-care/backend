@@ -8,7 +8,6 @@ import { SearchFacilityDto } from '../dto/requests/search-facility.dto';
 import { paginate } from '../../../common/helpers/pagination';
 import { RESPONSE_MESSAGES } from '../../../common/constants/response-message.constant';
 import { searchBuilder } from '../../../common/helpers/search-builder';
-
 @Injectable()
 export class FacilitiesRepository implements IFacilitiesRepository {
   constructor(
@@ -124,4 +123,16 @@ export class FacilitiesRepository implements IFacilitiesRepository {
     facility.status = status;
     return this.repository.save(facility);
   }
+
+  async deActivateFacility(id: string): Promise<Facility> {
+    const facility = await this.findById(id);
+    if (!facility) {
+      throw new Error(RESPONSE_MESSAGES.FACILITY_NOT_FOUND);
+    }
+    facility.status = FacilityStatus.INACTIVE;
+    return this.repository.save(facility);
+  }
+
+
+  
 }

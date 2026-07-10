@@ -5,7 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { DoctorShiftStatus } from '../../common/constants/status.enum';
+import { DoctorShiftStatus } from '../../../common/constants/status.enum';
 
 @Entity('doctor_shifts')
 export class DoctorShift {
@@ -19,7 +19,7 @@ export class DoctorShift {
   facilityId: string;
 
   @Column({ name: 'room_id', type: 'bigint', nullable: true })
-  roomId: string;
+  roomId: string | null;
 
   @Column({ name: 'shift_date', type: 'date' })
   shiftDate: string;
@@ -31,7 +31,7 @@ export class DoctorShift {
   endTime: string;
 
   @Column({ name: 'max_appointments', type: 'int', nullable: true })
-  maxAppointments: number;
+  maxAppointments: number | null;
 
   @Column({ type: 'varchar', length: 30 })
   status: DoctorShiftStatus;
