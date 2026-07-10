@@ -7,6 +7,7 @@ import { RoomsService } from '../../rooms/rooms.service';
 import { DoctorShift } from '../entities/doctor-shifts.entity';
 import { CheckShiftConflictDto } from '../dto/requests/check-shift-conflict.dto';
 import { CreateDoctorShiftDto } from '../dto/requests/create-doctor-shift.dto';
+import { DoctorAvailabilityQueryDto } from '../dto/requests/doctor-availability.dto';
 import {
   addDays,
   currentWeekStart,
@@ -31,10 +32,13 @@ export class DoctorShiftsValidator {
   ) {}
 
   async validateForCreate(dto: CreateDoctorShiftDto): Promise<void> {
+    
     const facility = await this.validateReferences(dto.doctorId, dto.facilityId, dto.roomId);
+
     validateSchedule(dto.shiftDate, dto.startTime, dto.endTime, true);
     validateStatusDetails(dto.status, dto.roomId);
     validateFacilityHours(facility, dto.startTime, dto.endTime, dto.status);
+    
     throwIfConflicted(await this.repository.findConflicts(dto));
   }
 
@@ -56,17 +60,34 @@ export class DoctorShiftsValidator {
   }
 
   async validateForConflictCheck(dto: CheckShiftConflictDto): Promise<void> {
+    // kiểm tra xem bác sĩ, cơ sở y tế và phòng có hợp lệ không, nếu không hợp lệ thì ném ra lỗi xung đột.
     const facility = await this.validateReferences(dto.doctorId, dto.facilityId, dto.roomId);
+    //kiểm tra xem ca trực có hợp lệ không, nếu không hợp lệ thì ném ra lỗi xung đột.
     validateSchedule(dto.shiftDate, dto.startTime, dto.endTime, true);
+    // kiểm tra xem ca trực có hợp lệ không, nếu không hợp lệ thì ném ra lỗi xung đột.
     validateFacilityHours(facility, dto.startTime, dto.endTime, DoctorShiftStatus.AVAILABLE);
   }
 
+  async validateDoctorAvailabilityInput(
+    doctorId: string,
+    query: DoctorAvailabilityQueryDto,
+  ): Promise<void> {
+    await this.ensureActiveFacility(query.facilityId);
+    if (!await this.repository.isDoctorAssignedToFacility(doctorId, query.facilityId)) {
+      throw new ConflictException(DOCTOR_SHIFT_CONSTANT.DOCTOR_NOT_ASSIGNED);
+    }
+  }
+
+  // trả về start, end của tuần, 
+  // đồng thời kiểm tra xem cơ sở y tế có hợp lệ không, 
+  // nếu không hợp lệ thì ném ra lỗi xung đột.
   async prepareWeeklyRange(
     facilityId: string,
     weekStart?: string,
     doctorId?: string,
   ): Promise<{ start: string; end: string }> {
     await this.ensureActiveFacility(facilityId);
+    // nếu có doctorId nhưng bác sĩ không được chỉ định cho cơ sở y tế, ném ra lỗi xung đột.
     if (doctorId && !await this.repository.isDoctorAssignedToFacility(doctorId, facilityId)) {
       throw new ConflictException(DOCTOR_SHIFT_CONSTANT.DOCTOR_NOT_ASSIGNED);
     }
@@ -74,6 +95,8 @@ export class DoctorShiftsValidator {
     return { start, end: addDays(start, 6) };
   }
 
+  //kiem tra bac si co hop le khong, co hop le thi tra ve facility
+  //dong thoi kiem tra room co hop le khong
   private async validateReferences(
     doctorId: string,
     facilityId: string,
@@ -92,6 +115,8 @@ export class DoctorShiftsValidator {
     return facility;
   }
 
+
+  //kiem tra status facility
   private async ensureActiveFacility(facilityId: string): Promise<Facility> {
     const facility = await this.facilitiesService.findById(facilityId);
     if (facility.status !== FacilityStatus.ACTIVE) {

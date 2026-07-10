@@ -3,6 +3,7 @@ import { DoctorShiftStatus } from '../../../common/constants/status.enum';
 import { DOCTOR_SHIFT_CONSTANT } from '../../../common/constants/doctor-shift.constant';
 import { Facility } from '../../facilities/entities/facilities.entity';
 import { ShiftConflicts } from '../interfaces/shift-conflicts.interface';
+import { ShiftWorkingDay } from '../dto/requests/bulk-create-doctor-shift.dto';
 
 /** Kiểm tra id nhận từ path trước khi truy vấn database. */
 export function validateShiftId(id: string): void {
@@ -105,3 +106,77 @@ export function addDays(date: string, days: number): string {
   return value.toISOString().slice(0, 10);
 }
 
+
+// Tính số ngày giữa hai ngày, không phụ thuộc timezone
+export function dateDiffInDays(fromDate: string, toDate: string): number {
+  const from = new Date(`${fromDate}T00:00:00Z`).getTime();
+  const to = new Date(`${toDate}T00:00:00Z`).getTime();
+  return Math.round((to - from) / (24 * 60 * 60 * 1000));
+}
+
+export function workingDayOf(date: string): ShiftWorkingDay {
+  const day = new Date(`${date}T00:00:00Z`).getUTCDay();
+  return [
+    ShiftWorkingDay.SUN,
+    ShiftWorkingDay.MON,
+    ShiftWorkingDay.TUE,
+    ShiftWorkingDay.WED,
+    ShiftWorkingDay.THU,
+    ShiftWorkingDay.FRI,
+    ShiftWorkingDay.SAT,
+  ][day];
+}
+
+
+// Xây dựng danh sách các ngày làm việc trong khoảng thời gian cho trước
+export function buildShiftDates(
+  fromDate: string,
+  toDate: string,
+  workingDays: ShiftWorkingDay[],
+): string[] {
+  // tính số ngày
+  const diff = dateDiffInDays(fromDate, toDate);
+  // tạo mảng các ngày từ fromDate đến toDate, 
+  // sau đó lọc ra những ngày mà thứ của nó nằm trong workingDays
+  // const dates: string[] = [];
+  // // lặp qua từng ngày trong khoảng từ fromDate đến toDate
+  // for (let i = 0; i <= diff; i++) {
+  //   const date = addDays(fromDate, i);
+  //   if (workingDays.includes(workingDayOf(date))) {
+  //     dates.push(date);
+  //   }
+  // }
+  // return dates;
+  // (_, index) => addDays(fromDate, index): tạo một mảng các ngày từ fromDate đến toDate
+  return Array.from({ length: diff + 1 }, (_, index) => addDays(fromDate, index))
+    .filter(date => workingDays.includes(workingDayOf(date)));
+}
+
+export function timeToMinutes(value: string): number {
+  const [hour, minute] = normalizeTime(value).split(':').map(Number);
+  return hour * 60 + minute;
+}
+
+export function minutesToTime(value: number): string {
+  const hour = Math.floor(value / 60).toString().padStart(2, '0');
+  const minute = (value % 60).toString().padStart(2, '0');
+  return `${hour}:${minute}:00`;
+}
+
+export function timesOverlap(
+  firstStart: string,
+  firstEnd: string,
+  secondStart: string,
+  secondEnd: string,
+): boolean {
+  return normalizeTime(firstStart) < normalizeTime(secondEnd)
+    && normalizeTime(firstEnd) > normalizeTime(secondStart);
+}
+
+export function dateTimeToTime(value: Date | string): string {
+  const date = value instanceof Date ? value : new Date(value);
+  const hour = date.getHours().toString().padStart(2, '0');
+  const minute = date.getMinutes().toString().padStart(2, '0');
+  const second = date.getSeconds().toString().padStart(2, '0');
+  return `${hour}:${minute}:${second}`;
+}

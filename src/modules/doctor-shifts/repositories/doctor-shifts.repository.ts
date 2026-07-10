@@ -7,6 +7,8 @@ import { SearchDoctorShiftDto } from '../dto/requests/search-doctor-shift.dto';
 import { IDoctorShiftsRepository } from '../interfaces/doctor-shifts-repository.interface';
 import { ShiftConflictInput } from '../interfaces/shifts-conflict-input.interface';
 import { ShiftConflicts } from '../interfaces/shift-conflicts.interface';
+import { DoctorAppointmentBlock } from '../interfaces/doctor-appointment-block.interface';
+import { AppointmentStatus, DoctorShiftStatus } from '../../../common/constants/status.enum';
 
 @Injectable()
 export class DoctorShiftsRepository implements IDoctorShiftsRepository {
@@ -31,6 +33,10 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
 
   save(shift: DoctorShift): Promise<DoctorShift> {
     return this.repository.save(shift);
+  }
+
+  saveMany(shifts: DeepPartial<DoctorShift>[]): Promise<DoctorShift[]> {
+    return this.repository.save(shifts);
   }
 
   async remove(shift: DoctorShift): Promise<void> {
@@ -107,7 +113,55 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
     return query.getMany();
   }
 
+  findDoctorShiftsForDate(
+    facilityId: string,
+    doctorId: string,
+    date: string,
+  ): Promise<DoctorShift[]> {
+    return this.repository
+      .createQueryBuilder('shift')
+      .where('shift.facilityId = :facilityId', { facilityId })
+      .andWhere('shift.doctorId = :doctorId', { doctorId })
+      .andWhere('shift.shiftDate = :date', { date })
+      .andWhere('shift.status IN (:...statuses)', {
+        statuses: [DoctorShiftStatus.AVAILABLE, DoctorShiftStatus.FULL],
+      })
+      .orderBy('shift.startTime', 'ASC')
+      .getMany();
+  }
+
+  findDoctorAppointmentsForDate(
+    facilityId: string,
+    doctorId: string,
+    date: string,
+  ): Promise<DoctorAppointmentBlock[]> {
+    const activeStatuses = [
+      AppointmentStatus.PENDING_PAYMENT,
+      AppointmentStatus.BOOKED,
+      AppointmentStatus.CONFIRMED,
+      AppointmentStatus.CHECKED_IN,
+      AppointmentStatus.IN_PROGRESS,
+    ];
+
+    return this.repository.manager
+      .createQueryBuilder()
+      .select('appointment.id', 'id')
+      .addSelect('appointment.scheduled_start', 'scheduledStart')
+      .addSelect('appointment.scheduled_end', 'scheduledEnd')
+      .addSelect('appointment.status', 'status')
+      .from('appointments', 'appointment')
+      .where('appointment.facility_id = :facilityId', { facilityId })
+      .andWhere('appointment.doctor_id = :doctorId', { doctorId })
+      .andWhere('DATE(appointment.scheduled_start) = :date', { date })
+      .andWhere('appointment.status IN (:...activeStatuses)', { activeStatuses })
+      .orderBy('appointment.scheduled_start', 'ASC')
+      .getRawMany<DoctorAppointmentBlock>();
+  }
+
+  // return true nếu bác sĩ được chỉ định cho cơ sở y tế, ngược lại return false.
   async isDoctorAssignedToFacility(doctorId: string, facilityId: string): Promise<boolean> {
+    // this.repository.manager: là một đối tượng quản lý kết nối cơ sở dữ liệu trong TypeORM,
+    // được sử dụng để thực hiện các thao tác cơ sở dữ liệu như truy vấn, lưu trữ, xóa, v.v.
     const row = await this.repository.manager
       .createQueryBuilder()
       .select('COUNT(*)', 'count')
@@ -117,7 +171,9 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
       .andWhere('doctor.status = :active', { active: 'active' })
       .andWhere('staff.facility_id = :facilityId', { facilityId })
       .andWhere('staff.status = :active', { active: 'active' })
-      .getRawOne<{ count: string }>();
+      .getRawOne<{ count: string }>(); 
+      //set sang số nguyên
+      // phát hiện trả 1 không có thì trả 0
     return Number(row?.count ?? 0) > 0;
   }
 
@@ -134,4 +190,12 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
     if (filters?.dateTo) query.andWhere('shift.shiftDate <= :dateTo', { dateTo: filters.dateTo });
     return query;
   }
+
+
+  
+
+  async insertMonthlyShifts(shifts: DeepPartial<DoctorShift>[]): Promise<DoctorShift[]> {
+    return this.saveMany(shifts);
+  }
+
 }
