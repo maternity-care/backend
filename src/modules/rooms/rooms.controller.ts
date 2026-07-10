@@ -125,10 +125,6 @@ export class RoomsController {
     try {
       const existingRoom = await this.roomsService.findById(id);
       assertFacilityAccess(user, existingRoom.facilityId);
-      const activeFacilityId = getActiveFacilityId(user);
-      if (activeFacilityId) {
-        dto.facilityId = activeFacilityId;
-      }
       const room = await this.roomsService.update(id, dto);
       return {
         message: ROOM_CONSTANT.UPDATED_SUCCESSFULLY,

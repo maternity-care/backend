@@ -38,6 +38,8 @@ export function requireActiveFacilityId(
   return String(facilityId);
 }
 
+
+// Asserts that the user has access to the specified facility.
 export function assertFacilityAccess(
   user: AuthenticatedUser,
   facilityId: string,

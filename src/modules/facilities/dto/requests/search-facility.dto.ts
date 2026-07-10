@@ -1,35 +1,41 @@
+import { Transform, Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsInt, IsEnum, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { FacilityStatus } from '../../../../common/constants/status.enum';
+import { trimText } from '../../../../common/helpers/dto-transform.helper';
 
 export class SearchFacilityDto {
-  @ApiPropertyOptional({ description: 'Tìm kiếm theo tên hoặc địa chỉ' })
-  @IsString()
+  @ApiPropertyOptional()
   @IsOptional()
+  @Transform(({ value }) => trimText(value))
+  @IsString()
+  @MaxLength(100)
   search?: string;
 
-  @ApiPropertyOptional({ description: 'Lọc theo thành phố / tỉnh' })
-  @IsString()
+  @ApiPropertyOptional()
   @IsOptional()
+  @Transform(({ value }) => trimText(value))
+  @IsString()
+  @MaxLength(100)
   city?: string;
 
-  @ApiPropertyOptional({ description: 'Lọc theo trạng thái cơ sở', enum: FacilityStatus })
-  @IsEnum(FacilityStatus)
+  @ApiPropertyOptional({ enum: FacilityStatus })
   @IsOptional()
+  @IsEnum(FacilityStatus)
   status?: FacilityStatus;
 
-  @ApiPropertyOptional({ description: 'Số trang (bắt đầu từ 1)' })
+  @ApiPropertyOptional({ minimum: 1 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional({ description: 'Kích thước trang (mặc định 20)' })
+  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 20 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(100)
   limit?: number;
 }

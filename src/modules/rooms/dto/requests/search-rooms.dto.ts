@@ -1,40 +1,49 @@
+import { Transform, Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsInt, IsEnum, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsEnum, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { ActiveStatus } from '../../../../common/constants/status.enum';
+import { trimText } from '../../../../common/helpers/dto-transform.helper';
+import { POSITIVE_ID_PATTERN } from './create-room.dto';
 
 export class SearchRoomsDto {
-  @ApiPropertyOptional({ description: 'Tìm kiếm theo tên phòng' })
-  @IsString()
+  @ApiPropertyOptional()
   @IsOptional()
+  @Transform(({ value }) => trimText(value))
+  @IsString()
+  @MaxLength(100)
   search?: string;
 
-  @ApiPropertyOptional({ description: 'Lọc theo tầng' })
-  @IsString()
+  @ApiPropertyOptional()
   @IsOptional()
+  @Transform(({ value }) => trimText(value))
+  @IsString()
+  @MaxLength(50)
   floor?: string;
 
-  @ApiPropertyOptional({ description: 'Lọc theo trạng thái phòng', enum: ActiveStatus })
-  @IsEnum(ActiveStatus)
+  @ApiPropertyOptional({ enum: ActiveStatus })
   @IsOptional()
+  @IsEnum(ActiveStatus)
   status?: ActiveStatus;
 
-  @ApiPropertyOptional({ description: 'Số trang (bắt đầu từ 1)' })
+  @ApiPropertyOptional({ minimum: 1 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional({ description: 'Kích thước trang (mặc định 20)' })
+  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 20 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(100)
   limit?: number;
 
-  @ApiPropertyOptional({ description: 'Lọc theo facilityId' })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @Matches(POSITIVE_ID_PATTERN, { message: 'facilityId phải là số nguyên dương' })
   facilityId?: string;
 }
+
