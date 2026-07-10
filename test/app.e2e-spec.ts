@@ -29,6 +29,7 @@ import { UsersService } from '../src/modules/users/users.service';
 import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../src/common/guards/roles.guard';
 import { PermissionsGuard } from '../src/common/guards/permissions.guard';
+import { RESPONSE_MESSAGES } from '../src/common/constants/response-message.constant';
 
 describe('Application routes (e2e)', () => {
   let app: INestApplication;
@@ -172,7 +173,7 @@ describe('Application routes (e2e)', () => {
       .get('/auth/me')
       .expect(200)
       .expect(({ body }) => {
-        expect(body.message).toBe('Authenticated profile retrieved successfully');
+        expect(body.message).toBe(RESPONSE_MESSAGES.AUTH_PROFILE_RETRIEVED);
       });
   });
 
