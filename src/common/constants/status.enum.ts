@@ -148,3 +148,19 @@ export enum ContentReportStatus {
   RESOLVED = 'resolved',
   REJECTED = 'rejected',
 }
+
+export enum DisruptionStatus {
+  OPEN = 'open',
+  PARTIALLY_RESOLVED = 'partially_resolved',
+  RESOLVED = 'resolved',
+  CANCELLED = 'cancelled',
+}
+
+export enum AppointmentDisruptionResolutionStatus {
+  PENDING = 'pending',
+  RESCHEDULED = 'rescheduled',
+  REASSIGNED = 'reassigned',
+  CANCELLED = 'cancelled',
+  REFUND_PENDING = 'refund_pending',
+  RESOLVED = 'resolved',
+}

@@ -1,6 +1,7 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { DOCTOR_SHIFT_CONSTANT } from '../../common/constants/doctor-shift.constant';
 import { DoctorShiftStatus } from '../../common/constants/status.enum';
+import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
 import { DoctorShift } from './entities/doctor-shifts.entity';
 import { BulkCreateDoctorShiftDto } from './dto/requests/bulk-create-doctor-shift.dto';
 import { CheckShiftConflictDto } from './dto/requests/check-shift-conflict.dto';
@@ -98,8 +99,26 @@ export class DoctorShiftsService {
     return this.repository.save(shift);
   }
 
-  async remove(id: string): Promise<void> {
-    await this.repository.remove(await this.findById(id));
+  async remove(id: string, reason?: string, deletedBy?: string | null): Promise<SafeRemoveResult> {
+    const shift = await this.findById(id);
+    const relatedAppointments = await this.repository.findAppointmentsForShift(shift);
+    if (relatedAppointments.length === 0) {
+      await this.repository.remove(shift);
+      return { action: 'hard_deleted', affectedCount: 0 };
+    }
+
+    const activeAffectedAppointments = await this.repository.findAppointmentsForShift(shift, true);
+    const result = await this.repository.cancelShiftWithDisruption(
+      shift,
+      activeAffectedAppointments,
+      reason,
+      deletedBy,
+    );
+    return {
+      action: 'cancelled',
+      affectedCount: activeAffectedAppointments.length,
+      disruptionId: result.disruptionId,
+    };
   }
 
   async checkConflicts(dto: CheckShiftConflictDto) {

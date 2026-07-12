@@ -17,6 +17,8 @@ export interface IFacilitiesRepository {
   findByCode(code: string): Promise<Facility | null>;
   findByName(name: string): Promise<Facility | null>;
   remove(facility: Facility): Promise<void>;
+  countDependencies(facilityId: string): Promise<number>;
+  softDelete(facility: Facility, reason?: string, deletedBy?: string | null): Promise<Facility>;
   updateStatus(id: string, status: FacilityStatus): Promise<Facility>;
   deActivateFacility(id: string): Promise<Facility>;
 }

@@ -144,10 +144,14 @@ export class DoctorShiftsController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete doctor shift' })
-  async remove(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+  async remove(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Query('reason') reason?: string,
+  ) {
     const existing = await this.service.findById(id);
-    assertFacilityAccess(user, existing.facilityId);
-    await this.service.remove(id);
-    return { message: DOCTOR_SHIFT_CONSTANT.DELETED, data: null };
+    if (user) assertFacilityAccess(user, existing.facilityId);
+    const data = await this.service.remove(id, reason, user?.id ?? null);
+    return { message: DOCTOR_SHIFT_CONSTANT.DELETED, data };
   }
 }
