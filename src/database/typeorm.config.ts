@@ -24,6 +24,7 @@ import { CreateStaffAuthTokens1751200000000 } from './migrations/1751200000000-C
 import { RemoveStaffPosition1751300000000 } from './migrations/1751300000000-RemoveStaffPosition';
 import { AllowMultipleFacilityStaffRoles1751400000000 } from './migrations/1751400000000-AllowMultipleFacilityStaffRoles';
 import { ConvertStatusesToEnums1751500000000 } from './migrations/1751500000000-ConvertStatusesToEnums';
+import { AddOperationalSoftDeleteAndDisruptions1751600000000 } from './migrations/1751600000000-AddOperationalSoftDeleteAndDisruptions';
 import { StaffRefreshToken } from '../modules/auth/entities/staff-refresh-token.entity';
 import { StaffPasswordResetToken } from '../modules/auth/entities/staff-password-reset-token.entity';
 import { Facility } from '../modules/facilities/entities/facilities.entity';
@@ -75,6 +76,7 @@ export const typeOrmConfig: DataSourceOptions = {
     RemoveStaffPosition1751300000000,
     AllowMultipleFacilityStaffRoles1751400000000,
     ConvertStatusesToEnums1751500000000,
+    AddOperationalSoftDeleteAndDisruptions1751600000000,
   ],
   charset: 'utf8mb4_unicode_ci',
 };

@@ -134,11 +134,12 @@ export class FacilitiesController {
   async remove(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
+    @Query('reason') reason?: string,
   ) {
     try {
       assertFacilityAccess(user, id);
-      await this.facilitiesService.remove(id);
-      return { message: RESPONSE_MESSAGES.FACILITY_DELETED, data: null };
+      const data = await this.facilitiesService.remove(id, reason, user?.id ?? null);
+      return { message: RESPONSE_MESSAGES.FACILITY_DELETED, data };
     } catch (error) {
       this.handleError(error);
     }
