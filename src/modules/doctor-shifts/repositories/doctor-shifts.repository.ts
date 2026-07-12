@@ -8,7 +8,12 @@ import { IDoctorShiftsRepository } from '../interfaces/doctor-shifts-repository.
 import { ShiftConflictInput } from '../interfaces/shifts-conflict-input.interface';
 import { ShiftConflicts } from '../interfaces/shift-conflicts.interface';
 import { DoctorAppointmentBlock } from '../interfaces/doctor-appointment-block.interface';
-import { AppointmentStatus, DoctorShiftStatus } from '../../../common/constants/status.enum';
+import {
+  AppointmentDisruptionResolutionStatus,
+  AppointmentStatus,
+  DisruptionStatus,
+  DoctorShiftStatus,
+} from '../../../common/constants/status.enum';
 
 @Injectable()
 export class DoctorShiftsRepository implements IDoctorShiftsRepository {
@@ -44,7 +49,11 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
   }
 
   findById(id: string): Promise<DoctorShift | null> {
-    return this.repository.findOne({ where: { id } });
+    return this.repository
+      .createQueryBuilder('shift')
+      .where('shift.id = :id', { id })
+      .andWhere('shift.deletedAt IS NULL')
+      .getOne();
   }
 
   findAll(filters?: SearchDoctorShiftDto): Promise<DoctorShift[]> {
@@ -70,6 +79,7 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
       //doctor_shifts: là tên của bảng trong cơ sở dữ liệu mà truy vấn sẽ được thực hiện.
         .createQueryBuilder('doctor_shifts')
         .where('doctor_shifts.shiftDate = :shiftDate', { shiftDate: input.shiftDate })
+        .andWhere('doctor_shifts.deletedAt IS NULL')
         .andWhere('doctor_shifts.startTime < :endTime', { endTime: input.endTime })
         .andWhere('doctor_shifts.endTime > :startTime', { startTime: input.startTime })
         // IN (:...statuses): là một điều kiện trong truy vấn SQL,
@@ -106,6 +116,7 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
     const query = this.repository
       .createQueryBuilder('shift')
       .where('shift.facilityId = :facilityId', { facilityId })
+      .andWhere('shift.deletedAt IS NULL')
       .andWhere('shift.shiftDate BETWEEN :startDate AND :endDate', { startDate, endDate })
       .orderBy('shift.shiftDate', 'ASC')
       .addOrderBy('shift.startTime', 'ASC');
@@ -121,6 +132,7 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
     return this.repository
       .createQueryBuilder('shift')
       .where('shift.facilityId = :facilityId', { facilityId })
+      .andWhere('shift.deletedAt IS NULL')
       .andWhere('shift.doctorId = :doctorId', { doctorId })
       .andWhere('shift.shiftDate = :date', { date })
       .andWhere('shift.status IN (:...statuses)', {
@@ -158,6 +170,103 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
       .getRawMany<DoctorAppointmentBlock>();
   }
 
+  findAppointmentsForShift(shift: DoctorShift, activeOnly = false): Promise<DoctorAppointmentBlock[]> {
+    const query = this.repository.manager
+      .createQueryBuilder()
+      .select('appointment.id', 'id')
+      .addSelect('appointment.doctor_id', 'doctorId')
+      .addSelect('appointment.room_id', 'roomId')
+      .addSelect('appointment.scheduled_start', 'scheduledStart')
+      .addSelect('appointment.scheduled_end', 'scheduledEnd')
+      .addSelect('appointment.status', 'status')
+      .from('appointments', 'appointment')
+      .where('appointment.facility_id = :facilityId', { facilityId: shift.facilityId })
+      .andWhere('appointment.doctor_id = :doctorId', { doctorId: shift.doctorId })
+      .andWhere('DATE(appointment.scheduled_start) = :shiftDate', { shiftDate: shift.shiftDate })
+      .andWhere('TIME(appointment.scheduled_start) < :endTime', { endTime: shift.endTime })
+      .andWhere('TIME(appointment.scheduled_end) > :startTime', { startTime: shift.startTime });
+
+    if (activeOnly) {
+      query.andWhere('appointment.status IN (:...statuses)', {
+        statuses: [
+          AppointmentStatus.PENDING_PAYMENT,
+          AppointmentStatus.BOOKED,
+          AppointmentStatus.CONFIRMED,
+          AppointmentStatus.CHECKED_IN,
+          AppointmentStatus.IN_PROGRESS,
+        ],
+      });
+    }
+
+    return query.orderBy('appointment.scheduled_start', 'ASC').getRawMany<DoctorAppointmentBlock>();
+  }
+
+  async cancelShiftWithDisruption(
+    shift: DoctorShift,
+    affectedAppointments: DoctorAppointmentBlock[],
+    reason?: string,
+    changedBy?: string | null,
+  ): Promise<{ shift: DoctorShift; disruptionId?: string }> {
+    return this.repository.manager.transaction(async manager => {
+      
+      await manager.update(DoctorShift, shift.id, {
+        status: DoctorShiftStatus.CANCELLED,
+        deletedAt: new Date(),
+        deletedBy: changedBy ?? null,
+        deleteReason: reason ?? null,
+      });
+
+      await manager.createQueryBuilder().insert().into('doctor_shift_change_logs').values({
+        shift_id: shift.id,
+        action: 'cancelled',
+        old_status: shift.status,
+        new_status: DoctorShiftStatus.CANCELLED,
+        old_doctor_id: shift.doctorId,
+        new_doctor_id: shift.doctorId,
+        old_room_id: shift.roomId,
+        new_room_id: shift.roomId,
+        old_start_time: shift.startTime,
+        new_start_time: shift.startTime,
+        old_end_time: shift.endTime,
+        new_end_time: shift.endTime,
+        reason: reason ?? null,
+        changed_by: changedBy ?? null,
+      }).execute();
+
+      let disruptionId: string | undefined;
+      if (affectedAppointments.length > 0) {
+        const disruptionResult = await manager.createQueryBuilder().insert().into('shift_disruptions').values({
+          type: 'doctor_shift_cancelled',
+          source_type: 'doctor_shift',
+          source_id: shift.id,
+          facility_id: shift.facilityId,
+          doctor_shift_id: shift.id,
+          room_id: shift.roomId ?? null,
+          reason: reason ?? null,
+          status: DisruptionStatus.OPEN,
+          created_by: changedBy ?? null,
+        }).execute();
+
+        disruptionId = String(disruptionResult.identifiers[0]?.id);
+
+        await manager.createQueryBuilder().insert().into('appointment_disruption_items').values(
+          affectedAppointments.map(appointment => ({
+            disruption_id: disruptionId,
+            appointment_id: appointment.id,
+            old_doctor_id: shift.doctorId,
+            old_room_id: shift.roomId ?? null,
+            old_scheduled_start: appointment.scheduledStart,
+            old_scheduled_end: appointment.scheduledEnd,
+            resolution_status: AppointmentDisruptionResolutionStatus.PENDING,
+          })),
+        ).execute();
+      }
+
+      const updatedShift = await manager.findOneByOrFail(DoctorShift, { id: shift.id });
+      return { shift: updatedShift, disruptionId };
+    });
+  }
+
   // return true nếu bác sĩ được chỉ định cho cơ sở y tế, ngược lại return false.
   async isDoctorAssignedToFacility(doctorId: string, facilityId: string): Promise<boolean> {
     // this.repository.manager: là một đối tượng quản lý kết nối cơ sở dữ liệu trong TypeORM,
@@ -180,6 +289,7 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
   private buildListQuery(filters?: SearchDoctorShiftDto): SelectQueryBuilder<DoctorShift> {
     const query = this.repository
       .createQueryBuilder('shift')
+      .where('shift.deletedAt IS NULL')
       .orderBy('shift.shiftDate', 'DESC')
       .addOrderBy('shift.startTime', 'ASC');
     if (filters?.doctorId) query.andWhere('shift.doctorId = :doctorId', { doctorId: filters.doctorId });
@@ -191,7 +301,7 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
     return query;
   }
 
-
+  
   
 
   async insertMonthlyShifts(shifts: DeepPartial<DoctorShift>[]): Promise<DoctorShift[]> {

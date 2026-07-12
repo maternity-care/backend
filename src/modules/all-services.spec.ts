@@ -202,6 +202,8 @@ describe('module services', () => {
       findById: jest.fn().mockResolvedValue(entity),
       findByName: jest.fn().mockResolvedValue(entity),
       remove: jest.fn().mockResolvedValue(undefined),
+      countDependencies: jest.fn().mockResolvedValue(0),
+      softDelete: jest.fn(),
     };
     const facilitiesService = new FacilitiesService(facilityRepo as never);
     await expect(
@@ -218,7 +220,10 @@ describe('module services', () => {
     ).resolves.toMatchObject({ code: 'MAIN' });
     await expect(facilitiesService.findAll()).resolves.toEqual([entity]);
     await expect(facilitiesService.findById('1')).resolves.toEqual(entity);
-    await expect(facilitiesService.remove('1')).resolves.toBeUndefined();
+    await expect(facilitiesService.remove('1')).resolves.toEqual({
+      action: 'hard_deleted',
+      affectedCount: 0,
+    });
 
     const room = { id: '1', name: 'Room 1', facilityId: '1' };
     const roomsRepo = {
@@ -229,6 +234,8 @@ describe('module services', () => {
       findByName: jest.fn().mockResolvedValue(room),
       findByFacilityId: jest.fn().mockResolvedValue([room]),
       remove: jest.fn().mockResolvedValue(undefined),
+      countDependencies: jest.fn().mockResolvedValue(0),
+      softDelete: jest.fn(),
     };
     const roomsService = new RoomsService(roomsRepo as never, facilitiesService);
     await expect(

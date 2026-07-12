@@ -8,6 +8,7 @@ import { FacilitiesService } from '../facilities/facilities.service';
 import { SearchRoomsDto } from './dto/requests/search-rooms.dto';
 import {ROOM_CONSTANT} from '../../common/constants/room.constant';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
+import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
 
 @Injectable()
 export class RoomsService {
@@ -58,9 +59,16 @@ export class RoomsService {
     return this.roomsRepository.save(room);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, reason?: string, deletedBy?: string | null): Promise<SafeRemoveResult> {
     const room = await this.findById(id);
-    await this.roomsRepository.remove(room);
+    const dependencyCount = await this.roomsRepository.countDependencies(room.id);
+    if (dependencyCount === 0) {
+      await this.roomsRepository.remove(room);
+      return { action: 'hard_deleted', affectedCount: 0 };
+    }
+
+    await this.roomsRepository.softDelete(room, reason, deletedBy);
+    return { action: 'soft_deleted', affectedCount: dependencyCount };
   }
 
   async findByFacilityId(facilityId: string, filters?: SearchRoomsDto): Promise<{ facility: Facility; rooms: Room[] }> {

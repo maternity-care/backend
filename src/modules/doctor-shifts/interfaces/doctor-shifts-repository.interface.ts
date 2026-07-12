@@ -22,6 +22,13 @@ export interface IDoctorShiftsRepository {
   findWeekly(facilityId: string, startDate: string, endDate: string, doctorId?: string): Promise<DoctorShift[]>;
   findDoctorShiftsForDate(facilityId: string, doctorId: string, date: string): Promise<DoctorShift[]>;
   findDoctorAppointmentsForDate(facilityId: string, doctorId: string, date: string): Promise<DoctorAppointmentBlock[]>;
+  findAppointmentsForShift(shift: DoctorShift, activeOnly?: boolean): Promise<DoctorAppointmentBlock[]>;
+  cancelShiftWithDisruption(
+    shift: DoctorShift,
+    affectedAppointments: DoctorAppointmentBlock[],
+    reason?: string,
+    changedBy?: string | null,
+  ): Promise<{ shift: DoctorShift; disruptionId?: string }>;
   isDoctorAssignedToFacility(doctorId: string, facilityId: string): Promise<boolean>;
 
 }

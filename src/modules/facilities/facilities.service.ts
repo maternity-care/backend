@@ -5,6 +5,7 @@ import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
 import { Facility } from './entities/facilities.entity';
 import { FACILITIES_REPOSITORY, IFacilitiesRepository } from './interfaces/facility-repository.interface';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
+import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
 
 @Injectable()
 export class FacilitiesService {
@@ -70,9 +71,16 @@ export class FacilitiesService {
     return this.facilitiesRepository.save(facility);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, reason?: string, deletedBy?: string | null): Promise<SafeRemoveResult> {
     const facility = await this.findById(id);
-    await this.facilitiesRepository.remove(facility);
+    const dependencyCount = await this.facilitiesRepository.countDependencies(facility.id);
+    if (dependencyCount === 0) {
+      await this.facilitiesRepository.remove(facility);
+      return { action: 'hard_deleted', affectedCount: 0 };
+    }
+
+    await this.facilitiesRepository.softDelete(facility, reason, deletedBy);
+    return { action: 'soft_deleted', affectedCount: dependencyCount };
   }
 
   async deActivateFacility(id: string): Promise<Facility> {

@@ -7,6 +7,7 @@ import { SearchRoomsDto } from '../dto/requests/search-rooms.dto';
 import { SearchRooms2Dto } from '../dto/requests/search-room-2';
 import { paginate } from '../../../common/helpers/pagination';
 import { searchBuilder } from '../../../common/helpers/search-builder';
+import { ActiveStatus } from '../../../common/constants/status.enum';
 @Injectable()
 export class RoomsRepository implements IRoomsRepository {
   constructor(
@@ -32,7 +33,7 @@ export class RoomsRepository implements IRoomsRepository {
       'room.status',
       'room.createdAt',
       'room.updatedAt',
-    ]);
+    ]).where('room.deletedAt IS NULL');
 
     searchBuilder(query, filters?.search, {
       columns: ['name', 'roomType', 'floor', 'status', 'facilityId'],
@@ -65,10 +66,10 @@ export class RoomsRepository implements IRoomsRepository {
         'room.status',
         'room.createdAt',
         'room.updatedAt',
-      ]);
+      ]).where('room.deletedAt IS NULL');
 
       if (filters?.facilityId) {
-        query.where('room.facilityId = :facilityId', { facilityId: filters.facilityId });
+        query.andWhere('room.facilityId = :facilityId', { facilityId: filters.facilityId });
       }
 
       searchBuilder(query, filters?.search, {
@@ -89,7 +90,11 @@ export class RoomsRepository implements IRoomsRepository {
     }
 
   findById(id: string): Promise<Room | null> {
-    return this.repository.findOne({ where: { id } });
+    return this.repository
+      .createQueryBuilder('room')
+      .where('room.id = :id', { id })
+      .andWhere('room.deletedAt IS NULL')
+      .getOne();
   }
 
   findByName(name: string): Promise<Room | null> {
@@ -100,8 +105,35 @@ export class RoomsRepository implements IRoomsRepository {
     await this.repository.remove(room);
   }
 
+  async countDependencies(roomId: string): Promise<number> {
+    const [shiftRow, appointmentRow] = await Promise.all([
+      this.repository.manager.createQueryBuilder()
+        .select('COUNT(*)', 'count')
+        .from('doctor_shifts', 'shift')
+        .where('shift.room_id = :roomId', { roomId })
+        .getRawOne<{ count: string }>(),
+      this.repository.manager.createQueryBuilder()
+        .select('COUNT(*)', 'count')
+        .from('appointments', 'appointment')
+        .where('appointment.room_id = :roomId', { roomId })
+        .getRawOne<{ count: string }>(),
+    ]);
+
+    return Number(shiftRow?.count ?? 0) + Number(appointmentRow?.count ?? 0);
+  }
+
+  async softDelete(room: Room, reason?: string, deletedBy?: string | null): Promise<Room> {
+    room.status = ActiveStatus.INACTIVE;
+    room.deletedAt = new Date();
+    room.deletedBy = deletedBy ?? null;
+    room.deleteReason = reason ?? null;
+    return this.repository.save(room);
+  }
+
   findByFacilityId(facilityId: string, filters?: SearchRooms2Dto): Promise<Room[]> {
-    const query = this.repository.createQueryBuilder('room').where('room.facilityId = :facilityId', { facilityId })
+    const query = this.repository.createQueryBuilder('room')
+    .where('room.facilityId = :facilityId', { facilityId })
+    .andWhere('room.deletedAt IS NULL')
     .select([
       'room.id',
       'room.facilityId',
