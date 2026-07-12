@@ -62,4 +62,13 @@ export class Facility {
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
   updatedAt: Date;
 
+  @Column({ name: 'deleted_at', type: 'timestamp', nullable: true })
+  deletedAt: Date | null;
+
+  @Column({ name: 'deleted_by', type: 'bigint', nullable: true })
+  deletedBy: string | null;
+
+  @Column({ name: 'delete_reason', type: 'varchar', length: 500, nullable: true })
+  deleteReason: string | null;
+
 }

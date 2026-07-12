@@ -20,7 +20,9 @@ export class FacilitiesRepository implements IFacilitiesRepository {
   }
 
   async findAllPaginated(filters?: SearchFacilityDto) {
-    const query = this.repository.createQueryBuilder('facility');
+    const query = this.repository
+      .createQueryBuilder('facility')
+      .where('facility.deletedAt IS NULL');
 
     searchBuilder(query, filters?.search, {
       columns: ['name', 'code', 'address', 'province', 'district', 'status'],
@@ -49,7 +51,9 @@ export class FacilitiesRepository implements IFacilitiesRepository {
   
 
   findAll(filters?: SearchFacilityDto): Promise<Facility[]> {
-    const query = this.repository.createQueryBuilder('facility');
+    const query = this.repository
+      .createQueryBuilder('facility')
+      .where('facility.deletedAt IS NULL');
 
     searchBuilder(query, filters?.search, {
       columns: ['name', 'code', 'address', 'province', 'district', 'status'],
@@ -71,7 +75,11 @@ export class FacilitiesRepository implements IFacilitiesRepository {
   }
 
   findById(id: string): Promise<Facility | null> {
-    return this.repository.findOne({ where: { id } });
+    return this.repository
+      .createQueryBuilder('facility')
+      .where('facility.id = :id', { id })
+      .andWhere('facility.deletedAt IS NULL')
+      .getOne();
   }
 
   findByCode(code: string): Promise<Facility | null> {
@@ -84,6 +92,33 @@ export class FacilitiesRepository implements IFacilitiesRepository {
 
   async remove(facility: Facility): Promise<void> {
     await this.repository.remove(facility);
+  }
+
+  async countDependencies(facilityId: string): Promise<number> {
+    const tables = [
+      { table: 'rooms', column: 'facility_id' },
+      { table: 'doctor_shifts', column: 'facility_id' },
+      { table: 'appointments', column: 'facility_id' },
+      { table: 'facility_staff', column: 'facility_id' },
+      { table: 'package_service_facilities', column: 'facility_id' },
+    ];
+
+    const rows = await Promise.all(tables.map(item => this.repository.manager
+      .createQueryBuilder()
+      .select('COUNT(*)', 'count')
+      .from(item.table, item.table)
+      .where(`${item.table}.${item.column} = :facilityId`, { facilityId })
+      .getRawOne<{ count: string }>()));
+
+    return rows.reduce((total, row) => total + Number(row?.count ?? 0), 0);
+  }
+
+  async softDelete(facility: Facility, reason?: string, deletedBy?: string | null): Promise<Facility> {
+    facility.status = FacilityStatus.DELETED;
+    facility.deletedAt = new Date();
+    facility.deletedBy = deletedBy ?? null;
+    facility.deleteReason = reason ?? null;
+    return this.repository.save(facility);
   }
 
   //test raw mysql query
