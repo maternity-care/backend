@@ -19,11 +19,13 @@ import {
 @Controller('public/facilities')
 export class PublicFacilitiesController {
   constructor(private readonly service: FacilitiesService) {}
+
   @Get()
   @ApiOperation({ summary: 'List facilities' })
   async findAll(@Query() query: SearchFacilityDto) {
     return { message: RESPONSE_MESSAGES.SUCCESS, data: await this.service.findAll(query) };
   }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get facility details' })
     async findById(@Param('id') id: string) {

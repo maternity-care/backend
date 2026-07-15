@@ -24,7 +24,7 @@ export class CreateDoctorShiftDto {
   @IsOptional()
   @IsString()
   @Matches(POSITIVE_ID_PATTERN)
-  roomId?: string | null;
+  roomId?: string;
 
   @ApiProperty({ example: '2026-07-07' })
   @IsDateString({ strict: true })
