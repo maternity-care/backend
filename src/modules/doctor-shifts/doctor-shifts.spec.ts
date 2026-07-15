@@ -12,6 +12,14 @@ import { UpdateDoctorShiftDto } from './dto/requests/update-doctor-shift.dto';
 import { DoctorShiftsService } from './doctor-shifts.service';
 import { DoctorShiftsValidator } from './validators/doctor-shifts.validator';
 
+// describe: dùng để nhóm các test case liên quan đến một chức năng hoặc module cụ thể,
+//  giúp tổ chức và quản lý các test case dễ dàng hơn. Trong ví dụ này, 
+// describe được sử dụng để nhóm các test case liên quan đến việc kiểm tra tính hợp lệ của các DTO trong module DoctorShifts 
+// và các validation nghiệp vụ của DoctorShiftsService.
+
+//it: đại diện cho một test case cụ thể, mô tả một hành vi hoặc kết quả mong đợi của chức năng được kiểm tra.
+
+//mô tả 1: Kiểm tra tính hợp lệ của các DTO trong module DoctorShifts
 describe('DoctorShifts DTO validation', () => {
   const validPayload = {
     doctorId: '1', facilityId: '1', roomId: '2', shiftDate: '2099-07-07',
@@ -19,12 +27,16 @@ describe('DoctorShifts DTO validation', () => {
     status: DoctorShiftStatus.AVAILABLE,
   };
 
+  //test1: kiểm tra xem DTO CreateDoctorShiftDto có chấp nhận một payload hợp lệ và chuyển đổi 
+  // maxAppointments từ chuỗi sang số nguyên hay không.
   it('accepts a valid create payload and transforms maxAppointments', async () => {
     const dto = plainToInstance(CreateDoctorShiftDto, { ...validPayload, maxAppointments: '10' });
     expect(await validate(dto)).toHaveLength(0);
     expect(dto.maxAppointments).toBe(10);
   });
 
+  //test2: kiểm tra xem DTO CreateDoctorShiftDto có từ chối các payload không hợp lệ và xác định đúng
+  // thuộc tính bị lỗi hay không. Sử dụng it.each để chạy nhiều trường hợp kiểm tra với các payload khác nhau.
   it.each([
     [{ ...validPayload, doctorId: '0' }, 'doctorId'],
     [{ ...validPayload, shiftDate: '07/07/2099' }, 'shiftDate'],
@@ -37,6 +49,7 @@ describe('DoctorShifts DTO validation', () => {
     expect(errors.some(error => error.property === property)).toBe(true);
   });
 
+  //test3: kiểm tra xem DTO UpdateDoctorShiftDto có cho phép cập nhật trạng thái là cancelled hoặc full hay không.
   it('allows cancelled/full status on update', async () => {
     expect(await validate(plainToInstance(UpdateDoctorShiftDto, {
       status: DoctorShiftStatus.CANCELLED,
@@ -86,6 +99,8 @@ describe('DoctorShifts DTO validation', () => {
   });
 });
 
+
+//mô tả 2: Kiểm tra các validation nghiệp vụ của DoctorShiftsService
 describe('DoctorShiftsService business validation', () => {
   const facility = { id: '1', status: FacilityStatus.ACTIVE };
   const room = { id: '2', facilityId: '1', status: ActiveStatus.ACTIVE };

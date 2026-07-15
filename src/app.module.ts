@@ -17,6 +17,8 @@ import { RoomsModule } from './modules/rooms/rooms.module';
 import { StaffsModule } from './modules/staffs/staffs.module';
 import { MapsModule } from './modules/maps/maps.module';
 import { DoctorShiftsModule } from './modules/doctor-shifts/doctor-shifts.module';
+import { ServicesModule } from './modules/services/services.module';
+import { FacilityServicesModule } from './modules/facility-services/facility-services.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -50,6 +52,8 @@ import { DoctorShiftsModule } from './modules/doctor-shifts/doctor-shifts.module
     RoomsModule,
     MapsModule,
     DoctorShiftsModule,
+    ServicesModule,
+    FacilityServicesModule,
   ],
 })
 export class AppModule {}

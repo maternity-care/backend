@@ -29,8 +29,13 @@ import { StaffRefreshToken } from '../modules/auth/entities/staff-refresh-token.
 import { StaffPasswordResetToken } from '../modules/auth/entities/staff-password-reset-token.entity';
 import { Facility } from '../modules/facilities/entities/facilities.entity';
 import { FacilityStaff } from '../modules/facilities/entities/facility-staff.entity';
+import { FacilityService } from '../modules/facility-services/entities/facility-services.entity';
 import { Doctor } from '../modules/doctors/entities/doctors.entity';
 import { Room } from '../modules/rooms/entities/rooms.entity';
+import { DoctorShift } from '../modules/doctor-shifts/entities/doctor-shifts.entity';
+import { DoctorShiftChangeLog } from '../modules/doctor-shifts/entities/doctor-shift-change-logs.entity';
+import { ShiftDisruption } from '../modules/doctor-shifts/entities/shift-disruptions.entity';
+import { AppointmentDisruptionItem } from '../modules/doctor-shifts/entities/appointment-disruption-items.entity';
 
 config();
 
@@ -57,8 +62,13 @@ export const typeOrmConfig: DataSourceOptions = {
     StaffPasswordResetToken,
     Facility,
     FacilityStaff,
+    FacilityService,
     Doctor,
     Room,
+    DoctorShift,
+    DoctorShiftChangeLog,
+    ShiftDisruption,
+    AppointmentDisruptionItem,
     join(__dirname, 'entities', '*.entity{.ts,.js}'),
   ],
   migrations: [
