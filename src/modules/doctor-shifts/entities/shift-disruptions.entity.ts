@@ -1,5 +1,5 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
-import { DisruptionStatus } from '../../common/constants/status.enum';
+import { DisruptionStatus } from '../../../common/constants/status.enum';
 
 @Entity('shift_disruptions')
 export class ShiftDisruption {
