@@ -48,17 +48,17 @@ export const RESPONSE_MESSAGES = {
   FACILITY_NOT_ASSIGNED: 'Bạn không thuộc cơ sở đã chọn.',
   FACILITY_ACCESS_DENIED: 'Bạn không có quyền truy cập dữ liệu của cơ sở này.',
   PREGNANCY_PROFILES: {
-    CREATED_SUCCESS: 'Pregnancy profile created successfully',
-    GET_SUCCESS: 'Pregnancy profile retrieved successfully',
-    GET_LIST_SUCCESS: 'Pregnancy profiles retrieved successfully',
-    NOT_FOUND: 'Pregnancy profile not found',
-    UPDATED: 'Pregnancy profile updated successfully',
-    DELETED: 'Pregnancy profile soft deleted successfully',
-    EXISTS: 'Pregnancy profile already exists for this patient',
+    CREATED_SUCCESS: 'Hồ sơ mang thai đã được tạo thành công',
+    GET_SUCCESS: 'Hồ sơ mang thai đã được lấy thành công',
+    GET_LIST_SUCCESS: 'Danh sách hồ sơ mang thai đã được lấy thành công',
+    NOT_FOUND: 'Hồ sơ mang thai không tồn tại',
+    UPDATED: 'Hồ sơ mang thai đã được cập nhật thành công',
+    DELETED: 'Hồ sơ mang thai đã được xóa tạm thời thành công',
+    EXISTS: 'Hồ sơ mang thai đã tồn tại cho bệnh nhân này',
     PARA_CONFLICT:
-      'The total number of full-term births, premature births, and abortions cannot be less than the number of pregnancies',
+      'Tổng số lần sinh con đủ tháng, sinh non và sảy thai không thể ít hơn số lần mang thai',
     NOT_IS_STAFF:
-      'Only staff members (doctors, nurses, or staff) can request soft deletion of pregnancy profiles',
+      'Chỉ nhân viên (bác sĩ, điều dưỡng hoặc nhân viên) mới có thể yêu cầu xóa tạm thời hồ sơ mang thai',
   },
-  NOT_FOUND_CURRENT_USER: 'User current not found',
+  NOT_FOUND_CURRENT_USER: 'Người dùng hiện tại không tồn tại',
 } as const;
