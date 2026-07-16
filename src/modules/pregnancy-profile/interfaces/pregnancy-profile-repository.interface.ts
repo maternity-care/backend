@@ -1,5 +1,6 @@
 import { PregnancyProfile } from 'src/database/entities';
 import { DeepPartial } from 'typeorm';
+import { SearchProfileQueryDto } from '../dto/request/search-pregnancy-profiles.dto';
 
 export const PREGNANCY_PROFILE_REPOSITORY = Symbol('PREGNANCY_PROFILE_REPOSITORY');
 
@@ -13,4 +14,9 @@ export interface IPregnancyProfileRepository {
   findByPatientId(patientId: string): Promise<PregnancyProfile[]>;
   softDelete(userId: string, pregnancyId: string, reason: string): Promise<void>;
   remove(id: string): Promise<void>;
+  generatePregnancyCode(): Promise<string>;
+  searchProfiles(
+    query: SearchProfileQueryDto,
+  ): Promise<{ data: PregnancyProfile[]; total: number }>;
+  checkActiveProfileExists(patientId: string): Promise<boolean>;
 }

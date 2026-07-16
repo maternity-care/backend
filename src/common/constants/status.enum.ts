@@ -51,7 +51,8 @@ export enum PatientExtraServiceStatus {
 export enum PregnancyProfileStatus {
   ACTIVE = 'active',
   COMPLETED = 'completed',
-  ARCHIVED = 'archived',
+  TERMINATED = 'terminated',
+  DELETED = 'deleted',
 }
 
 export enum AppointmentStatus {
