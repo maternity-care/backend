@@ -13,6 +13,8 @@ export interface IRoomsRepository {
   findById(id: string): Promise<Room | null>;
   findByName(name: string): Promise<Room | null>;
   remove(room: Room): Promise<void>;
+  countDependencies(roomId: string): Promise<number>;
+  softDelete(room: Room, reason?: string, deletedBy?: string | null): Promise<Room>;
   findByFacilityId(facilityId: string, filters?: SearchRoomsDto): Promise<Room[]>;
   findByFacilityIdPaginated?(facilityId: string, filters?: SearchRooms2Dto): Promise<PaginationResult<Room>>;
   findAllRoomsWithFacilitiesPaginated?( filters?: SearchRoomsDto): Promise<PaginationResult<Room>>;

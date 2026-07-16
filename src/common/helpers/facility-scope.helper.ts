@@ -1,4 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
+import { FacilityStatus } from '../constants/status.enum';
+import { RESPONSE_MESSAGES } from '../constants/response-message.constant';
 import { RoleEnum } from '../constants/role.enum';
 import { AuthenticatedUser } from '../../modules/auth/interfaces/authenticated-user.interface';
 
@@ -7,14 +9,47 @@ export function isSuperAdmin(user: AuthenticatedUser): boolean {
 }
 
 export function getActiveFacilityId(user: AuthenticatedUser): string | null {
-  return isSuperAdmin(user) ? null : user.activeFacilityId;
+  return requireActiveFacilityId(user);
 }
 
+/**
+ * Returns the selected facility for operational staff.
+ * Super admins are intentionally unscoped and therefore receive null.
+ */
+export function requireActiveFacilityId(
+  user: AuthenticatedUser,
+): string | null {
+  if (isSuperAdmin(user)) {
+    return null;
+  }
+
+  const facilityId = user.activeFacilityId;
+  const assignedFacility = user.facilities.find(
+    (facility) =>
+      String(facility.id) === String(facilityId) &&
+      facility.status === FacilityStatus.ACTIVE &&
+      (facility.roles?.length ?? 0) > 0,
+  );
+
+  if (!facilityId || !assignedFacility) {
+    throw new ForbiddenException(RESPONSE_MESSAGES.FACILITY_ASSIGNMENT_INVALID);
+  }
+
+  return String(facilityId);
+}
+
+
+// Asserts that the user has access to the specified facility.
 export function assertFacilityAccess(
   user: AuthenticatedUser,
   facilityId: string,
 ): void {
-  if (!isSuperAdmin(user) && String(user.activeFacilityId) !== String(facilityId)) {
-    throw new ForbiddenException('Bạn không có quyền truy cập dữ liệu của cơ sở này.');
+  if (isSuperAdmin(user)) {
+    return;
+  }
+
+  const activeFacilityId = requireActiveFacilityId(user);
+  if (String(activeFacilityId) !== String(facilityId)) {
+    throw new ForbiddenException(RESPONSE_MESSAGES.FACILITY_ACCESS_DENIED);
   }
 }

@@ -46,5 +46,8 @@ export function checkRole(user: AuthenticatedUser, roleName: RoleEnum): boolean 
 }
 
 export function checkPermission(user: AuthenticatedUser, permissionName: PermissionEnum): boolean {
+  if (checkRole(user, RoleEnum.SUPER_ADMIN)) {
+    return true;
+  }
   return getUserPermissions(user).includes(permissionName);
 }
