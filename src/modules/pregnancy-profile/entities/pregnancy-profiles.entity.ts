@@ -1,3 +1,4 @@
+import { PregnancyProfileStatus } from 'src/common/constants/status.enum';
 import { UserProfile } from 'src/database/entities';
 import { User } from 'src/modules/users/entities/user.entity';
 import {
@@ -27,6 +28,9 @@ export class PregnancyProfile {
 
   @Column({ name: 'expected_due_date', type: 'date', nullable: true })
   expectedDueDate: string;
+
+  @Column({ type: 'int', default: 1 })
+  fetalCount: number;
 
   @Column({ type: 'int' })
   gravida: number;
@@ -58,9 +62,17 @@ export class PregnancyProfile {
   @Column({ name: 'risk_level', type: 'varchar', length: 30 })
   riskLevel: string;
 
-  @Column({ type: 'varchar', length: 30 })
+  @Column({
+    type: 'varchar',
+    length: 30,
+    enum: PregnancyProfileStatus,
+    default: PregnancyProfileStatus.ACTIVE,
+  })
   status: string;
-  // ACTIVE: đang mang thai, COMPLETED: Đã sinh, TERMINATED: Đã hủy thai (sảy thai, thai lưu, đình chỉ thai nghén)
+  // ACTIVE: đang mang thai
+  // COMPLETED: Đã sinh
+  // TERMINATED: Đã hủy thai (sảy thai, thai lưu, đình chỉ thai nghén)
+  // DELETED: Đã xóa hồ sơ thai sản (Xóa mềm)
 
   @Column({ type: 'text', nullable: true })
   notes: string;

@@ -1,12 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsOptional, IsString, IsInt, IsIn, Min } from 'class-validator';
+import { IsDateString, IsOptional, IsString, IsInt, IsIn, Min, IsEnum } from 'class-validator';
+import { PregnancyProfileStatus } from 'src/common/constants/status.enum';
 
 export class UpdatePregnancyProfileDto {
-  @ApiPropertyOptional({ description: 'Mã hồ sơ thai sản' })
-  @IsString()
-  @IsOptional()
-  code?: string;
-
   @ApiPropertyOptional({ description: 'Ngày kinh cuối' })
   @IsDateString()
   @IsOptional()
@@ -16,6 +12,12 @@ export class UpdatePregnancyProfileDto {
   @IsDateString()
   @IsOptional()
   expectedDueDate?: string;
+
+  @ApiPropertyOptional({ description: 'Số thai nhi hiện tại' })
+  @IsInt()
+  @IsOptional()
+  @Min(1)
+  fetalCount?: number;
 
   @ApiPropertyOptional({ description: 'Số lần mang thai' })
   @IsInt()
@@ -53,10 +55,22 @@ export class UpdatePregnancyProfileDto {
   @IsIn(['low', 'medium', 'high'])
   riskLevel?: string;
 
-  @ApiPropertyOptional({ description: 'Trạng thái', enum: ['ACTIVE', 'COMPLETED', 'TERMINATED'] })
+  @ApiPropertyOptional({
+    description: 'Trạng thái',
+    enum: [
+      PregnancyProfileStatus.ACTIVE,
+      PregnancyProfileStatus.COMPLETED,
+      PregnancyProfileStatus.TERMINATED,
+    ],
+  })
   @IsString()
   @IsOptional()
-  @IsIn(['ACTIVE', 'COMPLETED', 'TERMINATED'])
+  @IsEnum([
+    // không cho cặp nhật sang trạng thái deleted
+    PregnancyProfileStatus.ACTIVE,
+    PregnancyProfileStatus.COMPLETED,
+    PregnancyProfileStatus.TERMINATED,
+  ])
   status?: string;
 
   @ApiPropertyOptional({ description: 'Ghi chú' })

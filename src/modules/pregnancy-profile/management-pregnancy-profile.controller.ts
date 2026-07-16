@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
@@ -10,6 +20,8 @@ import { CreatePregnancyProfileDto } from './dto/request/create-pregnancy-profil
 import { UpdatePregnancyProfileDto } from './dto/request/update-pregnancy-profile.dto';
 import { PregnancyProfileResponseDto } from './dto/response/pregnancy-profile-response.dto';
 import { PermissionEnum } from '../../common/constants/permission.enum';
+import { SearchProfileQueryDto } from './dto/request/search-pregnancy-profiles.dto';
+import { RESPONSE_MESSAGES } from 'src/common/constants/response-message.constant';
 
 @ApiTags('Management - Pregnancy Profiles')
 @ApiBearerAuth()
@@ -27,17 +39,26 @@ export class ManagementPregnancyProfileController {
     @Param('patientId') patientId: string,
     @Body() dto: CreatePregnancyProfileDto,
   ) {
-    const profile = await this.pregnancyProfileService.create(patientId, dto, user.id);
-    return { message: 'Tạo hồ sơ thai sản cho thai phụ thành công', data: profile };
+    const profile = await this.pregnancyProfileService.create(patientId, dto, user);
+    return { message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.CREATED_SUCCESS, data: profile };
+  }
+
+  @Get()
+  @Permissions(PermissionEnum.PREGNANCY_VIEW)
+  @ApiOperation({ summary: 'List pregnancy profiles' })
+  @ApiResponse({ status: 200, type: [PregnancyProfileResponseDto] })
+  async findAll(@Query() query: SearchProfileQueryDto) {
+    const profiles = await this.pregnancyProfileService.searchProfiles(query);
+    return { message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.GET_LIST_SUCCESS, data: profiles };
   }
 
   @Get('patients/:patientId')
   @Permissions(PermissionEnum.PREGNANCY_VIEW)
   @ApiOperation({ summary: 'List pregnancy profiles for a patient' })
   @ApiResponse({ status: 200, type: [PregnancyProfileResponseDto] })
-  async findByPatient(@Param('patientId') patientId: string) {
-    const profiles = await this.pregnancyProfileService.findMyProfiles(patientId);
-    return { message: 'Lấy danh sách hồ sơ thai sản của thai phụ thành công', data: profiles };
+  async findByPatientId(@Param('patientId') patientId: string) {
+    const profiles = await this.pregnancyProfileService.findByPatientId(patientId);
+    return { message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.GET_SUCCESS, data: profiles };
   }
 
   @Get(':id')
@@ -46,7 +67,7 @@ export class ManagementPregnancyProfileController {
   @ApiResponse({ status: 200, type: PregnancyProfileResponseDto })
   async findOne(@Param('id') id: string) {
     const profile = await this.pregnancyProfileService.findById(id);
-    return { message: 'Lấy thông tin hồ sơ thai sản thành công', data: profile };
+    return { message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.GET_SUCCESS, data: profile };
   }
 
   @Patch(':id')
@@ -55,6 +76,19 @@ export class ManagementPregnancyProfileController {
   @ApiResponse({ status: 200, type: PregnancyProfileResponseDto })
   async update(@Param('id') id: string, @Body() dto: UpdatePregnancyProfileDto) {
     const profile = await this.pregnancyProfileService.update(id, dto);
-    return { message: 'Cập nhật hồ sơ thai sản thành công', data: profile };
+    return { message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.UPDATED, data: profile };
+  }
+
+  @Delete(':id')
+  @Permissions(PermissionEnum.PREGNANCY_DELETE)
+  @ApiOperation({ summary: 'Delete pregnancy profile' })
+  @ApiResponse({ status: 200, type: PregnancyProfileResponseDto })
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body('reason') reason: string,
+  ) {
+    await this.pregnancyProfileService.softDelete(user.id, id, reason);
+    return { message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.DELETED, data: null };
   }
 }

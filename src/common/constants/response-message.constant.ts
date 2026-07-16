@@ -37,8 +37,16 @@ export const RESPONSE_MESSAGES = {
   PASSWORD_RESET_SUCCESS: 'Password reset successfully',
   PREGNANCY_PROFILES: {
     CREATED_SUCCESS: 'Pregnancy profile created successfully',
-    RETRIEVED: 'Pregnancy profile retrieved successfully',
+    GET_SUCCESS: 'Pregnancy profile retrieved successfully',
+    GET_LIST_SUCCESS: 'Pregnancy profiles retrieved successfully',
+    NOT_FOUND: 'Pregnancy profile not found',
     UPDATED: 'Pregnancy profile updated successfully',
-    DELETED: 'Pregnancy profile deleted successfully',
+    DELETED: 'Pregnancy profile soft deleted successfully',
+    EXISTS: 'Pregnancy profile already exists for this patient',
+    PARA_CONFLICT:
+      'The total number of full-term births, premature births, and abortions cannot be less than the number of pregnancies',
+    NOT_IS_STAFF:
+      'Only staff members (doctors, nurses, or staff) can request soft deletion of pregnancy profiles',
   },
+  NOT_FOUND_CURRENT_USER: 'User current not found',
 } as const;
