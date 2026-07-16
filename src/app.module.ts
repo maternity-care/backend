@@ -16,6 +16,7 @@ import { FacilitiesModule } from './modules/facilities/facilities.module';
 import { RoomsModule } from './modules/rooms/rooms.module';
 import { StaffsModule } from './modules/staffs/staffs.module';
 import { PregnancyProfileModule } from './modules/pregnancy-profile/pregnancy-profile.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -48,6 +49,7 @@ import { PregnancyProfileModule } from './modules/pregnancy-profile/pregnancy-pr
     FacilitiesModule,
     RoomsModule,
     PregnancyProfileModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}
