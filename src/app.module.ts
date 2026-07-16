@@ -15,6 +15,10 @@ import { UsersModule } from './modules/users/users.module';
 import { FacilitiesModule } from './modules/facilities/facilities.module';
 import { RoomsModule } from './modules/rooms/rooms.module';
 import { StaffsModule } from './modules/staffs/staffs.module';
+import { MapsModule } from './modules/maps/maps.module';
+import { DoctorShiftsModule } from './modules/doctor-shifts/doctor-shifts.module';
+import { ServicesModule } from './modules/services/services.module';
+import { FacilityServicesModule } from './modules/facility-services/facility-services.module';
 import { PregnancyProfileModule } from './modules/pregnancy-profile/pregnancy-profile.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 @Module({
@@ -48,6 +52,10 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     SettingsModule,
     FacilitiesModule,
     RoomsModule,
+    MapsModule,
+    DoctorShiftsModule,
+    ServicesModule,
+    FacilityServicesModule,
     PregnancyProfileModule,
     NotificationsModule,
   ],

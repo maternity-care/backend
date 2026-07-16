@@ -4,9 +4,12 @@ export { StaffProfile } from '../../modules/staffs/entities/staff-profiles.entit
 export { Facility } from '../../modules/facilities/entities/facilities.entity';
 export { Room } from '../../modules/rooms/entities/rooms.entity';
 export { FacilityStaff } from '../../modules/facilities/entities/facility-staff.entity';
-export { DoctorShift } from './doctor-shifts.entity';
+export { DoctorShift } from '../../modules/doctor-shifts/entities/doctor-shifts.entity';
+export { DoctorShiftChangeLog } from '../../modules/doctor-shifts/entities/doctor-shift-change-logs.entity';
+export { ShiftDisruption } from '../../modules/doctor-shifts/entities/shift-disruptions.entity';
+export { AppointmentDisruptionItem } from '../../modules/doctor-shifts/entities/appointment-disruption-items.entity';
 export { Service } from './services.entity';
-export { FacilityService } from '../../modules/facilities/entities/facility-services.entity';
+export { FacilityService } from '../../modules/facility-services/entities/facility-services.entity';
 export { MaternityPackage } from './maternity-packages.entity';
 export { PackageService } from './package-services.entity';
 export { PackageServiceFacility } from './package-service-facilities.entity';

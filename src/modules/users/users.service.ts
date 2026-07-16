@@ -27,6 +27,7 @@ import { IRolesService, ROLES_SERVICE } from '../roles/interfaces/roles-service.
 import { UserStatusEnum } from './users.enum';
 import { IAdminManageService } from './interfaces/admin-manage-service.interface';
 import { RoleEnum } from '../../common/constants/role.enum';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import {
   IStaffProfileRepository,
   STAFF_PROFILE_REPOSITORY,
@@ -538,7 +539,9 @@ export class UsersService implements IUsersService, IAdminManageService {
     if (!actor || isSuperAdmin(actor)) return;
     const activeFacilityId = getActiveFacilityId(actor);
     if (!activeFacilityId) {
-      throw new ForbiddenException('Vui lòng chọn cơ sở làm việc.');
+      throw new ForbiddenException(
+        RESPONSE_MESSAGES.FACILITY_SELECTION_REQUIRED,
+      );
     }
     const assignment = await this.facilityStaffRepository.findOne({
       where: {

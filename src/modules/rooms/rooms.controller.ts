@@ -125,10 +125,6 @@ export class RoomsController {
     try {
       const existingRoom = await this.roomsService.findById(id);
       assertFacilityAccess(user, existingRoom.facilityId);
-      const activeFacilityId = getActiveFacilityId(user);
-      if (activeFacilityId) {
-        dto.facilityId = activeFacilityId;
-      }
       const room = await this.roomsService.update(id, dto);
       return {
         message: ROOM_CONSTANT.UPDATED_SUCCESSFULLY,
@@ -145,12 +141,13 @@ export class RoomsController {
   async remove(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
+    @Query('reason') reason?: string,
   ) {
     try {
       const room = await this.roomsService.findById(id);
       assertFacilityAccess(user, room.facilityId);
-      await this.roomsService.remove(id);
-      return { message: ROOM_CONSTANT.DELETED_SUCCESSFULLY, data: null };
+      const data = await this.roomsService.remove(id, reason, user?.id ?? null);
+      return { message: ROOM_CONSTANT.DELETED_SUCCESSFULLY, data };
     } catch (error) {
       this.handleError(error);
     }

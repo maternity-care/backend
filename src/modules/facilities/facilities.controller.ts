@@ -7,7 +7,7 @@ import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
 import { SearchFacilityDto } from './dto/requests/search-facility.dto';
 import { FacilityResponseDto } from './dto/responds/facilities-respond';
 import { HttpException } from '@nestjs/common';
-import { FACILITY_CONSTANT } from '../../common/constants/facility.constant';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import {
@@ -44,7 +44,7 @@ export class FacilitiesController {
       if (activeFacilityId) {
         const facility = await this.facilitiesService.findById(activeFacilityId);
         return {
-          message: FACILITY_CONSTANT.FACILITY_FOUND,
+          message: RESPONSE_MESSAGES.FACILITIES_RETRIEVED,
           data: query?.page
             ? { items: [facility], total: 1, page: Number(query.page), limit: 1 }
             : [facility],
@@ -55,14 +55,14 @@ export class FacilitiesController {
       if (query?.page) {
         const paged = await this.facilitiesService.findAllPaginated(query);
         return {
-          message: FACILITY_CONSTANT.FACILITY_FOUND,
+          message: RESPONSE_MESSAGES.FACILITIES_RETRIEVED,
           data: paged,
         };
       }
 
       const facilities = await this.facilitiesService.findAll(query);
       return {
-        message: FACILITY_CONSTANT.FACILITY_FOUND,
+        message: RESPONSE_MESSAGES.FACILITIES_RETRIEVED,
         data: facilities,
       };
     } catch (error) {
@@ -81,7 +81,7 @@ export class FacilitiesController {
       assertFacilityAccess(user, id);
       const facility = await this.facilitiesService.findById(id);
       return {
-        message: FACILITY_CONSTANT.FACILITY_DETAIL_FOUND,
+        message: RESPONSE_MESSAGES.FACILITY_RETRIEVED,
         data: facility,
       };
     } catch (error) {
@@ -97,7 +97,7 @@ export class FacilitiesController {
     try {
       const facility = await this.facilitiesService.create(dto);
       return {
-        message: FACILITY_CONSTANT.CREATED_SUCCESSFULLY,
+        message: RESPONSE_MESSAGES.FACILITY_CREATED,
         data: facility,
       };
     } catch (error) {
@@ -117,13 +117,15 @@ export class FacilitiesController {
       assertFacilityAccess(user, id);
       const data = await this.facilitiesService.update(id, dto);
       return {
-        message: FACILITY_CONSTANT.UPDATED_SUCCESSFULLY,
+        message: RESPONSE_MESSAGES.FACILITY_UPDATED,
         data: data,
       };
     } catch (error) {
       this.handleError(error);
     }
   }
+
+
 
   @Delete(':id')
   @Roles(RoleEnum.SUPER_ADMIN)
@@ -132,11 +134,32 @@ export class FacilitiesController {
   async remove(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
+    @Query('reason') reason?: string,
   ) {
     try {
       assertFacilityAccess(user, id);
-      await this.facilitiesService.remove(id);
-      return { message: FACILITY_CONSTANT.DELETED_SUCCESSFULLY, data: null };
+      const data = await this.facilitiesService.remove(id, reason, user?.id ?? null);
+      return { message: RESPONSE_MESSAGES.FACILITY_DELETED, data };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Patch(':id/deactivate')
+  @ApiOperation({ summary: 'Update facility' })
+  @ApiResponse({ status: 200, type: FacilityResponseDto })
+  async deActivateFacility(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateFacilityDto,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      const data = await this.facilitiesService.deActivateFacility(id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITY_STATUS_UPDATED,
+        data: data,
+      };
     } catch (error) {
       this.handleError(error);
     }

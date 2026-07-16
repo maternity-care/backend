@@ -7,7 +7,8 @@ import { IRoomsRepository, ROOMS_REPOSITORY } from './interfaces/rooms-repositor
 import { FacilitiesService } from '../facilities/facilities.service';
 import { SearchRoomsDto } from './dto/requests/search-rooms.dto';
 import {ROOM_CONSTANT} from '../../common/constants/room.constant';
-import {FACILITY_CONSTANT} from '../../common/constants/facility.constant';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
+import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
 
 @Injectable()
 export class RoomsService {
@@ -58,15 +59,22 @@ export class RoomsService {
     return this.roomsRepository.save(room);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, reason?: string, deletedBy?: string | null): Promise<SafeRemoveResult> {
     const room = await this.findById(id);
-    await this.roomsRepository.remove(room);
+    const dependencyCount = await this.roomsRepository.countDependencies(room.id);
+    if (dependencyCount === 0) {
+      await this.roomsRepository.remove(room);
+      return { action: 'hard_deleted', affectedCount: 0 };
+    }
+
+    await this.roomsRepository.softDelete(room, reason, deletedBy);
+    return { action: 'soft_deleted', affectedCount: dependencyCount };
   }
 
   async findByFacilityId(facilityId: string, filters?: SearchRoomsDto): Promise<{ facility: Facility; rooms: Room[] }> {
     const facility = await this.facilitiesService.findById(facilityId);
     if (!facility) {
-      throw new NotFoundException(FACILITY_CONSTANT.FACILITY_NOT_FOUND);
+      throw new NotFoundException(RESPONSE_MESSAGES.FACILITY_NOT_FOUND);
     }
 
     // nếu client gửi page => trả về phân trang
@@ -113,7 +121,7 @@ export class RoomsService {
 
     const facilities = await this.facilitiesService.findAll();
     if (!facilities || facilities.length === 0) {
-      throw new NotFoundException(FACILITY_CONSTANT.FACILITY_NOT_FOUND);
+      throw new NotFoundException(RESPONSE_MESSAGES.FACILITY_NOT_FOUND);
     }
 
     const result = await Promise.all(
