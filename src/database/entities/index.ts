@@ -16,7 +16,7 @@ export { PackageServiceFacility } from './package-service-facilities.entity';
 export { PatientPackage } from './patient-packages.entity';
 export { PatientPackageBenefit } from './patient-package-benefits.entity';
 export { PatientExtraService } from './patient-extra-services.entity';
-export { PregnancyProfile } from './pregnancy-profiles.entity';
+export { PregnancyProfile } from '../../modules/pregnancy-profile/entities/pregnancy-profiles.entity';
 export { PregnancyHistoryEvent } from './pregnancy-history-events.entity';
 export { HealthMetric } from './health-metrics.entity';
 export { Appointment } from './appointments.entity';

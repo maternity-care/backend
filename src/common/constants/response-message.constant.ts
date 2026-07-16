@@ -47,4 +47,18 @@ export const RESPONSE_MESSAGES = {
   FACILITY_ASSIGNMENT_INVALID: 'Cơ sở đang chọn không còn là nơi làm việc hợp lệ của bạn.',
   FACILITY_NOT_ASSIGNED: 'Bạn không thuộc cơ sở đã chọn.',
   FACILITY_ACCESS_DENIED: 'Bạn không có quyền truy cập dữ liệu của cơ sở này.',
+  PREGNANCY_PROFILES: {
+    CREATED_SUCCESS: 'Hồ sơ mang thai đã được tạo thành công',
+    GET_SUCCESS: 'Hồ sơ mang thai đã được lấy thành công',
+    GET_LIST_SUCCESS: 'Danh sách hồ sơ mang thai đã được lấy thành công',
+    NOT_FOUND: 'Hồ sơ mang thai không tồn tại',
+    UPDATED: 'Hồ sơ mang thai đã được cập nhật thành công',
+    DELETED: 'Hồ sơ mang thai đã được xóa tạm thời thành công',
+    EXISTS: 'Hồ sơ mang thai đã tồn tại cho bệnh nhân này',
+    PARA_CONFLICT:
+      'Tổng số lần sinh con đủ tháng, sinh non và sảy thai không thể ít hơn số lần mang thai',
+    NOT_IS_STAFF:
+      'Chỉ nhân viên (bác sĩ, điều dưỡng hoặc nhân viên) mới có thể yêu cầu xóa tạm thời hồ sơ mang thai',
+  },
+  NOT_FOUND_CURRENT_USER: 'Người dùng hiện tại không tồn tại',
 } as const;

@@ -5,6 +5,9 @@ export class UserProfile {
   @PrimaryColumn({ name: 'user_id', type: 'bigint' })
   userId: string;
 
+  @Column({ name: 'date_of_birth', type: 'date', nullable: true })
+  dateOfBirth: string;
+
   @Column({ type: 'varchar', length: 500, nullable: true })
   address: string;
 
