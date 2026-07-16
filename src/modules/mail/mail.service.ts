@@ -1,10 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createTransport, Transporter } from 'nodemailer';
-import { IMailService, SendPasswordResetEmailInput } from './interfaces/mail-service.interface';
+import {
+  IMailService,
+  RequestSoftDeleteEmailInput,
+  SendPasswordResetEmailInput,
+} from './interfaces/mail-service.interface';
 import { passwordResetTemplate } from './templates/password-reset.template';
 import { createdAccountTemplate } from './templates/created-account.template';
 import { CreatedAccountInterface } from './interfaces/created-account.interface';
+import { createRequestSoftDeletePregnancyProfileTemplate } from './templates/request-soft-delete-pregnancy-profile.template';
 
 interface MailPayload {
   to: string;
@@ -77,6 +82,17 @@ export class MailService implements IMailService {
 
   async sendCreatedAccountEmail(input: CreatedAccountInterface): Promise<void> {
     const template = createdAccountTemplate(input);
+
+    await this.sendMail({
+      to: input.to,
+      subject: template.subject,
+      text: template.text,
+      html: template.html,
+    });
+  }
+
+  async sendSoftDeleteRequestEmail(input: RequestSoftDeleteEmailInput): Promise<void> {
+    const template = createRequestSoftDeletePregnancyProfileTemplate(input);
 
     await this.sendMail({
       to: input.to,

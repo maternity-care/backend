@@ -19,6 +19,9 @@ export class HealthMetric {
   @Column({ name: 'recorded_at', type: 'timestamp' })
   recordedAt: Date;
 
+  @Column({ name: 'gestational_age_weeks', type: 'int', nullable: true })
+  gestationalAgeWeeks: number;
+
   @Column({ name: 'weight_kg', type: 'decimal', precision: 5, scale: 2, nullable: true })
   weightKg: string;
 

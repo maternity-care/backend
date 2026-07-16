@@ -25,6 +25,8 @@ import { RemoveStaffPosition1751300000000 } from './migrations/1751300000000-Rem
 import { AllowMultipleFacilityStaffRoles1751400000000 } from './migrations/1751400000000-AllowMultipleFacilityStaffRoles';
 import { ConvertStatusesToEnums1751500000000 } from './migrations/1751500000000-ConvertStatusesToEnums';
 import { AddOperationalSoftDeleteAndDisruptions1751600000000 } from './migrations/1751600000000-AddOperationalSoftDeleteAndDisruptions';
+import { UpdatePregnancyProfilesTable1751600000000 } from './migrations/1751600000000-UpdatePregnancyProfilesTable';
+import { CreateNotificationsTable1760000000000 } from './migrations/1760000000000-CreateNotificationsTable';
 import { StaffRefreshToken } from '../modules/auth/entities/staff-refresh-token.entity';
 import { StaffPasswordResetToken } from '../modules/auth/entities/staff-password-reset-token.entity';
 import { Facility } from '../modules/facilities/entities/facilities.entity';
@@ -36,6 +38,7 @@ import { DoctorShift } from '../modules/doctor-shifts/entities/doctor-shifts.ent
 import { DoctorShiftChangeLog } from '../modules/doctor-shifts/entities/doctor-shift-change-logs.entity';
 import { ShiftDisruption } from '../modules/doctor-shifts/entities/shift-disruptions.entity';
 import { AppointmentDisruptionItem } from '../modules/doctor-shifts/entities/appointment-disruption-items.entity';
+import { Notification } from '../modules/notifications/entities/notification.entity';
 
 config();
 
@@ -69,6 +72,7 @@ export const typeOrmConfig: DataSourceOptions = {
     DoctorShiftChangeLog,
     ShiftDisruption,
     AppointmentDisruptionItem,
+    Notification,
     join(__dirname, 'entities', '*.entity{.ts,.js}'),
   ],
   migrations: [
@@ -87,6 +91,8 @@ export const typeOrmConfig: DataSourceOptions = {
     AllowMultipleFacilityStaffRoles1751400000000,
     ConvertStatusesToEnums1751500000000,
     AddOperationalSoftDeleteAndDisruptions1751600000000,
+    UpdatePregnancyProfilesTable1751600000000,
+    CreateNotificationsTable1760000000000,
   ],
   charset: 'utf8mb4_unicode_ci',
 };
