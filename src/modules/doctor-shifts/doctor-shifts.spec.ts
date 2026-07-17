@@ -394,7 +394,7 @@ describe('DoctorShiftsService business validation', () => {
   it('TC-UNIT-DSHIFT-014 rejects list and bulk-create when date range is reversed', async () => {
     const { repo, service } = createService();
 
-    expect(() => service.findAll({ dateFrom: '2099-07-20', dateTo: '2099-07-01' })).toThrow(BadRequestException);
+    await expect(service.findAll({ dateFrom: '2099-07-20', dateTo: '2099-07-01' })).rejects.toBeInstanceOf(BadRequestException);
     expect(repo.findAll).not.toHaveBeenCalled();
     await expect(service.bulkCreate({
       doctorId: '1',
@@ -469,6 +469,22 @@ describe('DoctorShiftsService business validation', () => {
 
     await expect(service.findAllPaginated({ page: 1, limit: 20 })).resolves.toMatchObject({ total: 1 });
     expect(repo.findAllPaginated).toHaveBeenCalledWith({ page: 1, limit: 20 });
+  });
+
+  it('returns not found when list or paginated list has no shifts', async () => {
+    const listContext = createService();
+    listContext.repo.findAll.mockResolvedValueOnce([]);
+    await expect(listContext.service.findAll({ facilityId: '1' })).rejects.toBeInstanceOf(NotFoundException);
+
+    const pagedContext = createService();
+    pagedContext.repo.findAllPaginated.mockResolvedValueOnce({
+      items: [],
+      total: 0,
+      page: 1,
+      limit: 20,
+      totalPages: 0,
+    });
+    await expect(pagedContext.service.findAllPaginated({ page: 1, limit: 20 })).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('TC-UNIT-DSHIFT-021 returns a shift by valid id', async () => {
@@ -677,6 +693,23 @@ describe('DoctorShiftsService business validation', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it('returns not found when weekly schedule has no shifts', async () => {
+    const { repo, service } = createService();
+    repo.findWeeklyWithDetails.mockResolvedValueOnce([]);
+
+    await expect(service.getWeeklySchedule('1', '2099-07-06')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('returns not found when doctor availability has no working shifts', async () => {
+    const { repo, service } = createService();
+    repo.findDoctorShiftsForDate.mockResolvedValueOnce([]);
+
+    await expect(service.getDoctorAvailability('1', {
+      facilityId: '1',
+      date: '2099-07-07',
+    })).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('TC-UNIT-DSHIFT-042 validates conflict-check input without throwing on conflict details', async () => {
