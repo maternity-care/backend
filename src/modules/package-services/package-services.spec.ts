@@ -184,6 +184,26 @@ describe('PackageServicesService business logic', () => {
     await expect(context.service.findById('99')).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('throws not found when package service lists are empty', async () => {
+    const listContext = createService();
+    listContext.repo.findAll.mockResolvedValueOnce([]);
+    await expect(listContext.service.findAll({ packageId: '1' })).rejects.toBeInstanceOf(NotFoundException);
+
+    const pagedContext = createService();
+    pagedContext.repo.findAllPaginated.mockResolvedValueOnce({
+      items: [],
+      total: 0,
+      page: 1,
+      limit: 20,
+      totalPages: 0,
+    });
+    await expect(pagedContext.service.findAllPaginated({ page: 1, limit: 20 })).rejects.toBeInstanceOf(NotFoundException);
+
+    const publicContext = createService();
+    publicContext.repo.findDetailsByPackageId.mockResolvedValueOnce([]);
+    await expect(publicContext.service.findDetailsByPackageId('1')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   it('deletes unused package service and rejects deletion after benefits are generated', async () => {
     const hardContext = createService();
     await expect(hardContext.service.remove('10')).resolves.toBeUndefined();

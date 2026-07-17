@@ -73,14 +73,18 @@ export class DoctorShiftsService {
     return this.repository.saveMany(payloads.map(payload => this.repository.create(payload)));
   }
 
-  findAll(filters?: SearchDoctorShiftDto): Promise<DoctorShiftWithDetails[]> {
+  async findAll(filters?: SearchDoctorShiftDto): Promise<DoctorShiftWithDetails[]> {
     validateDateRange(filters?.dateFrom, filters?.dateTo);
-    return this.repository.findAll(filters);
+    const shifts = await this.repository.findAll(filters);
+    this.ensureShiftsFound(shifts);
+    return shifts;
   }
 
-  findAllPaginated(filters?: SearchDoctorShiftDto) {
+  async findAllPaginated(filters?: SearchDoctorShiftDto) {
     validateDateRange(filters?.dateFrom, filters?.dateTo);
-    return this.repository.findAllPaginated(filters);
+    const result = await this.repository.findAllPaginated(filters);
+    this.ensureShiftsFound(result.items);
+    return result;
   }
 
   async findById(id: string): Promise<DoctorShift> {
@@ -187,6 +191,7 @@ export class DoctorShiftsService {
       this.repository.findDoctorShiftsForDate(query.facilityId, doctorId, query.date),
       this.repository.findDoctorAppointmentsForDate(query.facilityId, doctorId, query.date),
     ]);
+    this.ensureShiftsFound(shifts);
 
     return {
       doctorId,
@@ -228,6 +233,7 @@ export class DoctorShiftsService {
       doctorId,
     );
     const shifts = await this.repository.findWeeklyWithDetails(facilityId, start, end, doctorId);
+    this.ensureShiftsFound(shifts);
     return {
       facilityId,
       weekStart: start,
@@ -262,6 +268,12 @@ export class DoctorShiftsService {
     }
 
     return slots;
+  }
+
+  private ensureShiftsFound(shifts?: unknown[] | null): void {
+    if (!shifts || shifts.length === 0) {
+      throw new NotFoundException(DOCTOR_SHIFT_CONSTANT.NOT_FOUND);
+    }
   }
 
   
