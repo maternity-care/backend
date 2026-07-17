@@ -14,6 +14,7 @@ import { SearchFacilityServiceDto } from './dto/requests/search-facility-service
 import { UpdateFacilityServiceDto } from './dto/requests/update-facility-service.dto';
 import {
   FACILITY_SERVICES_REPOSITORY,
+  FacilityServiceWithDetails,
   IFacilityServicesRepository,
 } from './interfaces/facility-services-repository.interface';
 
@@ -38,7 +39,7 @@ export class FacilityServicesService {
   }
 
   // Lấy danh sách mapping facility-service cho màn hình quản trị.
-  findAll(filters?: SearchFacilityServiceDto): Promise<FacilityService[]> {
+  findAll(filters?: SearchFacilityServiceDto): Promise<FacilityServiceWithDetails[]> {
     return this.repository.findAll(filters);
   }
 
@@ -59,6 +60,15 @@ export class FacilityServicesService {
   // Tìm một mapping theo id, dùng cho detail/update/delete.
   async findById(id: string): Promise<FacilityService> {
     const entity = await this.repository.findById(id);
+    if (!entity) {
+      throw new NotFoundException(FACILITY_SERVICE_CONSTANT.NOT_FOUND);
+    }
+    return entity;
+  }
+
+  // Detail cho controller/FE: ngoài id còn có facilityName/serviceName để hiển thị trực tiếp.
+  async findDetailsById(id: string): Promise<FacilityServiceWithDetails> {
+    const entity = await this.repository.findDetailsById(id);
     if (!entity) {
       throw new NotFoundException(FACILITY_SERVICE_CONSTANT.NOT_FOUND);
     }

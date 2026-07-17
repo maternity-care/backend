@@ -1,7 +1,8 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FACILITY_SERVICE_CONSTANT } from '../../common/constants/facility-service.constant';
 import { CreateFacilityServiceDto } from './dto/requests/create-facility-service.dto';
+import { FacilityServiceResponseDto } from './dto/responses/facility-service-response.dto';
 import { SearchFacilityServiceDto } from './dto/requests/search-facility-service.dto';
 import { UpdateFacilityServiceDto } from './dto/requests/update-facility-service.dto';
 import { FacilityServicesService } from './facility-services.service';
@@ -14,6 +15,7 @@ export class FacilityServicesController {
   // Lấy danh sách dịch vụ theo từng facility; dùng cho màn hình quản trị giá/thời lượng.
   @Get()
   @ApiOperation({ summary: 'List facility services' })
+  @ApiResponse({ status: 200, type: [FacilityServiceResponseDto] })
   async findAll(@Query() query: SearchFacilityServiceDto) {
     const data = query.page
       ? await this.facilityServicesService.findAllPaginated(query)
@@ -24,10 +26,11 @@ export class FacilityServicesController {
   // Lấy chi tiết một mapping facility-service.
   @Get(':id')
   @ApiOperation({ summary: 'Get facility service details' })
+  @ApiResponse({ status: 200, type: FacilityServiceResponseDto })
   async findOne(@Param('id') id: string) {
     return {
       message: FACILITY_SERVICE_CONSTANT.DETAIL_FOUND,
-      data: await this.facilityServicesService.findById(id),
+      data: await this.facilityServicesService.findDetailsById(id),
     };
   }
 
