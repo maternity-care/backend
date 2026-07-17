@@ -10,7 +10,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { DOCTOR_SHIFT_CONSTANT } from '../../common/constants/doctor-shift.constant';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { assertFacilityAccess, getActiveFacilityId } from '../../common/helpers/facility-scope.helper';
@@ -23,6 +23,7 @@ import { CreateDoctorShiftDto } from './dto/requests/create-doctor-shift.dto';
 import { DoctorAvailabilityQueryDto } from './dto/requests/doctor-availability.dto';
 import { SearchDoctorShiftDto, WeeklyDoctorShiftDto } from './dto/requests/search-doctor-shift.dto';
 import { UpdateDoctorShiftDto } from './dto/requests/update-doctor-shift.dto';
+import { DoctorShiftResponseDto } from './dto/responses/doctor-shift-response.dto';
 import { DoctorShiftsService } from './doctor-shifts.service';
 
 @ApiTags('Management - Doctor Shifts')
@@ -34,6 +35,7 @@ export class DoctorShiftsController {
 
   @Get()
   @ApiOperation({ summary: 'List doctor shifts' })
+  @ApiResponse({ status: 200, type: [DoctorShiftResponseDto] })
   async findAll(
     //@CurrentUser() user: AuthenticatedUser,
    @Query() query: SearchDoctorShiftDto) {
@@ -92,6 +94,7 @@ export class DoctorShiftsController {
 
   @Get('weekly')
   @ApiOperation({ summary: 'Get weekly doctor shift calendar' })
+  @ApiResponse({ status: 200, type: [DoctorShiftResponseDto] })
   async getWeekly(
     //@CurrentUser() user: AuthenticatedUser,
     @Query() query: WeeklyDoctorShiftDto,
@@ -109,10 +112,11 @@ export class DoctorShiftsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get doctor shift details' })
+  @ApiResponse({ status: 200, type: DoctorShiftResponseDto })
   async findOne(
     // @CurrentUser() user: AuthenticatedUser,
      @Param('id') id: string) {
-    const shift = await this.service.findById(id);
+    const shift = await this.service.findDetailsById(id);
     // assertFacilityAccess(user, shift.facilityId);
     return { message: DOCTOR_SHIFT_CONSTANT.DETAIL_FOUND, data: shift };
   }
