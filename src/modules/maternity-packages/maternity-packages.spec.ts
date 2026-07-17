@@ -5,6 +5,7 @@ import { MaternityPackageStatus } from '../../common/constants/status.enum';
 import { CreateMaternityPackageDto } from './dto/requests/create-maternity-package.dto';
 import { SearchMaternityPackageDto } from './dto/requests/search-maternity-package.dto';
 import { MaternityPackagesService } from './maternity-packages.service';
+import { PublicMaternityPackagesController } from './public-maternity-packages.controller';
 
 describe('MaternityPackages DTO validation', () => {
   const validPayload = {
@@ -117,6 +118,22 @@ describe('MaternityPackagesService business logic', () => {
     await expect(context.service.findById('99')).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('throws not found when package lists are empty', async () => {
+    const listContext = createService();
+    listContext.repo.findAll.mockResolvedValueOnce([]);
+    await expect(listContext.service.findAll({ status: MaternityPackageStatus.ACTIVE })).rejects.toBeInstanceOf(NotFoundException);
+
+    const pagedContext = createService();
+    pagedContext.repo.findAllPaginated.mockResolvedValueOnce({
+      items: [],
+      total: 0,
+      page: 1,
+      limit: 20,
+      totalPages: 0,
+    });
+    await expect(pagedContext.service.findAllPaginated({ page: 1, limit: 20 })).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   it('hard deletes unused package and marks used package inactive', async () => {
     const hardContext = createService();
     await expect(hardContext.service.remove('1')).resolves.toEqual({
@@ -135,5 +152,19 @@ describe('MaternityPackagesService business logic', () => {
       expect.objectContaining({ id: '1' }),
       MaternityPackageStatus.INACTIVE,
     );
+  });
+});
+
+describe('PublicMaternityPackagesController', () => {
+  it('throws not found instead of returning success with null when package is not active', async () => {
+    const service = {
+      findById: jest.fn().mockResolvedValue({
+        id: '1',
+        status: MaternityPackageStatus.DRAFT,
+      }),
+    };
+    const controller = new PublicMaternityPackagesController(service as never);
+
+    await expect(controller.findOne('1')).rejects.toBeInstanceOf(NotFoundException);
   });
 });
