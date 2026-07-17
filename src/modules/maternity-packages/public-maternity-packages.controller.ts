@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { MATERNITY_PACKAGE_CONSTANT } from '../../common/constants/maternity-package.constant';
 import { MaternityPackageStatus } from '../../common/constants/status.enum';
@@ -26,9 +26,12 @@ export class PublicMaternityPackagesController {
   @ApiOperation({ summary: 'Get active maternity package details' })
   async findOne(@Param('id') id: string) {
     const pkg = await this.maternityPackagesService.findById(id);
+    if (pkg.status !== MaternityPackageStatus.ACTIVE) {
+      throw new NotFoundException(MATERNITY_PACKAGE_CONSTANT.NOT_FOUND);
+    }
     return {
       message: MATERNITY_PACKAGE_CONSTANT.DETAIL_FOUND,
-      data: pkg.status === MaternityPackageStatus.ACTIVE ? pkg : null,
+      data: pkg,
     };
   }
 }

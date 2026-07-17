@@ -34,13 +34,17 @@ export class MaternityPackagesService {
   }
 
   // Lấy danh sách gói cho management/public tùy controller gọi filter status thế nào.
-  findAll(filters?: SearchMaternityPackageDto): Promise<MaternityPackage[]> {
-    return this.repository.findAll(filters);
+  async findAll(filters?: SearchMaternityPackageDto): Promise<MaternityPackage[]> {
+    const packages = await this.repository.findAll(filters);
+    this.ensurePackagesFound(packages);
+    return packages;
   }
 
   // Lấy danh sách gói có phân trang.
-  findAllPaginated(filters?: SearchMaternityPackageDto) {
-    return this.repository.findAllPaginated(filters);
+  async findAllPaginated(filters?: SearchMaternityPackageDto) {
+    const result = await this.repository.findAllPaginated(filters);
+    this.ensurePackagesFound(result.items);
+    return result;
   }
 
   // Lấy chi tiết gói theo id.
@@ -95,6 +99,12 @@ export class MaternityPackagesService {
   private async ensureUniqueName(name: string): Promise<void> {
     if (await this.repository.findByName(name)) {
       throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.NAME_EXISTS);
+    }
+  }
+
+  private ensurePackagesFound(packages?: unknown[] | null): void {
+    if (!packages || packages.length === 0) {
+      throw new NotFoundException(MATERNITY_PACKAGE_CONSTANT.NOT_FOUND);
     }
   }
 }
