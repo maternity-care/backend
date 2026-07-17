@@ -79,6 +79,8 @@ export function throwIfConflicted(conflicts: ShiftConflicts): void {
   }
 }
 
+
+
 /** Kiểm tra khoảng ngày dùng cho API tìm kiếm. */
 export function validateDateRange(dateFrom?: string, dateTo?: string): void {
   if (dateFrom && dateTo && dateFrom > dateTo) {

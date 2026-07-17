@@ -23,6 +23,7 @@ import {
 } from './helpers/doctor-shifts.helper';
 import {
   DOCTOR_SHIFTS_REPOSITORY,
+  DoctorShiftWithDetails,
   IDoctorShiftsRepository,
 } from './interfaces/doctor-shifts-repository.interface';
 import { DoctorShiftsValidator } from './validators/doctor-shifts.validator';
@@ -72,7 +73,7 @@ export class DoctorShiftsService {
     return this.repository.saveMany(payloads.map(payload => this.repository.create(payload)));
   }
 
-  findAll(filters?: SearchDoctorShiftDto): Promise<DoctorShift[]> {
+  findAll(filters?: SearchDoctorShiftDto): Promise<DoctorShiftWithDetails[]> {
     validateDateRange(filters?.dateFrom, filters?.dateTo);
     return this.repository.findAll(filters);
   }
@@ -85,6 +86,13 @@ export class DoctorShiftsService {
   async findById(id: string): Promise<DoctorShift> {
     validateShiftId(id);
     const shift = await this.repository.findById(id);
+    if (!shift) throw new NotFoundException(DOCTOR_SHIFT_CONSTANT.NOT_FOUND);
+    return shift;
+  }
+
+  async findDetailsById(id: string): Promise<DoctorShiftWithDetails> {
+    validateShiftId(id);
+    const shift = await this.repository.findDetailsById(id);
     if (!shift) throw new NotFoundException(DOCTOR_SHIFT_CONSTANT.NOT_FOUND);
     return shift;
   }
@@ -219,7 +227,7 @@ export class DoctorShiftsService {
       weekStart,
       doctorId,
     );
-    const shifts = await this.repository.findWeekly(facilityId, start, end, doctorId);
+    const shifts = await this.repository.findWeeklyWithDetails(facilityId, start, end, doctorId);
     return {
       facilityId,
       weekStart: start,
@@ -255,4 +263,6 @@ export class DoctorShiftsService {
 
     return slots;
   }
+
+  
 }

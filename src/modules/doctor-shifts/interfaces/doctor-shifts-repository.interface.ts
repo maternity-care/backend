@@ -5,9 +5,11 @@ import { SearchDoctorShiftDto } from '../dto/requests/search-doctor-shift.dto';
 import { ShiftConflicts } from './shift-conflicts.interface';
 import { ShiftConflictInput } from './shifts-conflict-input.interface';
 import { DoctorAppointmentBlock } from './doctor-appointment-block.interface';
+import { DoctorShiftResponseDto } from '../dto/responses/doctor-shift-response.dto';
 
 export const DOCTOR_SHIFTS_REPOSITORY = Symbol('DOCTOR_SHIFTS_REPOSITORY');
 
+export type DoctorShiftWithDetails = DoctorShiftResponseDto;
 
 export interface IDoctorShiftsRepository {
   create(data: DeepPartial<DoctorShift>): DoctorShift;
@@ -16,10 +18,12 @@ export interface IDoctorShiftsRepository {
   save(shift: DoctorShift): Promise<DoctorShift>;
   remove(shift: DoctorShift): Promise<void>;
   findById(id: string): Promise<DoctorShift | null>;
-  findAll(filters?: SearchDoctorShiftDto): Promise<DoctorShift[]>;
-  findAllPaginated(filters?: SearchDoctorShiftDto): Promise<PaginationResult<DoctorShift>>;
+  findDetailsById(id: string): Promise<DoctorShiftWithDetails | null>;
+  findAll(filters?: SearchDoctorShiftDto): Promise<DoctorShiftWithDetails[]>;
+  findAllPaginated(filters?: SearchDoctorShiftDto): Promise<PaginationResult<DoctorShiftWithDetails>>;
   findConflicts(input: ShiftConflictInput): Promise<ShiftConflicts>;
   findWeekly(facilityId: string, startDate: string, endDate: string, doctorId?: string): Promise<DoctorShift[]>;
+  findWeeklyWithDetails(facilityId: string, startDate: string, endDate: string, doctorId?: string): Promise<DoctorShiftWithDetails[]>;
   findDoctorShiftsForDate(facilityId: string, doctorId: string, date: string): Promise<DoctorShift[]>;
   findDoctorAppointmentsForDate(facilityId: string, doctorId: string, date: string): Promise<DoctorAppointmentBlock[]>;
   findAppointmentsForShift(shift: DoctorShift, activeOnly?: boolean): Promise<DoctorAppointmentBlock[]>;
