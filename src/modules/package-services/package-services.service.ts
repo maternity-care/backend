@@ -53,18 +53,24 @@ export class PackageServicesService {
   }
 
   // List cấu hình service trong gói cho management.
-  findAll(filters?: SearchPackageServiceDto): Promise<PackageServiceWithDetails[]> {
-    return this.repository.findAll(filters);
+  async findAll(filters?: SearchPackageServiceDto): Promise<PackageServiceWithDetails[]> {
+    const packageServices = await this.repository.findAll(filters);
+    this.ensurePackageServicesFound(packageServices);
+    return packageServices;
   }
 
   // List có phân trang.
-  findAllPaginated(filters?: SearchPackageServiceDto) {
-    return this.repository.findAllPaginated(filters);
+  async findAllPaginated(filters?: SearchPackageServiceDto) {
+    const result = await this.repository.findAllPaginated(filters);
+    this.ensurePackageServicesFound(result.items);
+    return result;
   }
 
   // List service con của một package kèm thông tin service gốc và facilityIds.
-  findDetailsByPackageId(packageId: string, filters?: SearchPackageServiceDto) {
-    return this.repository.findDetailsByPackageId(packageId, filters);
+  async findDetailsByPackageId(packageId: string, filters?: SearchPackageServiceDto) {
+    const packageServices = await this.repository.findDetailsByPackageId(packageId, filters);
+    this.ensurePackageServicesFound(packageServices);
+    return packageServices;
   }
 
   // Lấy detail một package service.
@@ -153,6 +159,12 @@ export class PackageServicesService {
     const facilities = await Promise.all(facilityIds.map(id => this.facilitiesService.findById(id)));
     if (facilities.some(facility => facility.status !== FacilityStatus.ACTIVE)) {
       throw new ConflictException(PACKAGE_SERVICE_CONSTANT.SELECTED_FACILITIES_REQUIRED);
+    }
+  }
+
+  private ensurePackageServicesFound(packageServices?: unknown[] | null): void {
+    if (!packageServices || packageServices.length === 0) {
+      throw new NotFoundException(PACKAGE_SERVICE_CONSTANT.NOT_FOUND);
     }
   }
 }
