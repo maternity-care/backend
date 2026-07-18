@@ -8,11 +8,11 @@ export { DoctorShift } from '../../modules/doctor-shifts/entities/doctor-shifts.
 export { DoctorShiftChangeLog } from '../../modules/doctor-shifts/entities/doctor-shift-change-logs.entity';
 export { ShiftDisruption } from '../../modules/doctor-shifts/entities/shift-disruptions.entity';
 export { AppointmentDisruptionItem } from '../../modules/doctor-shifts/entities/appointment-disruption-items.entity';
-export { Service } from './services.entity';
+export { Service } from '../../modules/services/entities/services.entity';
 export { FacilityService } from '../../modules/facility-services/entities/facility-services.entity';
-export { MaternityPackage } from './maternity-packages.entity';
-export { PackageService } from './package-services.entity';
-export { PackageServiceFacility } from './package-service-facilities.entity';
+export { MaternityPackage } from '../../modules/maternity-packages/entities/maternity-packages.entity';
+export { PackageService } from '../../modules/package-services/entities/package-services.entity';
+export { PackageServiceFacility } from '../../modules/package-services/entities/package-service-facilities.entity';
 export { PatientPackage } from './patient-packages.entity';
 export { PatientPackageBenefit } from './patient-package-benefits.entity';
 export { PatientExtraService } from './patient-extra-services.entity';
