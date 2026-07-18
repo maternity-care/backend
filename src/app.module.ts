@@ -19,6 +19,8 @@ import { MapsModule } from './modules/maps/maps.module';
 import { DoctorShiftsModule } from './modules/doctor-shifts/doctor-shifts.module';
 import { ServicesModule } from './modules/services/services.module';
 import { FacilityServicesModule } from './modules/facility-services/facility-services.module';
+import { MaternityPackagesModule } from './modules/maternity-packages/maternity-packages.module';
+import { PackageServicesModule } from './modules/package-services/package-services.module';
 import { PregnancyProfileModule } from './modules/pregnancy-profile/pregnancy-profile.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { DoctorsModule } from './modules/doctors/doctors.module';
@@ -57,6 +59,8 @@ import { DoctorsModule } from './modules/doctors/doctors.module';
     DoctorShiftsModule,
     ServicesModule,
     FacilityServicesModule,
+    MaternityPackagesModule,
+    PackageServicesModule,
     PregnancyProfileModule,
     NotificationsModule,
     DoctorsModule,

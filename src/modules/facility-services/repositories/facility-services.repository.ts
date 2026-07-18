@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
 import { AvailabilityStatus, ActiveStatus, FacilityStatus } from '../../../common/constants/status.enum';
-import { paginate } from '../../../common/helpers/pagination';
 import { FacilityService } from '../entities/facility-services.entity';
 import { SearchFacilityServiceDto } from '../dto/requests/search-facility-service.dto';
 import {
@@ -38,19 +37,25 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
     return this.repository.findOne({ where: { id } });
   }
 
+  async findDetailsById(id: string): Promise<FacilityServiceWithDetails | null> {
+    return (await this.buildDetailsQuery()
+      .where('facilityService.id = :id', { id })
+      .getRawOne<FacilityServiceWithDetails>()) ?? null;
+  }
+
   // Kiểm tra một facility đã được gán service này chưa để chống trùng unique pair.
   findByFacilityAndService(facilityId: string, serviceId: string): Promise<FacilityService | null> {
     return this.repository.findOne({ where: { facilityId, serviceId } });
   }
 
   // Danh sách management: filter theo facility/service/status/serviceType/search.
-  findAll(filters?: SearchFacilityServiceDto): Promise<FacilityService[]> {
-    return this.buildListQuery(filters).getMany();
+  findAll(filters?: SearchFacilityServiceDto): Promise<FacilityServiceWithDetails[]> {
+    return this.buildListQuery(filters).getRawMany<FacilityServiceWithDetails>();
   }
 
   // Danh sách management có phân trang.
   findAllPaginated(filters?: SearchFacilityServiceDto) {
-    return paginate(this.buildListQuery(filters), {
+    return this.paginateRaw<FacilityServiceWithDetails>(this.buildListQuery(filters), {
       page: filters?.page,
       limit: filters?.limit,
     });
@@ -61,23 +66,7 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
     facilityId: string,
     filters?: SearchFacilityServiceDto,
   ): Promise<FacilityServiceWithDetails[]> {
-    const query = this.repository
-      .createQueryBuilder('facilityService')
-      .innerJoin('services', 'service', 'service.id = facilityService.serviceId')
-      .innerJoin('facilities', 'facility', 'facility.id = facilityService.facilityId')
-      .select('facilityService.id', 'id')
-      .addSelect('facilityService.facilityId', 'facilityId')
-      .addSelect('facilityService.serviceId', 'serviceId')
-      .addSelect('facilityService.price', 'price')
-      .addSelect('facilityService.durationMinutes', 'durationMinutes')
-      .addSelect('facilityService.status', 'status')
-      .addSelect('service.code', 'serviceCode')
-      .addSelect('service.name', 'serviceName')
-      .addSelect('service.description', 'serviceDescription')
-      .addSelect('service.service_type', 'serviceType')
-      .addSelect('service.base_price', 'serviceBasePrice')
-      .addSelect('service.default_duration_minutes', 'serviceDefaultDurationMinutes')
-      .addSelect('service.requires_doctor_warning', 'serviceRequiresDoctorWarning')
+    const query = this.buildDetailsQuery()
       .where('facilityService.facilityId = :facilityId', { facilityId })
       .andWhere('facilityService.status = :available', { available: AvailabilityStatus.AVAILABLE })
       .andWhere('service.status = :active', { active: ActiveStatus.ACTIVE })
@@ -123,9 +112,7 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
 
   // Query chung cho findAll và findAllPaginated.
   private buildListQuery(filters?: SearchFacilityServiceDto): SelectQueryBuilder<FacilityService> {
-    const query = this.repository
-      .createQueryBuilder('facilityService')
-      .innerJoin('services', 'service', 'service.id = facilityService.serviceId')
+    const query = this.buildDetailsQuery()
       .orderBy('facilityService.createdAt', 'DESC');
 
     if (filters?.facilityId) {
@@ -142,11 +129,56 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
     }
     if (filters?.search) {
       query.andWhere(
-        '(LOWER(service.code) LIKE LOWER(:search) OR LOWER(service.name) LIKE LOWER(:search) OR LOWER(service.description) LIKE LOWER(:search))',
+        '(LOWER(service.code) LIKE LOWER(:search) OR LOWER(service.name) LIKE LOWER(:search) OR LOWER(service.description) LIKE LOWER(:search) OR LOWER(facility.code) LIKE LOWER(:search) OR LOWER(facility.name) LIKE LOWER(:search))',
         { search: `%${filters.search}%` },
       );
     }
 
     return query;
+  }
+
+  private buildDetailsQuery(): SelectQueryBuilder<FacilityService> {
+    return this.repository
+      .createQueryBuilder('facilityService')
+      .innerJoin('services', 'service', 'service.id = facilityService.serviceId')
+      .innerJoin('facilities', 'facility', 'facility.id = facilityService.facilityId')
+      .select('facilityService.id', 'id')
+      .addSelect('facilityService.facilityId', 'facilityId')
+      .addSelect('facilityService.serviceId', 'serviceId')
+      .addSelect('facilityService.price', 'price')
+      .addSelect('facilityService.durationMinutes', 'durationMinutes')
+      .addSelect('facilityService.status', 'status')
+      .addSelect('facilityService.createdAt', 'createdAt')
+      .addSelect('facilityService.updatedAt', 'updatedAt')
+      .addSelect('facility.code', 'facilityCode')
+      .addSelect('facility.name', 'facilityName')
+      .addSelect('facility.address', 'facilityAddress')
+      .addSelect('facility.province', 'facilityProvince')
+      .addSelect('facility.district', 'facilityDistrict')
+      .addSelect('service.code', 'serviceCode')
+      .addSelect('service.name', 'serviceName')
+      .addSelect('service.description', 'serviceDescription')
+      .addSelect('service.service_type', 'serviceType')
+      .addSelect('service.base_price', 'serviceBasePrice')
+      .addSelect('service.default_duration_minutes', 'serviceDefaultDurationMinutes')
+      .addSelect('service.requires_doctor_warning', 'serviceRequiresDoctorWarning');
+  }
+
+  private async paginateRaw<T>(
+    query: SelectQueryBuilder<FacilityService>,
+    options?: { page?: number; limit?: number },
+  ) {
+    const page = Math.max(1, Number(options?.page) || 1);
+    const limit = Math.max(1, Number(options?.limit) || 20);
+    const total = await query.clone().getCount();
+    const items = await query.offset((page - 1) * limit).limit(limit).getRawMany<T>();
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 }

@@ -39,6 +39,10 @@ import { DoctorShiftChangeLog } from '../modules/doctor-shifts/entities/doctor-s
 import { ShiftDisruption } from '../modules/doctor-shifts/entities/shift-disruptions.entity';
 import { AppointmentDisruptionItem } from '../modules/doctor-shifts/entities/appointment-disruption-items.entity';
 import { Notification } from '../modules/notifications/entities/notification.entity';
+import { Service } from '../modules/services/entities/services.entity';
+import { MaternityPackage } from '../modules/maternity-packages/entities/maternity-packages.entity';
+import { PackageService } from '../modules/package-services/entities/package-services.entity';
+import { PackageServiceFacility } from '../modules/package-services/entities/package-service-facilities.entity';
 
 config();
 
@@ -73,6 +77,10 @@ export const typeOrmConfig: DataSourceOptions = {
     ShiftDisruption,
     AppointmentDisruptionItem,
     Notification,
+    Service,
+    MaternityPackage,
+    PackageService,
+    PackageServiceFacility,
     join(__dirname, 'entities', '*.entity{.ts,.js}'),
   ],
   migrations: [
