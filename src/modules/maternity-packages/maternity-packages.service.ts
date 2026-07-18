@@ -1,11 +1,13 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { MATERNITY_PACKAGE_CONSTANT } from '../../common/constants/maternity-package.constant';
-import { MaternityPackageStatus } from '../../common/constants/status.enum';
+import { FacilityStatus, MaternityPackageStatus } from '../../common/constants/status.enum';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
-import { MaternityPackage } from '../../database/entities/maternity-packages.entity';
+import { MaternityPackage } from './entities/maternity-packages.entity';
+import { FacilitiesService } from '../facilities/facilities.service';
 import { CreateMaternityPackageDto } from './dto/requests/create-maternity-package.dto';
 import { SearchMaternityPackageDto } from './dto/requests/search-maternity-package.dto';
 import { UpdateMaternityPackageDto } from './dto/requests/update-maternity-package.dto';
+import { AvailableMaternityPackageResponseDto } from './dto/responses/available-maternity-package-response.dto';
 import {
   IMaternityPackagesRepository,
   MATERNITY_PACKAGES_REPOSITORY,
@@ -17,6 +19,7 @@ export class MaternityPackagesService {
     // Inject qua token để service phụ thuộc vào abstraction, không phụ thuộc trực tiếp TypeORM class.
     @Inject(MATERNITY_PACKAGES_REPOSITORY)
     private readonly repository: IMaternityPackagesRepository,
+    private readonly facilitiesService: FacilitiesService,
   ) {}
 
   // Tạo "vỏ gói" dịch vụ: code/name/price/duration/status.
@@ -48,6 +51,26 @@ export class MaternityPackagesService {
   }
 
   // Lấy chi tiết gói theo id.
+  async findAvailableByFacilityId(
+    facilityId: string,
+    filters?: SearchMaternityPackageDto,
+  ): Promise<AvailableMaternityPackageResponseDto[]> {
+    await this.ensureActiveFacility(facilityId);
+    const packages = await this.repository.findAvailableByFacilityId(facilityId, filters);
+    this.ensurePackagesFound(packages);
+    return packages;
+  }
+
+  async findAvailableByFacilityIdPaginated(
+    facilityId: string,
+    filters?: SearchMaternityPackageDto,
+  ) {
+    await this.ensureActiveFacility(facilityId);
+    const result = await this.repository.findAvailableByFacilityIdPaginated(facilityId, filters);
+    this.ensurePackagesFound(result.items);
+    return result;
+  }
+
   async findById(id: string): Promise<MaternityPackage> {
     const entity = await this.repository.findById(id);
     if (!entity) {
@@ -99,6 +122,13 @@ export class MaternityPackagesService {
   private async ensureUniqueName(name: string): Promise<void> {
     if (await this.repository.findByName(name)) {
       throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.NAME_EXISTS);
+    }
+  }
+
+  private async ensureActiveFacility(facilityId: string): Promise<void> {
+    const facility = await this.facilitiesService.findById(facilityId);
+    if (facility.status !== FacilityStatus.ACTIVE) {
+      throw new NotFoundException(MATERNITY_PACKAGE_CONSTANT.NOT_FOUND);
     }
   }
 

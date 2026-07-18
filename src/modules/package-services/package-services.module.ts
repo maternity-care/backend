@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { PackageServiceFacility } from '../../database/entities/package-service-facilities.entity';
-import { PackageService } from '../../database/entities/package-services.entity';
+import { PackageServiceFacility } from './entities/package-service-facilities.entity';
+import { PackageService } from './entities/package-services.entity';
 import { FacilitiesModule } from '../facilities/facilities.module';
 import { MaternityPackagesModule } from '../maternity-packages/maternity-packages.module';
 import { ServicesModule } from '../services/services.module';

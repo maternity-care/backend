@@ -879,6 +879,11 @@ describe('DoctorShiftsController unit routing and scope', () => {
     activeFacilityId: '1',
     facilities: [{ id: '1', status: FacilityStatus.ACTIVE, roles: [{ name: RoleEnum.ADMIN }] }],
   };
+  const superUser = {
+    id: '1',
+    roles: [{ name: RoleEnum.SUPER_ADMIN }],
+    facilities: [],
+  };
   const createController = () => {
     const service = {
       findAll: jest.fn().mockResolvedValue([shift]),
@@ -900,10 +905,10 @@ describe('DoctorShiftsController unit routing and scope', () => {
   it('TC-UNIT-DSHIFT-049 chooses paginated or non-paginated list method by query.page', async () => {
     const { service, controller } = createController();
 
-    await expect(controller.findAll({ page: 1 } as never)).resolves.toMatchObject({
+    await expect(controller.findAll(superUser as never, { page: 1 } as never)).resolves.toMatchObject({
       data: { total: 1 },
     });
-    await expect(controller.findAll({} as never)).resolves.toMatchObject({
+    await expect(controller.findAll(superUser as never, {} as never)).resolves.toMatchObject({
       data: [shift],
     });
     expect(service.findAllPaginated).toHaveBeenCalledWith({ page: 1 });
@@ -913,7 +918,7 @@ describe('DoctorShiftsController unit routing and scope', () => {
   it('TC-UNIT-DSHIFT-050 rejects weekly calendar requests without facilityId', async () => {
     const { controller } = createController();
 
-    await expect(controller.getWeekly({} as never)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(controller.getWeekly(superUser as never, {} as never)).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('TC-UNIT-DSHIFT-051 checks facility scope before updating a shift', async () => {
@@ -936,14 +941,14 @@ describe('DoctorShiftsController unit routing and scope', () => {
   it('wraps create responses with the expected message and data', async () => {
     const { service, controller } = createController();
 
-    await expect(controller.create(shift as never)).resolves.toMatchObject({ data: shift });
+    await expect(controller.create(scopedUser as never, shift as never)).resolves.toMatchObject({ data: shift });
     expect(service.create).toHaveBeenCalledWith(shift);
   });
 
   it('wraps detail responses from findOne', async () => {
     const { service, controller } = createController();
 
-    await expect(controller.findOne('10')).resolves.toMatchObject({ data: shift });
+    await expect(controller.findOne(scopedUser as never, '10')).resolves.toMatchObject({ data: shift });
     expect(service.findDetailsById).toHaveBeenCalledWith('10');
   });
 
@@ -951,7 +956,7 @@ describe('DoctorShiftsController unit routing and scope', () => {
     const { service, controller } = createController();
     const dto = { doctorId: '1', facilityId: '1', shiftDate: '2099-07-07', startTime: '08:00', endTime: '12:00' };
 
-    await expect(controller.checkConflicts(dto as never)).resolves.toMatchObject({
+    await expect(controller.checkConflicts(scopedUser as never, dto as never)).resolves.toMatchObject({
       data: { hasConflict: false },
     });
     expect(service.checkConflicts).toHaveBeenCalledWith(dto);
@@ -989,11 +994,11 @@ describe('DoctorShiftsController unit routing and scope', () => {
       date: '2099-07-07',
       slotMinutes: 30,
     })).resolves.toMatchObject({ data: { shifts: [] } });
-    await expect(controller.getWeekly({
+    await expect(controller.getWeekly(superUser as never, {
       facilityId: '1',
       weekStart: '2099-07-06',
       doctorId: '2',
-    })).resolves.toMatchObject({ data: { days: [] } });
+    } as never)).resolves.toMatchObject({ data: { days: [] } });
     expect(service.getDoctorAvailability).toHaveBeenCalledWith('1', {
       facilityId: '1',
       date: '2099-07-07',
