@@ -9,13 +9,23 @@ import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interfa
 import { UpdateDoctorDto } from './dto/requests/update-doctor.dto';
 import { IDoctorsRepository, DOCTORS_REPOSITORY } from './interfaces/doctors-repository.interface';
 import { Doctor } from './entities/doctors.entity';
+import { UsersService } from '../users/users.service';
+import { AdminCreateUserDto } from '../users/dto/request/admin-create-user.dto';
+import { User } from '../users/entities/user.entity';
+import { USERS_SERVICE } from '../users/interfaces/users-service.interface';
 
 @Injectable()
 export class DoctorsService {
   constructor(
     @Inject(DOCTORS_REPOSITORY)
     private readonly repository: IDoctorsRepository,
+    @Inject(USERS_SERVICE)
+    private readonly usersService: UsersService,
   ) {}
+
+  async create(dto: AdminCreateUserDto, actor: AuthenticatedUser): Promise<User> {
+    return this.usersService.createUser(dto, actor);
+  }
 
   async findAll(): Promise<Doctor[]> {
     return this.repository.findAll();
