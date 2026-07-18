@@ -23,6 +23,7 @@ import { MaternityPackagesModule } from './modules/maternity-packages/maternity-
 import { PackageServicesModule } from './modules/package-services/package-services.module';
 import { PregnancyProfileModule } from './modules/pregnancy-profile/pregnancy-profile.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { DoctorsModule } from './modules/doctors/doctors.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -62,6 +63,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     PackageServicesModule,
     PregnancyProfileModule,
     NotificationsModule,
+    DoctorsModule,
   ],
 })
 export class AppModule {}
