@@ -2,7 +2,7 @@ import { ConflictException, Inject, Injectable, NotFoundException } from '@nestj
 import { ActiveStatus } from '../../common/constants/status.enum';
 import { SERVICE_CONSTANT } from '../../common/constants/service.constant';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
-import { Service } from '../../database/entities/services.entity';
+import { Service } from './entities/services.entity';
 import { CreateServiceDto } from './dto/requests/create-service.dto';
 import { SearchServiceDto } from './dto/requests/search-service.dto';
 import { UpdateServiceDto } from './dto/requests/update-service.dto';

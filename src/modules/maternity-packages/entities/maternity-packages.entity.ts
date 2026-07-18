@@ -5,7 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { MaternityPackageStatus } from '../../common/constants/status.enum';
+import { MaternityPackageStatus } from '../../../common/constants/status.enum';
 
 @Entity('maternity_packages')
 export class MaternityPackage {
@@ -38,5 +38,4 @@ export class MaternityPackage {
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
   updatedAt: Date;
-
 }

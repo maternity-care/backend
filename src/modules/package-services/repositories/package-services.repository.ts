@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
-import { PackageServiceFacility } from '../../../database/entities/package-service-facilities.entity';
-import { PackageService } from '../../../database/entities/package-services.entity';
+import { PackageServiceFacility } from '../entities/package-service-facilities.entity';
+import { PackageService } from '../entities/package-services.entity';
 import { PackageServiceFacilityScope } from '../dto/requests/create-package-service.dto';
 import { SearchPackageServiceDto } from '../dto/requests/search-package-service.dto';
 import {

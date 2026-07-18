@@ -6,11 +6,13 @@ import {
   FacilityStatus,
   MaternityPackageStatus,
 } from '../../common/constants/status.enum';
+import { PACKAGE_SERVICE_CONSTANT } from '../../common/constants/package-service.constant';
 import {
   CreatePackageServiceDto,
   PackageServiceFacilityScope,
 } from './dto/requests/create-package-service.dto';
 import { SearchPackageServiceDto } from './dto/requests/search-package-service.dto';
+import { PackageServicesController } from './package-services.controller';
 import { PackageServicesService } from './package-services.service';
 
 describe('PackageServices DTO validation', () => {
@@ -78,6 +80,7 @@ describe('PackageServicesService business logic', () => {
     replaceFacilities: jest.fn().mockResolvedValue(undefined),
     remove: jest.fn().mockResolvedValue(undefined),
     findById: jest.fn().mockResolvedValue({ ...entity }),
+    findDetailsById: jest.fn().mockResolvedValue({ ...entity, serviceName: 'SiÃªu Ã¢m' }),
     findByPackageAndService: jest.fn().mockResolvedValue(null),
     findAll: jest.fn().mockResolvedValue([{ ...entity }]),
     findAllPaginated: jest.fn().mockResolvedValue({ items: [{ ...entity }], total: 1 }),
@@ -129,6 +132,29 @@ describe('PackageServicesService business logic', () => {
     expect(facilitiesService.findById).toHaveBeenCalledWith('3');
   });
 
+  it('rejects selected facility scope without facility ids or with inactive facilities', async () => {
+    await expect(createService().service.create({
+      packageId: '1',
+      serviceId: '2',
+      includedQuantity: 1,
+      isRequired: true,
+      isOptional: false,
+      allowedFacilityScope: PackageServiceFacilityScope.SELECTED,
+      facilityIds: [],
+    })).rejects.toBeInstanceOf(ConflictException);
+
+    facilitiesService.findById.mockResolvedValueOnce({ ...facility, status: FacilityStatus.INACTIVE });
+    await expect(createService().service.create({
+      packageId: '1',
+      serviceId: '2',
+      includedQuantity: 1,
+      isRequired: true,
+      isOptional: false,
+      allowedFacilityScope: PackageServiceFacilityScope.SELECTED,
+      facilityIds: ['3'],
+    })).rejects.toBeInstanceOf(ConflictException);
+  });
+
   it('rejects duplicated package-service pair and inactive references', async () => {
     const duplicateContext = createService();
     duplicateContext.repo.findByPackageAndService.mockResolvedValueOnce(entity);
@@ -178,6 +204,37 @@ describe('PackageServicesService business logic', () => {
     );
   });
 
+  it('updates package/service pair when unique and rejects duplicated pair', async () => {
+    const uniqueContext = createService();
+    await expect(uniqueContext.service.update('10', { serviceId: '3' })).resolves.toMatchObject({
+      serviceId: '3',
+    });
+    expect(uniqueContext.repo.findByPackageAndService).toHaveBeenCalledWith('1', '3');
+
+    const duplicateContext = createService();
+    duplicateContext.repo.findByPackageAndService.mockResolvedValueOnce({ ...entity, id: '99' });
+    await expect(duplicateContext.service.update('10', { serviceId: '3' })).rejects.toBeInstanceOf(ConflictException);
+    expect(duplicateContext.repo.saveWithFacilities).not.toHaveBeenCalled();
+  });
+
+  it('converts optional flags during update', async () => {
+    const { service } = createService();
+
+    await expect(service.update('10', { isRequired: false, isOptional: true })).resolves.toMatchObject({
+      isRequired: 0,
+      isOptional: 1,
+    });
+  });
+
+  it('returns detail records and throws when detail does not exist', async () => {
+    const { service } = createService();
+    await expect(service.findDetailsById('10')).resolves.toMatchObject({ serviceName: 'SiÃªu Ã¢m' });
+
+    const missingContext = createService();
+    missingContext.repo.findDetailsById.mockResolvedValueOnce(null);
+    await expect(missingContext.service.findDetailsById('99')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   it('throws not found when package service does not exist', async () => {
     const context = createService();
     context.repo.findById.mockResolvedValueOnce(null);
@@ -212,5 +269,56 @@ describe('PackageServicesService business logic', () => {
     const usedContext = createService();
     usedContext.repo.countGeneratedBenefits.mockResolvedValueOnce(2);
     await expect(usedContext.service.remove('10')).rejects.toBeInstanceOf(ConflictException);
+  });
+});
+
+describe('PackageServicesController', () => {
+  const entity = {
+    id: '10',
+    packageId: '1',
+    serviceId: '2',
+    includedQuantity: 2,
+    isRequired: 1,
+    isOptional: 0,
+    allowedFacilityScope: PackageServiceFacilityScope.ALL,
+  };
+
+  const createServiceMock = () => ({
+    create: jest.fn().mockResolvedValue(entity),
+    findAll: jest.fn().mockResolvedValue([entity]),
+    findAllPaginated: jest.fn().mockResolvedValue({ items: [entity], total: 1 }),
+    findDetailsById: jest.fn().mockResolvedValue({ ...entity, serviceName: 'Sieu am' }),
+    update: jest.fn().mockResolvedValue({ ...entity, includedQuantity: 3 }),
+    remove: jest.fn().mockResolvedValue(undefined),
+  });
+
+  it('chooses list method by query.page and wraps response', async () => {
+    const service = createServiceMock();
+    const controller = new PackageServicesController(service as never);
+
+    await expect(controller.findAll({ page: 1 } as never)).resolves.toMatchObject({
+      message: PACKAGE_SERVICE_CONSTANT.FOUND,
+      data: { total: 1 },
+    });
+    await expect(controller.findAll({} as never)).resolves.toMatchObject({
+      message: PACKAGE_SERVICE_CONSTANT.FOUND,
+      data: [entity],
+    });
+  });
+
+  it('wraps detail, create, update, and remove responses', async () => {
+    const service = createServiceMock();
+    const controller = new PackageServicesController(service as never);
+
+    await expect(controller.findOne('10')).resolves.toMatchObject({ message: PACKAGE_SERVICE_CONSTANT.DETAIL_FOUND });
+    await expect(controller.create(entity as never)).resolves.toMatchObject({ message: PACKAGE_SERVICE_CONSTANT.CREATED, data: entity });
+    await expect(controller.update('10', { includedQuantity: 3 })).resolves.toMatchObject({
+      message: PACKAGE_SERVICE_CONSTANT.UPDATED,
+      data: { includedQuantity: 3 },
+    });
+    await expect(controller.remove('10')).resolves.toEqual({
+      message: PACKAGE_SERVICE_CONSTANT.DELETED,
+      data: null,
+    });
   });
 });

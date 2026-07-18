@@ -88,6 +88,9 @@ export function validateDateRange(dateFrom?: string, dateTo?: string): void {
   }
 }
 
+
+
+
 /** Lấy ngày hiện tại theo UTC+7 dưới dạng YYYY-MM-DD. */
 export function todayInVietnam(): string {
   return new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -165,6 +168,7 @@ export function minutesToTime(value: number): string {
   return `${hour}:${minute}:00`;
 }
 
+//trả về true nếu hai khoảng thời gian overlap nhau, ngược lại trả về false
 export function timesOverlap(
   firstStart: string,
   firstEnd: string,
@@ -182,3 +186,4 @@ export function dateTimeToTime(value: Date | string): string {
   const second = date.getSeconds().toString().padStart(2, '0');
   return `${hour}:${minute}:${second}`;
 }
+

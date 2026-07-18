@@ -2,8 +2,10 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { ActiveStatus } from '../../common/constants/status.enum';
+import { SERVICE_CONSTANT } from '../../common/constants/service.constant';
 import { CreateServiceDto, ServiceType } from './dto/requests/create-service.dto';
 import { SearchServiceDto } from './dto/requests/search-service.dto';
+import { ServicesController } from './services.controller';
 import { ServicesService } from './services.service';
 
 describe('Services DTO validation', () => {
@@ -114,6 +116,40 @@ describe('ServicesService business logic', () => {
     expect(repo.save).toHaveBeenCalled();
   });
 
+  it('returns plain and paginated service lists through repository', async () => {
+    const { repo, service } = createService();
+    await expect(service.findAll({ serviceType: ServiceType.ULTRASOUND })).resolves.toEqual([{ ...serviceEntity }]);
+    await expect(service.findAllPaginated({ page: 1, limit: 20 })).resolves.toEqual({
+      items: [{ ...serviceEntity }],
+      total: 1,
+    });
+    expect(repo.findAll).toHaveBeenCalledWith({ serviceType: ServiceType.ULTRASOUND });
+    expect(repo.findAllPaginated).toHaveBeenCalledWith({ page: 1, limit: 20 });
+  });
+
+  it('checks duplicated code and name when update changes those fields', async () => {
+    const duplicateCodeContext = createService();
+    duplicateCodeContext.repo.findByCode.mockResolvedValueOnce(serviceEntity);
+    await expect(duplicateCodeContext.service.update('1', { code: 'US_3D' })).rejects.toBeInstanceOf(ConflictException);
+    expect(duplicateCodeContext.repo.save).not.toHaveBeenCalled();
+
+    const duplicateNameContext = createService();
+    duplicateNameContext.repo.findByName.mockResolvedValueOnce(serviceEntity);
+    await expect(duplicateNameContext.service.update('1', { name: 'Sieu am thai 3D' })).rejects.toBeInstanceOf(ConflictException);
+    expect(duplicateNameContext.repo.save).not.toHaveBeenCalled();
+  });
+
+  it('preserves description and warning flag when update omits them', async () => {
+    const { repo, service } = createService();
+    repo.findById.mockResolvedValueOnce({ ...serviceEntity, description: 'old description', requiresDoctorWarning: 1 });
+
+    await expect(service.update('1', { basePrice: '350000.00' })).resolves.toMatchObject({
+      description: 'old description',
+      requiresDoctorWarning: 1,
+      basePrice: '350000.00',
+    });
+  });
+
   it('throws not found when service does not exist', async () => {
     const context = createService();
     context.repo.findById.mockResolvedValueOnce(null);
@@ -138,5 +174,59 @@ describe('ServicesService business logic', () => {
       expect.objectContaining({ id: '1' }),
       ActiveStatus.INACTIVE,
     );
+  });
+});
+
+describe('ServicesController', () => {
+  const serviceEntity = {
+    id: '1',
+    code: 'US_2D',
+    name: 'Sieu am thai 2D',
+    serviceType: ServiceType.ULTRASOUND,
+    defaultDurationMinutes: 30,
+    basePrice: '300000.00',
+    requiresDoctorWarning: 1,
+    status: ActiveStatus.ACTIVE,
+  };
+
+  const createServiceMock = () => ({
+    create: jest.fn().mockResolvedValue(serviceEntity),
+    findAll: jest.fn().mockResolvedValue([serviceEntity]),
+    findAllPaginated: jest.fn().mockResolvedValue({ items: [serviceEntity], total: 1, page: 1, limit: 20 }),
+    findById: jest.fn().mockResolvedValue(serviceEntity),
+    update: jest.fn().mockResolvedValue({ ...serviceEntity, basePrice: '350000.00' }),
+    remove: jest.fn().mockResolvedValue({ action: 'hard_deleted', affectedCount: 0 }),
+  });
+
+  it('chooses list method by query.page and wraps response', async () => {
+    const service = createServiceMock();
+    const controller = new ServicesController(service as never);
+
+    await expect(controller.findAll({ page: 1 } as never)).resolves.toMatchObject({
+      message: SERVICE_CONSTANT.FOUND,
+      data: { total: 1 },
+    });
+    await expect(controller.findAll({} as never)).resolves.toMatchObject({
+      message: SERVICE_CONSTANT.FOUND,
+      data: [serviceEntity],
+    });
+    expect(service.findAllPaginated).toHaveBeenCalledWith({ page: 1 });
+    expect(service.findAll).toHaveBeenCalledWith({});
+  });
+
+  it('wraps detail, create, update, and remove responses', async () => {
+    const service = createServiceMock();
+    const controller = new ServicesController(service as never);
+
+    await expect(controller.findOne('1')).resolves.toMatchObject({ message: SERVICE_CONSTANT.DETAIL_FOUND, data: serviceEntity });
+    await expect(controller.create(serviceEntity as never)).resolves.toMatchObject({ message: SERVICE_CONSTANT.CREATED, data: serviceEntity });
+    await expect(controller.update('1', { basePrice: '350000.00' })).resolves.toMatchObject({
+      message: SERVICE_CONSTANT.UPDATED,
+      data: { basePrice: '350000.00' },
+    });
+    await expect(controller.remove('1')).resolves.toMatchObject({
+      message: SERVICE_CONSTANT.DELETED,
+      data: { action: 'hard_deleted' },
+    });
   });
 });
