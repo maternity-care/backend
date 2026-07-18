@@ -1,8 +1,9 @@
 import { DeepPartial } from 'typeorm';
 import { PaginationResult } from '../../../common/helpers/pagination';
 import { MaternityPackageStatus } from '../../../common/constants/status.enum';
-import { MaternityPackage } from '../../../database/entities/maternity-packages.entity';
+import { MaternityPackage } from '../entities/maternity-packages.entity';
 import { SearchMaternityPackageDto } from '../dto/requests/search-maternity-package.dto';
+import { AvailableMaternityPackageResponseDto } from '../dto/responses/available-maternity-package-response.dto';
 
 export const MATERNITY_PACKAGES_REPOSITORY = Symbol('MATERNITY_PACKAGES_REPOSITORY');
 
@@ -15,6 +16,8 @@ export interface IMaternityPackagesRepository {
   findByName(name: string): Promise<MaternityPackage | null>;
   findAll(filters?: SearchMaternityPackageDto): Promise<MaternityPackage[]>;
   findAllPaginated(filters?: SearchMaternityPackageDto): Promise<PaginationResult<MaternityPackage>>;
+  findAvailableByFacilityId(facilityId: string, filters?: SearchMaternityPackageDto): Promise<AvailableMaternityPackageResponseDto[]>;
+  findAvailableByFacilityIdPaginated(facilityId: string, filters?: SearchMaternityPackageDto): Promise<PaginationResult<AvailableMaternityPackageResponseDto>>;
   countDependencies(packageId: string): Promise<number>;
   updateStatus(entity: MaternityPackage, status: MaternityPackageStatus): Promise<MaternityPackage>;
 }

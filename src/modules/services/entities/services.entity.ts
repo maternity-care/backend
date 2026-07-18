@@ -5,7 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { ActiveStatus } from '../../common/constants/status.enum';
+import { ActiveStatus } from '../../../common/constants/status.enum';
 
 @Entity('services')
 export class Service {
@@ -41,5 +41,4 @@ export class Service {
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
   updatedAt: Date;
-
 }
