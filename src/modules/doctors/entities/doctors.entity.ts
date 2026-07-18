@@ -44,7 +44,7 @@ export class Doctor {
 
   @OneToOne(() => StaffProfile, (staff) => staff.id)
   @JoinColumn({
-    name: 'staffId',
+    name: 'staff_id',
     referencedColumnName: 'id',
   })
   staff: StaffProfile;
