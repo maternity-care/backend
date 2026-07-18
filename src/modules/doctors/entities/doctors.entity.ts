@@ -2,10 +2,13 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { ActiveStatus } from '../../../common/constants/status.enum';
+import { StaffProfile } from 'src/modules/staffs/entities/staff-profiles.entity';
 
 @Entity('doctors')
 export class Doctor {
@@ -38,4 +41,11 @@ export class Doctor {
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
   updatedAt: Date;
+
+  @OneToOne(() => StaffProfile, (staff) => staff.id)
+  @JoinColumn({
+    name: 'staffId',
+    referencedColumnName: 'id',
+  })
+  staff: StaffProfile;
 }
