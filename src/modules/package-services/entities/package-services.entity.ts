@@ -34,5 +34,4 @@ export class PackageService {
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
   updatedAt: Date;
-
 }

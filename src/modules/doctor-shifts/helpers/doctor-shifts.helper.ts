@@ -79,12 +79,17 @@ export function throwIfConflicted(conflicts: ShiftConflicts): void {
   }
 }
 
+
+
 /** Kiểm tra khoảng ngày dùng cho API tìm kiếm. */
 export function validateDateRange(dateFrom?: string, dateTo?: string): void {
   if (dateFrom && dateTo && dateFrom > dateTo) {
     throw new BadRequestException('dateFrom phải sớm hơn hoặc bằng dateTo');
   }
 }
+
+
+
 
 /** Lấy ngày hiện tại theo UTC+7 dưới dạng YYYY-MM-DD. */
 export function todayInVietnam(): string {
@@ -163,6 +168,7 @@ export function minutesToTime(value: number): string {
   return `${hour}:${minute}:00`;
 }
 
+//trả về true nếu hai khoảng thời gian overlap nhau, ngược lại trả về false
 export function timesOverlap(
   firstStart: string,
   firstEnd: string,
@@ -180,3 +186,4 @@ export function dateTimeToTime(value: Date | string): string {
   const second = date.getSeconds().toString().padStart(2, '0');
   return `${hour}:${minute}:${second}`;
 }
+

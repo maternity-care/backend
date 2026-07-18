@@ -3,7 +3,7 @@ import { CreateRoomDto } from './dto/requests/create-room.dto';
 import { UpdateRoomDto } from './dto/requests/update-room.dto';
 import { Room } from './entities/rooms.entity';
 import { Facility } from '../facilities/entities/facilities.entity';
-import { IRoomsRepository, ROOMS_REPOSITORY } from './interfaces/rooms-repository.interface';
+import { IRoomsRepository, ROOMS_REPOSITORY, RoomWithDetails } from './interfaces/rooms-repository.interface';
 import { FacilitiesService } from '../facilities/facilities.service';
 import { SearchRoomsDto } from './dto/requests/search-rooms.dto';
 import {ROOM_CONSTANT} from '../../common/constants/room.constant';
@@ -24,7 +24,7 @@ export class RoomsService {
     return this.roomsRepository.save(room);
   }
 
-  async findAll(filters?: SearchRoomsDto): Promise<Room[]> {
+  async findAll(filters?: SearchRoomsDto): Promise<RoomWithDetails[]> {
     return this.roomsRepository.findAll(filters);
   }
 
@@ -35,6 +35,14 @@ export class RoomsService {
 
   async findById(id: string): Promise<Room> {
     const room = await this.roomsRepository.findById(id);
+    if (!room) {
+      throw new NotFoundException(ROOM_CONSTANT.ROOM_NOT_FOUND);
+    }
+    return room;
+  }
+
+  async findDetailsById(id: string): Promise<RoomWithDetails> {
+    const room = await this.roomsRepository.findDetailsById(id);
     if (!room) {
       throw new NotFoundException(ROOM_CONSTANT.ROOM_NOT_FOUND);
     }
@@ -71,7 +79,7 @@ export class RoomsService {
     return { action: 'soft_deleted', affectedCount: dependencyCount };
   }
 
-  async findByFacilityId(facilityId: string, filters?: SearchRoomsDto): Promise<{ facility: Facility; rooms: Room[] }> {
+  async findByFacilityId(facilityId: string, filters?: SearchRoomsDto): Promise<{ facility: Facility; rooms: RoomWithDetails[] }> {
     const facility = await this.facilitiesService.findById(facilityId);
     if (!facility) {
       throw new NotFoundException(RESPONSE_MESSAGES.FACILITY_NOT_FOUND);

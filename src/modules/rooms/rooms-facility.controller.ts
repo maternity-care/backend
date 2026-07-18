@@ -1,7 +1,7 @@
 import { Controller, Get, HttpException, InternalServerErrorException, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RoomsService } from './rooms.service';
-import { RoomResponseDto } from './dto/responds/room-response.dto';
+import { RoomWithDetailsResponseDto } from './dto/responses/room-with-details-response.dto';
 import { SearchRooms2Dto } from './dto/requests/search-room-2';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -26,7 +26,7 @@ export class RoomsFacilityController {
 
   @Get('rooms/:facilityId')
   @ApiOperation({ summary: 'Get rooms by facility'})
-  @ApiResponse({ status : 200, description: 'Rooms found', type: [RoomResponseDto] })
+  @ApiResponse({ status : 200, description: 'Rooms found', type: [RoomWithDetailsResponseDto] })
   async findRoomsByFacility(
   @CurrentUser() user: AuthenticatedUser,
   @Param('facilityId') facilityId: string,

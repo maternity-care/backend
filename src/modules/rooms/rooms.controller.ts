@@ -6,6 +6,7 @@ import { CreateRoomDto } from './dto/requests/create-room.dto';
 import { UpdateRoomDto } from './dto/requests/update-room.dto';
 import { RoomResponseDto } from './dto/responds/room-response.dto';
 import { RoomsWithFacilityResponseDto } from './dto/responds/rooms-with-facility-response.dto';
+import { RoomWithDetailsResponseDto } from './dto/responses/room-with-details-response.dto';
 import { SearchRoomsDto } from './dto/requests/search-rooms.dto';
 import { IsOptional } from 'class-validator';
 import { ROOM_CONSTANT } from '../../common/constants/room.constant';
@@ -31,7 +32,7 @@ export class RoomsController {
 
   @Get()
   @ApiOperation({ summary: 'List rooms' })
-  @ApiResponse({ status: 200, description: 'Rooms found', type: [RoomResponseDto] })
+  @ApiResponse({ status: 200, description: 'Rooms found', type: [RoomWithDetailsResponseDto] })
   async findAll(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: SearchRoomsDto,
@@ -75,13 +76,13 @@ export class RoomsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get room details' })
-  @ApiResponse({ status: 200, description: 'Room found', type: RoomResponseDto })
+  @ApiResponse({ status: 200, description: 'Room found', type: RoomWithDetailsResponseDto })
   async findOne(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
   ) {
     try {
-      const room = await this.roomsService.findById(id);
+      const room = await this.roomsService.findDetailsById(id);
       assertFacilityAccess(user, room.facilityId);
       return {
         message: ROOM_CONSTANT.ROOM_DETAIL_FOUND,

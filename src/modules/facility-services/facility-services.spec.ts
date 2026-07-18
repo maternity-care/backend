@@ -6,10 +6,14 @@ import {
   AvailabilityStatus,
   FacilityStatus,
 } from '../../common/constants/status.enum';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
+import { FACILITY_SERVICE_CONSTANT } from '../../common/constants/facility-service.constant';
 import { ServiceType } from '../services/dto/requests/create-service.dto';
 import { CreateFacilityServiceDto } from './dto/requests/create-facility-service.dto';
 import { SearchFacilityServiceDto } from './dto/requests/search-facility-service.dto';
+import { FacilityServicesController } from './facility-services.controller';
 import { FacilityServicesService } from './facility-services.service';
+import { PublicFacilityServicesController } from './public-facility-services.controller';
 
 describe('FacilityServices DTO validation', () => {
   const validPayload = {
@@ -74,6 +78,7 @@ describe('FacilityServicesService business logic', () => {
     findPublicByFacilityId: jest.fn().mockResolvedValue([{ ...entity, serviceName: 'Siêu âm thai 2D' }]),
     countDependencies: jest.fn().mockResolvedValue(0),
     updateStatus: jest.fn(async (item, status) => ({ ...item, status })),
+    findDetailsById: jest.fn().mockResolvedValue({ ...entity }),
   });
   const facilitiesService = { findById: jest.fn().mockResolvedValue(facility) };
   const servicesService = { findById: jest.fn().mockResolvedValue(service) };
@@ -97,6 +102,27 @@ describe('FacilityServicesService business logic', () => {
     expect(repo.findByFacilityAndService).toHaveBeenCalledWith('1', '2');
   });
 
+  it('returns list, paginated list, public list, and details through repository', async () => {
+    const { repo, service: facilityServicesService } = createService();
+
+    await expect(facilityServicesService.findAll({ facilityId: '1' })).resolves.toEqual([{ ...entity }]);
+    await expect(facilityServicesService.findAllPaginated({ page: 1, limit: 20 })).resolves.toEqual({
+      items: [{ ...entity }],
+      total: 1,
+    });
+    await expect(facilityServicesService.findPublicByFacilityId('1', { status: AvailabilityStatus.AVAILABLE })).resolves.toEqual([
+      expect.objectContaining({ id: '10', serviceName: expect.any(String) }),
+    ]);
+    await expect(facilityServicesService.findDetailsById('10')).resolves.toEqual({ ...entity });
+    expect(repo.findPublicByFacilityId).toHaveBeenCalledWith('1', { status: AvailabilityStatus.AVAILABLE });
+  });
+
+  it('rejects public facility services when facility is inactive', async () => {
+    facilitiesService.findById.mockResolvedValueOnce({ ...facility, status: FacilityStatus.INACTIVE });
+
+    await expect(createService().service.findPublicByFacilityId('1')).rejects.toBeInstanceOf(ConflictException);
+  });
+
   it('rejects duplicated mapping or inactive references', async () => {
     const duplicateContext = createService();
     duplicateContext.repo.findByFacilityAndService.mockResolvedValueOnce(entity);
@@ -117,10 +143,34 @@ describe('FacilityServicesService business logic', () => {
     expect(repo.save).toHaveBeenCalled();
   });
 
+  it('rejects update when changed facility-service pair belongs to another mapping', async () => {
+    const context = createService();
+    context.repo.findByFacilityAndService.mockResolvedValueOnce({ ...entity, id: '99' });
+
+    await expect(context.service.update('10', { serviceId: '3' })).rejects.toBeInstanceOf(ConflictException);
+    expect(context.repo.save).not.toHaveBeenCalled();
+  });
+
+  it('does not check duplicate pair when update only changes price or status', async () => {
+    const { repo, service: facilityServicesService } = createService();
+
+    await expect(facilityServicesService.update('10', { price: '310000.00' })).resolves.toMatchObject({
+      price: '310000.00',
+    });
+    expect(repo.findByFacilityAndService).not.toHaveBeenCalled();
+  });
+
   it('throws not found when mapping does not exist', async () => {
     const context = createService();
     context.repo.findById.mockResolvedValueOnce(null);
     await expect(context.service.findById('99')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('throws not found when mapping details do not exist', async () => {
+    const context = createService();
+    context.repo.findDetailsById = jest.fn().mockResolvedValueOnce(null);
+
+    await expect(context.service.findDetailsById('99')).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('hard deletes unused mapping and marks used mapping unavailable', async () => {
@@ -141,5 +191,67 @@ describe('FacilityServicesService business logic', () => {
       expect.objectContaining({ id: '10' }),
       AvailabilityStatus.UNAVAILABLE,
     );
+  });
+});
+
+describe('FacilityServicesController', () => {
+  const entity = {
+    id: '10',
+    facilityId: '1',
+    serviceId: '2',
+    price: '280000.00',
+    durationMinutes: 30,
+    status: AvailabilityStatus.AVAILABLE,
+  };
+
+  const createServiceMock = () => ({
+    create: jest.fn().mockResolvedValue(entity),
+    findAll: jest.fn().mockResolvedValue([entity]),
+    findAllPaginated: jest.fn().mockResolvedValue({ items: [entity], total: 1, page: 1, limit: 20 }),
+    findDetailsById: jest.fn().mockResolvedValue({ ...entity, serviceName: 'Sieu am' }),
+    update: jest.fn().mockResolvedValue({ ...entity, price: '300000.00' }),
+    remove: jest.fn().mockResolvedValue({ action: 'soft_deleted', affectedCount: 1 }),
+    findPublicByFacilityId: jest.fn().mockResolvedValue([entity]),
+  });
+
+  it('chooses list method by query.page and wraps management response', async () => {
+    const service = createServiceMock();
+    const controller = new FacilityServicesController(service as never);
+
+    await expect(controller.findAll({ page: 1 } as never)).resolves.toMatchObject({
+      message: FACILITY_SERVICE_CONSTANT.FOUND,
+      data: { total: 1 },
+    });
+    await expect(controller.findAll({} as never)).resolves.toMatchObject({
+      message: FACILITY_SERVICE_CONSTANT.FOUND,
+      data: [entity],
+    });
+  });
+
+  it('wraps detail, create, update, and remove responses', async () => {
+    const service = createServiceMock();
+    const controller = new FacilityServicesController(service as never);
+
+    await expect(controller.findOne('10')).resolves.toMatchObject({ message: FACILITY_SERVICE_CONSTANT.DETAIL_FOUND });
+    await expect(controller.create(entity as never)).resolves.toMatchObject({ message: FACILITY_SERVICE_CONSTANT.CREATED, data: entity });
+    await expect(controller.update('10', { price: '300000.00' })).resolves.toMatchObject({
+      message: FACILITY_SERVICE_CONSTANT.UPDATED,
+      data: { price: '300000.00' },
+    });
+    await expect(controller.remove('10')).resolves.toMatchObject({
+      message: FACILITY_SERVICE_CONSTANT.DELETED,
+      data: { action: 'soft_deleted' },
+    });
+  });
+
+  it('wraps public facility service response', async () => {
+    const service = createServiceMock();
+    const controller = new PublicFacilityServicesController(service as never);
+
+    await expect(controller.findServicesByFacility('1', { serviceType: ServiceType.ULTRASOUND } as never)).resolves.toEqual({
+      message: RESPONSE_MESSAGES.SUCCESS,
+      data: [entity],
+    });
+    expect(service.findPublicByFacilityId).toHaveBeenCalledWith('1', { serviceType: ServiceType.ULTRASOUND });
   });
 });

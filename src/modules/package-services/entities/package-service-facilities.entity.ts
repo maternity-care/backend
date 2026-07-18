@@ -11,5 +11,4 @@ export class PackageServiceFacility {
 
   @PrimaryColumn({ name: 'facility_id', type: 'bigint' })
   facilityId: string;
-
 }

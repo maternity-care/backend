@@ -14,6 +14,10 @@
     "strict": true,
     "skipLibCheck": true,
     "strictPropertyInitialization": false,
-    "noImplicitAny": true
+    "noImplicitAny": true,
+    "types": [
+      "node",
+      "jest" // <-- Thêm dòng này
+    ]
   }
 }
