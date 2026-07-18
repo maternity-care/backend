@@ -21,6 +21,7 @@ import { ServicesModule } from './modules/services/services.module';
 import { FacilityServicesModule } from './modules/facility-services/facility-services.module';
 import { PregnancyProfileModule } from './modules/pregnancy-profile/pregnancy-profile.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { DoctorsModule } from './modules/doctors/doctors.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -58,6 +59,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     FacilityServicesModule,
     PregnancyProfileModule,
     NotificationsModule,
+    DoctorsModule,
   ],
 })
 export class AppModule {}
