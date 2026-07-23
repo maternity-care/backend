@@ -8,16 +8,16 @@ import { Permission } from '../../modules/permissions/entities/permission.entity
 import { Role } from '../../modules/roles/entities/role.entity';
 import { Setting } from '../../modules/settings/entities/setting.entity';
 import { User } from '../../modules/users/entities/user.entity';
-import { StaffProfile } from '../../modules/staffs/entities/staff-profiles.entity';
+import { StaffProfile } from '../../modules/staffs/entities/staff.entity';
 import {
   AccountStatus,
   ActiveStatus,
   FacilityStatus,
 } from '../../common/constants/status.enum';
-import { Facility } from '../../modules/facilities/entities/facilities.entity';
+import { Facility } from '../../modules/facilities/entities/facility.entity';
 import { FacilityStaff } from '../../modules/facilities/entities/facility-staff.entity';
-import { Doctor } from '../../modules/doctors/entities/doctors.entity';
-import { Room } from '../../modules/rooms/entities/rooms.entity';
+import { Doctor } from '../../modules/doctors/entities/doctor.entity';
+import { Room } from '../../modules/rooms/entities/room.entity';
 
 type SeederClass =
   | 'DatabaseSeeder'

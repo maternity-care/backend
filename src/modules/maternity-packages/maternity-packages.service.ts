@@ -2,7 +2,7 @@ import { ConflictException, Inject, Injectable, NotFoundException } from '@nestj
 import { MATERNITY_PACKAGE_CONSTANT } from '../../common/constants/maternity-package.constant';
 import { FacilityStatus, MaternityPackageStatus } from '../../common/constants/status.enum';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
-import { MaternityPackage } from './entities/maternity-packages.entity';
+import { MaternityPackage } from './entities/maternity-package.entity';
 import { FacilitiesService } from '../facilities/facilities.service';
 import { CreateMaternityPackageDto } from './dto/requests/create-maternity-package.dto';
 import { SearchMaternityPackageDto } from './dto/requests/search-maternity-package.dto';

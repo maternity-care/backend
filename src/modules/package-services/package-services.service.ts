@@ -5,7 +5,7 @@ import {
   FacilityStatus,
   MaternityPackageStatus,
 } from '../../common/constants/status.enum';
-import { PackageService } from './entities/package-services.entity';
+import { PackageService } from './entities/package-item.entity';
 import { FacilitiesService } from '../facilities/facilities.service';
 import { MaternityPackagesService } from '../maternity-packages/maternity-packages.service';
 import { ServicesService } from '../services/services.service';

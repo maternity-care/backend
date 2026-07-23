@@ -1,5 +1,5 @@
 import { DeepPartial } from 'typeorm';
-import { StaffProfile } from '../entities/staff-profiles.entity';
+import { StaffProfile } from '../entities/staff.entity';
 
 export interface IStaffProfileService {
   findById(id: string): Promise<StaffProfile | null>;

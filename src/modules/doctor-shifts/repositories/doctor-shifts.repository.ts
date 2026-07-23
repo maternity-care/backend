@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
-import { DoctorShift } from '../entities/doctor-shifts.entity';
+import { DoctorShift } from '../entities/shift.entity';
 import { SearchDoctorShiftDto } from '../dto/requests/search-doctor-shift.dto';
 import { DoctorShiftWithDetails, IDoctorShiftsRepository } from '../interfaces/doctor-shifts-repository.interface';
 import { ShiftConflictInput } from '../interfaces/shifts-conflict-input.interface';

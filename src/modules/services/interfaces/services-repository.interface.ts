@@ -1,5 +1,5 @@
 import { DeepPartial } from 'typeorm';
-import { Service } from '../entities/services.entity';
+import { Service } from '../entities/service.entity';
 import { PaginationResult } from '../../../common/helpers/pagination';
 import { SearchServiceDto } from '../dto/requests/search-service.dto';
 import { ActiveStatus } from '../../../common/constants/status.enum';

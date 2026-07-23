@@ -1,6 +1,6 @@
 import { DeepPartial } from 'typeorm';
 import { PaginationResult } from '../../../common/helpers/pagination';
-import { FacilityService } from '../entities/facility-services.entity';
+import { FacilityService } from '../entities/facility-service.entity';
 import { SearchFacilityServiceDto } from '../dto/requests/search-facility-service.dto';
 import { AvailabilityStatus } from '../../../common/constants/status.enum';
 import { FacilityServiceResponseDto } from '../dto/responses/facility-service-response.dto';

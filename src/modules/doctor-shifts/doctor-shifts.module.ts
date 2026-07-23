@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { DoctorShift } from './entities/doctor-shifts.entity';
-import { DoctorShiftChangeLog } from './entities/doctor-shift-change-logs.entity';
-import { ShiftDisruption } from './entities/shift-disruptions.entity';
-import { AppointmentDisruptionItem } from './entities/appointment-disruption-items.entity';
+import { DoctorShift } from './entities/shift.entity';
+import { DoctorShiftChangeLog } from './entities/doctor-shift-change-log.entity';
+import { ShiftDisruption } from './entities/shift-disruption.entity';
+import { AppointmentDisruptionItem } from './entities/appointment-disruption-item.entity';
 import { FacilitiesModule } from '../facilities/facilities.module';
 import { RoomsModule } from '../rooms/rooms.module';
 import { DoctorShiftsController } from './doctor-shifts.controller';

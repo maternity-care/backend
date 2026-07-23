@@ -9,7 +9,7 @@ import { RoleEnum } from '../../common/constants/role.enum';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { FacilitiesController } from './facilities.controller';
 import { FacilitiesService } from './facilities.service';
-import { Facility } from './entities/facilities.entity';
+import { Facility } from './entities/facility.entity';
 
 const createFacility = (overrides: Partial<Facility> = {}): Facility => ({
   id: 'fac-1',

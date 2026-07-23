@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { MaternityPackage } from './entities/maternity-packages.entity';
+import { MaternityPackage } from './entities/maternity-package.entity';
 import { FacilitiesModule } from '../facilities/facilities.module';
 import { MATERNITY_PACKAGES_REPOSITORY } from './interfaces/maternity-packages-repository.interface';
 import { MaternityPackagesController } from './maternity-packages.controller';
