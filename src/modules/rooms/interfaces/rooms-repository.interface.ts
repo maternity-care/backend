@@ -1,5 +1,5 @@
 import { DeepPartial } from 'typeorm';
-import { Room } from '../entities/rooms.entity';
+import { Room } from '../entities/room.entity';
 import { SearchRoomsDto } from '../dto/requests/search-rooms.dto';
 import { PaginationResult } from '../../../common/helpers/pagination';
 import { SearchRooms2Dto } from '../dto/requests/search-room-2';

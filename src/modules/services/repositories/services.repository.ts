@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
-import { Service } from '../entities/services.entity';
+import { Service } from '../entities/service.entity';
 import { paginate } from '../../../common/helpers/pagination';
 import { searchBuilder } from '../../../common/helpers/search-builder';
 import { ActiveStatus } from '../../../common/constants/status.enum';

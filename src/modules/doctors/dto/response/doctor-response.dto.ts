@@ -1,4 +1,4 @@
-import { StaffProfile } from './../../../staffs/entities/staff-profiles.entity';
+import { StaffProfile } from '../../../staffs/entities/staff.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ActiveStatus } from '../../../../common/constants/status.enum';
 

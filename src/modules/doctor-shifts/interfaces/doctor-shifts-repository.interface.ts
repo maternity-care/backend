@@ -1,6 +1,6 @@
 import { DeepPartial } from 'typeorm';
 import { PaginationResult } from '../../../common/helpers/pagination';
-import { DoctorShift } from '../entities/doctor-shifts.entity';
+import { DoctorShift } from '../entities/shift.entity';
 import { SearchDoctorShiftDto } from '../dto/requests/search-doctor-shift.dto';
 import { ShiftConflicts } from './shift-conflicts.interface';
 import { ShiftConflictInput } from './shifts-conflict-input.interface';

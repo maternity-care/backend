@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { DoctorShiftStatus } from '../../../common/constants/status.enum';
 import { DOCTOR_SHIFT_CONSTANT } from '../../../common/constants/doctor-shift.constant';
-import { Facility } from '../../facilities/entities/facilities.entity';
+import { Facility } from '../../facilities/entities/facility.entity';
 import { ShiftConflicts } from '../interfaces/shift-conflicts.interface';
 import { ShiftWorkingDay } from '../dto/requests/bulk-create-doctor-shift.dto';
 

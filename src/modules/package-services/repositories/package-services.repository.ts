@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
 import { PackageServiceFacility } from '../entities/package-service-facilities.entity';
-import { PackageService } from '../entities/package-services.entity';
+import { PackageService } from '../entities/package-item.entity';
 import { PackageServiceFacilityScope } from '../dto/requests/create-package-service.dto';
 import { SearchPackageServiceDto } from '../dto/requests/search-package-service.dto';
 import {

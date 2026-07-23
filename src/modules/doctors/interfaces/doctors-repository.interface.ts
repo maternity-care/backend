@@ -1,5 +1,5 @@
 import { DeepPartial } from 'typeorm';
-import { Doctor } from '../entities/doctors.entity';
+import { Doctor } from '../entities/doctor.entity';
 
 export const DOCTORS_REPOSITORY = 'DOCTORS_REPOSITORY';
 

@@ -8,7 +8,7 @@ import {
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { UpdateDoctorDto } from './dto/requests/update-doctor.dto';
 import { IDoctorsRepository, DOCTORS_REPOSITORY } from './interfaces/doctors-repository.interface';
-import { Doctor } from './entities/doctors.entity';
+import { Doctor } from './entities/doctor.entity';
 import { UsersService } from '../users/users.service';
 import { AdminCreateUserDto } from '../users/dto/request/admin-create-user.dto';
 import { User } from '../users/entities/user.entity';

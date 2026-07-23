@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository } from 'typeorm';
-import { Doctor } from '../entities/doctors.entity';
+import { Doctor } from '../entities/doctor.entity';
 import { IDoctorsRepository } from '../interfaces/doctors-repository.interface';
 
 @Injectable()
