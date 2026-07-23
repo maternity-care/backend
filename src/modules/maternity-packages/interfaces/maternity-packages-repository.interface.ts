@@ -1,7 +1,7 @@
 import { DeepPartial } from 'typeorm';
 import { PaginationResult } from '../../../common/helpers/pagination';
 import { MaternityPackageStatus } from '../../../common/constants/status.enum';
-import { MaternityPackage } from '../entities/maternity-packages.entity';
+import { MaternityPackage } from '../entities/maternity-package.entity';
 import { SearchMaternityPackageDto } from '../dto/requests/search-maternity-package.dto';
 import { AvailableMaternityPackageResponseDto } from '../dto/responses/available-maternity-package-response.dto';
 

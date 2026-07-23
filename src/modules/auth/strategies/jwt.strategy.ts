@@ -9,9 +9,9 @@ import { UsersService } from '../../users/users.service';
 import { JwtPayload } from '../interfaces/jwt-payload.interface';
 import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 import { RoleEnum } from '../../../common/constants/role.enum';
-import { StaffProfile } from '../../staffs/entities/staff-profiles.entity';
+import { StaffProfile } from '../../staffs/entities/staff.entity';
 import { FacilityStaff } from '../../facilities/entities/facility-staff.entity';
-import { Facility } from '../../facilities/entities/facilities.entity';
+import { Facility } from '../../facilities/entities/facility.entity';
 import {
   AccountStatus,
   ActiveStatus,

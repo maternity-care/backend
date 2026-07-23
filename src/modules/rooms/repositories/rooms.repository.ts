@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
-import { Room } from '../entities/rooms.entity';
+import { Room } from '../entities/room.entity';
 import { IRoomsRepository, RoomWithDetails } from '../interfaces/rooms-repository.interface';
 import { SearchRoomsDto } from '../dto/requests/search-rooms.dto';
 import { SearchRooms2Dto } from '../dto/requests/search-room-2';

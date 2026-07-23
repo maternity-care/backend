@@ -1,7 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, FindOptionsWhere, Repository } from 'typeorm';
-import { PregnancyProfile } from '../entities/pregnancy-profiles.entity';
+import { PregnancyProfile } from '../entities/pregnancy-profile.entity';
 import { IPregnancyProfileRepository } from '../interfaces/pregnancy-profile-repository.interface';
 import { SearchProfileQueryDto } from '../dto/request/search-pregnancy-profiles.dto';
 import { User } from 'src/modules/users/entities/user.entity';

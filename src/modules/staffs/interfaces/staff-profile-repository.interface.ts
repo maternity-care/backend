@@ -1,5 +1,5 @@
 import { DeepPartial } from 'typeorm';
-import { StaffProfile } from '../entities/staff-profiles.entity';
+import { StaffProfile } from '../entities/staff.entity';
 
 export const STAFF_PROFILE_REPOSITORY = Symbol('STAFF_PROFILE_REPOSITORY');
 

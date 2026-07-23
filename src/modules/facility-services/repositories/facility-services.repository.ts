@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
 import { AvailabilityStatus, ActiveStatus, FacilityStatus } from '../../../common/constants/status.enum';
-import { FacilityService } from '../entities/facility-services.entity';
+import { FacilityService } from '../entities/facility-service.entity';
 import { SearchFacilityServiceDto } from '../dto/requests/search-facility-service.dto';
 import {
   FacilityServiceWithDetails,

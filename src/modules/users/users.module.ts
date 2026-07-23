@@ -2,10 +2,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PermissionsModule } from '../permissions/permissions.module';
-import { UserPermission } from '../permissions/entities/user-permission.entity';
+import { UserPermission } from '../permissions/entities/staff-permission.entity';
 import { RolesModule } from '../roles/roles.module';
 import { MailModule } from '../mail/mail.module';
-import { StaffProfile } from '../staffs/entities/staff-profiles.entity';
+import { StaffProfile } from '../staffs/entities/staff.entity';
 import { STAFF_PROFILE_REPOSITORY } from '../staffs/interfaces/staff-profile-repository.interface';
 import { StaffProfileRepository } from '../staffs/repositories/staff-profile.repository';
 import { User } from './entities/user.entity';
@@ -18,8 +18,8 @@ import { MailService } from '../mail/mail.service';
 import { MAIL_SERVICE } from '../mail/interfaces/mail-service.interface';
 import { ManagementSystemUsersController } from './management-system-users.controller';
 import { FacilityStaff } from '../facilities/entities/facility-staff.entity';
-import { Facility } from '../facilities/entities/facilities.entity';
-import { Doctor } from '../doctors/entities/doctors.entity';
+import { Facility } from '../facilities/entities/facility.entity';
+import { Doctor } from '../doctors/entities/doctor.entity';
 
 @Module({
   imports: [

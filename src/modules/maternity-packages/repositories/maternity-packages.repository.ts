@@ -8,7 +8,7 @@ import {
 } from '../../../common/constants/status.enum';
 import { paginate } from '../../../common/helpers/pagination';
 import { searchBuilder } from '../../../common/helpers/search-builder';
-import { MaternityPackage } from '../entities/maternity-packages.entity';
+import { MaternityPackage } from '../entities/maternity-package.entity';
 import { SearchMaternityPackageDto } from '../dto/requests/search-maternity-package.dto';
 import { AvailableMaternityPackageResponseDto } from '../dto/responses/available-maternity-package-response.dto';
 import { IMaternityPackagesRepository } from '../interfaces/maternity-packages-repository.interface';

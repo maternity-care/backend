@@ -1,57 +1,73 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   Column,
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
-  JoinTable,
-  ManyToMany,
-  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Exclude } from 'class-transformer';
-import { Role } from '../../roles/entities/role.entity';
-import { AccountStatus } from '../../../common/constants/status.enum';
-import { UserPermission } from '../../permissions/entities/user-permission.entity';
+import { UserStatusEnum } from '../users.enum';
 
 @Entity('users')
 export class User {
+  @ApiProperty({ type: String, example: '1' })
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: string;
 
-  @Column({ type: 'varchar', length: 150 })
+  @ApiProperty({ type: String })
+  @Column({ name: 'cccd', type: 'varchar', length: 100, unique: true })
+  cccd: string;
+
+  @ApiProperty({ type: String })
+  @Column({ name: 'name', type: 'varchar', length: 255 })
   name: string;
 
-  @Column({ type: 'varchar', length: 190, unique: true })
-  email: string;
-
-  @Column({ type: 'varchar', length: 15, unique: true, nullable: true })
+  @ApiProperty({ type: String })
+  @Column({ name: 'phone', type: 'varchar', length: 20, unique: true })
   phone: string;
 
-  @Exclude()
-  @Column({ type: 'varchar', length: 255, select: false })
-  password: string;
+  @ApiProperty({ type: String })
+  @Column({ name: 'date_of_birth', type: 'date' })
+  dateOfBirth: string;
 
-  @Column({ type: 'enum', enum: AccountStatus, default: AccountStatus.ACTIVE })
-  status: AccountStatus;
+  @ApiProperty({ type: String })
+  @Column({ name: 'address', type: 'varchar', length: 255 })
+  address: string;
 
-  @ManyToMany(() => Role, (role) => role.users, { cascade: false })
-  @JoinTable({
-    name: 'user_roles',
-    joinColumn: { name: 'user_id', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'role_id', referencedColumnName: 'id' },
-  })
-  roles: Role[];
+  @ApiProperty({ type: String })
+  @Column({ name: 'province', type: 'varchar', length: 255 })
+  province: string;
 
-  @OneToMany(() => UserPermission, (permissionOverride) => permissionOverride.user)
-  permissionOverrides: UserPermission[];
+  @ApiProperty({ type: String })
+  @Column({ name: 'ward', type: 'varchar', length: 255 })
+  ward: string;
 
+  @ApiProperty({ enum: UserStatusEnum, enumName: 'UserStatusEnum' })
+  @Column({ name: 'status', type: 'enum', enum: UserStatusEnum })
+  status: UserStatusEnum;
+
+  @ApiProperty({ type: String })
+  @Column({ name: 'emergency_contact_name', type: 'varchar', length: 255 })
+  emergencyContactName: string;
+
+  @ApiProperty({ type: String })
+  @Column({ name: 'emergency_contact_phone', type: 'varchar', length: 20 })
+  emergencyContactPhone: string;
+
+  @ApiPropertyOptional({ type: Object, nullable: true, required: false })
+  @Column({ name: 'metadata', type: 'json', nullable: true })
+  metadata: Record<string, unknown> | null;
+
+  @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
 
+  @ApiProperty({ type: Date })
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
   updatedAt: Date;
 
+  @ApiPropertyOptional({ type: Date, nullable: true })
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamp', nullable: true })
   deletedAt: Date | null;
 }

@@ -6,8 +6,8 @@ import {
 import { FacilityStatus, ActiveStatus } from '../../common/constants/status.enum';
 import { RoleEnum } from '../../common/constants/role.enum';
 import { ROOM_CONSTANT } from '../../common/constants/room.constant';
-import { Facility } from '../facilities/entities/facilities.entity';
-import { Room } from './entities/rooms.entity';
+import { Facility } from '../facilities/entities/facility.entity';
+import { Room } from './entities/room.entity';
 import { RoomsController } from './rooms.controller';
 import { RoomsFacilityController } from './rooms-facility.controller';
 import { RoomsService } from './rooms.service';

@@ -29,7 +29,7 @@ import {
 } from '../staffs/interfaces/staff-profile-repository.interface';
 import { StaffRefreshToken } from './entities/staff-refresh-token.entity';
 import { StaffPasswordResetToken } from './entities/staff-password-reset-token.entity';
-import { StaffProfile } from '../staffs/entities/staff-profiles.entity';
+import { StaffProfile } from '../staffs/entities/staff.entity';
 import { AccountStatus } from '../../common/constants/status.enum';
 import { UpdateManagementProfileDto } from './dto/request/update-management-profile.dto';
 import { ChangeManagementPasswordDto } from './dto/request/change-management-password.dto';

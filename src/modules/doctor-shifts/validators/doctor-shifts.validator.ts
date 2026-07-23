@@ -1,10 +1,10 @@
 import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import { ActiveStatus, DoctorShiftStatus, FacilityStatus } from '../../../common/constants/status.enum';
 import { DOCTOR_SHIFT_CONSTANT } from '../../../common/constants/doctor-shift.constant';
-import { Facility } from '../../facilities/entities/facilities.entity';
+import { Facility } from '../../facilities/entities/facility.entity';
 import { FacilitiesService } from '../../facilities/facilities.service';
 import { RoomsService } from '../../rooms/rooms.service';
-import { DoctorShift } from '../entities/doctor-shifts.entity';
+import { DoctorShift } from '../entities/shift.entity';
 import { CheckShiftConflictDto } from '../dto/requests/check-shift-conflict.dto';
 import { CreateDoctorShiftDto } from '../dto/requests/create-doctor-shift.dto';
 import { DoctorAvailabilityQueryDto } from '../dto/requests/doctor-availability.dto';

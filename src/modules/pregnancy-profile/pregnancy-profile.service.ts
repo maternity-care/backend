@@ -1,7 +1,7 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CreatePregnancyProfileDto } from './dto/request/create-pregnancy-profile.dto';
 import { UpdatePregnancyProfileDto } from './dto/request/update-pregnancy-profile.dto';
-import { PregnancyProfile } from './entities/pregnancy-profiles.entity';
+import { PregnancyProfile } from './entities/pregnancy-profile.entity';
 import {
   IPregnancyProfileRepository,
   PREGNANCY_PROFILE_REPOSITORY,
