@@ -1,39 +1,36 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   Column,
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
-  ManyToMany,
-  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Role } from '../../roles/entities/role.entity';
-import { UserPermission } from './user-permission.entity';
 
 @Entity('permissions')
 export class Permission {
+  @ApiProperty({ type: String, example: '1' })
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: string;
 
-  @Column({ type: 'varchar', length: 150, unique: true })
+  @ApiProperty({ type: String })
+  @Column({ name: 'name', type: 'varchar', length: 150, unique: true })
   name: string;
 
+  @ApiProperty({ type: String })
   @Column({ name: 'guard_name', type: 'varchar', length: 50, default: 'api' })
   guardName: string;
 
-  @ManyToMany(() => Role, (role) => role.permissions)
-  roles: Role[];
-
-  @OneToMany(() => UserPermission, (permissionOverride) => permissionOverride.permission)
-  userOverrides: UserPermission[];
-
+  @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
 
+  @ApiProperty({ type: Date })
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
   updatedAt: Date;
 
+  @ApiPropertyOptional({ type: Date, nullable: true })
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamp', nullable: true })
   deletedAt: Date | null;
 }

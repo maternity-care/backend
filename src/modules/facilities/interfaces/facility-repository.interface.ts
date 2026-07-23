@@ -1,5 +1,5 @@
 import { DeepPartial } from 'typeorm';
-import { Facility } from '../entities/facilities.entity';
+import { Facility } from '../entities/facility.entity';
 import { FacilityStatus } from '../../../common/constants/status.enum';
 import { SearchFacilityDto } from '../dto/requests/search-facility.dto';
 import {PaginationResult} from '../../../common/helpers/pagination';

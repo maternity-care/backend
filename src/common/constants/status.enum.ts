@@ -22,6 +22,13 @@ export enum DoctorShiftStatus {
   OFF = 'off',
 }
 
+export enum ShiftDisruptionStatus {
+  OPEN = 'open',
+  PARTIALLY_RESOLVED = 'partially_resolved',
+  RESOLVED = 'resolved',
+  CANCELLED = 'cancelled',
+}
+
 export enum AvailabilityStatus {
   AVAILABLE = 'available',
   UNAVAILABLE = 'unavailable',
@@ -53,6 +60,12 @@ export enum PregnancyProfileStatus {
   COMPLETED = 'completed',
   TERMINATED = 'terminated',
   DELETED = 'deleted',
+}
+
+export enum RiskLevel {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
 }
 
 export enum AppointmentStatus {
@@ -164,4 +177,12 @@ export enum AppointmentDisruptionResolutionStatus {
   CANCELLED = 'cancelled',
   REFUND_PENDING = 'refund_pending',
   RESOLVED = 'resolved',
+}
+
+export enum FaqStatusEnum {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  PENDING = 'pending',
+  COMPLETED = 'completed',
+  CANCELLED = 'cancelled',
 }

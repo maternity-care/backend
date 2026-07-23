@@ -2,7 +2,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from '@nes
 import { DOCTOR_SHIFT_CONSTANT } from '../../common/constants/doctor-shift.constant';
 import { DoctorShiftStatus } from '../../common/constants/status.enum';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
-import { DoctorShift } from './entities/doctor-shifts.entity';
+import { DoctorShift } from './entities/shift.entity';
 import { BulkCreateDoctorShiftDto } from './dto/requests/bulk-create-doctor-shift.dto';
 import { CheckShiftConflictDto } from './dto/requests/check-shift-conflict.dto';
 import { CopyWeekDoctorShiftDto } from './dto/requests/copy-week-doctor-shift.dto';

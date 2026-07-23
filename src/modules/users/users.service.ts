@@ -15,7 +15,7 @@ import {
   PERMISSIONS_SERVICE,
   IPermissionsService,
 } from '../permissions/interfaces/permissions-service.interface';
-import { UserPermission } from '../permissions/entities/user-permission.entity';
+import { UserPermission } from '../permissions/entities/staff-permission.entity';
 import { CreateUserDto } from './dto/request/create-user.dto';
 import { UpdateProfileDto } from './dto/request/update-profile.dto';
 import { UpdateUserDto } from './dto/request/update-user.dto';
@@ -38,9 +38,9 @@ import { parseSearch } from '../../common/helpers/search-builder';
 import { SearchUserResponseDto } from './dto/response/search-user-response.dto';
 import { IMailService, MAIL_SERVICE } from '../mail/interfaces/mail-service.interface';
 import { FacilityStaff } from '../facilities/entities/facility-staff.entity';
-import { Facility } from '../facilities/entities/facilities.entity';
-import { StaffProfile } from '../staffs/entities/staff-profiles.entity';
-import { Doctor } from '../doctors/entities/doctors.entity';
+import { Facility } from '../facilities/entities/facility.entity';
+import { StaffProfile } from '../staffs/entities/staff.entity';
+import { Doctor } from '../doctors/entities/doctor.entity';
 import { FacilityStaffAssignmentDto } from './dto/request/facility-staff-assignment.dto';
 import {
   AccountStatus,

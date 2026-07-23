@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { PregnancyProfile } from './entities/pregnancy-profiles.entity';
+import { PregnancyProfile } from './entities/pregnancy-profile.entity';
 import { PregnancyProfileController } from './pregnancy-profile.controller';
 import { ManagementPregnancyProfileController } from './management-pregnancy-profile.controller';
 import { PregnancyProfileService } from './pregnancy-profile.service';

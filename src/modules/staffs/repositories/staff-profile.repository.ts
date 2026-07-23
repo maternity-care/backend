@@ -1,5 +1,5 @@
 import { DeepPartial, Repository } from 'typeorm';
-import { StaffProfile } from '../entities/staff-profiles.entity';
+import { Staff } from '../entities/staff.entity';
 import { IStaffProfileRepository } from '../interfaces/staff-profile-repository.interface';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConflictException, NotFoundException } from '@nestjs/common';
@@ -7,11 +7,11 @@ import { EMAIL_DOMAIN } from 'src/modules/users/users.enum';
 
 export class StaffProfileRepository implements IStaffProfileRepository {
   constructor(
-    @InjectRepository(StaffProfile)
-    private readonly repository: Repository<StaffProfile>,
+    @InjectRepository(Staff)
+    private readonly repository: Repository<Staff>,
   ) {}
 
-  async create(data: DeepPartial<StaffProfile>): Promise<StaffProfile> {
+  async create(data: DeepPartial<Staff>): Promise<Staff> {
     const isExistEmail = await this.repository.findOne({
       where: { personalEmail: data.personalEmail },
     });
@@ -26,32 +26,32 @@ export class StaffProfileRepository implements IStaffProfileRepository {
     return savedStaffProfile;
   }
 
-  async save(staffProfile: StaffProfile): Promise<StaffProfile> {
+  async save(staffProfile: Staff): Promise<Staff> {
     return this.repository.save(staffProfile);
   }
 
-  findAll(): Promise<StaffProfile[]> {
+  findAll(): Promise<Staff[]> {
     return this.repository.find({
       relations: { roles: { permissions: true } },
       order: { id: 'ASC' },
     });
   }
 
-  async findById(id: string): Promise<StaffProfile | null> {
+  async findById(id: string): Promise<Staff | null> {
     return this.repository.findOne({
       where: { id },
       relations: { roles: { permissions: true } },
     });
   }
 
-  async findByEmail(email: string): Promise<StaffProfile | null> {
+  async findByEmail(email: string): Promise<Staff | null> {
     return this.repository.findOne({
       where: { email },
       relations: { roles: { permissions: true } },
     });
   }
 
-  async findByEmailWithPassword(email: string): Promise<StaffProfile | null> {
+  async findByEmailWithPassword(email: string): Promise<Staff | null> {
     return this.repository
       .createQueryBuilder('staff')
       .addSelect('staff.password')
@@ -61,14 +61,14 @@ export class StaffProfileRepository implements IStaffProfileRepository {
       .getOne();
   }
 
-  async findByEmployeeCode(employeeCode: string): Promise<StaffProfile | null> {
+  async findByEmployeeCode(employeeCode: string): Promise<Staff | null> {
     return this.repository.findOne({
       where: { employeeCode },
       relations: { roles: { permissions: true } },
     });
   }
 
-  async findByPersonalEmail(email: string): Promise<StaffProfile | null> {
+  async findByPersonalEmail(email: string): Promise<Staff | null> {
     return this.repository.findOne({
       where: { personalEmail: email },
       relations: { roles: { permissions: true } },
@@ -77,8 +77,8 @@ export class StaffProfileRepository implements IStaffProfileRepository {
 
   async updateStaffProfile(
     id: string,
-    data: DeepPartial<StaffProfile>,
-  ): Promise<StaffProfile | null> {
+    data: DeepPartial<Staff>,
+  ): Promise<Staff | null> {
     const staffProfile = await this.repository.findOne({ where: { id } });
     if (!staffProfile) {
       throw new NotFoundException(`Không tìm thấy hồ sơ nhân viên với ID: ${id}`);

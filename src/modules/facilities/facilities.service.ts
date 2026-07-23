@@ -2,7 +2,7 @@ import { ConflictException, Inject, Injectable, NotFoundException } from '@nestj
 import { CreateFacilityDto } from './dto/requests/create-facility.dto';
 import { SearchFacilityDto } from './dto/requests/search-facility.dto';
 import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
-import { Facility } from './entities/facilities.entity';
+import { Facility } from './entities/facility.entity';
 import { FACILITIES_REPOSITORY, IFacilitiesRepository } from './interfaces/facility-repository.interface';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';

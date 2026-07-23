@@ -1,6 +1,6 @@
 import { DeepPartial } from 'typeorm';
 import { PaginationResult } from '../../../common/helpers/pagination';
-import { PackageService } from '../entities/package-services.entity';
+import { PackageService } from '../entities/package-item.entity';
 import { SearchPackageServiceDto } from '../dto/requests/search-package-service.dto';
 import { PackageServiceResponseDto } from '../dto/responses/package-service-response.dto';
 

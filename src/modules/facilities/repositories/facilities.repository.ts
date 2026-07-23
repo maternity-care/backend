@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository } from 'typeorm';
-import { Facility } from '../entities/facilities.entity';
+import { Facility } from '../entities/facility.entity';
 import { FacilityStatus } from '../../../common/constants/status.enum';
 import { IFacilitiesRepository } from '../interfaces/facility-repository.interface';
 import { SearchFacilityDto } from '../dto/requests/search-facility.dto';

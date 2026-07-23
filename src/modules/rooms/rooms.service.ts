@@ -1,8 +1,8 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateRoomDto } from './dto/requests/create-room.dto';
 import { UpdateRoomDto } from './dto/requests/update-room.dto';
-import { Room } from './entities/rooms.entity';
-import { Facility } from '../facilities/entities/facilities.entity';
+import { Room } from './entities/room.entity';
+import { Facility } from '../facilities/entities/facility.entity';
 import { IRoomsRepository, ROOMS_REPOSITORY, RoomWithDetails } from './interfaces/rooms-repository.interface';
 import { FacilitiesService } from '../facilities/facilities.service';
 import { SearchRoomsDto } from './dto/requests/search-rooms.dto';

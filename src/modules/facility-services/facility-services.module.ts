@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FacilitiesModule } from '../facilities/facilities.module';
 import { ServicesModule } from '../services/services.module';
-import { FacilityService } from './entities/facility-services.entity';
+import { FacilityService } from './entities/facility-service.entity';
 import { FacilityServicesController } from './facility-services.controller';
 import { FacilityServicesService } from './facility-services.service';
 import { PublicFacilityServicesController } from './public-facility-services.controller';
