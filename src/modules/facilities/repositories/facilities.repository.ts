@@ -4,8 +4,9 @@ import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
 import { Facility } from '../entities/facility.entity';
 import { FacilityClosureDay } from '../entities/facility-closure-day.entity';
 import { FacilityDayOfWeek, FacilityOperatingHour } from '../entities/facility-operating-hour.entity';
-import { AccountStatus, FacilityStatus } from '../../../common/constants/status.enum';
+import { AccountStatus, DoctorShiftStatus, FacilityStatus } from '../../../common/constants/status.enum';
 import {
+  FacilityShiftScheduleViolation,
   FacilityLookup,
   FacilityWithDetails,
   IFacilitiesRepository,
@@ -57,6 +58,35 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       .where('operatingHour.facilityId = :facilityId', { facilityId })
       .orderBy(`FIELD(operatingHour.dayOfWeek, 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN')`)
       .getRawMany();
+  }
+
+  async findActiveShiftsForOperatingHourValidation(
+    facilityId: string,
+    fromDate: string,
+  ): Promise<FacilityShiftScheduleViolation[]> {
+    return this.repository.manager
+      .createQueryBuilder()
+      .select('shift.id', 'id')
+      .addSelect('shift.shift_date', 'shiftDate')
+      .addSelect('shift.start_time', 'startTime')
+      .addSelect('shift.end_time', 'endTime')
+      .addSelect('shift.status', 'status')
+      .addSelect('staff.name', 'doctorName')
+      .addSelect('room.name', 'roomName')
+      .addSelect('slot.name', 'slotName')
+      .from('shifts', 'shift')
+      .leftJoin('staffs', 'staff', 'staff.id = shift.staff_id')
+      .leftJoin('rooms', 'room', 'room.id = shift.room_id')
+      .leftJoin('shift_slots', 'slot', 'slot.id = shift.slot_id')
+      .where('shift.facility_id = :facilityId', { facilityId })
+      .andWhere('shift.deleted_at IS NULL')
+      .andWhere('shift.shift_date >= :fromDate', { fromDate })
+      .andWhere('shift.status IN (:...statuses)', {
+        statuses: [DoctorShiftStatus.AVAILABLE, DoctorShiftStatus.FULL],
+      })
+      .orderBy('shift.shift_date', 'ASC')
+      .addOrderBy('shift.start_time', 'ASC')
+      .getRawMany<FacilityShiftScheduleViolation>();
   }
 
   createClosureDay(data: DeepPartial<FacilityClosureDay>): FacilityClosureDay {
@@ -276,9 +306,6 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       .addSelect('owner.phone', 'ownerPhone')
       .addSelect('facility.phone', 'phone')
       .addSelect('facility.email', 'email')
-      .addSelect('facility.openTime', 'openTime')
-      .addSelect('facility.closeTime', 'closeTime')
-      .addSelect('facility.workingDays', 'workingDays')
       .addSelect('facility.address', 'address')
       .addSelect('facility.province', 'province')
       .addSelect('facility.ward', 'ward')

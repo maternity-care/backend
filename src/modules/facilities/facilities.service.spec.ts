@@ -21,9 +21,6 @@ const createFacility = (overrides: Partial<Facility> = {}): Facility => ({
   ownerId: 'staff-1',
   phone: '0900000000',
   email: 'clinic@example.com',
-  openTime: '08:00' as any,
-  closeTime: '17:00' as any,
-  workingDays: 'mon,tue,wed,thu,fri',
   address: '123 Nguyen Trai',
   province: 'Ho Chi Minh',
   ward: 'Ben Nghe',
@@ -60,6 +57,7 @@ describe('FacilitiesService', () => {
     findDetailsById: jest.fn(),
     syncOperatingHours: jest.fn(),
     findOperatingHoursByFacilityId: jest.fn(),
+    findActiveShiftsForOperatingHourValidation: jest.fn(),
     createClosureDay: jest.fn((dto) => createClosureDay(dto)),
     saveClosureDay: jest.fn(async (closureDay) => closureDay),
     removeClosureDay: jest.fn(async () => undefined),
@@ -93,6 +91,7 @@ describe('FacilitiesService', () => {
     repository.findByPhone.mockResolvedValue(null);
     repository.syncOperatingHours.mockResolvedValue(undefined);
     repository.findOperatingHoursByFacilityId.mockResolvedValue([]);
+    repository.findActiveShiftsForOperatingHourValidation.mockResolvedValue([]);
     repository.findClosureDaysByFacilityId.mockResolvedValue([]);
     repository.findClosureDayById.mockResolvedValue(null);
     repository.findClosureDayByDate.mockResolvedValue(null);
@@ -119,7 +118,7 @@ describe('FacilitiesService', () => {
     expect(repository.findCodesByPrefix).toHaveBeenCalledWith('CS-HCM');
     expect(repository.create).toHaveBeenCalledWith({ ...dto, code: 'CS-HCM-03' });
     expect(repository.syncOperatingHours).toHaveBeenCalledWith('fac-1', expect.arrayContaining([
-      expect.objectContaining({ dayOfWeek: 'MON', openTime: dto.openTime, closeTime: dto.closeTime, isClosed: false }),
+      expect.objectContaining({ dayOfWeek: 'MON', openTime: '07:00:00', closeTime: '17:00:00', isClosed: false }),
       expect.objectContaining({ dayOfWeek: 'SUN', openTime: null, closeTime: null, isClosed: true }),
     ]));
     expect(repository.save).toHaveBeenCalledTimes(1);
@@ -208,13 +207,13 @@ describe('FacilitiesService', () => {
       expect.objectContaining({
         id: 'fac-1',
         operatingHours: expect.arrayContaining([expect.objectContaining({ dayOfWeek: 'MON', isClosed: false })]),
-        operatingHourGroups: expect.arrayContaining([expect.objectContaining({ dayLabel: 'Thứ 2 - Thứ 6', displayTime: '08:00 - 17:00' })]),
+        operatingHourGroups: expect.arrayContaining([expect.objectContaining({ displayTime: '07:00 - 17:00' })]),
         closureDays: [],
       }),
       expect.objectContaining({
         id: 'fac-2',
         operatingHours: expect.arrayContaining([expect.objectContaining({ dayOfWeek: 'MON', isClosed: false })]),
-        operatingHourGroups: expect.arrayContaining([expect.objectContaining({ dayLabel: 'Thứ 2 - Thứ 6', displayTime: '08:00 - 17:00' })]),
+        operatingHourGroups: expect.arrayContaining([expect.objectContaining({ displayTime: '07:00 - 17:00' })]),
         closureDays: [],
       }),
     ]);
@@ -238,7 +237,7 @@ describe('FacilitiesService', () => {
       items: [expect.objectContaining({
         id: 'fac-1',
         operatingHours: expect.arrayContaining([expect.objectContaining({ dayOfWeek: 'MON', isClosed: false })]),
-        operatingHourGroups: expect.arrayContaining([expect.objectContaining({ dayLabel: 'Thứ 2 - Thứ 6', displayTime: '08:00 - 17:00' })]),
+        operatingHourGroups: expect.arrayContaining([expect.objectContaining({ displayTime: '07:00 - 17:00' })]),
         closureDays: [],
       })],
     });
@@ -256,8 +255,8 @@ describe('FacilitiesService', () => {
       isOpenNow: true,
       todayOperatingHour: expect.objectContaining({
         dayOfWeek: 'WED',
-        openTime: '08:00',
-        closeTime: '17:00',
+        openTime: '07:00:00',
+        closeTime: '17:00:00',
         isClosed: false,
       }),
     });
@@ -348,6 +347,118 @@ describe('FacilitiesService', () => {
       expect.objectContaining({ dayOfWeek: 'SAT', openTime: '08:00:00', closeTime: '17:00:00', isClosed: false }),
       expect.objectContaining({ dayOfWeek: 'SUN', openTime: null, closeTime: null, isClosed: true }),
     ]);
+  });
+
+  // Vai tro: neu thu hep gio hoat dong lam shift sap toi bi nam ngoai khung gio moi thi phai chan cap nhat.
+  it('rejects operating hour updates that would make upcoming active shifts invalid', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-24T03:00:00.000Z'));
+    repository.findById.mockResolvedValue(createFacility());
+    repository.findOperatingHoursByFacilityId.mockResolvedValue([]);
+    repository.findActiveShiftsForOperatingHourValidation.mockResolvedValue([
+      {
+        id: 'shift-1',
+        shiftDate: '2026-07-27',
+        startTime: '07:00:00',
+        endTime: '12:00:00',
+        status: 'available',
+        doctorName: 'Bac si An',
+        roomName: 'Phong 101',
+        slotName: 'Ca sang',
+      },
+    ]);
+
+    let error: ConflictException | undefined;
+    try {
+      await service.updateOperatingHours('fac-1', {
+        schedules: [
+          { days: ['MON'] as any, openTime: '08:00:00', closeTime: '17:00:00', isClosed: false },
+        ],
+      });
+    } catch (caughtError) {
+      error = caughtError as ConflictException;
+    }
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect(error!.getResponse()).toMatchObject({
+      data: {
+        duplicatedField: 'operatingHours',
+        impactedShifts: [
+          expect.objectContaining({
+            id: 'shift-1',
+            shiftDate: '2026-07-27',
+            startTime: '07:00:00',
+            endTime: '12:00:00',
+            doctorName: 'Bac si An',
+          }),
+        ],
+      },
+    });
+    expect(repository.findActiveShiftsForOperatingHourValidation).toHaveBeenCalledWith('fac-1', '2026-07-24');
+    expect(repository.syncOperatingHours).not.toHaveBeenCalled();
+  });
+
+  // Vai tro: preview gio hoat dong chi tra danh sach shift bi anh huong, khong ghi DB.
+  it('previews operating hour impacts without saving changes', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-24T03:00:00.000Z'));
+    repository.findById.mockResolvedValue(createFacility());
+    repository.findOperatingHoursByFacilityId.mockResolvedValue([]);
+    repository.findActiveShiftsForOperatingHourValidation.mockResolvedValue([
+      {
+        id: 'shift-1',
+        shiftDate: '2026-07-27',
+        startTime: '07:00:00',
+        endTime: '12:00:00',
+        status: 'available',
+        doctorName: 'Bac si An',
+      },
+    ]);
+
+    await expect(service.previewOperatingHours('fac-1', {
+      schedules: [
+        { days: ['MON'] as any, openTime: '08:00:00', closeTime: '17:00:00', isClosed: false },
+      ],
+    })).resolves.toMatchObject({
+      canUpdate: false,
+      summary: { impactedShiftCount: 1 },
+      impactedShifts: [
+        expect.objectContaining({
+          id: 'shift-1',
+          reason: 'Ca bat dau truoc gio mo cua moi 08:00:00',
+        }),
+      ],
+    });
+    expect(repository.syncOperatingHours).not.toHaveBeenCalled();
+  });
+
+  // Vai tro: mo rong gio hoat dong khong lam shift cu bi sai nen van cho cap nhat.
+  it('allows operating hour updates when upcoming shifts still fit the new wider hours', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-24T03:00:00.000Z'));
+    repository.findById.mockResolvedValue(createFacility());
+    repository.findOperatingHoursByFacilityId
+      .mockResolvedValueOnce([
+        { dayOfWeek: 'MON', openTime: '08:00:00', closeTime: '17:00:00', isClosed: false },
+      ])
+      .mockResolvedValueOnce([
+        { dayOfWeek: 'MON', openTime: '07:00:00', closeTime: '17:00:00', isClosed: false },
+      ]);
+    repository.findActiveShiftsForOperatingHourValidation.mockResolvedValue([
+      {
+        id: 'shift-1',
+        shiftDate: '2026-07-27',
+        startTime: '08:00:00',
+        endTime: '12:00:00',
+        status: 'available',
+      },
+    ]);
+
+    await expect(service.updateOperatingHours('fac-1', {
+      schedules: [
+        { days: ['MON'] as any, openTime: '07:00:00', closeTime: '17:00:00', isClosed: false },
+      ],
+    })).resolves.toMatchObject({
+      operatingHours: expect.any(Array),
+    });
+    expect(repository.syncOperatingHours).toHaveBeenCalled();
   });
 
   // Vai tro: dam bao ket qua phan trang facility rong cung tra 404 ro rang.
@@ -674,6 +785,7 @@ describe('FacilitiesController', () => {
     findById: jest.fn(),
     findDetailsById: jest.fn(),
     getOperatingHours: jest.fn(),
+    previewOperatingHours: jest.fn(),
     updateOperatingHours: jest.fn(),
     getClosureDays: jest.fn(),
     createClosureDay: jest.fn(),
@@ -801,6 +913,29 @@ describe('FacilitiesController', () => {
       data: closureDays,
     });
     expect(mockService.getClosureDays).toHaveBeenCalledWith('fac-1', { status: ActiveStatus.ACTIVE });
+  });
+
+  // Vai tro: API preview operating-hours cho FE xem impacted shifts truoc khi bam luu that.
+  it('wraps operating hour preview response after facility access check', async () => {
+    const mockService = createService();
+    const preview = {
+      canUpdate: false,
+      summary: { impactedShiftCount: 1 },
+      impactedShifts: [{ id: 'shift-1', reason: 'Ca bat dau truoc gio mo cua moi 08:00:00' }],
+    };
+    mockService.previewOperatingHours.mockResolvedValue(preview);
+    const controller = new FacilitiesController(mockService as any);
+    const dto = {
+      schedules: [
+        { days: ['MON'] as any, openTime: '08:00:00', closeTime: '17:00:00', isClosed: false },
+      ],
+    };
+
+    await expect(controller.previewOperatingHours(facilityAdmin, 'fac-1', dto)).resolves.toEqual({
+      message: RESPONSE_MESSAGES.FACILITY_RETRIEVED,
+      data: preview,
+    });
+    expect(mockService.previewOperatingHours).toHaveBeenCalledWith('fac-1', dto);
   });
 
   // Vai tro: dam bao API tao closure-day khong cho admin co so nay tao ngay nghi cho co so khac.

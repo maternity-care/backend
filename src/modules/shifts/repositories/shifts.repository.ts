@@ -356,12 +356,14 @@ export class ShiftsRepository implements IShiftsRepository {
     // Vì vậy cần join doctors với facility_staff để kiểm tra bác sĩ có thuộc cơ sở này không.
     // this.repository.manager: là một đối tượng quản lý kết nối cơ sở dữ liệu trong TypeORM,
     // được sử dụng để thực hiện các thao tác cơ sở dữ liệu như truy vấn, lưu trữ, xóa, v.v.
+    // Schema hien tai dang gan co so truc tiep tren staffs.facility_id.
+    // Do do query di theo doctors.staff_id -> staffs.id, khong join bang facility_staff.
     const row = await this.repository.manager
       .createQueryBuilder()
       .select('COUNT(*)', 'count')
       .from('doctors', 'doctor')
       // staff.staff_id = doctor.staff_id nghĩa là lấy assignment cơ sở của staff đứng sau bác sĩ đó.
-      .innerJoin('facility_staff', 'staff', 'staff.staff_id = doctor.staff_id')
+      .innerJoin('staffs', 'staff', 'staff.id = doctor.staff_id')
       .where('doctor.id = :doctorId', { doctorId })
       .andWhere('doctor.status = :active', { active: 'active' })
       .andWhere('staff.facility_id = :facilityId', { facilityId })
@@ -378,13 +380,13 @@ export class ShiftsRepository implements IShiftsRepository {
       .createQueryBuilder()
       .select('doctor.staff_id', 'staffId')
       .from('doctors', 'doctor')
-      .innerJoin('facility_staff', 'facilityStaff', 'facilityStaff.staff_id = doctor.staff_id')
+      .innerJoin('staffs', 'staff', 'staff.id = doctor.staff_id')
       .where('doctor.id = :doctorId', { doctorId })
       .andWhere('doctor.status = :active', { active: 'active' })
-      .andWhere('facilityStaff.status = :active', { active: 'active' });
+      .andWhere('staff.status = :active', { active: 'active' });
 
     if (facilityId) {
-      query.andWhere('facilityStaff.facility_id = :facilityId', { facilityId });
+      query.andWhere('staff.facility_id = :facilityId', { facilityId });
     }
 
     const row = await query.getRawOne<{ staffId: string }>();
@@ -396,13 +398,13 @@ export class ShiftsRepository implements IShiftsRepository {
       .createQueryBuilder()
       .select('doctor.id', 'doctorId')
       .from('doctors', 'doctor')
-      .innerJoin('facility_staff', 'facilityStaff', 'facilityStaff.staff_id = doctor.staff_id')
+      .innerJoin('staffs', 'staff', 'staff.id = doctor.staff_id')
       .where('doctor.staff_id = :staffId', { staffId })
       .andWhere('doctor.status = :active', { active: 'active' })
-      .andWhere('facilityStaff.status = :active', { active: 'active' });
+      .andWhere('staff.status = :active', { active: 'active' });
 
     if (facilityId) {
-      query.andWhere('facilityStaff.facility_id = :facilityId', { facilityId });
+      query.andWhere('staff.facility_id = :facilityId', { facilityId });
     }
 
     const row = await query.getRawOne<{ doctorId: string }>();

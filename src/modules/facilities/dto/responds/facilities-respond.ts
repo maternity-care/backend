@@ -80,15 +80,6 @@ export class FacilityResponseDto {
   @ApiProperty()
   email: string;
 
-  @ApiPropertyOptional({ nullable: true })
-  openTime: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  closeTime: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  workingDays: string | null;
-
   @ApiProperty()
   address: string;
 

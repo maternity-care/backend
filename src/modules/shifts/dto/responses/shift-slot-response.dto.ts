@@ -5,8 +5,14 @@ export class ShiftSlotResponseDto {
   @ApiProperty()
   id: string;
 
-  @ApiPropertyOptional({ nullable: true })
-  facilityId: string | null;
+  @ApiProperty()
+  facilityId: string;
+
+  @ApiPropertyOptional()
+  facilityName?: string;
+
+  @ApiPropertyOptional()
+  facilityCode?: string;
 
   @ApiProperty()
   code: string;
@@ -32,19 +38,14 @@ export class ShiftSlotResponseDto {
   @ApiProperty()
   updatedAt: Date;
 
-  @ApiPropertyOptional({ nullable: true })
-  facilityCode?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  facilityName?: string | null;
 }
 
 export class ShiftSlotLookupResponseDto {
   @ApiProperty()
   id: string;
 
-  @ApiPropertyOptional({ nullable: true })
-  facilityId: string | null;
+  @ApiProperty()
+  facilityId: string;
 
   @ApiProperty()
   code: string;
@@ -61,6 +62,4 @@ export class ShiftSlotLookupResponseDto {
   @ApiProperty({ enum: ActiveStatus })
   status: ActiveStatus;
 
-  @ApiPropertyOptional({ nullable: true })
-  facilityName?: string | null;
 }

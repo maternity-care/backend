@@ -1,9 +1,15 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { DoctorShiftStatus } from '../../../common/constants/status.enum';
 import { DOCTOR_SHIFT_CONSTANT } from '../../../common/constants/doctor-shift.constant';
-import { Facility } from '../../facilities/entities/facility.entity';
 import { ShiftConflicts } from '../interfaces/shift-conflicts.interface';
 import { ShiftWorkingDay } from '../dto/requests/bulk-create-doctor-shift.dto';
+
+export interface FacilityOperatingHourLike {
+  dayOfWeek?: string;
+  openTime: string | null;
+  closeTime: string | null;
+  isClosed: boolean;
+}
 
 /** Kiểm tra id nhận từ path trước khi truy vấn database. */
 export function validateShiftId(id: string): void {
@@ -47,20 +53,26 @@ export function validateStatusDetails(
 
 /** Đảm bảo ca làm việc nằm trong giờ mở cửa của facility. */
 export function validateFacilityHours(
-  facility: Facility,
+  operatingHour: FacilityOperatingHourLike | null | undefined,
   startTime: string,
   endTime: string,
   status: DoctorShiftStatus,
 ): void {
   if (status === DoctorShiftStatus.OFF || status === DoctorShiftStatus.CANCELLED) return;
-  const facilityTime = facility as Facility & { open_time?: string; close_time?: string };
-  const rawOpenTime = facilityTime.openTime ?? facilityTime.open_time;
-  const rawCloseTime = facilityTime.closeTime ?? facilityTime.close_time;
-  const openTime = rawOpenTime ? normalizeTime(String(rawOpenTime)) : null;
-  const closeTime = rawCloseTime ? normalizeTime(String(rawCloseTime)) : null;
+
+  if (!operatingHour || operatingHour.isClosed) {
+    throw new BadRequestException('Cơ sở đóng cửa trong ngày được chọn');
+  }
+
+  const openTime = operatingHour.openTime ? normalizeTime(String(operatingHour.openTime)) : null;
+  const closeTime = operatingHour.closeTime ? normalizeTime(String(operatingHour.closeTime)) : null;
+  if (!openTime || !closeTime) {
+    throw new BadRequestException('Cơ sở chưa cấu hình đầy đủ giờ hoạt động cho ngày được chọn');
+  }
+
   const normalizedStart = normalizeTime(startTime);
   const normalizedEnd = normalizeTime(endTime);
-  if (openTime && closeTime && (normalizedStart < openTime || normalizedEnd > closeTime)) {
+  if (normalizedStart < openTime || normalizedEnd > closeTime) {
     throw new BadRequestException(
       `Ca trực phải nằm trong giờ hoạt động của cơ sở (${openTime} - ${closeTime})`,
     );

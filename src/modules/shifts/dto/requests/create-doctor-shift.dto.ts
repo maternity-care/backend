@@ -30,7 +30,7 @@ export class CreateDoctorShiftDto {
   @IsOptional()
   @IsString()
   @Matches(POSITIVE_ID_PATTERN)
-  slotId?: string | null;
+  slotId?: string;
 
   @ApiProperty({ example: '2026-07-07' })
   @IsDateString({ strict: true })

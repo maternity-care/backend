@@ -15,6 +15,7 @@ import {
   validateFacilityHours,
   validateSchedule,
   validateStatusDetails,
+  workingDayOf,
 } from '../helpers/shifts.helper';
 import {
   SHIFTS_REPOSITORY,
@@ -40,20 +41,27 @@ export class ShiftsValidator {
 
   /** Validate dữ liệu tạo ca và chuẩn hóa doctorId profile thành staffId thật để lưu vào bảng shifts. */
   async validateForCreate(dto: CreateDoctorShiftDto): Promise<PreparedDoctorShiftInput> {
+    const prepared = await this.prepareForCreate(dto);
+
+    throwIfConflicted(await this.repository.findConflicts({
+      ...dto,
+      staffId: prepared.staffId,
+      slotId: prepared.slotId,
+      startTime: prepared.startTime,
+      endTime: prepared.endTime,
+    }));
+
+    return prepared;
+  }
+
+  /** Validate candidate tao ca nhung chua check conflict, dung cho preview auto-generate de tra conflict details. */
+  async prepareForCreate(dto: CreateDoctorShiftDto): Promise<PreparedDoctorShiftInput> {
     const { facility, staffId } = await this.validateReferences(dto.doctorId, dto.facilityId, dto.roomId);
     const timing = await this.resolveShiftTiming(dto);
 
     validateSchedule(dto.shiftDate, timing.startTime, timing.endTime, true);
     validateStatusDetails(dto.status, dto.roomId);
-    validateFacilityHours(facility, timing.startTime, timing.endTime, dto.status);
-
-    throwIfConflicted(await this.repository.findConflicts({
-      ...dto,
-      staffId,
-      slotId: timing.slotId,
-      startTime: timing.startTime,
-      endTime: timing.endTime,
-    }));
+    await this.validateFacilityOperatingHours(facility.id, dto.shiftDate, timing.startTime, timing.endTime, dto.status);
 
     return { staffId, ...timing };
   }
@@ -69,7 +77,7 @@ export class ShiftsValidator {
 
     validateSchedule(shift.shiftDate, timing.startTime, timing.endTime, false);
     validateStatusDetails(shift.status, shift.roomId);
-    validateFacilityHours(facility, timing.startTime, timing.endTime, shift.status);
+    await this.validateFacilityOperatingHours(facility.id, shift.shiftDate, timing.startTime, timing.endTime, shift.status);
 
     if (shift.status !== DoctorShiftStatus.CANCELLED) {
       throwIfConflicted(await this.repository.findConflicts({
@@ -92,7 +100,7 @@ export class ShiftsValidator {
     const timing = await this.resolveShiftTiming(dto);
 
     validateSchedule(dto.shiftDate, timing.startTime, timing.endTime, true);
-    validateFacilityHours(facility, timing.startTime, timing.endTime, DoctorShiftStatus.AVAILABLE);
+    await this.validateFacilityOperatingHours(facility.id, dto.shiftDate, timing.startTime, timing.endTime, DoctorShiftStatus.AVAILABLE);
 
     return { staffId, ...timing };
   }
@@ -120,6 +128,16 @@ export class ShiftsValidator {
     }
     const start = weekStart ?? currentWeekStart();
     return { start, end: addDays(start, 6) };
+  }
+
+  /** Lay danh sach ngay dong cua active cua facility trong khoang ngay, dung de auto-generate bo qua ngay nghi. */
+  async getActiveClosureDates(facilityId: string, fromDate: string, toDate: string): Promise<Set<string>> {
+    const closureDays = await this.facilitiesService.getClosureDays(facilityId, {
+      fromDate,
+      toDate,
+      status: ActiveStatus.ACTIVE,
+    });
+    return new Set(closureDays.map(item => this.toDateOnly(item.closureDate)));
   }
 
   /** Kiểm tra facility, doctor assignment, room; đồng thời trả staffId để lưu vào shifts.staff_id. */
@@ -173,10 +191,9 @@ export class ShiftsValidator {
       if (!slot || slot.status !== ActiveStatus.ACTIVE) {
         throw new BadRequestException('Khung ca không tồn tại hoặc đã ngừng hoạt động');
       }
-      if (slot.facilityId && slot.facilityId !== input.facilityId) {
-        throw new BadRequestException('Khung ca không thuộc cơ sở này');
+      if (slot.facilityId !== input.facilityId) {
+        throw new BadRequestException('Khung ca khong thuoc co so dang tao lich truc');
       }
-
       return {
         slotId: input.slotId,
         startTime: slot.startTime,
@@ -195,6 +212,22 @@ export class ShiftsValidator {
     };
   }
 
+  /** Validate ca trực theo facility_operating_hours của đúng ngày trong tuần. */
+  private async validateFacilityOperatingHours(
+    facilityId: string,
+    shiftDate: string,
+    startTime: string,
+    endTime: string,
+    status: DoctorShiftStatus,
+  ): Promise<void> {
+    if (status === DoctorShiftStatus.OFF || status === DoctorShiftStatus.CANCELLED) return;
+
+    const schedule = await this.facilitiesService.getOperatingHours(facilityId);
+    const dayOfWeek = workingDayOf(shiftDate);
+    const operatingHour = schedule.operatingHours.find(item => item.dayOfWeek === dayOfWeek);
+    validateFacilityHours(operatingHour, startTime, endTime, status);
+  }
+
   /** Chỉ cho xếp lịch ở facility đang hoạt động. */
   private async ensureActiveFacility(facilityId: string): Promise<Facility> {
     const facility = await this.facilitiesService.findById(facilityId);
@@ -202,5 +235,10 @@ export class ShiftsValidator {
       throw new ConflictException(DOCTOR_SHIFT_CONSTANT.FACILITY_INACTIVE);
     }
     return facility;
+  }
+
+  private toDateOnly(value: string | Date): string {
+    if (value instanceof Date) return value.toISOString().slice(0, 10);
+    return String(value).slice(0, 10);
   }
 }

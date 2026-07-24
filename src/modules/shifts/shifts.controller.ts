@@ -14,6 +14,7 @@ import { DOCTOR_SHIFT_CONSTANT } from '../../common/constants/doctor-shift.const
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { assertFacilityAccess, getActiveFacilityId } from '../../common/helpers/facility-scope.helper';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import { AutoGenerateShiftsDto } from './dto/requests/auto-generate-shifts.dto';
 import { CheckShiftConflictDto } from './dto/requests/check-shift-conflict.dto';
 import { BulkCreateDoctorShiftDto } from './dto/requests/bulk-create-doctor-shift.dto';
 import { CopyWeekDoctorShiftDto } from './dto/requests/copy-week-doctor-shift.dto';
@@ -68,6 +69,42 @@ export class ShiftsController {
     return {
       message: 'Tạo ca trực hàng loạt thành công',
       data: await this.service.bulkCreate(dto),
+    };
+  }
+
+  @Post('auto-generate/preview')
+  @ApiOperation({ summary: 'Preview auto-generated shifts before saving' })
+  async previewAutoGenerate(@Body() dto: AutoGenerateShiftsDto) {
+    return {
+      message: 'Preview tao lich truc tu dong thanh cong',
+      data: await this.service.previewAutoGenerate(dto),
+    };
+  }
+
+  @Post('auto-generate/confirm')
+  @ApiOperation({ summary: 'Confirm and save valid auto-generated shifts' })
+  async confirmAutoGenerate(@Body() dto: AutoGenerateShiftsDto) {
+    return {
+      message: 'Tao lich truc tu dong thanh cong',
+      data: await this.service.confirmAutoGenerate(dto),
+    };
+  }
+
+  @Post('bulk-generate/preview')
+  @ApiOperation({ summary: 'Preview bulk generated shifts before saving' })
+  async previewBulkGenerate(@Body() dto: AutoGenerateShiftsDto) {
+    return {
+      message: 'Preview tao lich truc hang loat thanh cong',
+      data: await this.service.previewAutoGenerate(dto),
+    };
+  }
+
+  @Post('bulk-generate/confirm')
+  @ApiOperation({ summary: 'Confirm and save valid bulk generated shifts' })
+  async confirmBulkGenerate(@Body() dto: AutoGenerateShiftsDto) {
+    return {
+      message: 'Tao lich truc hang loat thanh cong',
+      data: await this.service.confirmAutoGenerate(dto),
     };
   }
 

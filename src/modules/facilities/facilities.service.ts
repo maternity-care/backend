@@ -14,6 +14,7 @@ import { FacilityClosureDay } from './entities/facility-closure-day.entity';
 import { FacilityDayOfWeek } from './entities/facility-operating-hour.entity';
 import {
   FACILITIES_REPOSITORY,
+  FacilityShiftScheduleViolation,
   FacilityLookup,
   FacilityWithDetails,
   IFacilitiesRepository,
@@ -99,9 +100,6 @@ export class FacilitiesService {
 
     Object.assign(facility, updatableDto);
     const saved = await this.facilitiesRepository.save(facility);
-    if (this.shouldSyncOperatingHours(updatableDto)) {
-      await this.facilitiesRepository.syncOperatingHours(saved.id, this.buildOperatingHoursFromFacilitySchedule(saved));
-    }
     return this.findDetailsById(saved.id);
   }
 
@@ -136,10 +134,33 @@ export class FacilitiesService {
     };
   }
 
+  /**
+   * Preview thay doi gio hoat dong truoc khi luu:
+   * - Build lich gio moi tu payload.
+   * - Kiem tra cac shift sap toi con active/full co bi nam ngoai khung gio moi khong.
+   * - Khong sync DB, chi tra canUpdate + impactedShifts de FE hien thi confirm/canh bao.
+   */
+  async previewOperatingHours(id: string, dto: UpdateFacilityOperatingHoursDto) {
+    const facility = await this.findById(id);
+    const operatingHours = await this.buildOperatingHoursFromGroupedInput(facility, dto);
+    const impactedShifts = await this.findOperatingHourImpactedShifts(facility.id, operatingHours);
+
+    return {
+      canUpdate: impactedShifts.length === 0,
+      summary: {
+        impactedShiftCount: impactedShifts.length,
+      },
+      operatingHours,
+      operatingHourGroups: this.groupOperatingHoursForDisplay(operatingHours),
+      impactedShifts,
+    };
+  }
+
   async updateOperatingHours(id: string, dto: UpdateFacilityOperatingHoursDto) {
     const facility = await this.findById(id);
     const operatingHours = await this.buildOperatingHoursFromGroupedInput(facility, dto);
 
+    await this.ensureOperatingHoursCompatibleWithUpcomingShifts(facility.id, operatingHours);
     await this.facilitiesRepository.syncOperatingHours(facility.id, operatingHours);
     return this.getOperatingHours(facility.id);
   }
@@ -352,44 +373,8 @@ export class FacilitiesService {
     };
   }
 
-  private buildOperatingHoursFromFacilitySchedule(
-    schedule: {
-      workingDays?: string | null;
-      openTime?: string | null;
-      closeTime?: string | null;
-    },
-  ) {
-    const openTime = schedule.openTime ?? '07:00:00';
-    const closeTime = schedule.closeTime ?? '17:00:00';
-    const workingDaysText = schedule.workingDays ?? 'MON,TUE,WED,THU,FRI,SAT';
-    const workingDays = new Set(String(workingDaysText).split(',').map(day => day.trim().toUpperCase()).filter(Boolean));
-    const days = [
-      FacilityDayOfWeek.MON,
-      FacilityDayOfWeek.TUE,
-      FacilityDayOfWeek.WED,
-      FacilityDayOfWeek.THU,
-      FacilityDayOfWeek.FRI,
-      FacilityDayOfWeek.SAT,
-      FacilityDayOfWeek.SUN,
-    ];
-
-    return days.map(dayOfWeek => {
-      const isClosed = !workingDays.has(dayOfWeek);
-      return {
-        dayOfWeek,
-        openTime: isClosed ? null : openTime,
-        closeTime: isClosed ? null : closeTime,
-        isClosed,
-      };
-    });
-  }
-
-  private shouldSyncOperatingHours(dto: UpdateFacilityDto): boolean {
-    return dto.openTime !== undefined || dto.closeTime !== undefined || dto.workingDays !== undefined;
-  }
-
   private async getOperatingHoursOrDefault(
-    facility: Pick<Facility, 'id' | 'workingDays' | 'openTime' | 'closeTime'>,
+    facility: Pick<Facility, 'id'>,
   ) {
     const operatingHours = await this.facilitiesRepository.findOperatingHoursByFacilityId(facility.id);
     if (operatingHours.length > 0) {
@@ -399,7 +384,7 @@ export class FacilitiesService {
       }));
     }
 
-    return this.buildOperatingHoursFromFacilitySchedule(facility);
+    return this.buildDefaultOperatingHours();
   }
 
   private buildOperatingHoursForCreate(dto: CreateFacilityDto) {
@@ -407,15 +392,27 @@ export class FacilitiesService {
       return this.buildOperatingHoursFromGroupedSchedules(dto.schedules);
     }
 
-    return this.buildOperatingHoursFromFacilitySchedule(dto);
+    return this.buildDefaultOperatingHours();
   }
 
   private async buildOperatingHoursFromGroupedInput(
-    facility: Pick<Facility, 'id' | 'workingDays' | 'openTime' | 'closeTime'>,
+    facility: Pick<Facility, 'id'>,
     dto: UpdateFacilityOperatingHoursDto,
   ) {
     const currentHours = await this.getOperatingHoursOrDefault(facility);
     return this.buildOperatingHoursFromGroupedSchedules(dto.schedules, currentHours);
+  }
+
+  private buildDefaultOperatingHours() {
+    return this.getOrderedDays().map(dayOfWeek => {
+      const isSunday = dayOfWeek === FacilityDayOfWeek.SUN;
+      return {
+        dayOfWeek,
+        openTime: isSunday ? null : '07:00:00',
+        closeTime: isSunday ? null : '17:00:00',
+        isClosed: isSunday,
+      };
+    });
   }
 
   private buildOperatingHoursFromGroupedSchedules(
@@ -463,6 +460,83 @@ export class FacilitiesService {
         isClosed: current?.isClosed ?? true,
       };
     });
+  }
+
+  private async ensureOperatingHoursCompatibleWithUpcomingShifts(
+    facilityId: string,
+    operatingHours: Array<{ dayOfWeek: string; openTime: string | null; closeTime: string | null; isClosed: boolean }>,
+  ): Promise<void> {
+    const impactedShifts = await this.findOperatingHourImpactedShifts(facilityId, operatingHours);
+    if (impactedShifts.length === 0) return;
+
+    throw new ConflictException({
+      message: 'Khong the cap nhat gio hoat dong vi con ca truc sap toi nam ngoai khung gio moi',
+      data: {
+        duplicatedField: 'operatingHours',
+        impactedShifts,
+      },
+    });
+  }
+
+  private async findOperatingHourImpactedShifts(
+    facilityId: string,
+    operatingHours: Array<{ dayOfWeek: string; openTime: string | null; closeTime: string | null; isClosed: boolean }>,
+  ) {
+    const shifts = await this.facilitiesRepository.findActiveShiftsForOperatingHourValidation(
+      facilityId,
+      this.todayInVietnam(),
+    );
+    if (shifts.length === 0) return [];
+
+    const operatingHoursByDay = new Map(operatingHours.map(item => [item.dayOfWeek, item]));
+    const impactedShifts = [];
+    for (const shift of shifts) {
+      const dayOfWeek = this.getDayOfWeekFromDate(shift.shiftDate);
+      const operatingHour = operatingHoursByDay.get(dayOfWeek);
+      if (!operatingHour || operatingHour.isClosed || !operatingHour.openTime || !operatingHour.closeTime) {
+        impactedShifts.push(this.toImpactedShiftData(
+          shift,
+          'Ngay nay dang bi cau hinh dong cua trong gio hoat dong moi',
+        ));
+        continue;
+      }
+
+      const normalizedStart = this.normalizeTime(shift.startTime);
+      const normalizedEnd = this.normalizeTime(shift.endTime);
+      const normalizedOpen = this.normalizeTime(String(operatingHour.openTime));
+      const normalizedClose = this.normalizeTime(String(operatingHour.closeTime));
+
+      if (normalizedStart < normalizedOpen) {
+        impactedShifts.push(this.toImpactedShiftData(
+          shift,
+          `Ca bat dau truoc gio mo cua moi ${normalizedOpen}`,
+        ));
+        continue;
+      }
+
+      if (normalizedEnd > normalizedClose) {
+        impactedShifts.push(this.toImpactedShiftData(
+          shift,
+          `Ca ket thuc sau gio dong cua moi ${normalizedClose}`,
+        ));
+      }
+    }
+
+    return impactedShifts;
+  }
+
+  private toImpactedShiftData(shift: FacilityShiftScheduleViolation, reason?: string) {
+    return {
+      id: shift.id,
+      shiftDate: this.formatDateOnly(shift.shiftDate),
+      startTime: this.normalizeTime(shift.startTime),
+      endTime: this.normalizeTime(shift.endTime),
+      status: shift.status,
+      doctorName: shift.doctorName ?? null,
+      roomName: shift.roomName ?? null,
+      slotName: shift.slotName ?? null,
+      reason,
+    };
   }
 
   private groupOperatingHoursForDisplay(
@@ -636,6 +710,20 @@ export class FacilitiesService {
       return value.toISOString().slice(0, 10);
     }
     return String(value).slice(0, 10);
+  }
+
+  private todayInVietnam(): string {
+    return this.getVietnamNowParts().date;
+  }
+
+  private normalizeTime(value: string): string {
+    return value.length === 5 ? `${value}:00` : value;
+  }
+
+  private getDayOfWeekFromDate(value: string | Date): FacilityDayOfWeek {
+    const dateOnly = this.formatDateOnly(value);
+    const day = new Date(`${dateOnly}T00:00:00Z`).getUTCDay();
+    return this.getDayOfWeekFromUtcDay(day);
   }
 
   private getOrderedDays(): FacilityDayOfWeek[] {

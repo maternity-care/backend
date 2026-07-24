@@ -203,6 +203,15 @@ describe('ShiftsService business validation', () => {
     shiftDate: '2099-07-07', startTime: '08:00', endTime: '12:00',
     maxAppointments: 10, status: DoctorShiftStatus.AVAILABLE,
   };
+  const operatingHours = [
+    { dayOfWeek: 'MON', openTime: '07:00:00', closeTime: '17:00:00', isClosed: false },
+    { dayOfWeek: 'TUE', openTime: '07:00:00', closeTime: '17:00:00', isClosed: false },
+    { dayOfWeek: 'WED', openTime: '07:00:00', closeTime: '17:00:00', isClosed: false },
+    { dayOfWeek: 'THU', openTime: '07:00:00', closeTime: '17:00:00', isClosed: false },
+    { dayOfWeek: 'FRI', openTime: '07:00:00', closeTime: '17:00:00', isClosed: false },
+    { dayOfWeek: 'SAT', openTime: '07:00:00', closeTime: '17:00:00', isClosed: false },
+    { dayOfWeek: 'SUN', openTime: null, closeTime: null, isClosed: true },
+  ];
   const createRepo = () => ({
     create: jest.fn(data => ({ ...data })),
     save: jest.fn(async data => ({ ...data, id: data.id ?? '10' })),
@@ -225,7 +234,11 @@ describe('ShiftsService business validation', () => {
       id: String(index + 1),
     }))),
   });
-  const facilitiesService = { findById: jest.fn().mockResolvedValue(facility) };
+  const facilitiesService = {
+    findById: jest.fn().mockResolvedValue(facility),
+    getOperatingHours: jest.fn().mockResolvedValue({ facilityId: '1', operatingHours }),
+    getClosureDays: jest.fn().mockResolvedValue([]),
+  };
   const roomsService = { findById: jest.fn().mockResolvedValue(room) };
   const createService = (repo = createRepo()) => ({
     repo,
@@ -247,10 +260,9 @@ describe('ShiftsService business validation', () => {
 
   // Vai tro: dam bao so sanh gio lam viec chuan hoa HH:mm va HH:mm:ss nhu nhau.
   it('treats HH:mm shift time as equal to HH:mm:ss facility opening time', async () => {
-    facilitiesService.findById.mockResolvedValueOnce({
-      ...facility,
-      open_time: '07:00:00',
-      close_time: '17:00:00',
+    facilitiesService.getOperatingHours.mockResolvedValueOnce({
+      facilityId: '1',
+      operatingHours,
     });
     const { service } = createService();
     await expect(service.create({
@@ -337,6 +349,63 @@ describe('ShiftsService business validation', () => {
     ]));
   });
 
+  // Vai tro: preview auto-generate phai phan tach ca hop le, ngay dong cua va ca bi conflict thay vi dung o loi dau tien.
+  it('previews auto-generated shifts with valid, skipped, and conflicted candidates', async () => {
+    const { repo, service } = createService();
+    facilitiesService.getClosureDays.mockResolvedValueOnce([
+      { closureDate: '2099-07-08', status: ActiveStatus.ACTIVE },
+    ]);
+    repo.findConflicts
+      .mockResolvedValueOnce({ doctorConflicts: [], roomConflicts: [] })
+      .mockResolvedValueOnce({ doctorConflicts: [shift], roomConflicts: [] });
+
+    const result = await service.previewAutoGenerate({
+      doctorId: '1',
+      facilityId: '1',
+      roomId: '2',
+      fromDate: '2099-07-06',
+      toDate: '2099-07-10',
+      workingDays: [ShiftWorkingDay.MON, ShiftWorkingDay.WED, ShiftWorkingDay.FRI],
+      startTime: '08:00',
+      endTime: '12:00',
+      maxAppointments: 8,
+      status: DoctorShiftStatus.AVAILABLE,
+    });
+
+    expect(result.summary).toEqual({ totalCandidates: 3, valid: 1, skipped: 1, conflicted: 1 });
+    expect(result.validShifts).toEqual([expect.objectContaining({ shiftDate: '2099-07-06' })]);
+    expect(result.skippedItems).toEqual([expect.objectContaining({ shiftDate: '2099-07-08' })]);
+    expect(result.conflictItems).toEqual([expect.objectContaining({ shiftDate: '2099-07-10' })]);
+    expect(repo.saveMany).not.toHaveBeenCalled();
+  });
+
+  // Vai tro: confirm auto-generate chi luu candidate hop le va van tra summary cac ngay bi bo qua.
+  it('confirms auto-generated shifts by saving only valid candidates', async () => {
+    const { repo, service } = createService();
+    facilitiesService.getClosureDays.mockResolvedValueOnce([
+      { closureDate: '2099-07-08', status: ActiveStatus.ACTIVE },
+    ]);
+
+    const result = await service.confirmAutoGenerate({
+      doctorId: '1',
+      facilityId: '1',
+      roomId: '2',
+      fromDate: '2099-07-06',
+      toDate: '2099-07-08',
+      workingDays: [ShiftWorkingDay.MON, ShiftWorkingDay.WED],
+      startTime: '08:00',
+      endTime: '12:00',
+      maxAppointments: 8,
+      status: DoctorShiftStatus.AVAILABLE,
+    });
+
+    expect(result.summary).toEqual({ totalCandidates: 2, valid: 1, skipped: 1, conflicted: 0 });
+    expect(repo.saveMany).toHaveBeenCalledWith([
+      expect.objectContaining({ shiftDate: '2099-07-06' }),
+    ]);
+    expect(result.createdShifts).toHaveLength(1);
+  });
+
   // Vai tro: dam bao copy-week bo qua ca cancelled va reset ca full ve available o tuan moi.
   it('copies a week, skips cancelled shifts, and resets full shifts to available', async () => {
     const { repo, service } = createService();
@@ -402,10 +471,11 @@ describe('ShiftsService business validation', () => {
 
   // Vai tro: dam bao ca truc phai nam trong gio hoat dong cua facility.
   it('TC-UNIT-DSHIFT-009 rejects shifts outside facility opening hours', async () => {
-    facilitiesService.findById.mockResolvedValueOnce({
-      ...facility,
-      open_time: '08:00:00',
-      close_time: '17:00:00',
+    facilitiesService.getOperatingHours.mockResolvedValueOnce({
+      facilityId: '1',
+      operatingHours: operatingHours.map(item => item.dayOfWeek === 'TUE'
+        ? { ...item, openTime: '08:00:00', closeTime: '17:00:00' }
+        : item),
     });
 
     await expect(createService().service.create({
@@ -950,6 +1020,8 @@ describe('ShiftsController unit routing and scope', () => {
       findAllPaginated: jest.fn().mockResolvedValue({ items: [shift], total: 1, page: 1, limit: 20 }),
       checkConflicts: jest.fn().mockResolvedValue({ hasConflict: false, doctorConflicts: [], roomConflicts: [] }),
       bulkCreate: jest.fn().mockResolvedValue([shift]),
+      previewAutoGenerate: jest.fn().mockResolvedValue({ summary: { validCount: 1 } }),
+      confirmAutoGenerate: jest.fn().mockResolvedValue({ createdShifts: [shift] }),
       copyWeek: jest.fn().mockResolvedValue([shift]),
       getDoctorAvailability: jest.fn().mockResolvedValue({ shifts: [] }),
       getWeeklySchedule: jest.fn().mockResolvedValue({ days: [] }),
@@ -1052,6 +1124,30 @@ describe('ShiftsController unit routing and scope', () => {
     await expect(controller.copyWeek(copyDto)).resolves.toMatchObject({ data: [shift] });
     expect(service.bulkCreate).toHaveBeenCalledWith(bulkDto);
     expect(service.copyWeek).toHaveBeenCalledWith(copyDto);
+  });
+
+  // Vai tro: bulk-generate la ten API moi ro nghia hon auto-generate, nhung van dung chung service preview/confirm.
+  it('routes bulk-generate preview and confirm commands to the service', async () => {
+    const { service, controller } = createController();
+    const dto = {
+      doctorId: '1',
+      facilityId: '1',
+      fromDate: '2099-07-06',
+      toDate: '2099-07-13',
+      workingDays: [ShiftWorkingDay.MON],
+      startTime: '08:00',
+      endTime: '12:00',
+      status: DoctorShiftStatus.AVAILABLE,
+    };
+
+    await expect(controller.previewBulkGenerate(dto as never)).resolves.toMatchObject({
+      data: { summary: { validCount: 1 } },
+    });
+    await expect(controller.confirmBulkGenerate(dto as never)).resolves.toMatchObject({
+      data: { createdShifts: [shift] },
+    });
+    expect(service.previewAutoGenerate).toHaveBeenCalledWith(dto);
+    expect(service.confirmAutoGenerate).toHaveBeenCalledWith(dto);
   });
 
   // Vai tro: dam bao controller route availability va weekly schedule hop le xuong dung service method.
@@ -1312,6 +1408,15 @@ describe('ShiftsRepository unit query behavior', () => {
 
 describe('ShiftSlotsService business validation', () => {
   const activeFacility = { id: '1', status: FacilityStatus.ACTIVE };
+  const operatingHours = [
+    { dayOfWeek: 'MON', openTime: '07:00:00', closeTime: '17:00:00', isClosed: false },
+    { dayOfWeek: 'TUE', openTime: '07:00:00', closeTime: '17:00:00', isClosed: false },
+    { dayOfWeek: 'WED', openTime: '07:00:00', closeTime: '17:00:00', isClosed: false },
+    { dayOfWeek: 'THU', openTime: '07:00:00', closeTime: '17:00:00', isClosed: false },
+    { dayOfWeek: 'FRI', openTime: '07:00:00', closeTime: '17:00:00', isClosed: false },
+    { dayOfWeek: 'SAT', openTime: '08:00:00', closeTime: '17:00:00', isClosed: false },
+    { dayOfWeek: 'SUN', openTime: null, closeTime: null, isClosed: true },
+  ];
 
   const createQueryBuilder = (options?: {
     rawMany?: unknown[];
@@ -1353,6 +1458,7 @@ describe('ShiftSlotsService business validation', () => {
     };
     const facilitiesService = {
       findById: jest.fn().mockResolvedValue(activeFacility),
+      getOperatingHours: jest.fn().mockResolvedValue({ facilityId: '1', operatingHours }),
     };
 
     return {
@@ -1362,7 +1468,7 @@ describe('ShiftSlotsService business validation', () => {
     };
   };
 
-  // Vai tro: dam bao tao khung ca se tu sinh code, validate facility va luu status active mac dinh.
+  // Vai tro: dam bao tao khung ca theo facility se tu sinh code va luu status active mac dinh.
   it('creates a shift slot with generated code and default active status', async () => {
     const { repository, facilitiesService, service } = createService();
 
@@ -1373,18 +1479,17 @@ describe('ShiftSlotsService business validation', () => {
       endTime: '12:00',
     })).resolves.toMatchObject({
       id: '1',
-      facilityId: '1',
       code: 'CA_SANG',
       status: ActiveStatus.ACTIVE,
     });
 
     expect(facilitiesService.findById).toHaveBeenCalledWith('1');
-    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ code: 'CA_SANG' }));
+    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ facilityId: '1', code: 'CA_SANG' }));
   });
 
-  // Vai tro: dam bao khong tao 2 khung ca trung ten trong cung scope facility/global.
-  it('rejects duplicated shift slot names in the same scope', async () => {
-    const duplicateSlot = { id: '5', name: 'Ca sang', facilityId: '1' };
+  // Vai tro: dam bao khong tao 2 khung ca trung ten trong cung mot facility.
+  it('rejects duplicated facility shift slot names', async () => {
+    const duplicateSlot = { id: '5', facilityId: '1', name: 'Ca sang' };
     const { service } = createService({
       createQueryBuilder: jest.fn()
         .mockReturnValueOnce(createQueryBuilder({ rawMany: [] }))
@@ -1399,11 +1504,30 @@ describe('ShiftSlotsService business validation', () => {
     })).rejects.toBeInstanceOf(ConflictException);
   });
 
-  // Vai tro: dam bao lookup theo facility tra ca slot global va slot rieng cua facility cho FE chon.
-  it('looks up active global and facility-specific shift slots', async () => {
+  // Vai tro: chan tao slot active neu khung gio khong nam trong bat ky ngay mo cua nao cua facility.
+  it('rejects active shift slots outside all facility operating hours', async () => {
+    const { service, repository, facilitiesService } = createService();
+    facilitiesService.getOperatingHours.mockResolvedValueOnce({
+      facilityId: '1',
+      operatingHours: operatingHours.map(item => item.isClosed
+        ? item
+        : { ...item, openTime: '08:00:00', closeTime: '17:00:00' }),
+    });
+
+    await expect(service.create({
+      facilityId: '1',
+      name: 'Ca qua som',
+      startTime: '07:00',
+      endTime: '12:00',
+    })).rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  // Vai tro: dam bao lookup tra cac khung ca active cua facility cho FE chon.
+  it('looks up active facility shift slots', async () => {
     const slots = [
-      { id: '1', facilityId: null, name: 'Ca sang' },
-      { id: '2', facilityId: '1', name: 'Ca toi' },
+      { id: '1', name: 'Ca sang' },
+      { id: '2', name: 'Ca toi' },
     ];
     const qb = createQueryBuilder({ many: slots });
     const { service, facilitiesService } = createService({
@@ -1411,13 +1535,13 @@ describe('ShiftSlotsService business validation', () => {
     });
 
     await expect(service.lookup({ facilityId: '1', limit: 20 })).resolves.toEqual(slots);
-    expect(facilitiesService.findById).toHaveBeenCalledWith('1');
+    expect(facilitiesService.findById).not.toHaveBeenCalled();
     expect(qb.andWhere).toHaveBeenCalled();
   });
 
   // Vai tro: dam bao slot chua duoc shifts su dung thi co the hard delete.
   it('hard deletes an unused shift slot', async () => {
-    const slot = { id: '1', facilityId: null, status: ActiveStatus.ACTIVE };
+    const slot = { id: '1', facilityId: '1', status: ActiveStatus.ACTIVE };
     const { service, repository } = createService({
       findOne: jest.fn().mockResolvedValue(slot),
       manager: {
@@ -1431,7 +1555,7 @@ describe('ShiftSlotsService business validation', () => {
 
   // Vai tro: dam bao slot da duoc ca truc su dung thi chi soft delete/inactive de giu lich su.
   it('soft deletes a used shift slot', async () => {
-    const slot = { id: '1', facilityId: null, status: ActiveStatus.ACTIVE, deletedAt: null };
+    const slot = { id: '1', facilityId: '1', status: ActiveStatus.ACTIVE, deletedAt: null };
     const { service, repository } = createService({
       findOne: jest.fn().mockResolvedValue(slot),
       manager: {

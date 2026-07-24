@@ -4,8 +4,10 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsNotEmpty,
+  IsOptional,
   IsString,
   Matches,
   MaxLength,
@@ -56,4 +58,15 @@ export class BulkCreateRoomsDto {
   @ValidateNested({ each: true })
   @Type(() => CreateRoomDto)
   rooms: CreateRoomDto[];
+}
+
+export class BulkCreateRoomsPreviewDto extends BulkCreateRoomsDto {
+  @ApiProperty({
+    example: true,
+    required: false,
+    description: 'true: confirm chi luu cac phong hop le; false: neu con dong loi thi khong luu dong nao',
+  })
+  @IsOptional()
+  @IsBoolean()
+  saveOnlyValid?: boolean = true;
 }

@@ -15,21 +15,14 @@ import {
   Matches,
   MaxLength,
   MinLength,
-  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { FacilityStatus } from '../../../../common/constants/status.enum';
 import {
-  normalizeWorkingDays,
   trimText,
   trimValue,
 } from '../../../../common/helpers/dto-transform.helper';
-import { HasUniqueCsvValues, IsLaterThan } from '../../../../common/helpers/dto-validation.helper';
-import {
-  FACILITY_TIME_PATTERN,
-  FacilityOperatingHourGroupDto,
-  WORKING_DAYS_PATTERN,
-} from './facility-schedule.dto';
+import { FacilityOperatingHourGroupDto } from './facility-schedule.dto';
 
 export const POSITIVE_ID_PATTERN = /^[1-9]\d*$/;
 
@@ -60,41 +53,6 @@ export class CreateFacilityDto {
   @IsEmail({}, { message: 'email khong dung dinh dang' })
   @MaxLength(191)
   email: string;
-
-  @ApiPropertyOptional({
-    example: '07:00',
-    description: 'Legacy: nen dung schedules de khai bao gio hoat dong theo tung ngay',
-  })
-  @ValidateIf((dto: CreateFacilityDto) => dto.openTime !== undefined || dto.closeTime !== undefined)
-  @Transform(({ value }) => trimValue(value))
-  @IsNotEmpty()
-  @Matches(FACILITY_TIME_PATTERN, { message: 'openTime phai co dinh dang HH:mm hoac HH:mm:ss' })
-  openTime?: string;
-
-  @ApiPropertyOptional({
-    example: '17:00',
-    description: 'Legacy: nen dung schedules de khai bao gio hoat dong theo tung ngay',
-  })
-  @ValidateIf((dto: CreateFacilityDto) => dto.openTime !== undefined || dto.closeTime !== undefined)
-  @Transform(({ value }) => trimValue(value))
-  @IsNotEmpty()
-  @Matches(FACILITY_TIME_PATTERN, { message: 'closeTime phai co dinh dang HH:mm hoac HH:mm:ss' })
-  @IsLaterThan('openTime', { message: 'closeTime phai muon hon openTime' })
-  closeTime?: string;
-
-  @ApiPropertyOptional({
-    example: 'MON,TUE,WED,THU,FRI,SAT',
-    description: 'Legacy: nen dung schedules de khai bao gio hoat dong theo tung ngay',
-  })
-  @IsOptional()
-  @Transform(({ value }) => normalizeWorkingDays(value))
-  @IsString()
-  @Matches(WORKING_DAYS_PATTERN, {
-    message: 'workingDays dung MON,TUE,WED,THU,FRI,SAT,SUN va phan cach bang dau phay',
-  })
-  @HasUniqueCsvValues({ message: 'workingDays khong duoc chua ngay trung nhau' })
-  @MaxLength(255)
-  workingDays?: string;
 
   @ApiPropertyOptional({
     type: [FacilityOperatingHourGroupDto],

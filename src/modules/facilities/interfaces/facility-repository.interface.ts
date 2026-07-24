@@ -12,6 +12,17 @@ export const FACILITIES_REPOSITORY = Symbol('FACILITIES_REPOSITORY');
 export type FacilityWithDetails = FacilityResponseDto;
 export type FacilityLookup = FacilityLookupResponseDto;
 
+export interface FacilityShiftScheduleViolation {
+  id: string;
+  shiftDate: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  doctorName?: string | null;
+  roomName?: string | null;
+  slotName?: string | null;
+}
+
 // truy cap db 
 export interface IFacilitiesRepository {
   // tạo một facility
@@ -23,6 +34,7 @@ export interface IFacilitiesRepository {
     operatingHours: Array<{ dayOfWeek: FacilityDayOfWeek; openTime: string | null; closeTime: string | null; isClosed: boolean }>,
   ): Promise<void>;
   findOperatingHoursByFacilityId(facilityId: string): Promise<Array<{ dayOfWeek: string; openTime: string | null; closeTime: string | null; isClosed: boolean }>>;
+  findActiveShiftsForOperatingHourValidation(facilityId: string, fromDate: string): Promise<FacilityShiftScheduleViolation[]>;
   createClosureDay(data: DeepPartial<FacilityClosureDay>): FacilityClosureDay;
   saveClosureDay(closureDay: FacilityClosureDay): Promise<FacilityClosureDay>;
   removeClosureDay(closureDay: FacilityClosureDay): Promise<void>;

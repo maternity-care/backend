@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   InternalServerErrorException,
@@ -22,9 +23,6 @@ const createFacility = (overrides: Partial<Facility> = {}): Facility => ({
   ownerId: 'staff-1',
   phone: '0900000000',
   email: 'clinic@example.com',
-  openTime: '08:00' as any,
-  closeTime: '17:00' as any,
-  workingDays: 'mon,tue,wed,thu,fri',
   address: '123 Nguyen Trai',
   province: 'Ho Chi Minh',
   ward: 'Ben Nghe',
@@ -169,6 +167,81 @@ describe('RoomsService', () => {
       expect.objectContaining({ id: 'room-2', name: 'Room 102' }),
     ]);
     expect(repository.saveMany).toHaveBeenCalledTimes(1);
+  });
+
+  // Vai tro: preview bulk-create chi kiem tra va sinh code du kien, khong luu DB.
+  it('previews bulk-create rooms with valid and conflicted items', async () => {
+    facilitiesService.findById.mockResolvedValue(createFacility());
+
+    await expect(service.previewBulkCreate({
+      rooms: [
+        { facilityId: 'fac-1', name: 'Room 101', roomTypeId: 'type-1', floor: '1', status: ActiveStatus.ACTIVE },
+        { facilityId: 'fac-1', name: ' room 101 ', roomTypeId: 'type-1', floor: '1', status: ActiveStatus.ACTIVE },
+      ],
+    })).resolves.toMatchObject({
+      summary: {
+        total: 2,
+        validCount: 1,
+        conflictCount: 1,
+        skippedCount: 0,
+        canConfirm: true,
+      },
+      validRooms: [
+        expect.objectContaining({
+          index: 0,
+          generatedCode: 'R-FAC-001-001',
+          facility: expect.objectContaining({ id: 'fac-1', name: 'Main Clinic' }),
+          roomType: expect.objectContaining({ id: 'type-1', name: 'Consultation' }),
+        }),
+      ],
+      conflictItems: [
+        expect.objectContaining({
+          index: 1,
+          duplicatedField: 'name',
+          duplicatedData: expect.objectContaining({ name: ' room 101 ' }),
+        }),
+      ],
+    });
+    expect(repository.saveMany).not.toHaveBeenCalled();
+  });
+
+  // Vai tro: confirm bulk-create mac dinh chi luu cac phong hop le, cac dong trung/loi van nam trong response.
+  it('confirms bulk-create rooms by saving only valid items', async () => {
+    facilitiesService.findById.mockResolvedValue(createFacility());
+    repository.findDetailsById.mockResolvedValue({ ...createRoom(), id: 'room-1', name: 'Room 101' } as any);
+
+    await expect(service.confirmBulkCreate({
+      rooms: [
+        { facilityId: 'fac-1', name: 'Room 101', roomTypeId: 'type-1', floor: '1', status: ActiveStatus.ACTIVE },
+        { facilityId: 'fac-1', name: ' room 101 ', roomTypeId: 'type-1', floor: '1', status: ActiveStatus.ACTIVE },
+      ],
+    })).resolves.toMatchObject({
+      summary: {
+        validCount: 1,
+        conflictCount: 1,
+      },
+      createdRooms: [
+        expect.objectContaining({ id: 'room-1', name: 'Room 101' }),
+      ],
+    });
+    expect(repository.saveMany).toHaveBeenCalledTimes(1);
+    expect(repository.saveMany).toHaveBeenCalledWith([
+      expect.objectContaining({ name: 'Room 101', code: 'R-FAC-001-001' }),
+    ]);
+  });
+
+  // Vai tro: confirm o che do strict khong duoc luu neu payload van con dong bi loi.
+  it('rejects strict bulk-create confirm when there are conflicts', async () => {
+    facilitiesService.findById.mockResolvedValue(createFacility());
+
+    await expect(service.confirmBulkCreate({
+      saveOnlyValid: false,
+      rooms: [
+        { facilityId: 'fac-1', name: 'Room 101', roomTypeId: 'type-1', floor: '1', status: ActiveStatus.ACTIVE },
+        { facilityId: 'fac-1', name: ' room 101 ', roomTypeId: 'type-1', floor: '1', status: ActiveStatus.ACTIVE },
+      ],
+    })).rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.saveMany).not.toHaveBeenCalled();
   });
 
   // Vai tro: chan bulk-create neu trong payload co ten phong bi trung trong cung co so.
@@ -616,6 +689,8 @@ describe('RoomsController', () => {
     findAllWithRooms: jest.fn(),
     findRoomTypesByFacilityId: jest.fn(),
     bulkCreate: jest.fn(),
+    previewBulkCreate: jest.fn(),
+    confirmBulkCreate: jest.fn(),
     lookup: jest.fn(),
     lookupRoomTypes: jest.fn(),
     createRoomType: jest.fn(),
@@ -693,6 +768,32 @@ describe('RoomsController', () => {
       data: [room],
     });
     expect(service.bulkCreate).toHaveBeenCalledWith({
+      rooms: [expect.objectContaining({ facilityId: 'fac-1' })],
+    });
+  });
+
+  // Vai tro: controller bulk-create preview/confirm cung phai ep facilityId theo user dang quan ly.
+  it('overrides bulk-create preview and confirm facilityId for scoped users', async () => {
+    const service = createService();
+    service.previewBulkCreate.mockResolvedValue({ summary: { validCount: 1 } });
+    service.confirmBulkCreate.mockResolvedValue({ createdRooms: [room] });
+    const dto = {
+      rooms: [
+        { facilityId: 'fac-2', name: 'Room 101', roomTypeId: 'type-1', floor: '1', status: ActiveStatus.ACTIVE },
+      ],
+    } as any;
+    const controller = new RoomsController(service as any);
+
+    await expect(controller.previewBulkCreate(facilityAdmin, dto)).resolves.toMatchObject({
+      data: { summary: { validCount: 1 } },
+    });
+    await expect(controller.confirmBulkCreate(facilityAdmin, dto)).resolves.toMatchObject({
+      data: { createdRooms: [room] },
+    });
+    expect(service.previewBulkCreate).toHaveBeenCalledWith({
+      rooms: [expect.objectContaining({ facilityId: 'fac-1' })],
+    });
+    expect(service.confirmBulkCreate).toHaveBeenCalledWith({
       rooms: [expect.objectContaining({ facilityId: 'fac-1' })],
     });
   });

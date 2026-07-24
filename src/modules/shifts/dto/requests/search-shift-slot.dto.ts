@@ -13,7 +13,7 @@ export class SearchShiftSlotDto {
   @MaxLength(100)
   search?: string;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ nullable: true, description: 'Loc khung ca theo co so' })
   @IsOptional()
   @IsString()
   @Matches(POSITIVE_ID_PATTERN, { message: 'facilityId phai la so nguyen duong' })
@@ -49,7 +49,7 @@ export class LookupShiftSlotDto {
   search?: string;
 
   @ApiPropertyOptional({
-    description: 'Neu truyen facilityId thi tra slot global + slot rieng cua co so do',
+    description: 'Loc khung ca dang active cua mot co so de FE hien thi select khi tao shift',
   })
   @IsOptional()
   @IsString()
