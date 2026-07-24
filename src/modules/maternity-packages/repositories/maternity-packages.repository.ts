@@ -125,6 +125,9 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
       .addOrderBy('pkg.createdAt', 'DESC');
   }
 
+
+  // Query cho danh sách gói khả dụng theo facility, 
+  // chỉ trả các gói active mà toàn bộ service con đều available tại cơ sở đó.
   private buildAvailableByFacilityQuery(
     facilityId: string,
     filters?: SearchMaternityPackageDto,

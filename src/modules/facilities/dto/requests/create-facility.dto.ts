@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import {
   IsEmail,
   IsEnum,
@@ -7,130 +7,111 @@ import {
   IsLatitude,
   IsLongitude,
   IsNotEmpty,
-  IsOptional,
   IsString,
   Matches,
   MaxLength,
   MinLength,
-  ValidateIf,
 } from 'class-validator';
 import { FacilityStatus } from '../../../../common/constants/status.enum';
 import {
-  normalizeCode,
   normalizeWorkingDays,
   trimText,
   trimValue,
 } from '../../../../common/helpers/dto-transform.helper';
 import { HasUniqueCsvValues, IsLaterThan } from '../../../../common/helpers/dto-validation.helper';
 
-// facility open_time và close_time phải có định dạng HH:mm hoặc HH:mm:ss
+export const POSITIVE_ID_PATTERN = /^[1-9]\d*$/;
 export const FACILITY_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/;
-// working_days chỉ được dùng MON,TUE,WED,THU,FRI,SAT,SUN và phân cách bằng dấu phẩy
 export const WORKING_DAYS_PATTERN = /^(MON|TUE|WED|THU|FRI|SAT|SUN)(,(MON|TUE|WED|THU|FRI|SAT|SUN))*$/;
 
 export class CreateFacilityDto {
-  //transform để chuẩn hóa dữ liệu đầu vào, ví dụ trim khoảng trắng, chuẩn hóa code, normalize working days
-  @ApiProperty({ example: 'Bệnh viện Phụ sản Trung tâm' })
+  @ApiProperty({ example: 'Maternity Care Ha Noi' })
   @Transform(({ value }) => trimText(value))
   @IsString()
   @IsNotEmpty()
   @MinLength(2)
-  @MaxLength(200)
+  @MaxLength(255)
   name: string;
 
-  @ApiProperty({ example: 'FAC-HCM-01' })
-  @Transform(({ value }) => normalizeCode(value))
+  @ApiProperty({ example: '1', description: 'Staff id cua nguoi phu trach/chu co so' })
   @IsString()
-  @Matches(/^[A-Z0-9_-]{2,50}$/, {
-    message: 'code chỉ gồm chữ in hoa, số, dấu gạch ngang hoặc gạch dưới (2-50 ký tự)',
-  })
-  code: string;
+  @Matches(POSITIVE_ID_PATTERN, { message: 'ownerId phai la so nguyen duong' })
+  ownerId: string;
 
   @ApiProperty({ example: '02873001234' })
   @Transform(({ value }) => trimValue(value))
   @IsString()
   @Matches(/^\+?\d{7,15}$/, {
-    message: 'phone phải gồm 7-15 chữ số và có thể bắt đầu bằng dấu +',
+    message: 'phone phai gom 7-15 chu so va co the bat dau bang dau +',
   })
   phone: string;
 
-  @ApiPropertyOptional({ example: 'contact@facility.vn', nullable: true })
-  @IsOptional()
+  @ApiProperty({ example: 'contact@facility.vn' })
   @Transform(({ value }) => typeof value === 'string' ? value.trim().toLowerCase() : value)
-  @IsEmail({}, { message: 'email không đúng định dạng' })
-  @MaxLength(190)
-  email?: string;
+  @IsEmail({}, { message: 'email khong dung dinh dang' })
+  @MaxLength(191)
+  email: string;
 
-  @ApiPropertyOptional({ example: '08:00' })
-  @ValidateIf((dto: CreateFacilityDto) => dto.open_time !== undefined || dto.close_time !== undefined)
+  @ApiProperty({ example: '07:00' })
   @Transform(({ value }) => trimValue(value))
-  @IsNotEmpty({ message: 'open_time và close_time phải được gửi cùng nhau' })
-  @Matches(FACILITY_TIME_PATTERN, { message: 'open_time phải có định dạng HH:mm hoặc HH:mm:ss' })
-  open_time?: string;
+  @IsNotEmpty()
+  @Matches(FACILITY_TIME_PATTERN, { message: 'openTime phai co dinh dang HH:mm hoac HH:mm:ss' })
+  openTime: string;
 
-  @ApiPropertyOptional({ example: '17:30' })
-  @ValidateIf((dto: CreateFacilityDto) => dto.open_time !== undefined || dto.close_time !== undefined)
+  @ApiProperty({ example: '17:00' })
   @Transform(({ value }) => trimValue(value))
-  @IsNotEmpty({ message: 'open_time và close_time phải được gửi cùng nhau' })
-  @Matches(FACILITY_TIME_PATTERN, { message: 'close_time phải có định dạng HH:mm hoặc HH:mm:ss' })
-  @IsLaterThan('open_time', { message: 'close_time phải muộn hơn open_time' })
-  close_time?: string;
+  @IsNotEmpty()
+  @Matches(FACILITY_TIME_PATTERN, { message: 'closeTime phai co dinh dang HH:mm hoac HH:mm:ss' })
+  @IsLaterThan('openTime', { message: 'closeTime phai muon hon openTime' })
+  closeTime: string;
 
-  @ApiPropertyOptional({ example: 'MON,TUE,WED,THU,FRI,SAT' })
-  @IsOptional()
+  @ApiProperty({ example: 'MON,TUE,WED,THU,FRI,SAT' })
   @Transform(({ value }) => normalizeWorkingDays(value))
   @IsString()
   @Matches(WORKING_DAYS_PATTERN, {
-    message: 'working_days dùng MON,TUE,WED,THU,FRI,SAT,SUN và phân cách bằng dấu phẩy',
+    message: 'workingDays dung MON,TUE,WED,THU,FRI,SAT,SUN va phan cach bang dau phay',
   })
-  @HasUniqueCsvValues({ message: 'working_days không được chứa ngày trùng nhau' })
-  @MaxLength(100)
-  working_days?: string;
+  @HasUniqueCsvValues({ message: 'workingDays khong duoc chua ngay trung nhau' })
+  @MaxLength(255)
+  workingDays: string;
 
-  @ApiProperty({ example: '123 Nguyễn Thị Minh Khai' })
+  @ApiProperty({ example: '123 Nguyen Trai' })
   @Transform(({ value }) => trimText(value))
   @IsString()
   @IsNotEmpty()
-  @MaxLength(500)
+  @MaxLength(255)
   address: string;
 
-  @ApiProperty({ example: 'Hồ Chí Minh' })
+  @ApiProperty({ example: 'Ha Noi' })
   @Transform(({ value }) => trimText(value))
   @IsString()
   @IsNotEmpty()
-  @MaxLength(100)
+  @MaxLength(255)
   province: string;
 
-  @ApiProperty({ example: 'Quận 3' })
+  @ApiProperty({ example: 'Dich Vong Hau' })
   @Transform(({ value }) => trimText(value))
   @IsString()
   @IsNotEmpty()
-  @MaxLength(100)
-  district: string;
-
-  @ApiProperty({ example: 'Phường 5' })
-  @Transform(({ value }) => trimText(value))
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
+  @MaxLength(255)
   ward: string;
 
-  @ApiPropertyOptional({ example: '10.7756', nullable: true })
-  @ValidateIf((dto: CreateFacilityDto) => dto.latitude !== undefined || dto.longitude !== undefined)
-  @IsNotEmpty({ message: 'latitude và longitude phải được gửi cùng nhau' })
-  @IsLatitude({ message: 'latitude phải nằm trong khoảng -90 đến 90' })
-  latitude?: string;
+  @ApiProperty({ example: '21.0285' })
+  @Transform(({ value }) => trimValue(value))
+  @IsNotEmpty()
+  @IsLatitude({ message: 'latitude phai nam trong khoang -90 den 90' })
+  latitude: string;
 
-  @ApiPropertyOptional({ example: '106.6871', nullable: true })
-  @ValidateIf((dto: CreateFacilityDto) => dto.latitude !== undefined || dto.longitude !== undefined)
-  @IsNotEmpty({ message: 'latitude và longitude phải được gửi cùng nhau' })
-  @IsLongitude({ message: 'longitude phải nằm trong khoảng -180 đến 180' })
-  longitude?: string;
+  @ApiProperty({ example: '105.8542' })
+  @Transform(({ value }) => trimValue(value))
+  @IsNotEmpty()
+  @IsLongitude({ message: 'longitude phai nam trong khoang -180 den 180' })
+  longitude: string;
 
   @ApiProperty({ enum: [FacilityStatus.ACTIVE, FacilityStatus.INACTIVE] })
   @IsEnum(FacilityStatus)
   @IsIn([FacilityStatus.ACTIVE, FacilityStatus.INACTIVE], {
-    message: 'Không thể tạo cơ sở với trạng thái deleted',
+    message: 'Khong the tao co so voi trang thai deleted',
   })
   status: FacilityStatus;
 }

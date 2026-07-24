@@ -1,7 +1,7 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { PermissionEnum } from '../constants/permission.enum';
 import { RoleEnum } from '../constants/role.enum';
-import { AuthenticatedUser } from '../../modules/auth/interfaces/authenticated-user.interface';
+import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 
 export function checkAuth(user?: AuthenticatedUser): AuthenticatedUser {
   if (!user) {
@@ -20,10 +20,10 @@ export function getUserRoles(user: AuthenticatedUser): string[] {
 
 export function getUserPermissions(user: AuthenticatedUser): string[] {
   const rolePermissions = user.roles.flatMap((role) =>
-    role.permissions.map((permission) => permission.name),
+    (role.permissions ?? []).map((permission) => permission.name),
   );
   const facilityPermissions = (user.facilityRoles ?? []).flatMap((role) =>
-    role.permissions.map((permission) => permission.name),
+    (role.permissions ?? []).map((permission) => permission.name),
   );
   const allowedOverrides = (user.permissionOverrides ?? [])
     .filter((permissionOverride) => permissionOverride.effect === 'allow')

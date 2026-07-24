@@ -1,5 +1,4 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Time } from 'bullmq';
 import { FacilityStatus } from '../../../../common/constants/status.enum';
 
 export class FacilityResponseDto {
@@ -13,19 +12,31 @@ export class FacilityResponseDto {
   code: string;
 
   @ApiProperty()
+  ownerId: string;
+
+  @ApiPropertyOptional()
+  ownerName?: string;
+
+  @ApiPropertyOptional()
+  ownerEmail?: string;
+
+  @ApiPropertyOptional()
+  ownerPhone?: string;
+
+  @ApiProperty()
   phone: string;
 
-  @ApiPropertyOptional()
-  email?: string;
+  @ApiProperty()
+  email: string;
 
-  @ApiPropertyOptional()
-  open_time?: Time;
+  @ApiProperty()
+  openTime: string;
 
-  @ApiPropertyOptional()
-  close_time?: Time;
+  @ApiProperty()
+  closeTime: string;
 
-  @ApiPropertyOptional()
-  working_days?: string;
+  @ApiProperty()
+  workingDays: string;
 
   @ApiProperty()
   address: string;
@@ -34,18 +45,15 @@ export class FacilityResponseDto {
   province: string;
 
   @ApiProperty()
-  district: string;
-
-  @ApiProperty()
   ward: string;
 
-  @ApiPropertyOptional()
-  latitude?: string;
-
-  @ApiPropertyOptional()
-  longitude?: string;
+  @ApiProperty()
+  latitude: string;
 
   @ApiProperty()
+  longitude: string;
+
+  @ApiProperty({ enum: FacilityStatus })
   status: FacilityStatus;
 
   @ApiProperty()
@@ -53,4 +61,30 @@ export class FacilityResponseDto {
 
   @ApiProperty()
   updatedAt: Date;
+}
+
+export class FacilityLookupResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  code: string;
+
+  @ApiProperty()
+  address: string;
+
+  @ApiProperty()
+  province: string;
+
+  @ApiProperty()
+  ward: string;
+
+  @ApiProperty({ enum: FacilityStatus })
+  status: FacilityStatus;
+
+  @ApiPropertyOptional()
+  ownerName?: string;
 }

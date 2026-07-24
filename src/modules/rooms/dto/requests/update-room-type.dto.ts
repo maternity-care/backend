@@ -1,12 +1,11 @@
 import { Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { ActiveStatus } from '../../../../common/constants/status.enum';
 import { trimText } from '../../../../common/helpers/dto-transform.helper';
-import { POSITIVE_ID_PATTERN } from './create-room.dto';
 
-export class UpdateRoomDto {
-  @ApiPropertyOptional()
+export class UpdateRoomTypeDto {
+  @ApiPropertyOptional({ example: 'Phòng siêu âm' })
   @IsOptional()
   @Transform(({ value }) => trimText(value))
   @IsString()
@@ -15,19 +14,13 @@ export class UpdateRoomDto {
   @MaxLength(255)
   name?: string;
 
-  @ApiPropertyOptional({ description: 'ID trong bang room_types' })
-  @IsOptional()
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN, { message: 'roomTypeId phai la so nguyen duong' })
-  roomTypeId?: string;
-
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'Phòng dùng cho dịch vụ siêu âm thai' })
   @IsOptional()
   @Transform(({ value }) => trimText(value))
   @IsString()
   @IsNotEmpty()
-  @MaxLength(255)
-  floor?: string;
+  @MaxLength(1000)
+  description?: string;
 
   @ApiPropertyOptional({ enum: ActiveStatus })
   @IsOptional()

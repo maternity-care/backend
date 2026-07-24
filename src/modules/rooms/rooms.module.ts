@@ -7,9 +7,10 @@ import { RoomsRepository } from './repositories/rooms.repository';
 import { ROOMS_REPOSITORY } from './interfaces/rooms-repository.interface';
 import { RoomsFacilityController } from './rooms-facility.controller';
 import { FacilitiesModule } from '../facilities/facilities.module';
+import { RoomType } from '../../database/entities/room-type.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Room]), FacilitiesModule],
+  imports: [TypeOrmModule.forFeature([Room, RoomType]), FacilitiesModule],
   controllers: [RoomsController, RoomsFacilityController],
   providers: [
     RoomsService,

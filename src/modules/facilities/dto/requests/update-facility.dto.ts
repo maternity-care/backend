@@ -16,13 +16,12 @@ import {
 } from 'class-validator';
 import { FacilityStatus } from '../../../../common/constants/status.enum';
 import {
-  normalizeCode,
   normalizeWorkingDays,
   trimText,
   trimValue,
 } from '../../../../common/helpers/dto-transform.helper';
 import { HasUniqueCsvValues, IsLaterThan } from '../../../../common/helpers/dto-validation.helper';
-import { FACILITY_TIME_PATTERN, WORKING_DAYS_PATTERN } from './create-facility.dto';
+import { FACILITY_TIME_PATTERN, POSITIVE_ID_PATTERN, WORKING_DAYS_PATTERN } from './create-facility.dto';
 
 export class UpdateFacilityDto {
   @ApiPropertyOptional()
@@ -31,15 +30,14 @@ export class UpdateFacilityDto {
   @IsString()
   @IsNotEmpty()
   @MinLength(2)
-  @MaxLength(200)
+  @MaxLength(255)
   name?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @Transform(({ value }) => normalizeCode(value))
   @IsString()
-  @Matches(/^[A-Z0-9_-]{2,50}$/)
-  code?: string;
+  @Matches(POSITIVE_ID_PATTERN, { message: 'ownerId phai la so nguyen duong' })
+  ownerId?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -48,43 +46,43 @@ export class UpdateFacilityDto {
   @Matches(/^\+?\d{7,15}$/)
   phone?: string;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional()
   @IsOptional()
   @Transform(({ value }) => typeof value === 'string' ? value.trim().toLowerCase() : value)
   @IsEmail()
-  @MaxLength(190)
+  @MaxLength(191)
   email?: string;
 
   @ApiPropertyOptional()
-  @ValidateIf((dto: UpdateFacilityDto) => dto.open_time !== undefined || dto.close_time !== undefined)
+  @ValidateIf((dto: UpdateFacilityDto) => dto.openTime !== undefined || dto.closeTime !== undefined)
   @Transform(({ value }) => trimValue(value))
-  @IsNotEmpty({ message: 'Khi cập nhật giờ hoạt động phải gửi cả open_time và close_time' })
+  @IsNotEmpty({ message: 'Khi cap nhat gio hoat dong phai gui ca openTime va closeTime' })
   @Matches(FACILITY_TIME_PATTERN)
-  open_time?: string;
+  openTime?: string;
 
   @ApiPropertyOptional()
-  @ValidateIf((dto: UpdateFacilityDto) => dto.open_time !== undefined || dto.close_time !== undefined)
+  @ValidateIf((dto: UpdateFacilityDto) => dto.openTime !== undefined || dto.closeTime !== undefined)
   @Transform(({ value }) => trimValue(value))
-  @IsNotEmpty({ message: 'Khi cập nhật giờ hoạt động phải gửi cả open_time và close_time' })
+  @IsNotEmpty({ message: 'Khi cap nhat gio hoat dong phai gui ca openTime va closeTime' })
   @Matches(FACILITY_TIME_PATTERN)
-  @IsLaterThan('open_time', { message: 'close_time phải muộn hơn open_time' })
-  close_time?: string;
+  @IsLaterThan('openTime', { message: 'closeTime phai muon hon openTime' })
+  closeTime?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @Transform(({ value }) => normalizeWorkingDays(value))
   @IsString()
   @Matches(WORKING_DAYS_PATTERN)
-  @HasUniqueCsvValues({ message: 'working_days không được chứa ngày trùng nhau' })
-  @MaxLength(100)
-  working_days?: string;
+  @HasUniqueCsvValues({ message: 'workingDays khong duoc chua ngay trung nhau' })
+  @MaxLength(255)
+  workingDays?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @Transform(({ value }) => trimText(value))
   @IsString()
   @IsNotEmpty()
-  @MaxLength(500)
+  @MaxLength(255)
   address?: string;
 
   @ApiPropertyOptional()
@@ -92,7 +90,7 @@ export class UpdateFacilityDto {
   @Transform(({ value }) => trimText(value))
   @IsString()
   @IsNotEmpty()
-  @MaxLength(100)
+  @MaxLength(255)
   province?: string;
 
   @ApiPropertyOptional()
@@ -100,26 +98,20 @@ export class UpdateFacilityDto {
   @Transform(({ value }) => trimText(value))
   @IsString()
   @IsNotEmpty()
-  @MaxLength(100)
-  district?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @Transform(({ value }) => trimText(value))
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
+  @MaxLength(255)
   ward?: string;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional()
   @ValidateIf((dto: UpdateFacilityDto) => dto.latitude !== undefined || dto.longitude !== undefined)
-  @IsNotEmpty({ message: 'Khi cập nhật tọa độ phải gửi cả latitude và longitude' })
+  @Transform(({ value }) => trimValue(value))
+  @IsNotEmpty({ message: 'Khi cap nhat toa do phai gui ca latitude va longitude' })
   @IsLatitude()
   latitude?: string;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional()
   @ValidateIf((dto: UpdateFacilityDto) => dto.latitude !== undefined || dto.longitude !== undefined)
-  @IsNotEmpty({ message: 'Khi cập nhật tọa độ phải gửi cả latitude và longitude' })
+  @Transform(({ value }) => trimValue(value))
+  @IsNotEmpty({ message: 'Khi cap nhat toa do phai gui ca latitude va longitude' })
   @IsLongitude()
   longitude?: string;
 

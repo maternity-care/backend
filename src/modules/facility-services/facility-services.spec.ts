@@ -24,12 +24,14 @@ describe('FacilityServices DTO validation', () => {
     status: AvailabilityStatus.AVAILABLE,
   };
 
+  // Vai tro: dam bao DTO tao facility-service hop le va convert durationMinutes ve number.
   it('accepts a valid create payload and transforms duration', async () => {
     const dto = plainToInstance(CreateFacilityServiceDto, validPayload);
     expect(await validate(dto)).toHaveLength(0);
     expect(dto.durationMinutes).toBe(30);
   });
 
+  // Vai tro: gom cac input sai khi gan dich vu vao co so de bat loi id, gia, thoi luong va status.
   it.each([
     [{ ...validPayload, facilityId: '0' }, 'facilityId'],
     [{ ...validPayload, serviceId: '-1' }, 'serviceId'],
@@ -41,6 +43,7 @@ describe('FacilityServices DTO validation', () => {
     expect(errors.some(error => error.property === property)).toBe(true);
   });
 
+  // Vai tro: dam bao query search facility-service chan filter/phan trang khong hop le.
   it('validates search filters and pagination', async () => {
     const dto = plainToInstance(SearchFacilityServiceDto, {
       facilityId: '0',
@@ -94,6 +97,7 @@ describe('FacilityServicesService business logic', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
+  // Vai tro: dam bao gan service vao facility chi duoc tao khi ca facility va service deu hop le.
   it('creates a facility service after validating facility and service', async () => {
     const { repo, service: facilityServicesService } = createService();
     await expect(facilityServicesService.create(entity as never)).resolves.toMatchObject({ id: '10' });
@@ -102,6 +106,7 @@ describe('FacilityServicesService business logic', () => {
     expect(repo.findByFacilityAndService).toHaveBeenCalledWith('1', '2');
   });
 
+  // Vai tro: kiem tra cac duong doc du lieu facility-service deu lay qua repository dung ham.
   it('returns list, paginated list, public list, and details through repository', async () => {
     const { repo, service: facilityServicesService } = createService();
 
@@ -117,12 +122,14 @@ describe('FacilityServicesService business logic', () => {
     expect(repo.findPublicByFacilityId).toHaveBeenCalledWith('1', { status: AvailabilityStatus.AVAILABLE });
   });
 
+  // Vai tro: dam bao API public khong hien dich vu cua facility da inactive.
   it('rejects public facility services when facility is inactive', async () => {
     facilitiesService.findById.mockResolvedValueOnce({ ...facility, status: FacilityStatus.INACTIVE });
 
     await expect(createService().service.findPublicByFacilityId('1')).rejects.toBeInstanceOf(ConflictException);
   });
 
+  // Vai tro: bao ve rule khong trung cap facility-service va khong gan reference inactive.
   it('rejects duplicated mapping or inactive references', async () => {
     const duplicateContext = createService();
     duplicateContext.repo.findByFacilityAndService.mockResolvedValueOnce(entity);
@@ -135,6 +142,7 @@ describe('FacilityServicesService business logic', () => {
     await expect(createService().service.create(entity as never)).rejects.toBeInstanceOf(ConflictException);
   });
 
+  // Vai tro: dam bao update mapping co save thanh cong va chi check duplicate khi cap facility/service thay doi.
   it('updates a facility service and checks duplicate pair when facility/service changes', async () => {
     const { repo, service: facilityServicesService } = createService();
     await expect(facilityServicesService.update('10', { price: '300000.00' })).resolves.toMatchObject({
@@ -143,6 +151,7 @@ describe('FacilityServicesService business logic', () => {
     expect(repo.save).toHaveBeenCalled();
   });
 
+  // Vai tro: chan update lam trung cap facility-service voi mapping khac.
   it('rejects update when changed facility-service pair belongs to another mapping', async () => {
     const context = createService();
     context.repo.findByFacilityAndService.mockResolvedValueOnce({ ...entity, id: '99' });
@@ -151,6 +160,7 @@ describe('FacilityServicesService business logic', () => {
     expect(context.repo.save).not.toHaveBeenCalled();
   });
 
+  // Vai tro: tranh query duplicate khong can thiet khi chi sua gia/trang thai cua mapping.
   it('does not check duplicate pair when update only changes price or status', async () => {
     const { repo, service: facilityServicesService } = createService();
 
@@ -160,12 +170,14 @@ describe('FacilityServicesService business logic', () => {
     expect(repo.findByFacilityAndService).not.toHaveBeenCalled();
   });
 
+  // Vai tro: dam bao mapping facility-service khong ton tai tra 404.
   it('throws not found when mapping does not exist', async () => {
     const context = createService();
     context.repo.findById.mockResolvedValueOnce(null);
     await expect(context.service.findById('99')).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  // Vai tro: dam bao ban detail co join thong tin khong tim thay cung tra 404.
   it('throws not found when mapping details do not exist', async () => {
     const context = createService();
     context.repo.findDetailsById = jest.fn().mockResolvedValueOnce(null);
@@ -173,6 +185,7 @@ describe('FacilityServicesService business logic', () => {
     await expect(context.service.findDetailsById('99')).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  // Vai tro: kiem tra xoa cung mapping chua dung va chuyen unavailable khi da co lien ket.
   it('hard deletes unused mapping and marks used mapping unavailable', async () => {
     const hardContext = createService();
     await expect(hardContext.service.remove('10')).resolves.toEqual({
@@ -214,6 +227,7 @@ describe('FacilityServicesController', () => {
     findPublicByFacilityId: jest.fn().mockResolvedValue([entity]),
   });
 
+  // Vai tro: dam bao controller quan tri chon list thuong/phan trang va boc response dung chuan.
   it('chooses list method by query.page and wraps management response', async () => {
     const service = createServiceMock();
     const controller = new FacilityServicesController(service as never);
@@ -228,6 +242,7 @@ describe('FacilityServicesController', () => {
     });
   });
 
+  // Vai tro: kiem tra CRUD facility-service tra message/data wrapper nhat quan.
   it('wraps detail, create, update, and remove responses', async () => {
     const service = createServiceMock();
     const controller = new FacilityServicesController(service as never);
@@ -244,6 +259,7 @@ describe('FacilityServicesController', () => {
     });
   });
 
+  // Vai tro: dam bao API public lay dich vu theo facility tra response dung format va truyen filter xuong service.
   it('wraps public facility service response', async () => {
     const service = createServiceMock();
     const controller = new PublicFacilityServicesController(service as never);
