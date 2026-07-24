@@ -1,16 +1,16 @@
 import { Controller, Get, HttpException, InternalServerErrorException, Param, Query } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RoomsService } from './rooms.service';
-import { RoomWithDetailsResponseDto } from './dto/responses/room-with-details-response.dto';
-import { SearchRooms2Dto } from './dto/requests/search-room-2';
+import { LookupRoomTypesDto } from './dto/requests/search-rooms.dto';
+import { FacilityRoomTypeResponseDto } from './dto/responses/room-with-details-response.dto';
+import { ROOM_CONSTANT } from '../../common/constants/room.constant';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { assertFacilityAccess } from '../../common/helpers/facility-scope.helper';
 
-@ApiTags('Management - Rooms')
-@Controller('management/facility')
-
-export class RoomsFacilityController {
+@ApiTags('Management - Facilities')
+@Controller('management/facilities')
+export class FacilityRoomTypesController {
   constructor(private readonly roomsService: RoomsService) {}
 
   private handleError(error: unknown): never {
@@ -20,26 +20,22 @@ export class RoomsFacilityController {
     throw new InternalServerErrorException('Internal server error');
   }
 
-
-  @Get('rooms/:facilityId')
-  @ApiOperation({ summary: 'Get rooms by facility'})
-  @ApiResponse({ status : 200, description: 'Rooms found', type: [RoomWithDetailsResponseDto] })
-  async findRoomsByFacility(
-  @CurrentUser() user: AuthenticatedUser,
-  @Param('facilityId') facilityId: string,
-  // không cho facilityId optional vào đây vì facility bắt buộc
-  @Query() filters: SearchRooms2Dto  ) {
+  @Get(':facilityId/room-types')
+  @ApiOperation({ summary: 'List room types currently used by a facility' })
+  @ApiResponse({ status: 200, type: [FacilityRoomTypeResponseDto] })
+  async findRoomTypesByFacility(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('facilityId') facilityId: string,
+    @Query() query: LookupRoomTypesDto,
+  ) {
     try {
       assertFacilityAccess(user, facilityId);
-      const rooms = await this.roomsService.findByFacilityId(facilityId, filters);
       return {
-        message: 'Lấy danh sách phòng theo cơ sở thành công',
-        data: rooms,
+        message: ROOM_CONSTANT.ROOM_TYPE_FOUND,
+        data: await this.roomsService.findRoomTypesByFacilityId(facilityId, query),
       };
     } catch (error) {
       this.handleError(error);
     }
   }
-
-
 }

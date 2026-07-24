@@ -16,16 +16,17 @@ import {
   minutesToTime,
   timesOverlap,
   timeToMinutes,
-} from './helpers/doctor-shifts.helper';
-import { DoctorShiftsController } from './doctor-shifts.controller';
-import { DoctorShiftsRepository } from './repositories/doctor-shifts.repository';
-import { DoctorShiftsService } from './doctor-shifts.service';
-import { DoctorShiftsValidator } from './validators/doctor-shifts.validator';
+} from './helpers/shifts.helper';
+import { ShiftsController } from './shifts.controller';
+import { ShiftsRepository } from './repositories/shifts.repository';
+import { ShiftsService } from './shifts.service';
+import { ShiftsValidator } from './validators/shifts.validator';
+import { ShiftSlotsService } from './shift-slots.service';
 
 // describe: dùng để nhóm các test case liên quan đến một chức năng hoặc module cụ thể,
 //  giúp tổ chức và quản lý các test case dễ dàng hơn. Trong ví dụ này, 
 // describe được sử dụng để nhóm các test case liên quan đến việc kiểm tra tính hợp lệ của các DTO trong module DoctorShifts 
-// và các validation nghiệp vụ của DoctorShiftsService.
+// và các validation nghiệp vụ của ShiftsService.
 
 //it: đại diện cho một test case cụ thể, mô tả một hành vi hoặc kết quả mong đợi của chức năng được kiểm tra.
 
@@ -193,8 +194,8 @@ describe('DoctorShifts DTO validation', () => {
 });
 
 
-//mô tả 2: Kiểm tra các validation nghiệp vụ của DoctorShiftsService
-describe('DoctorShiftsService business validation', () => {
+//mô tả 2: Kiểm tra các validation nghiệp vụ của ShiftsService
+describe('ShiftsService business validation', () => {
   const facility = { id: '1', status: FacilityStatus.ACTIVE };
   const room = { id: '2', facilityId: '1', status: ActiveStatus.ACTIVE };
   const shift = {
@@ -228,9 +229,9 @@ describe('DoctorShiftsService business validation', () => {
   const roomsService = { findById: jest.fn().mockResolvedValue(room) };
   const createService = (repo = createRepo()) => ({
     repo,
-    service: new DoctorShiftsService(
+    service: new ShiftsService(
       repo as never,
-      new DoctorShiftsValidator(repo as never, facilitiesService as never, roomsService as never),
+      new ShiftsValidator(repo as never, facilitiesService as never, roomsService as never),
     ),
   });
 
@@ -339,7 +340,7 @@ describe('DoctorShiftsService business validation', () => {
   // Vai tro: dam bao copy-week bo qua ca cancelled va reset ca full ve available o tuan moi.
   it('copies a week, skips cancelled shifts, and resets full shifts to available', async () => {
     const { repo, service } = createService();
-    repo.findWeekly.mockResolvedValueOnce([
+    repo.findWeeklyWithDetails.mockResolvedValueOnce([
       { ...shift, id: '1', shiftDate: '2099-07-06', status: DoctorShiftStatus.FULL },
       { ...shift, id: '2', shiftDate: '2099-07-07', status: DoctorShiftStatus.CANCELLED },
     ]);
@@ -641,7 +642,7 @@ describe('DoctorShiftsService business validation', () => {
   // Vai tro: dam bao source week chi co ca cancelled thi copy-week khong tao ca moi.
   it('TC-UNIT-DSHIFT-034 returns empty array when source week has only cancelled shifts', async () => {
     const { repo, service } = createService();
-    repo.findWeekly.mockResolvedValueOnce([{ ...shift, status: DoctorShiftStatus.CANCELLED }]);
+    repo.findWeeklyWithDetails.mockResolvedValueOnce([{ ...shift, status: DoctorShiftStatus.CANCELLED }]);
 
     await expect(service.copyWeek({
       facilityId: '1',
@@ -654,7 +655,7 @@ describe('DoctorShiftsService business validation', () => {
   // Vai tro: dam bao copy-week gap conflict o target thi khong save nua chung.
   it('TC-UNIT-DSHIFT-035 does not save copied shifts when target validation conflicts', async () => {
     const { repo, service } = createService();
-    repo.findWeekly.mockResolvedValueOnce([{ ...shift, shiftDate: '2099-07-06' }]);
+    repo.findWeeklyWithDetails.mockResolvedValueOnce([{ ...shift, shiftDate: '2099-07-06' }]);
     repo.findConflicts.mockResolvedValueOnce({ doctorConflicts: [shift], roomConflicts: [] });
 
     await expect(service.copyWeek({
@@ -845,7 +846,7 @@ describe('DoctorShiftsService business validation', () => {
   // Vai tro: dam bao copy-week giu nguyen status available/off cho cac ca hop le.
   it('copies available and off shifts without changing their statuses', async () => {
     const { repo, service } = createService();
-    repo.findWeekly.mockResolvedValueOnce([
+    repo.findWeeklyWithDetails.mockResolvedValueOnce([
       { ...shift, id: '1', shiftDate: '2099-07-06', status: DoctorShiftStatus.AVAILABLE },
       { ...shift, id: '2', roomId: null, shiftDate: '2099-07-07', status: DoctorShiftStatus.OFF },
     ]);
@@ -920,7 +921,7 @@ describe('DoctorShifts helper functions', () => {
   });
 });
 
-describe('DoctorShiftsController unit routing and scope', () => {
+describe('ShiftsController unit routing and scope', () => {
   const shift = {
     id: '10',
     doctorId: '1',
@@ -958,7 +959,7 @@ describe('DoctorShiftsController unit routing and scope', () => {
       update: jest.fn().mockResolvedValue({ ...shift, startTime: '09:00' }),
       remove: jest.fn().mockResolvedValue({ action: 'hard_deleted', affectedCount: 0 }),
     };
-    return { service, controller: new DoctorShiftsController(service as never) };
+    return { service, controller: new ShiftsController(service as never) };
   };
 
   // Vai tro: dam bao controller chon list phan trang/khong phan trang theo query.page.
@@ -1076,7 +1077,7 @@ describe('DoctorShiftsController unit routing and scope', () => {
   });
 });
 
-describe('DoctorShiftsRepository unit query behavior', () => {
+describe('ShiftsRepository unit query behavior', () => {
   const shift = {
     id: '10',
     doctorId: '1',
@@ -1114,7 +1115,7 @@ describe('DoctorShiftsRepository unit query behavior', () => {
   it('TC-UNIT-DSHIFT-043 builds doctor and room conflict queries with excludeShiftId', async () => {
     const doctorQb = createQueryBuilder([{ id: 'doctor-conflict' }]);
     const roomQb = createQueryBuilder([{ id: 'room-conflict' }]);
-    const repository = new DoctorShiftsRepository({
+    const repository = new ShiftsRepository({
       createQueryBuilder: jest.fn()
         .mockReturnValueOnce(doctorQb)
         .mockReturnValueOnce(roomQb),
@@ -1145,7 +1146,7 @@ describe('DoctorShiftsRepository unit query behavior', () => {
   it('TC-UNIT-DSHIFT-044 skips the room conflict query when roomId is absent', async () => {
     const doctorQb = createQueryBuilder([]);
     const typeormRepo = { createQueryBuilder: jest.fn().mockReturnValueOnce(doctorQb) };
-    const repository = new DoctorShiftsRepository(typeormRepo as never);
+    const repository = new ShiftsRepository(typeormRepo as never);
 
     await expect(repository.findConflicts({
       doctorId: '1',
@@ -1165,7 +1166,7 @@ describe('DoctorShiftsRepository unit query behavior', () => {
       createQueryBuilder: jest.fn().mockReturnValue(insertQb),
       findOneByOrFail: jest.fn().mockResolvedValue({ ...shift, status: DoctorShiftStatus.CANCELLED }),
     };
-    const repository = new DoctorShiftsRepository({
+    const repository = new ShiftsRepository({
       manager: {
         transaction: jest.fn(async callback => callback(manager)),
       },
@@ -1187,7 +1188,7 @@ describe('DoctorShiftsRepository unit query behavior', () => {
       deletedReason: 'reason',
     }));
     expect(manager.createQueryBuilder).toHaveBeenCalledTimes(3);
-    expect(insertQb.into).toHaveBeenCalledWith('doctor_shift_change_logs');
+    expect(insertQb.into).toHaveBeenCalledWith('shift_change_logs');
     expect(insertQb.into).toHaveBeenCalledWith('shift_disruptions');
     expect(insertQb.into).toHaveBeenCalledWith('appointment_disruption_items');
   });
@@ -1200,7 +1201,7 @@ describe('DoctorShiftsRepository unit query behavior', () => {
       createQueryBuilder: jest.fn().mockReturnValue(insertQb),
       findOneByOrFail: jest.fn().mockResolvedValue({ ...shift, status: DoctorShiftStatus.CANCELLED }),
     };
-    const repository = new DoctorShiftsRepository({
+    const repository = new ShiftsRepository({
       manager: {
         transaction: jest.fn(async callback => callback(manager)),
       },
@@ -1211,14 +1212,14 @@ describe('DoctorShiftsRepository unit query behavior', () => {
       disruptionId: undefined,
     });
     expect(manager.createQueryBuilder).toHaveBeenCalledTimes(1);
-    expect(insertQb.into).toHaveBeenCalledWith('doctor_shift_change_logs');
+    expect(insertQb.into).toHaveBeenCalledWith('shift_change_logs');
     expect(insertQb.into).not.toHaveBeenCalledWith('shift_disruptions');
   });
 
   // Vai tro: dam bao availability chi tinh cac appointment status con giu slot.
   it('TC-UNIT-DSHIFT-047 queries only appointment statuses that still hold a slot', async () => {
     const qb = createQueryBuilder([]);
-    const repository = new DoctorShiftsRepository({
+    const repository = new ShiftsRepository({
       manager: { createQueryBuilder: jest.fn().mockReturnValue(qb) },
     } as never);
 
@@ -1232,7 +1233,7 @@ describe('DoctorShiftsRepository unit query behavior', () => {
   // Vai tro: dam bao repository chi lay ca available/full khi tinh slot kha dung.
   it('queries only available and full shifts when building doctor availability', async () => {
     const qb = createQueryBuilder([]);
-    const repository = new DoctorShiftsRepository({
+    const repository = new ShiftsRepository({
       createQueryBuilder: jest.fn().mockReturnValue(qb),
     } as never);
 
@@ -1248,7 +1249,7 @@ describe('DoctorShiftsRepository unit query behavior', () => {
   it('adds doctor filter only when finding a weekly schedule for a specific doctor', async () => {
     const allDoctorsQb = createQueryBuilder([]);
     const oneDoctorQb = createQueryBuilder([]);
-    const repository = new DoctorShiftsRepository({
+    const repository = new ShiftsRepository({
       createQueryBuilder: jest.fn()
         .mockReturnValueOnce(allDoctorsQb)
         .mockReturnValueOnce(oneDoctorQb),
@@ -1257,14 +1258,20 @@ describe('DoctorShiftsRepository unit query behavior', () => {
     await repository.findWeekly('1', '2099-07-06', '2099-07-12');
     await repository.findWeekly('1', '2099-07-06', '2099-07-12', '2');
 
-    expect(allDoctorsQb.andWhere).not.toHaveBeenCalledWith('shift.doctorId = :doctorId', { doctorId: '2' });
-    expect(oneDoctorQb.andWhere).toHaveBeenCalledWith('shift.doctorId = :doctorId', { doctorId: '2' });
+    expect(allDoctorsQb.andWhere).not.toHaveBeenCalledWith(
+      'shift.staffId IN (SELECT doctor.staff_id FROM doctors doctor WHERE doctor.id = :doctorId)',
+      { doctorId: '2' },
+    );
+    expect(oneDoctorQb.andWhere).toHaveBeenCalledWith(
+      'shift.staffId IN (SELECT doctor.staff_id FROM doctors doctor WHERE doctor.id = :doctorId)',
+      { doctorId: '2' },
+    );
   });
 
   // Vai tro: dam bao findAppointmentsForShift co activeOnly se chi lay appointment con tac dong lich.
   it('adds active appointment status filtering when finding appointments for a shift with activeOnly=true', async () => {
     const qb = createQueryBuilder([]);
-    const repository = new DoctorShiftsRepository({
+    const repository = new ShiftsRepository({
       manager: { createQueryBuilder: jest.fn().mockReturnValue(qb) },
     } as never);
 
@@ -1278,7 +1285,7 @@ describe('DoctorShiftsRepository unit query behavior', () => {
   // Vai tro: dam bao mac dinh findAppointmentsForShift lay ca lich su, khong tu them filter active.
   it('does not add active appointment status filtering by default when finding appointments for a shift', async () => {
     const qb = createQueryBuilder([]);
-    const repository = new DoctorShiftsRepository({
+    const repository = new ShiftsRepository({
       manager: { createQueryBuilder: jest.fn().mockReturnValue(qb) },
     } as never);
 
@@ -1295,11 +1302,148 @@ describe('DoctorShiftsRepository unit query behavior', () => {
   ])('TC-UNIT-DSHIFT-048 returns %s assignment count as %s', async (count, expected) => {
     const qb = createQueryBuilder();
     qb.getRawOne.mockResolvedValueOnce(count === undefined ? undefined : { count });
-    const repository = new DoctorShiftsRepository({
+    const repository = new ShiftsRepository({
       manager: { createQueryBuilder: jest.fn().mockReturnValue(qb) },
     } as never);
 
     await expect(repository.isDoctorAssignedToFacility('1', '1')).resolves.toBe(expected);
+  });
+});
+
+describe('ShiftSlotsService business validation', () => {
+  const activeFacility = { id: '1', status: FacilityStatus.ACTIVE };
+
+  const createQueryBuilder = (options?: {
+    rawMany?: unknown[];
+    one?: unknown;
+    many?: unknown[];
+    rawOne?: unknown;
+  }) => ({
+    withDeleted: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    from: jest.fn().mockReturnThis(),
+    leftJoinAndSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    addOrderBy: jest.fn().mockReturnThis(),
+    take: jest.fn().mockReturnThis(),
+    skip: jest.fn().mockReturnThis(),
+    getRawMany: jest.fn().mockResolvedValue(options?.rawMany ?? []),
+    getRawOne: jest.fn().mockResolvedValue(options?.rawOne ?? { count: '0' }),
+    getOne: jest.fn().mockResolvedValue(options?.one ?? null),
+    getMany: jest.fn().mockResolvedValue(options?.many ?? []),
+    getManyAndCount: jest.fn().mockResolvedValue([options?.many ?? [], (options?.many ?? []).length]),
+  });
+
+  const createService = (repositoryOverrides: Record<string, unknown> = {}) => {
+    const repository = {
+      create: jest.fn(data => ({ ...data })),
+      save: jest.fn(async data => ({ ...data, id: data.id ?? '1' })),
+      remove: jest.fn().mockResolvedValue(undefined),
+      findOne: jest.fn().mockResolvedValue(null),
+      createQueryBuilder: jest.fn()
+        .mockReturnValueOnce(createQueryBuilder({ rawMany: [] }))
+        .mockReturnValueOnce(createQueryBuilder({ one: null }))
+        .mockReturnValueOnce(createQueryBuilder({ rawOne: { maxSortOrder: '3' } })),
+      manager: {
+        createQueryBuilder: jest.fn().mockReturnValue(createQueryBuilder({ rawOne: { count: '0' } })),
+      },
+      ...repositoryOverrides,
+    };
+    const facilitiesService = {
+      findById: jest.fn().mockResolvedValue(activeFacility),
+    };
+
+    return {
+      repository,
+      facilitiesService,
+      service: new ShiftSlotsService(repository as never, facilitiesService as never),
+    };
+  };
+
+  // Vai tro: dam bao tao khung ca se tu sinh code, validate facility va luu status active mac dinh.
+  it('creates a shift slot with generated code and default active status', async () => {
+    const { repository, facilitiesService, service } = createService();
+
+    await expect(service.create({
+      facilityId: '1',
+      name: 'Ca sang',
+      startTime: '07:00',
+      endTime: '12:00',
+    })).resolves.toMatchObject({
+      id: '1',
+      facilityId: '1',
+      code: 'CA_SANG',
+      status: ActiveStatus.ACTIVE,
+    });
+
+    expect(facilitiesService.findById).toHaveBeenCalledWith('1');
+    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ code: 'CA_SANG' }));
+  });
+
+  // Vai tro: dam bao khong tao 2 khung ca trung ten trong cung scope facility/global.
+  it('rejects duplicated shift slot names in the same scope', async () => {
+    const duplicateSlot = { id: '5', name: 'Ca sang', facilityId: '1' };
+    const { service } = createService({
+      createQueryBuilder: jest.fn()
+        .mockReturnValueOnce(createQueryBuilder({ rawMany: [] }))
+        .mockReturnValueOnce(createQueryBuilder({ one: duplicateSlot })),
+    });
+
+    await expect(service.create({
+      facilityId: '1',
+      name: 'Ca sang',
+      startTime: '07:00',
+      endTime: '12:00',
+    })).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  // Vai tro: dam bao lookup theo facility tra ca slot global va slot rieng cua facility cho FE chon.
+  it('looks up active global and facility-specific shift slots', async () => {
+    const slots = [
+      { id: '1', facilityId: null, name: 'Ca sang' },
+      { id: '2', facilityId: '1', name: 'Ca toi' },
+    ];
+    const qb = createQueryBuilder({ many: slots });
+    const { service, facilitiesService } = createService({
+      createQueryBuilder: jest.fn().mockReturnValue(qb),
+    });
+
+    await expect(service.lookup({ facilityId: '1', limit: 20 })).resolves.toEqual(slots);
+    expect(facilitiesService.findById).toHaveBeenCalledWith('1');
+    expect(qb.andWhere).toHaveBeenCalled();
+  });
+
+  // Vai tro: dam bao slot chua duoc shifts su dung thi co the hard delete.
+  it('hard deletes an unused shift slot', async () => {
+    const slot = { id: '1', facilityId: null, status: ActiveStatus.ACTIVE };
+    const { service, repository } = createService({
+      findOne: jest.fn().mockResolvedValue(slot),
+      manager: {
+        createQueryBuilder: jest.fn().mockReturnValue(createQueryBuilder({ rawOne: { count: '0' } })),
+      },
+    });
+
+    await expect(service.remove('1')).resolves.toEqual({ action: 'hard_deleted', affectedCount: 0 });
+    expect(repository.remove).toHaveBeenCalledWith(slot);
+  });
+
+  // Vai tro: dam bao slot da duoc ca truc su dung thi chi soft delete/inactive de giu lich su.
+  it('soft deletes a used shift slot', async () => {
+    const slot = { id: '1', facilityId: null, status: ActiveStatus.ACTIVE, deletedAt: null };
+    const { service, repository } = createService({
+      findOne: jest.fn().mockResolvedValue(slot),
+      manager: {
+        createQueryBuilder: jest.fn().mockReturnValue(createQueryBuilder({ rawOne: { count: '3' } })),
+      },
+    });
+
+    await expect(service.remove('1')).resolves.toEqual({ action: 'soft_deleted', affectedCount: 3 });
+    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({
+      status: ActiveStatus.INACTIVE,
+      deletedAt: expect.any(Date),
+    }));
   });
 });
 

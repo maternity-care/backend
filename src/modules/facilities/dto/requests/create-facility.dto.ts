@@ -1,16 +1,22 @@
-import { Transform } from 'class-transformer';
-import { ApiProperty } from '@nestjs/swagger';
+import { Transform, Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
   IsEmail,
   IsEnum,
   IsIn,
   IsLatitude,
   IsLongitude,
   IsNotEmpty,
+  IsOptional,
   IsString,
   Matches,
   MaxLength,
   MinLength,
+  ValidateIf,
+  ValidateNested,
 } from 'class-validator';
 import { FacilityStatus } from '../../../../common/constants/status.enum';
 import {
@@ -19,10 +25,13 @@ import {
   trimValue,
 } from '../../../../common/helpers/dto-transform.helper';
 import { HasUniqueCsvValues, IsLaterThan } from '../../../../common/helpers/dto-validation.helper';
+import {
+  FACILITY_TIME_PATTERN,
+  FacilityOperatingHourGroupDto,
+  WORKING_DAYS_PATTERN,
+} from './facility-schedule.dto';
 
 export const POSITIVE_ID_PATTERN = /^[1-9]\d*$/;
-export const FACILITY_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/;
-export const WORKING_DAYS_PATTERN = /^(MON|TUE|WED|THU|FRI|SAT|SUN)(,(MON|TUE|WED|THU|FRI|SAT|SUN))*$/;
 
 export class CreateFacilityDto {
   @ApiProperty({ example: 'Maternity Care Ha Noi' })
@@ -52,20 +61,32 @@ export class CreateFacilityDto {
   @MaxLength(191)
   email: string;
 
-  @ApiProperty({ example: '07:00' })
+  @ApiPropertyOptional({
+    example: '07:00',
+    description: 'Legacy: nen dung schedules de khai bao gio hoat dong theo tung ngay',
+  })
+  @ValidateIf((dto: CreateFacilityDto) => dto.openTime !== undefined || dto.closeTime !== undefined)
   @Transform(({ value }) => trimValue(value))
   @IsNotEmpty()
   @Matches(FACILITY_TIME_PATTERN, { message: 'openTime phai co dinh dang HH:mm hoac HH:mm:ss' })
-  openTime: string;
+  openTime?: string;
 
-  @ApiProperty({ example: '17:00' })
+  @ApiPropertyOptional({
+    example: '17:00',
+    description: 'Legacy: nen dung schedules de khai bao gio hoat dong theo tung ngay',
+  })
+  @ValidateIf((dto: CreateFacilityDto) => dto.openTime !== undefined || dto.closeTime !== undefined)
   @Transform(({ value }) => trimValue(value))
   @IsNotEmpty()
   @Matches(FACILITY_TIME_PATTERN, { message: 'closeTime phai co dinh dang HH:mm hoac HH:mm:ss' })
   @IsLaterThan('openTime', { message: 'closeTime phai muon hon openTime' })
-  closeTime: string;
+  closeTime?: string;
 
-  @ApiProperty({ example: 'MON,TUE,WED,THU,FRI,SAT' })
+  @ApiPropertyOptional({
+    example: 'MON,TUE,WED,THU,FRI,SAT',
+    description: 'Legacy: nen dung schedules de khai bao gio hoat dong theo tung ngay',
+  })
+  @IsOptional()
   @Transform(({ value }) => normalizeWorkingDays(value))
   @IsString()
   @Matches(WORKING_DAYS_PATTERN, {
@@ -73,7 +94,19 @@ export class CreateFacilityDto {
   })
   @HasUniqueCsvValues({ message: 'workingDays khong duoc chua ngay trung nhau' })
   @MaxLength(255)
-  workingDays: string;
+  workingDays?: string;
+
+  @ApiPropertyOptional({
+    type: [FacilityOperatingHourGroupDto],
+    description: 'Khung gio hoat dong moi. Neu khong gui, backend tao mac dinh T2-T7 07:00-17:00, CN dong cua.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(7)
+  @ValidateNested({ each: true })
+  @Type(() => FacilityOperatingHourGroupDto)
+  schedules?: FacilityOperatingHourGroupDto[];
 
   @ApiProperty({ example: '123 Nguyen Trai' })
   @Transform(({ value }) => trimText(value))

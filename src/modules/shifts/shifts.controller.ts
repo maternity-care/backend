@@ -22,19 +22,19 @@ import { DoctorAvailabilityQueryDto } from './dto/requests/doctor-availability.d
 import { SearchDoctorShiftDto, WeeklyDoctorShiftDto } from './dto/requests/search-doctor-shift.dto';
 import { UpdateDoctorShiftDto } from './dto/requests/update-doctor-shift.dto';
 import { DoctorShiftResponseDto } from './dto/responses/doctor-shift-response.dto';
-import { DoctorShiftsService } from './doctor-shifts.service';
+import { ShiftsService } from './shifts.service';
 
-@ApiTags('Management - Doctor Shifts')
-// TEMP DEV: JwtAuthGuard dang duoc tam tat de test doctor-shifts khi auth module chua dong bo entity moi.
+@ApiTags('Management - Shifts')
+// TEMP DEV: JwtAuthGuard dang duoc tam tat de test shifts khi auth module chua dong bo entity moi.
 // Khi sua xong auth, bat lai:
 // @ApiBearerAuth()
 // @UseGuards(JwtAuthGuard)
-@Controller('management/doctor-shifts')
-export class DoctorShiftsController {
-  constructor(private readonly service: DoctorShiftsService) {}
+@Controller('management/shifts')
+export class ShiftsController {
+  constructor(private readonly service: ShiftsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List doctor shifts' })
+  @ApiOperation({ summary: 'List shifts' })
   @ApiResponse({ status: 200, type: [DoctorShiftResponseDto] })
   async findAll(
     @CurrentUser() user: AuthenticatedUser,
@@ -63,7 +63,7 @@ export class DoctorShiftsController {
   }
 
   @Post('bulk-create')
-  @ApiOperation({ summary: 'Create many doctor shifts by date range and working days' })
+  @ApiOperation({ summary: 'Create many shifts by date range and working days' })
   async bulkCreate(@Body() dto: BulkCreateDoctorShiftDto) {
     return {
       message: 'Tạo ca trực hàng loạt thành công',
@@ -72,7 +72,7 @@ export class DoctorShiftsController {
   }
 
   @Post('copy-week')
-  @ApiOperation({ summary: 'Copy doctor shift schedule from one week to another week' })
+  @ApiOperation({ summary: 'Copy shift schedule from one week to another week' })
   async copyWeek(@Body() dto: CopyWeekDoctorShiftDto) {
     return {
       message: 'Copy lịch trực theo tuần thành công',
@@ -93,7 +93,7 @@ export class DoctorShiftsController {
   }
 
   @Get('weekly')
-  @ApiOperation({ summary: 'Get weekly doctor shift calendar' })
+  @ApiOperation({ summary: 'Get weekly shift calendar' })
   @ApiResponse({ status: 200, type: [DoctorShiftResponseDto] })
   async getWeekly(
     @CurrentUser() user: AuthenticatedUser,
@@ -111,7 +111,7 @@ export class DoctorShiftsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get doctor shift details' })
+  @ApiOperation({ summary: 'Get shift details' })
   @ApiResponse({ status: 200, type: DoctorShiftResponseDto })
   async findOne(
     @CurrentUser() user: AuthenticatedUser,
@@ -122,7 +122,7 @@ export class DoctorShiftsController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'Create doctor shift' })
+  @ApiOperation({ summary: 'Create shift' })
   async create(
      @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateDoctorShiftDto,
@@ -133,7 +133,7 @@ export class DoctorShiftsController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update doctor shift' })
+  @ApiOperation({ summary: 'Update shift' })
   async update(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
@@ -147,7 +147,7 @@ export class DoctorShiftsController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete doctor shift' })
+  @ApiOperation({ summary: 'Delete shift' })
   async remove(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,

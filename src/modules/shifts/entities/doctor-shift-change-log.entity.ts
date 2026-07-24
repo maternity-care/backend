@@ -9,7 +9,7 @@ import {
 } from 'typeorm';
 import { Shift } from './shift.entity';
 
-@Entity('doctor_shift_change_logs')
+@Entity('shift_change_logs')
 export class DoctorShiftChangeLog {
   @ApiProperty({ type: String, example: '1' })
   @PrimaryGeneratedColumn({ type: 'bigint' })
@@ -37,12 +37,12 @@ export class DoctorShiftChangeLog {
   newStatus: string | null;
 
   @ApiPropertyOptional({ type: String, nullable: true, required: false })
-  @Column({ name: 'old_doctor_id', type: 'bigint', nullable: true })
-  oldDoctorId: string | null;
+  @Column({ name: 'old_staff_id', type: 'bigint', nullable: true })
+  oldStaffId: string | null;
 
   @ApiPropertyOptional({ type: String, nullable: true, required: false })
-  @Column({ name: 'new_doctor_id', type: 'bigint', nullable: true })
-  newDoctorId: string | null;
+  @Column({ name: 'new_staff_id', type: 'bigint', nullable: true })
+  newStaffId: string | null;
 
   @ApiPropertyOptional({ type: String, nullable: true, required: false })
   @Column({ name: 'old_room_id', type: 'bigint', nullable: true })
@@ -69,12 +69,12 @@ export class DoctorShiftChangeLog {
   newEndTime: string | null;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'reason', type: 'text' })
-  reason: string;
+  @Column({ name: 'reason', type: 'text', nullable: true })
+  reason: string | null;
 
   @ApiPropertyOptional({ type: String, nullable: true, required: false })
-  @Column({ name: 'change_by', type: 'bigint', nullable: true })
-  changeBy: string | null;
+  @Column({ name: 'changed_by', type: 'bigint', nullable: true })
+  changedBy: string | null;
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })

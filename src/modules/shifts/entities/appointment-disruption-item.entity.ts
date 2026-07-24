@@ -30,6 +30,10 @@ export class AppointmentDisruptionItem {
   appointmentId: string;
 
   @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'old_staff_id', type: 'bigint', nullable: true })
+  oldStaffId: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
   @Column({ name: 'old_doctor_id', type: 'bigint', nullable: true })
   oldDoctorId: string | null;
 

@@ -9,6 +9,7 @@ import { RoleEnum } from '../../common/constants/role.enum';
 import { ROOM_CONSTANT } from '../../common/constants/room.constant';
 import { Facility } from '../facilities/entities/facility.entity';
 import { Room } from './entities/room.entity';
+import { FacilityRoomTypesController } from './facility-room-types.controller';
 import { RoomsController } from './rooms.controller';
 import { RoomsFacilityController } from './rooms-facility.controller';
 import { RoomsService } from './rooms.service';
@@ -42,15 +43,20 @@ const createRoom = (overrides: Partial<Room> = {}): Room => ({
   id: 'room-1',
   facilityId: 'fac-1',
   facility: createFacility(),
+  code: 'R-FAC-001-001',
   name: 'Room 101',
   roomTypeId: 'type-1',
   roomType: {
     id: 'type-1',
+    code: 'CONSULTATION',
     name: 'Consultation',
     description: 'Consultation room',
     status: ActiveStatus.ACTIVE,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    deletedAt: null,
+    deletedBy: null,
+    deleteReason: null,
   },
   floor: '1',
   status: ActiveStatus.ACTIVE,
@@ -64,11 +70,15 @@ const createRoom = (overrides: Partial<Room> = {}): Room => ({
 
 const createRoomType = (overrides: any = {}) => ({
   id: 'type-1',
+  code: 'CONSULTATION',
   name: 'Consultation',
   description: 'Consultation room',
   status: ActiveStatus.ACTIVE,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+  deletedAt: null,
+  deletedBy: null,
+  deleteReason: null,
   ...overrides,
 });
 
@@ -78,6 +88,7 @@ describe('RoomsService', () => {
     create: jest.fn((dto) => ({ id: 'draft', ...dto })),
     save: jest.fn(async (room) => ({ ...room, id: room.id === 'draft' ? 'room-1' : room.id })),
     saveMany: jest.fn(async (rooms: Room[]) => rooms.map((room: Room, index: number) => ({ ...room, id: `room-${index + 1}` }))),
+    findCodesByFacilityAndPrefix: jest.fn(),
     findAll: jest.fn(),
     findAllPaginated: jest.fn(),
     findById: jest.fn(),
@@ -90,6 +101,8 @@ describe('RoomsService', () => {
     findAllRoomTypesPaginated: jest.fn(),
     findRoomTypeById: jest.fn(),
     findRoomTypeByName: jest.fn(),
+    findRoomTypeCodesByPrefix: jest.fn(),
+    findRoomTypesByFacilityId: jest.fn(),
     lookup: jest.fn(),
     lookupRoomTypes: jest.fn(),
     removeRoomType: jest.fn(),
@@ -115,9 +128,12 @@ describe('RoomsService', () => {
   beforeEach(() => {
     repository = createRepository();
     repository.findDetailsById.mockResolvedValue(createRoom());
+    repository.findCodesByFacilityAndPrefix.mockResolvedValue([]);
     repository.findByFacilityAndName.mockResolvedValue(null);
     repository.findRoomTypeById.mockResolvedValue(createRoomType());
     repository.findRoomTypeByName.mockResolvedValue(null);
+    repository.findRoomTypeCodesByPrefix.mockResolvedValue([]);
+    repository.findRoomTypesByFacilityId.mockResolvedValue([]);
     facilitiesService = createFacilitiesService();
     service = new RoomsService(repository as any, facilitiesService as any);
   });
@@ -131,7 +147,8 @@ describe('RoomsService', () => {
     expect(facilitiesService.findById).toHaveBeenCalledWith('fac-1');
     expect(repository.findRoomTypeById).toHaveBeenCalledWith('type-1');
     expect(repository.findByFacilityAndName).toHaveBeenCalledWith('fac-1', 'Room 101', undefined);
-    expect(repository.create).toHaveBeenCalledWith(dto);
+    expect(repository.findCodesByFacilityAndPrefix).toHaveBeenCalledWith('fac-1', 'R-FAC-001');
+    expect(repository.create).toHaveBeenCalledWith({ ...dto, code: 'R-FAC-001-001' });
     expect(repository.save).toHaveBeenCalledTimes(1);
   });
 
@@ -227,6 +244,15 @@ describe('RoomsService', () => {
     await expect(service.findAllPaginated({ page: 1, limit: 10 } as any)).resolves.toBe(paged);
   });
 
+  // Vai tro: danh sach room rong phai tra 404 de FE khong hieu nham la request thanh cong co du lieu.
+  it('throws not found when room list is empty', async () => {
+    repository.findAll.mockResolvedValue([]);
+    repository.findAllPaginated.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10 });
+
+    await expect(service.findAll()).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.findAllPaginated({ page: 1, limit: 10 } as any)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   // Vai tro: CRUD room-type tao danh muc loai phong sau khi check trung ten.
   it('creates a room type when name is unique', async () => {
     const dto = { name: 'Ultrasound', description: 'Ultrasound room', status: ActiveStatus.ACTIVE };
@@ -234,7 +260,8 @@ describe('RoomsService', () => {
     await expect(service.createRoomType(dto as any)).resolves.toMatchObject(dto);
 
     expect(repository.findRoomTypeByName).toHaveBeenCalledWith('Ultrasound', undefined);
-    expect(repository.createRoomType).toHaveBeenCalledWith(dto);
+    expect(repository.findRoomTypeCodesByPrefix).toHaveBeenCalledWith('ULTRASOUND');
+    expect(repository.createRoomType).toHaveBeenCalledWith({ ...dto, code: 'ULTRASOUND' });
     expect(repository.saveRoomType).toHaveBeenCalledTimes(1);
   });
 
@@ -462,6 +489,14 @@ describe('RoomsService', () => {
     await expect(service.findByFacilityId('fac-1', { page: 1 } as any)).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  // Vai tro: facility co ton tai nhung chua co phong nao thi API rooms-by-facility tra 404 ro rang.
+  it('throws not found when facility has no rooms without pagination', async () => {
+    facilitiesService.findById.mockResolvedValue(createFacility());
+    repository.findByFacilityId.mockResolvedValue([]);
+
+    await expect(service.findByFacilityId('fac-1')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   // Vai tro: kiem tra man hinh tong hop facility + rooms khi khong can phan trang.
   it('returns facilities with rooms without pagination', async () => {
     const facilities = [createFacility(), createFacility({ id: 'fac-2', code: 'FAC-002' })];
@@ -512,6 +547,36 @@ describe('RoomsService', () => {
     await expect(service.lookup({ search: '101' })).resolves.toBe(roomOptions);
     await expect(service.lookupRoomTypes({ search: 'consult' })).resolves.toBe(roomTypeOptions);
   });
+
+  // Vai tro: tra ve cac loai phong dang that su duoc co so su dung, kem so phong active.
+  it('returns room types used by a facility with room count', async () => {
+    const roomTypes = [{
+      id: 'type-1',
+      code: 'CONSULTATION',
+      name: 'Consultation',
+      description: 'Consultation room',
+      status: ActiveStatus.ACTIVE,
+      roomCount: '2',
+    }];
+    facilitiesService.findById.mockResolvedValue(createFacility());
+    repository.findRoomTypesByFacilityId.mockResolvedValue(roomTypes);
+
+    await expect(service.findRoomTypesByFacilityId('fac-1', { search: 'consult' })).resolves.toEqual([
+      expect.objectContaining({
+        id: 'type-1',
+        roomCount: 2,
+      }),
+    ]);
+    expect(repository.findRoomTypesByFacilityId).toHaveBeenCalledWith('fac-1', { search: 'consult' });
+  });
+
+  // Vai tro: neu co so chua co phong active nao thuoc room type nao thi tra 404 ro rang.
+  it('throws not found when a facility has no used room types', async () => {
+    facilitiesService.findById.mockResolvedValue(createFacility());
+    repository.findRoomTypesByFacilityId.mockResolvedValue([]);
+
+    await expect(service.findRoomTypesByFacilityId('fac-1')).rejects.toBeInstanceOf(NotFoundException);
+  });
 });
 
 describe('RoomsController', () => {
@@ -549,6 +614,7 @@ describe('RoomsController', () => {
     remove: jest.fn(),
     findByFacilityId: jest.fn(),
     findAllWithRooms: jest.fn(),
+    findRoomTypesByFacilityId: jest.fn(),
     bulkCreate: jest.fn(),
     lookup: jest.fn(),
     lookupRoomTypes: jest.fn(),
@@ -754,5 +820,45 @@ describe('RoomsFacilityController', () => {
 
     await expect(controller.findRoomsByFacility(facilityAdmin, 'fac-2', {} as any)).rejects.toBeInstanceOf(ForbiddenException);
     expect(service.findByFacilityId).not.toHaveBeenCalled();
+  });
+});
+
+describe('FacilityRoomTypesController', () => {
+  const facilityAdmin = {
+    id: 'user-admin',
+    activeFacilityId: 'fac-1',
+    roles: [{ name: RoleEnum.ADMIN }],
+    facilities: [{ id: 'fac-1', status: FacilityStatus.ACTIVE, roles: [{ name: RoleEnum.ADMIN }] }],
+  } as any;
+
+  // Vai tro: tra room types dang co trong facility de FE dung lam select/filter theo co so.
+  it('returns room types for an allowed facility', async () => {
+    const data = [{
+      id: 'type-1',
+      code: 'CONSULTATION',
+      name: 'Consultation',
+      description: 'Consultation room',
+      status: ActiveStatus.ACTIVE,
+      roomCount: 2,
+    }];
+    const service = {
+      findRoomTypesByFacilityId: jest.fn().mockResolvedValue(data),
+    };
+    const controller = new FacilityRoomTypesController(service as any);
+
+    await expect(controller.findRoomTypesByFacility(facilityAdmin, 'fac-1', { search: 'consult' })).resolves.toEqual({
+      message: ROOM_CONSTANT.ROOM_TYPE_FOUND,
+      data,
+    });
+    expect(service.findRoomTypesByFacilityId).toHaveBeenCalledWith('fac-1', { search: 'consult' });
+  });
+
+  // Vai tro: khong cho admin co so lay room types cua facility khac.
+  it('denies facility room types outside active facility', async () => {
+    const service = { findRoomTypesByFacilityId: jest.fn() };
+    const controller = new FacilityRoomTypesController(service as any);
+
+    await expect(controller.findRoomTypesByFacility(facilityAdmin, 'fac-2', {} as any)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(service.findRoomTypesByFacilityId).not.toHaveBeenCalled();
   });
 });

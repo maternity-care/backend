@@ -16,7 +16,7 @@ import { FacilitiesModule } from './modules/facilities/facilities.module';
 import { RoomsModule } from './modules/rooms/rooms.module';
 import { StaffsModule } from './modules/staffs/staffs.module';
 import { MapsModule } from './modules/maps/maps.module';
-import { DoctorShiftsModule } from './modules/doctor-shifts/doctor-shifts.module';
+import { ShiftsModule } from './modules/shifts/shifts.module';
 import { ServicesModule } from './modules/services/services.module';
 import { FacilityServicesModule } from './modules/facility-services/facility-services.module';
 import { MaternityPackagesModule } from './modules/maternity-packages/maternity-packages.module';
@@ -56,7 +56,7 @@ import { DoctorsModule } from './modules/doctors/doctors.module';
     FacilitiesModule,
     RoomsModule,
     MapsModule,
-    DoctorShiftsModule,
+    ShiftsModule,
     ServicesModule,
     FacilityServicesModule,
     MaternityPackagesModule,

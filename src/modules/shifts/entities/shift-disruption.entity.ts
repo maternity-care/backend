@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Shift } from './shift.entity';
 import { ShiftDisruptionStatus } from '../../../common/constants/status.enum';
 
@@ -10,8 +10,13 @@ export class ShiftDisruption {
   id: string;
 
   @ApiProperty({ type: () => Shift })
-  @ManyToOne(() => Shift, { onDelete: 'RESTRICT', nullable: false })
+  @ManyToOne(() => Shift, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'shift_id' })
   shift: Shift;
+
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'shift_id', type: 'bigint', nullable: true })
+  shiftId: string | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'type', type: 'varchar', length: 50 })
@@ -32,6 +37,10 @@ export class ShiftDisruption {
   @ApiPropertyOptional({ type: String, nullable: true, required: false })
   @Column({ name: 'doctor_shift_id', type: 'bigint', nullable: true })
   doctorShiftId: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'staff_id', type: 'bigint', nullable: true })
+  staffId: string | null;
 
   @ApiPropertyOptional({ type: String, nullable: true, required: false })
   @Column({ name: 'room_id', type: 'bigint', nullable: true })

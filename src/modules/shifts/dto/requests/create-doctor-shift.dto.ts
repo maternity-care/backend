@@ -26,19 +26,27 @@ export class CreateDoctorShiftDto {
   @Matches(POSITIVE_ID_PATTERN)
   roomId?: string;
 
+  @ApiPropertyOptional({ example: '1', nullable: true, description: 'Khung ca sang/chieu/toi. Neu co slotId thi backend lay startTime/endTime tu slot.' })
+  @IsOptional()
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  slotId?: string | null;
+
   @ApiProperty({ example: '2026-07-07' })
   @IsDateString({ strict: true })
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'shiftDate phải có định dạng YYYY-MM-DD' })
   shiftDate: string;
 
-  @ApiProperty({ example: '08:00' })
+  @ApiPropertyOptional({ example: '08:00', description: 'Bat buoc neu khong gui slotId' })
+  @ValidateIf((dto: CreateDoctorShiftDto) => !dto.slotId)
   @Matches(SHIFT_TIME_PATTERN)
-  startTime: string;
+  startTime?: string;
 
-  @ApiProperty({ example: '12:00' })
+  @ApiPropertyOptional({ example: '12:00', description: 'Bat buoc neu khong gui slotId' })
+  @ValidateIf((dto: CreateDoctorShiftDto) => !dto.slotId)
   @Matches(SHIFT_TIME_PATTERN)
   @IsLaterThan('startTime', { message: 'endTime phải muộn hơn startTime' })
-  endTime: string;
+  endTime?: string;
 
   @ApiPropertyOptional({ minimum: 1, maximum: 100 })
   @IsOptional()
@@ -55,4 +63,3 @@ export class CreateDoctorShiftDto {
   })
   status: DoctorShiftStatus;
 }
-

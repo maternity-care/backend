@@ -2,12 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
 import { Facility } from '../entities/facility.entity';
+import { FacilityClosureDay } from '../entities/facility-closure-day.entity';
+import { FacilityDayOfWeek, FacilityOperatingHour } from '../entities/facility-operating-hour.entity';
 import { AccountStatus, FacilityStatus } from '../../../common/constants/status.enum';
 import {
   FacilityLookup,
   FacilityWithDetails,
   IFacilitiesRepository,
 } from '../interfaces/facility-repository.interface';
+import { SearchFacilityClosureDayDto } from '../dto/requests/facility-closure-day.dto';
 import { LookupFacilityDto, SearchFacilityDto } from '../dto/requests/search-facility.dto';
 import { PaginationResult } from '../../../common/helpers/pagination';
 import { RESPONSE_MESSAGES } from '../../../common/constants/response-message.constant';
@@ -17,6 +20,10 @@ export class FacilitiesRepository implements IFacilitiesRepository {
   constructor(
     @InjectRepository(Facility)
     private readonly repository: Repository<Facility>,
+    @InjectRepository(FacilityOperatingHour)
+    private readonly operatingHourRepository: Repository<FacilityOperatingHour>,
+    @InjectRepository(FacilityClosureDay)
+    private readonly closureDayRepository: Repository<FacilityClosureDay>,
   ) {}
 
   create(data: DeepPartial<Facility>): Facility {
@@ -25,6 +32,89 @@ export class FacilitiesRepository implements IFacilitiesRepository {
 
   save(facility: Facility): Promise<Facility> {
     return this.repository.save(facility);
+  }
+
+  async syncOperatingHours(
+    facilityId: string,
+    operatingHours: Array<{ dayOfWeek: FacilityDayOfWeek; openTime: string | null; closeTime: string | null; isClosed: boolean }>,
+  ): Promise<void> {
+    await this.repository.manager.transaction(async manager => {
+      await manager.delete(FacilityOperatingHour, { facilityId });
+      await manager.save(
+        FacilityOperatingHour,
+        operatingHours.map(item => manager.create(FacilityOperatingHour, { ...item, facilityId })),
+      );
+    });
+  }
+
+  async findOperatingHoursByFacilityId(facilityId: string): Promise<Array<{ dayOfWeek: string; openTime: string | null; closeTime: string | null; isClosed: boolean }>> {
+    return this.operatingHourRepository
+      .createQueryBuilder('operatingHour')
+      .select('operatingHour.dayOfWeek', 'dayOfWeek')
+      .addSelect('operatingHour.openTime', 'openTime')
+      .addSelect('operatingHour.closeTime', 'closeTime')
+      .addSelect('operatingHour.isClosed', 'isClosed')
+      .where('operatingHour.facilityId = :facilityId', { facilityId })
+      .orderBy(`FIELD(operatingHour.dayOfWeek, 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN')`)
+      .getRawMany();
+  }
+
+  createClosureDay(data: DeepPartial<FacilityClosureDay>): FacilityClosureDay {
+    return this.closureDayRepository.create(data);
+  }
+
+  saveClosureDay(closureDay: FacilityClosureDay): Promise<FacilityClosureDay> {
+    return this.closureDayRepository.save(closureDay);
+  }
+
+  async removeClosureDay(closureDay: FacilityClosureDay): Promise<void> {
+    await this.closureDayRepository.remove(closureDay);
+  }
+
+  async findClosureDaysByFacilityId(
+    facilityId: string,
+    filters?: SearchFacilityClosureDayDto,
+  ): Promise<Array<{ id: string; facilityId: string; closureDate: string; reason: string | null; status: string }>> {
+    const query = this.closureDayRepository
+      .createQueryBuilder('closureDay')
+      .select('closureDay.id', 'id')
+      .addSelect('closureDay.facilityId', 'facilityId')
+      .addSelect('closureDay.closureDate', 'closureDate')
+      .addSelect('closureDay.reason', 'reason')
+      .addSelect('closureDay.status', 'status')
+      .where('closureDay.facilityId = :facilityId', { facilityId });
+
+    if (filters?.fromDate) {
+      query.andWhere('closureDay.closureDate >= :fromDate', { fromDate: filters.fromDate });
+    }
+
+    if (filters?.toDate) {
+      query.andWhere('closureDay.closureDate <= :toDate', { toDate: filters.toDate });
+    }
+
+    if (filters?.status) {
+      query.andWhere('closureDay.status = :status', { status: filters.status });
+    }
+
+    return query.orderBy('closureDay.closureDate', 'ASC').getRawMany();
+  }
+
+  findClosureDayById(facilityId: string, closureDayId: string): Promise<FacilityClosureDay | null> {
+    return this.closureDayRepository.findOne({
+      where: {
+        id: closureDayId,
+        facilityId,
+      },
+    });
+  }
+
+  findClosureDayByDate(facilityId: string, closureDate: string): Promise<FacilityClosureDay | null> {
+    return this.closureDayRepository.findOne({
+      where: {
+        facilityId,
+        closureDate,
+      },
+    });
   }
 
   findAll(filters?: SearchFacilityDto): Promise<FacilityWithDetails[]> {

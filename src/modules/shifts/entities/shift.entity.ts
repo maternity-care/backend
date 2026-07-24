@@ -1,13 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DoctorShiftStatus } from '../../../common/constants/status.enum';
+import { Role } from '../../roles/entities/role.entity';
 import { Facility } from '../../facilities/entities/facility.entity';
 import { Room } from '../../rooms/entities/room.entity';
 import { Staff } from '../../staffs/entities/staff.entity';
+import { ShiftSlot } from '../../../database/entities/shift-slot.entity';
 import {
   Column,
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -15,6 +18,12 @@ import {
 } from 'typeorm';
 
 @Entity('shifts')
+@Index('idx_shifts_staff_date', ['staffId', 'shiftDate'])
+@Index('idx_shifts_facility_date', ['facilityId', 'shiftDate'])
+@Index('idx_shifts_room_date', ['roomId', 'shiftDate'])
+@Index('idx_shifts_slot_id', ['slotId'])
+@Index('idx_shifts_role_id', ['roleId'])
+@Index('idx_shifts_status', ['status'])
 export class Shift {
   @ApiProperty({ type: String, example: '1' })
   @PrimaryGeneratedColumn({ type: 'bigint' })
@@ -26,7 +35,7 @@ export class Shift {
   staff: Staff;
 
   @ApiProperty({ type: () => Room })
-  @ManyToOne(() => Room, { onDelete: 'RESTRICT', nullable: false })
+  @ManyToOne(() => Room, { onDelete: 'RESTRICT', nullable: true })
   @JoinColumn({ name: 'room_id' })
   room: Room;
 
@@ -35,13 +44,27 @@ export class Shift {
   @JoinColumn({ name: 'facility_id' })
   facility: Facility;
 
-  @ApiProperty({ type: String })
-  @Column({ name: 'slot_id', type: 'bigint' })
-  slotId: string;
+  @ApiPropertyOptional({ type: () => ShiftSlot, nullable: true, required: false })
+  @ManyToOne(() => ShiftSlot, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'slot_id' })
+  slot: ShiftSlot | null;
+
+  @ApiPropertyOptional({ type: () => Role, nullable: true, required: false })
+  @ManyToOne(() => Role, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'role_id' })
+  role: Role | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'slot_id', type: 'bigint', nullable: true })
+  slotId: string | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'staff_id', type: 'bigint' })
-  doctorId: string;
+  staffId: string;
+
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'role_id', type: 'bigint', nullable: true })
+  roleId: string | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'facility_id', type: 'bigint' })
@@ -71,6 +94,10 @@ export class Shift {
   @Column({ name: 'status', type: 'enum', enum: DoctorShiftStatus })
   status: DoctorShiftStatus;
 
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'note', type: 'text', nullable: true })
+  note: string | null;
+
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
@@ -90,6 +117,14 @@ export class Shift {
   @ApiPropertyOptional({ type: String, nullable: true, required: false })
   @Column({ name: 'deleted_reason', type: 'text', nullable: true })
   deletedReason: string | null;
+
+  get doctorId(): string {
+    return this.staffId;
+  }
+
+  set doctorId(value: string) {
+    this.staffId = value;
+  }
 }
 
 export { Shift as DoctorShift };

@@ -38,3 +38,7 @@ export class StaffPermission {
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
   updatedAt: Date;
 }
+
+// Alias tam thoi de cac module cu dang import theo ten user-permission khong bi loi khoi tao module.
+export { StaffPermission as UserPermission };
+export { StaffPermissionEffectEnum as UserPermissionEffect };

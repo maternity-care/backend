@@ -7,16 +7,19 @@ import { Permission } from './modules/permissions/entities/permission.entity';
 import { Role } from './modules/roles/entities/role.entity';
 import { Doctor } from './modules/doctors/entities/doctor.entity';
 import { Staff } from './modules/staffs/entities/staff.entity';
+import { FacilityClosureDay } from './modules/facilities/entities/facility-closure-day.entity';
 import { Facility } from './modules/facilities/entities/facility.entity';
+import { FacilityOperatingHour } from './modules/facilities/entities/facility-operating-hour.entity';
 import { Room } from './modules/rooms/entities/room.entity';
 import { RoomType } from './database/entities/room-type.entity';
-import { Shift } from './modules/doctor-shifts/entities/shift.entity';
-import { DoctorShiftChangeLog } from './modules/doctor-shifts/entities/doctor-shift-change-log.entity';
-import { ShiftDisruption } from './modules/doctor-shifts/entities/shift-disruption.entity';
-import { AppointmentDisruptionItem } from './modules/doctor-shifts/entities/appointment-disruption-item.entity';
+import { Shift } from './modules/shifts/entities/shift.entity';
+import { ShiftSlot } from './database/entities/shift-slot.entity';
+import { DoctorShiftChangeLog } from './modules/shifts/entities/doctor-shift-change-log.entity';
+import { ShiftDisruption } from './modules/shifts/entities/shift-disruption.entity';
+import { AppointmentDisruptionItem } from './modules/shifts/entities/appointment-disruption-item.entity';
 import { FacilitiesModule } from './modules/facilities/facilities.module';
 import { RoomsModule } from './modules/rooms/rooms.module';
-import { DoctorShiftsModule } from './modules/doctor-shifts/doctor-shifts.module';
+import { ShiftsModule } from './modules/shifts/shifts.module';
 
 @Module({
   imports: [
@@ -45,9 +48,12 @@ import { DoctorShiftsModule } from './modules/doctor-shifts/doctor-shifts.module
           Doctor,
           Staff,
           Facility,
+          FacilityClosureDay,
+          FacilityOperatingHour,
           Room,
           RoomType,
           Shift,
+          ShiftSlot,
           DoctorShiftChangeLog,
           ShiftDisruption,
           AppointmentDisruptionItem,
@@ -58,7 +64,7 @@ import { DoctorShiftsModule } from './modules/doctor-shifts/doctor-shifts.module
     }),
     FacilitiesModule,
     RoomsModule,
-    DoctorShiftsModule,
+    ShiftsModule,
   ],
 })
 export class FacilityRoomsAppModule {}

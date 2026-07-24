@@ -1,17 +1,27 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Staff } from '../../staffs/entities/staff.entity';
+import { FacilityClosureDay } from './facility-closure-day.entity';
+import { FacilityOperatingHour } from './facility-operating-hour.entity';
 import {
   Column,
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 
 @Entity('facilities')
+@Index('uq_facilities_code', ['code'], { unique: true })
+@Index('uq_facilities_email', ['email'], { unique: true })
+@Index('uq_facilities_phone', ['phone'], { unique: true })
+@Index('idx_facilities_status', ['status'])
+@Index('idx_facilities_owner_id', ['ownerId'])
+@Index('idx_facilities_location', ['province', 'ward'])
 export class Facility {
   @ApiProperty({ type: String, example: '1' })
   @PrimaryGeneratedColumn({ type: 'bigint' })
@@ -21,6 +31,14 @@ export class Facility {
   @ManyToOne(() => Staff, { onDelete: 'RESTRICT', nullable: true })
   @JoinColumn({ name: 'owner_id' })
   owner: Staff | null;
+
+  @ApiProperty({ type: () => [FacilityOperatingHour] })
+  @OneToMany(() => FacilityOperatingHour, operatingHour => operatingHour.facility)
+  operatingHours?: FacilityOperatingHour[];
+
+  @ApiProperty({ type: () => [FacilityClosureDay] })
+  @OneToMany(() => FacilityClosureDay, closureDay => closureDay.facility)
+  closureDays?: FacilityClosureDay[];
 
   @ApiProperty({ type: String })
   @Column({ name: 'name', type: 'varchar', length: 255 })
@@ -42,17 +60,17 @@ export class Facility {
   @Column({ name: 'email', type: 'varchar', length: 191 })
   email: string;
 
-  @ApiProperty({ type: String })
-  @Column({ name: 'open_time', type: 'time' })
-  openTime: string;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @Column({ name: 'open_time', type: 'time', nullable: true })
+  openTime: string | null;
 
-  @ApiProperty({ type: String })
-  @Column({ name: 'close_time', type: 'time' })
-  closeTime: string;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @Column({ name: 'close_time', type: 'time', nullable: true })
+  closeTime: string | null;
 
-  @ApiProperty({ type: String })
-  @Column({ name: 'working_days', type: 'varchar', length: 255 })
-  workingDays: string;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @Column({ name: 'working_days', type: 'varchar', length: 255, nullable: true })
+  workingDays: string | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'address', type: 'varchar', length: 255 })
@@ -67,11 +85,11 @@ export class Facility {
   ward: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'latitude', type: 'varchar', length: 255 })
+  @Column({ name: 'latitude', type: 'decimal', precision: 10, scale: 7 })
   latitude: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'longitude', type: 'varchar', length: 255 })
+  @Column({ name: 'longitude', type: 'decimal', precision: 10, scale: 7 })
   longitude: string;
 
   @ApiProperty({ type: String })

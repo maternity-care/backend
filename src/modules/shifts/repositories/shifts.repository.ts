@@ -2,8 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
 import { DoctorShift } from '../entities/shift.entity';
+import { ShiftSlot } from '../../../database/entities/shift-slot.entity';
 import { SearchDoctorShiftDto } from '../dto/requests/search-doctor-shift.dto';
-import { DoctorShiftWithDetails, IDoctorShiftsRepository } from '../interfaces/doctor-shifts-repository.interface';
+import { ShiftWithDetails, IShiftsRepository } from '../interfaces/shifts-repository.interface';
 import { ShiftConflictInput } from '../interfaces/shifts-conflict-input.interface';
 import { ShiftConflicts } from '../interfaces/shift-conflicts.interface';
 import { DoctorAppointmentBlock } from '../interfaces/doctor-appointment-block.interface';
@@ -15,8 +16,8 @@ import {
 } from '../../../common/constants/status.enum';
 
 @Injectable()
-export class DoctorShiftsRepository implements IDoctorShiftsRepository {
-  // Repository này là lớp truy cập dữ liệu của module doctor-shifts.
+export class ShiftsRepository implements IShiftsRepository {
+  // Repository này là lớp truy cập dữ liệu của module shifts.
   // Controller/Service không nên viết SQL trực tiếp; mọi thao tác DB về ca trực đi qua class này.
   constructor(
     // InjectRepository: là một decorator của NestJS, 
@@ -24,13 +25,15 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
     // Repository: là một lớp của TypeORM, cung cấp các phương thức để tương tác với cơ sở dữ liệu.
     // DoctorShift: là một entity, đại diện cho bảng doctor_shifts trong cơ sở dữ liệu.
     // Vì vậy, @InjectRepository(DoctorShift) sẽ tiêm một repository của 
-    // entity DoctorShift vào trong class DoctorShiftsRepository.
+    // entity DoctorShift vào trong class ShiftsRepository.
     //trong doctorShift có các thuộc tính như id, doctorId, facilityId, roomId, shiftDate, startTime, endTime, maxAppointments, status, createdAt và updatedAt.
     //quan trọng có @Entity('doctor_shifts') để xác định bảng trong cơ sở dữ liệu mà entity này đại diện.
 
     @InjectRepository(DoctorShift)
     
     private readonly repository: Repository<DoctorShift>,
+    @InjectRepository(ShiftSlot)
+    private readonly shiftSlotRepository?: Repository<ShiftSlot>,
   ) {}
 
   create(data: DeepPartial<DoctorShift>): DoctorShift {
@@ -61,20 +64,20 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
       .getOne();
   }
 
-  async findDetailsById(id: string): Promise<DoctorShiftWithDetails | null> {
+  async findDetailsById(id: string): Promise<ShiftWithDetails | null> {
     return (await this.buildDetailsQuery()
       .where('shift.id = :id', { id })
       .andWhere('shift.deletedAt IS NULL')
-      .getRawOne<DoctorShiftWithDetails>()) ?? null;
+      .getRawOne<ShiftWithDetails>()) ?? null;
   }
 
-  findAll(filters?: SearchDoctorShiftDto): Promise<DoctorShiftWithDetails[]> {
-    return this.buildListQuery(filters).getRawMany<DoctorShiftWithDetails>();
+  findAll(filters?: SearchDoctorShiftDto): Promise<ShiftWithDetails[]> {
+    return this.buildListQuery(filters).getRawMany<ShiftWithDetails>();
   }
 
   // Dùng chung buildListQuery với findAll để tránh lệch logic filter giữa list thường và list phân trang.
   findAllPaginated(filters?: SearchDoctorShiftDto) {
-    return this.paginateRaw<DoctorShiftWithDetails>(this.buildListQuery(filters), {
+    return this.paginateRaw<ShiftWithDetails>(this.buildListQuery(filters), {
       page: filters?.page,
       limit: filters?.limit,
     });
@@ -89,6 +92,7 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
     //b1: baseQuery: tạo một truy vấn cơ sở dữ liệu để 
     // tìm kiếm các ca làm việc của bác sĩ dựa trên các điều kiện được cung cấp trong input.
 
+    const staffId = input.staffId ?? input.doctorId;
     const baseQuery = (statuses: string[]) => {
       // baseQuery chứa điều kiện chung cho cả conflict theo bác sĩ và conflict theo phòng.
       // statuses giúp tùy biến trạng thái nào được tính là conflict trong từng loại query.
@@ -117,8 +121,8 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
 
     // Conflict theo bác sĩ: bác sĩ không được có 2 ca giao nhau.
     // Trạng thái off cũng tính là conflict vì off nghĩa là bác sĩ không làm việc trong khoảng đó.
-    const doctorQuery = baseQuery(['available', 'full', 'off']).andWhere('doctor_shifts.doctorId = :doctorId', {
-      doctorId: input.doctorId,
+    const doctorQuery = baseQuery(['available', 'full', 'off']).andWhere('doctor_shifts.staffId = :staffId', {
+      staffId,
     });
     // Conflict theo phòng: chỉ kiểm tra nếu ca có roomId.
     // OFF không dùng phòng nên roomQuery chỉ xét available/full.
@@ -150,7 +154,9 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
       .andWhere('shift.shiftDate BETWEEN :startDate AND :endDate', { startDate, endDate })
       .orderBy('shift.shiftDate', 'ASC')
       .addOrderBy('shift.startTime', 'ASC');
-    if (doctorId) query.andWhere('shift.doctorId = :doctorId', { doctorId });
+    if (doctorId) {
+      query.andWhere('shift.staffId IN (SELECT doctor.staff_id FROM doctors doctor WHERE doctor.id = :doctorId)', { doctorId });
+    }
     return query.getMany();
   }
 
@@ -159,7 +165,7 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
     startDate: string,
     endDate: string,
     doctorId?: string,
-  ): Promise<DoctorShiftWithDetails[]> {
+  ): Promise<ShiftWithDetails[]> {
     const query = this.buildDetailsQuery()
       .where('shift.facilityId = :facilityId', { facilityId })
       .andWhere('shift.deletedAt IS NULL')
@@ -167,8 +173,8 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
       .orderBy('shift.shiftDate', 'ASC')
       .addOrderBy('shift.startTime', 'ASC');
 
-    if (doctorId) query.andWhere('shift.doctorId = :doctorId', { doctorId });
-    return query.getRawMany<DoctorShiftWithDetails>();
+    if (doctorId) query.andWhere('doctor.id = :doctorId', { doctorId });
+    return query.getRawMany<ShiftWithDetails>();
   }
 
   findDoctorShiftsForDate(
@@ -182,7 +188,7 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
       .createQueryBuilder('shift')
       .where('shift.facilityId = :facilityId', { facilityId })
       .andWhere('shift.deletedAt IS NULL')
-      .andWhere('shift.doctorId = :doctorId', { doctorId })
+      .andWhere('shift.staffId IN (SELECT doctor.staff_id FROM doctors doctor WHERE doctor.id = :doctorId)', { doctorId })
       .andWhere('shift.shiftDate = :date', { date })
       .andWhere('shift.status IN (:...statuses)', {
         statuses: [DoctorShiftStatus.AVAILABLE, DoctorShiftStatus.FULL],
@@ -208,7 +214,7 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
 
     return this.repository.manager
       .createQueryBuilder()
-      // Dùng raw query vì Appointment entity nằm ngoài module doctor-shifts,
+      // Dùng raw query vì Appointment entity nằm ngoài module shifts,
       // và ở đây chỉ cần vài field nhỏ để tính slot, không cần load full entity.
       .select('appointment.id', 'id')
       .addSelect('appointment.scheduled_start', 'scheduledStart')
@@ -216,7 +222,8 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
       .addSelect('appointment.status', 'status')
       .from('appointments', 'appointment')
       .where('appointment.facility_id = :facilityId', { facilityId })
-      .andWhere('appointment.doctor_id = :doctorId', { doctorId })
+      .innerJoin('doctors', 'doctor', 'doctor.staff_id = appointment.doctor_id')
+      .andWhere('doctor.id = :doctorId', { doctorId })
       // DATE(...) giúp so sánh phần ngày của scheduled_start với date dạng YYYY-MM-DD.
       .andWhere('DATE(appointment.scheduled_start) = :date', { date })
       .andWhere('appointment.status IN (:...activeStatuses)', { activeStatuses })
@@ -237,7 +244,7 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
       .addSelect('appointment.status', 'status')
       .from('appointments', 'appointment')
       .where('appointment.facility_id = :facilityId', { facilityId: shift.facilityId })
-      .andWhere('appointment.doctor_id = :doctorId', { doctorId: shift.doctorId })
+      .andWhere('appointment.doctor_id = :staffId', { staffId: shift.staffId })
       .andWhere('DATE(appointment.scheduled_start) = :shiftDate', { shiftDate: shift.shiftDate })
       // Hai dòng TIME(...) dưới kiểm tra appointment có giao với giờ của ca không.
       .andWhere('TIME(appointment.scheduled_start) < :endTime', { endTime: shift.endTime })
@@ -281,13 +288,13 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
       });
 
       // Ghi audit log để sau này biết ai hủy, hủy từ trạng thái nào sang trạng thái nào, lý do gì.
-      await manager.createQueryBuilder().insert().into('doctor_shift_change_logs').values({
+      await manager.createQueryBuilder().insert().into('shift_change_logs').values({
         shift_id: shift.id,
         action: 'cancelled',
         old_status: shift.status,
         new_status: DoctorShiftStatus.CANCELLED,
-        old_doctor_id: shift.doctorId,
-        new_doctor_id: shift.doctorId,
+        old_staff_id: shift.staffId,
+        new_staff_id: shift.staffId,
         old_room_id: shift.roomId,
         new_room_id: shift.roomId,
         old_start_time: shift.startTime,
@@ -304,9 +311,11 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
         // Một disruption có thể ảnh hưởng nhiều appointment.
         const disruptionResult = await manager.createQueryBuilder().insert().into('shift_disruptions').values({
           type: 'doctor_shift_cancelled',
-          source_type: 'doctor_shift',
+          source_type: 'shift',
           source_id: shift.id,
           facility_id: shift.facilityId,
+          shift_id: shift.id,
+          staff_id: shift.staffId,
           doctor_shift_id: shift.id,
           room_id: shift.roomId ?? null,
           reason: reason ?? null,
@@ -324,7 +333,8 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
           affectedAppointments.map(appointment => ({
             disruption_id: disruptionId,
             appointment_id: appointment.id,
-            old_doctor_id: shift.doctorId,
+            old_staff_id: shift.staffId,
+            old_doctor_id: shift.staffId,
             old_room_id: shift.roomId ?? null,
             old_scheduled_start: appointment.scheduledStart,
             old_scheduled_end: appointment.scheduledEnd,
@@ -363,6 +373,53 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
     return Number(row?.count ?? 0) > 0;
   }
 
+  async findDoctorStaffId(doctorId: string, facilityId?: string): Promise<string | null> {
+    const query = this.repository.manager
+      .createQueryBuilder()
+      .select('doctor.staff_id', 'staffId')
+      .from('doctors', 'doctor')
+      .innerJoin('facility_staff', 'facilityStaff', 'facilityStaff.staff_id = doctor.staff_id')
+      .where('doctor.id = :doctorId', { doctorId })
+      .andWhere('doctor.status = :active', { active: 'active' })
+      .andWhere('facilityStaff.status = :active', { active: 'active' });
+
+    if (facilityId) {
+      query.andWhere('facilityStaff.facility_id = :facilityId', { facilityId });
+    }
+
+    const row = await query.getRawOne<{ staffId: string }>();
+    return row?.staffId ?? null;
+  }
+
+  async findDoctorIdByStaffId(staffId: string, facilityId?: string): Promise<string | null> {
+    const query = this.repository.manager
+      .createQueryBuilder()
+      .select('doctor.id', 'doctorId')
+      .from('doctors', 'doctor')
+      .innerJoin('facility_staff', 'facilityStaff', 'facilityStaff.staff_id = doctor.staff_id')
+      .where('doctor.staff_id = :staffId', { staffId })
+      .andWhere('doctor.status = :active', { active: 'active' })
+      .andWhere('facilityStaff.status = :active', { active: 'active' });
+
+    if (facilityId) {
+      query.andWhere('facilityStaff.facility_id = :facilityId', { facilityId });
+    }
+
+    const row = await query.getRawOne<{ doctorId: string }>();
+    return row?.doctorId ?? null;
+  }
+
+  findShiftSlotById(slotId: string): Promise<ShiftSlot | null> {
+    if (!this.shiftSlotRepository) {
+      return Promise.resolve(null);
+    }
+    return this.shiftSlotRepository
+      .createQueryBuilder('slot')
+      .where('slot.id = :slotId', { slotId })
+      .andWhere('slot.deletedAt IS NULL')
+      .getOne();
+  }
+
   private buildListQuery(filters?: SearchDoctorShiftDto): SelectQueryBuilder<DoctorShift> {
     // Query nền cho API list/search ca trực.
     // Tất cả list mặc định bỏ qua deletedAt để không hiện ca đã soft-delete/cancel.
@@ -370,7 +427,7 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
       .where('shift.deletedAt IS NULL')
       .orderBy('shift.shiftDate', 'DESC')
       .addOrderBy('shift.startTime', 'ASC');
-    if (filters?.doctorId) query.andWhere('shift.doctorId = :doctorId', { doctorId: filters.doctorId });
+    if (filters?.doctorId) query.andWhere('doctor.id = :doctorId', { doctorId: filters.doctorId });
     if (filters?.facilityId) query.andWhere('shift.facilityId = :facilityId', { facilityId: filters.facilityId });
     if (filters?.roomId) query.andWhere('shift.roomId = :roomId', { roomId: filters.roomId });
     if (filters?.status) query.andWhere('shift.status = :status', { status: filters.status });
@@ -383,11 +440,15 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
     return this.repository
       .createQueryBuilder('shift')
       .innerJoin('facilities', 'facility', 'facility.id = shift.facilityId')
-      .innerJoin('doctors', 'doctor', 'doctor.id = shift.doctorId')
-      .innerJoin('staffs', 'staff', 'staff.id = doctor.staff_id')
+      .innerJoin('staffs', 'staff', 'staff.id = shift.staffId')
+      .innerJoin('doctors', 'doctor', 'doctor.staff_id = staff.id')
+      .leftJoin('shift_slots', 'slot', 'slot.id = shift.slotId')
       .leftJoin('rooms', 'room', 'room.id = shift.roomId')
+      .leftJoin('room_types', 'roomType', 'roomType.id = room.roomTypeId')
       .select('shift.id', 'id')
-      .addSelect('shift.doctorId', 'doctorId')
+      .addSelect('doctor.id', 'doctorId')
+      .addSelect('shift.staffId', 'staffId')
+      .addSelect('shift.slotId', 'slotId')
       .addSelect('shift.facilityId', 'facilityId')
       .addSelect('shift.roomId', 'roomId')
       // DATE column qua raw query có thể bị mysql driver ép thành Date UTC.
@@ -397,6 +458,7 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
       .addSelect('shift.endTime', 'endTime')
       .addSelect('shift.maxAppointments', 'maxAppointments')
       .addSelect('shift.status', 'status')
+      .addSelect('shift.note', 'note')
       .addSelect('shift.createdAt', 'createdAt')
       .addSelect('shift.updatedAt', 'updatedAt')
       .addSelect('staff.name', 'doctorName')
@@ -405,7 +467,11 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
       .addSelect('facility.code', 'facilityCode')
       .addSelect('facility.name', 'facilityName')
       .addSelect('room.name', 'roomName')
-      .addSelect('room.room_type', 'roomType');
+      .addSelect('room.roomTypeId', 'roomTypeId')
+      .addSelect('roomType.code', 'roomType')
+      .addSelect('roomType.name', 'roomTypeName')
+      .addSelect('slot.code', 'slotCode')
+      .addSelect('slot.name', 'slotName');
   }
 
   private async paginateRaw<T>(
