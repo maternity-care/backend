@@ -1,7 +1,7 @@
+import { ShiftDisruptionStatus } from './../../../common/constants/status.enum';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Shift } from './shift.entity';
-import { ShiftDisruptionStatus } from 'src/common/constants/status.enum';
 
 @Entity('shift_disruptions')
 export class ShiftDisruption {

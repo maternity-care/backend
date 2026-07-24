@@ -1,6 +1,6 @@
+import { PregnancyProfileStatus, RiskLevel } from './../../../common/constants/status.enum';
+import { User } from './../../users/entities/user.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PregnancyProfileStatus, RiskLevel } from 'src/common/constants/status.enum';
-import { User } from 'src/modules/users/entities/user.entity';
 import {
   Column,
   CreateDateColumn,

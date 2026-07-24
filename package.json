@@ -24,7 +24,7 @@
     "migrate:rollback": "npm run migration:revert",
     "migrate:fresh": "npm run migration:fresh",
     "migrate:fresh:seed": "npm run migration:fresh:seed",
-    "seed": "ts-node -r tsconfig-paths/register src/database/seeders/seed.ts",
+    "seed": "ts-node -r tsconfig-paths/register src/database/seeders/updatedSeed.ts",
     "mail:test": "RUN_SMTP_INTEGRATION=true jest src/modules/mail/mail.service.spec.ts --runInBand --testNamePattern \"sends a real test email\"",
     "migration:run:prod": "typeorm migration:run -d dist/database/typeorm.config.js",
     "migration:revert:prod": "typeorm migration:revert -d dist/database/typeorm.config.js",

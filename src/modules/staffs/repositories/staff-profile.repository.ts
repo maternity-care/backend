@@ -1,9 +1,9 @@
+import { EMAIL_DOMAIN } from './../../users/users.enum';
 import { DeepPartial, Repository } from 'typeorm';
 import { Staff } from '../entities/staff.entity';
 import { IStaffProfileRepository } from '../interfaces/staff-profile-repository.interface';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConflictException, NotFoundException } from '@nestjs/common';
-import { EMAIL_DOMAIN } from 'src/modules/users/users.enum';
 
 export class StaffProfileRepository implements IStaffProfileRepository {
   constructor(
@@ -75,10 +75,7 @@ export class StaffProfileRepository implements IStaffProfileRepository {
     });
   }
 
-  async updateStaffProfile(
-    id: string,
-    data: DeepPartial<Staff>,
-  ): Promise<Staff | null> {
+  async updateStaffProfile(id: string, data: DeepPartial<Staff>): Promise<Staff | null> {
     const staffProfile = await this.repository.findOne({ where: { id } });
     if (!staffProfile) {
       throw new NotFoundException(`Không tìm thấy hồ sơ nhân viên với ID: ${id}`);

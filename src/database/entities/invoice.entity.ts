@@ -1,3 +1,4 @@
+import { InvoiceStatus } from './../../common/constants/status.enum';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -8,7 +9,6 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Order } from './order.entity';
-import { InvoiceStatus } from 'src/common/constants/status.enum';
 
 @Entity('invoices')
 export class Invoice {

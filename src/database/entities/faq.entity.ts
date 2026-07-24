@@ -1,5 +1,5 @@
+import { FaqStatusEnum } from './../../common/constants/status.enum';
 import { ApiProperty } from '@nestjs/swagger';
-import { FaqStatusEnum } from 'src/common/constants/status.enum';
 import {
   Column,
   CreateDateColumn,

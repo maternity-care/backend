@@ -1,3 +1,6 @@
+import { ConversationStatus } from './../../common/constants/status.enum';
+import { User } from './../../modules/users/entities/user.entity';
+import { Staff } from './../../modules/staffs/entities/staff.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -8,9 +11,6 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Staff } from 'src/modules/staffs/entities/staff.entity';
-import { User } from 'src/modules/users/entities/user.entity';
-import { ConversationStatus } from 'src/common/constants/status.enum';
 
 @Entity('chat_conversations')
 export class ChatConversation {

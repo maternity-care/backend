@@ -1,7 +1,8 @@
+import { AccountStatus } from './../../../common/constants/status.enum';
+import { Role } from './../../roles/entities/role.entity';
+import { Facility } from './../../facilities/entities/facility.entity';
+import { Doctor } from './../../doctors/entities/doctor.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { AccountStatus } from 'src/common/constants/status.enum';
-import { Doctor, Facility } from 'src/database/entities';
-import { Role } from 'src/modules/roles/entities/role.entity';
 import {
   Column,
   CreateDateColumn,
