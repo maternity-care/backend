@@ -6,12 +6,13 @@ import { RoomsService } from './rooms.service';
 import { RoomsRepository } from './repositories/rooms.repository';
 import { ROOMS_REPOSITORY } from './interfaces/rooms-repository.interface';
 import { RoomsFacilityController } from './rooms-facility.controller';
+import { FacilityRoomTypesController } from './facility-room-types.controller';
 import { FacilitiesModule } from '../facilities/facilities.module';
 import { RoomType } from '../../database/entities/room-type.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Room, RoomType]), FacilitiesModule],
-  controllers: [RoomsController, RoomsFacilityController],
+  controllers: [RoomsController, RoomsFacilityController, FacilityRoomTypesController],
   providers: [
     RoomsService,
     { provide: ROOMS_REPOSITORY, useClass: RoomsRepository },

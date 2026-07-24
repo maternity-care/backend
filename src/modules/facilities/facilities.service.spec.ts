@@ -5,12 +5,13 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { FacilityStatus } from '../../common/constants/status.enum';
+import { ActiveStatus, FacilityOperatingStatus, FacilityStatus } from '../../common/constants/status.enum';
 import { RoleEnum } from '../../common/constants/role.enum';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { FacilitiesController } from './facilities.controller';
 import { FacilitiesService } from './facilities.service';
 import { Facility } from './entities/facility.entity';
+import { FacilityClosureDay } from './entities/facility-closure-day.entity';
 
 const createFacility = (overrides: Partial<Facility> = {}): Facility => ({
   id: 'fac-1',
@@ -37,6 +38,18 @@ const createFacility = (overrides: Partial<Facility> = {}): Facility => ({
   ...overrides,
 });
 
+const createClosureDay = (overrides: Partial<FacilityClosureDay> = {}): FacilityClosureDay => ({
+  id: 'closure-1',
+  facility: null as any,
+  facilityId: 'fac-1',
+  closureDate: '2026-09-02',
+  reason: 'Nghi le Quoc khanh',
+  status: ActiveStatus.ACTIVE,
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+  ...overrides,
+});
+
 describe('FacilitiesService', () => {
   const createRepository = () => ({
     create: jest.fn((dto) => ({ id: 'draft', ...dto })),
@@ -45,6 +58,14 @@ describe('FacilitiesService', () => {
     findAllPaginated: jest.fn(),
     findById: jest.fn(),
     findDetailsById: jest.fn(),
+    syncOperatingHours: jest.fn(),
+    findOperatingHoursByFacilityId: jest.fn(),
+    createClosureDay: jest.fn((dto) => createClosureDay(dto)),
+    saveClosureDay: jest.fn(async (closureDay) => closureDay),
+    removeClosureDay: jest.fn(async () => undefined),
+    findClosureDaysByFacilityId: jest.fn(),
+    findClosureDayById: jest.fn(),
+    findClosureDayByDate: jest.fn(),
     findByCode: jest.fn(),
     findCodesByPrefix: jest.fn(),
     findByName: jest.fn(),
@@ -70,8 +91,17 @@ describe('FacilitiesService', () => {
     repository.findByName.mockResolvedValue(null);
     repository.findByEmail.mockResolvedValue(null);
     repository.findByPhone.mockResolvedValue(null);
+    repository.syncOperatingHours.mockResolvedValue(undefined);
+    repository.findOperatingHoursByFacilityId.mockResolvedValue([]);
+    repository.findClosureDaysByFacilityId.mockResolvedValue([]);
+    repository.findClosureDayById.mockResolvedValue(null);
+    repository.findClosureDayByDate.mockResolvedValue(null);
     repository.existsActiveOwner.mockResolvedValue(true);
     service = new FacilitiesService(repository as any);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   // Vai tro: tao facility khong can client nhap code; backend tu sinh code theo tinh/thanh.
@@ -88,6 +118,10 @@ describe('FacilitiesService', () => {
     expect(repository.findByPhone).toHaveBeenCalledWith(dto.phone);
     expect(repository.findCodesByPrefix).toHaveBeenCalledWith('CS-HCM');
     expect(repository.create).toHaveBeenCalledWith({ ...dto, code: 'CS-HCM-03' });
+    expect(repository.syncOperatingHours).toHaveBeenCalledWith('fac-1', expect.arrayContaining([
+      expect.objectContaining({ dayOfWeek: 'MON', openTime: dto.openTime, closeTime: dto.closeTime, isClosed: false }),
+      expect.objectContaining({ dayOfWeek: 'SUN', openTime: null, closeTime: null, isClosed: true }),
+    ]));
     expect(repository.save).toHaveBeenCalledTimes(1);
   });
 
@@ -170,7 +204,20 @@ describe('FacilitiesService', () => {
     const facilities = [createFacility(), createFacility({ id: 'fac-2', code: 'FAC-002' })];
     repository.findAll.mockResolvedValue(facilities);
 
-    await expect(service.findAll({ province: 'Ho Chi Minh' } as any)).resolves.toBe(facilities);
+    await expect(service.findAll({ province: 'Ho Chi Minh' } as any)).resolves.toEqual([
+      expect.objectContaining({
+        id: 'fac-1',
+        operatingHours: expect.arrayContaining([expect.objectContaining({ dayOfWeek: 'MON', isClosed: false })]),
+        operatingHourGroups: expect.arrayContaining([expect.objectContaining({ dayLabel: 'Thứ 2 - Thứ 6', displayTime: '08:00 - 17:00' })]),
+        closureDays: [],
+      }),
+      expect.objectContaining({
+        id: 'fac-2',
+        operatingHours: expect.arrayContaining([expect.objectContaining({ dayOfWeek: 'MON', isClosed: false })]),
+        operatingHourGroups: expect.arrayContaining([expect.objectContaining({ dayLabel: 'Thứ 2 - Thứ 6', displayTime: '08:00 - 17:00' })]),
+        closureDays: [],
+      }),
+    ]);
     expect(repository.findAll).toHaveBeenCalledWith({ province: 'Ho Chi Minh' });
   });
 
@@ -186,7 +233,121 @@ describe('FacilitiesService', () => {
     const paged = { items: [createFacility()], total: 1, page: 1, limit: 10 };
     repository.findAllPaginated.mockResolvedValue(paged);
 
-    await expect(service.findAllPaginated({ page: 1, limit: 10 } as any)).resolves.toBe(paged);
+    await expect(service.findAllPaginated({ page: 1, limit: 10 } as any)).resolves.toEqual({
+      ...paged,
+      items: [expect.objectContaining({
+        id: 'fac-1',
+        operatingHours: expect.arrayContaining([expect.objectContaining({ dayOfWeek: 'MON', isClosed: false })]),
+        operatingHourGroups: expect.arrayContaining([expect.objectContaining({ dayLabel: 'Thứ 2 - Thứ 6', displayTime: '08:00 - 17:00' })]),
+        closureDays: [],
+      })],
+    });
+  });
+
+  // Vai tro: tinh trang thai dong/mo cua dong theo gio hien tai o Viet Nam, khong luu vao DB.
+  it('adds open operating status when current Vietnam time is inside today operating hours', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-08T03:00:00.000Z')); // 10:00 ngay 08/07/2026 o Viet Nam.
+    repository.findDetailsById.mockResolvedValue(createFacility());
+
+    await expect(service.findDetailsById('fac-1')).resolves.toMatchObject({
+      id: 'fac-1',
+      operatingStatus: FacilityOperatingStatus.OPEN,
+      operatingStatusLabel: 'Dang mo cua',
+      isOpenNow: true,
+      todayOperatingHour: expect.objectContaining({
+        dayOfWeek: 'WED',
+        openTime: '08:00',
+        closeTime: '17:00',
+        isClosed: false,
+      }),
+    });
+  });
+
+  // Vai tro: neu qua gio dong cua thi response tu dong tra trang thai da dong cua.
+  it('adds closed operating status when current Vietnam time is outside today operating hours', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-08T12:00:00.000Z')); // 19:00 ngay 08/07/2026 o Viet Nam.
+    repository.findDetailsById.mockResolvedValue(createFacility());
+
+    await expect(service.findDetailsById('fac-1')).resolves.toMatchObject({
+      operatingStatus: FacilityOperatingStatus.CLOSED,
+      operatingStatusLabel: 'Da dong cua',
+      isOpenNow: false,
+      todayOperatingHour: expect.objectContaining({ dayOfWeek: 'WED' }),
+    });
+  });
+
+  // Vai tro: neu hom nay nam trong facility_closure_days active thi uu tien tra hom nay dong cua.
+  it('adds closed-today operating status when today is an active closure day', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-08T03:00:00.000Z'));
+    repository.findDetailsById.mockResolvedValue(createFacility());
+    repository.findClosureDaysByFacilityId.mockResolvedValue([{
+      id: 'closure-1',
+      facilityId: 'fac-1',
+      closureDate: '2026-07-08',
+      reason: 'Bao tri',
+      status: ActiveStatus.ACTIVE,
+    }]);
+
+    await expect(service.findDetailsById('fac-1')).resolves.toMatchObject({
+      operatingStatus: FacilityOperatingStatus.CLOSED_TODAY,
+      operatingStatusLabel: 'Hom nay dong cua',
+      isOpenNow: false,
+    });
+  });
+
+  // Vai tro: facility inactive/deleted khong duoc hien la dang mo cua ke ca trong gio lam viec.
+  it('adds inactive operating status when facility lifecycle status is inactive', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-08T03:00:00.000Z'));
+    repository.findDetailsById.mockResolvedValue(createFacility({ status: FacilityStatus.INACTIVE }));
+
+    await expect(service.findDetailsById('fac-1')).resolves.toMatchObject({
+      status: FacilityStatus.INACTIVE,
+      operatingStatus: FacilityOperatingStatus.INACTIVE,
+      operatingStatusLabel: 'Co so dang ngung hoat dong',
+      isOpenNow: false,
+    });
+  });
+
+  // Vai tro: cap nhat khung gio hoat dong theo nhom ngay va tra ve group de landing page hien thi truc tiep.
+  it('updates grouped operating hours and returns display groups for landing page', async () => {
+    const facility = createFacility();
+    repository.findById.mockResolvedValue(facility);
+    repository.findOperatingHoursByFacilityId
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { dayOfWeek: 'MON', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false },
+        { dayOfWeek: 'TUE', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false },
+        { dayOfWeek: 'WED', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false },
+        { dayOfWeek: 'THU', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false },
+        { dayOfWeek: 'FRI', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false },
+        { dayOfWeek: 'SAT', openTime: '08:00:00', closeTime: '17:00:00', isClosed: false },
+        { dayOfWeek: 'SUN', openTime: null, closeTime: null, isClosed: true },
+      ]);
+
+    await expect(service.updateOperatingHours('fac-1', {
+      schedules: [
+        { days: ['MON', 'TUE', 'WED', 'THU', 'FRI'] as any, openTime: '07:00:00', closeTime: '19:00:00', isClosed: false },
+        { days: ['SAT'] as any, openTime: '08:00:00', closeTime: '17:00:00', isClosed: false },
+        { days: ['SUN'] as any, isClosed: true },
+      ],
+    })).resolves.toEqual({
+      operatingHours: expect.any(Array),
+      operatingHourGroups: [
+        expect.objectContaining({ dayLabel: 'Thứ 2 - Thứ 6', displayTime: '07:00 - 19:00' }),
+        expect.objectContaining({ dayLabel: 'Thứ 7', displayTime: '08:00 - 17:00' }),
+        expect.objectContaining({ dayLabel: 'Chủ nhật', displayTime: 'Đóng cửa' }),
+      ],
+    });
+
+    expect(repository.syncOperatingHours).toHaveBeenCalledWith('fac-1', [
+      expect.objectContaining({ dayOfWeek: 'MON', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false }),
+      expect.objectContaining({ dayOfWeek: 'TUE', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false }),
+      expect.objectContaining({ dayOfWeek: 'WED', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false }),
+      expect.objectContaining({ dayOfWeek: 'THU', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false }),
+      expect.objectContaining({ dayOfWeek: 'FRI', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false }),
+      expect.objectContaining({ dayOfWeek: 'SAT', openTime: '08:00:00', closeTime: '17:00:00', isClosed: false }),
+      expect.objectContaining({ dayOfWeek: 'SUN', openTime: null, closeTime: null, isClosed: true }),
+    ]);
   });
 
   // Vai tro: dam bao ket qua phan trang facility rong cung tra 404 ro rang.
@@ -361,6 +522,135 @@ describe('FacilitiesService', () => {
 
     await expect(service.deActivateFacility('missing')).rejects.toBe(error);
   });
+
+  // Vai tro: lay danh sach ngay dong cua co filter ngay bat dau/ket thuc/trang thai.
+  it('returns facility closure days with filters', async () => {
+    const facility = createFacility();
+    const closureDays = [{
+      id: 'closure-1',
+      facilityId: 'fac-1',
+      closureDate: '2026-09-02',
+      reason: 'Nghi le Quoc khanh',
+      status: ActiveStatus.ACTIVE,
+    }];
+    repository.findById.mockResolvedValue(facility);
+    repository.findClosureDaysByFacilityId.mockResolvedValue(closureDays);
+
+    await expect(service.getClosureDays('fac-1', {
+      fromDate: '2026-09-01',
+      toDate: '2026-09-03',
+      status: ActiveStatus.ACTIVE,
+    })).resolves.toBe(closureDays);
+
+    expect(repository.findClosureDaysByFacilityId).toHaveBeenCalledWith('fac-1', {
+      fromDate: '2026-09-01',
+      toDate: '2026-09-03',
+      status: ActiveStatus.ACTIVE,
+    });
+  });
+
+  // Vai tro: bat loi query ngay sai thu tu de tranh FE gui fromDate lon hon toDate.
+  it('rejects invalid closure day date range', async () => {
+    repository.findById.mockResolvedValue(createFacility());
+
+    await expect(service.getClosureDays('fac-1', {
+      fromDate: '2026-09-03',
+      toDate: '2026-09-01',
+    })).rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.findClosureDaysByFacilityId).not.toHaveBeenCalled();
+  });
+
+  // Vai tro: tao ngay dong cua thu cong cho co so va default status la active.
+  it('creates a facility closure day', async () => {
+    repository.findById.mockResolvedValue(createFacility());
+    repository.saveClosureDay.mockResolvedValue(createClosureDay());
+
+    await expect(service.createClosureDay('fac-1', {
+      closureDate: '2026-09-02',
+      reason: 'Nghi le Quoc khanh',
+    })).resolves.toEqual({
+      id: 'closure-1',
+      facilityId: 'fac-1',
+      closureDate: '2026-09-02',
+      reason: 'Nghi le Quoc khanh',
+      status: ActiveStatus.ACTIVE,
+    });
+
+    expect(repository.createClosureDay).toHaveBeenCalledWith({
+      facilityId: 'fac-1',
+      closureDate: '2026-09-02',
+      reason: 'Nghi le Quoc khanh',
+      status: ActiveStatus.ACTIVE,
+    });
+  });
+
+  // Vai tro: khong cho tao trung ngay dong cua trong cung mot co so va tra data record bi trung.
+  it('rejects duplicated facility closure day date', async () => {
+    const duplicated = createClosureDay();
+    repository.findById.mockResolvedValue(createFacility());
+    repository.findClosureDayByDate.mockResolvedValue(duplicated);
+
+    let error: ConflictException | undefined;
+    try {
+      await service.createClosureDay('fac-1', { closureDate: '2026-09-02' });
+    } catch (caughtError) {
+      error = caughtError as ConflictException;
+    }
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect(error!.getResponse()).toMatchObject({
+      message: 'Ngay dong cua cua co so da ton tai',
+      data: {
+        duplicatedField: 'closureDate',
+        duplicatedData: {
+          id: 'closure-1',
+          facilityId: 'fac-1',
+          closureDate: '2026-09-02',
+          status: ActiveStatus.ACTIVE,
+        },
+      },
+    });
+    expect(repository.createClosureDay).not.toHaveBeenCalled();
+  });
+
+  // Vai tro: cap nhat ngay dong cua va check trung neu doi sang ngay khac.
+  it('updates a facility closure day', async () => {
+    const closureDay = createClosureDay();
+    repository.findById.mockResolvedValue(createFacility());
+    repository.findClosureDayById.mockResolvedValue(closureDay);
+    repository.saveClosureDay.mockImplementation(async (value) => value);
+
+    await expect(service.updateClosureDay('fac-1', 'closure-1', {
+      closureDate: '2026-09-03',
+      reason: 'Bao tri dot xuat',
+      status: ActiveStatus.INACTIVE,
+    })).resolves.toEqual({
+      id: 'closure-1',
+      facilityId: 'fac-1',
+      closureDate: '2026-09-03',
+      reason: 'Bao tri dot xuat',
+      status: ActiveStatus.INACTIVE,
+    });
+
+    expect(repository.findClosureDayByDate).toHaveBeenCalledWith('fac-1', '2026-09-03');
+    expect(repository.saveClosureDay).toHaveBeenCalledWith(closureDay);
+  });
+
+  // Vai tro: xoa record ngay dong cua khi admin nhap nham lich nghi.
+  it('removes a facility closure day', async () => {
+    const closureDay = createClosureDay();
+    repository.findById.mockResolvedValue(createFacility());
+    repository.findClosureDayById.mockResolvedValue(closureDay);
+
+    await expect(service.removeClosureDay('fac-1', 'closure-1')).resolves.toEqual({
+      id: 'closure-1',
+      facilityId: 'fac-1',
+      closureDate: '2026-09-02',
+      reason: 'Nghi le Quoc khanh',
+      status: ActiveStatus.ACTIVE,
+    });
+    expect(repository.removeClosureDay).toHaveBeenCalledWith(closureDay);
+  });
 });
 
 describe('FacilitiesController', () => {
@@ -383,6 +673,12 @@ describe('FacilitiesController', () => {
     findAllPaginated: jest.fn(),
     findById: jest.fn(),
     findDetailsById: jest.fn(),
+    getOperatingHours: jest.fn(),
+    updateOperatingHours: jest.fn(),
+    getClosureDays: jest.fn(),
+    createClosureDay: jest.fn(),
+    updateClosureDay: jest.fn(),
+    removeClosureDay: jest.fn(),
     lookup: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
@@ -485,6 +781,81 @@ describe('FacilitiesController', () => {
       message: RESPONSE_MESSAGES.FACILITY_STATUS_UPDATED,
       data: inactive,
     });
+  });
+
+  // Vai tro: dam bao API list closure-days check scope va wrap response dung chuan.
+  it('wraps get closure days response after facility access check', async () => {
+    const mockService = createService();
+    const closureDays = [{
+      id: 'closure-1',
+      facilityId: 'fac-1',
+      closureDate: '2026-09-02',
+      reason: 'Nghi le Quoc khanh',
+      status: ActiveStatus.ACTIVE,
+    }];
+    mockService.getClosureDays.mockResolvedValue(closureDays);
+    const controller = new FacilitiesController(mockService as any);
+
+    await expect(controller.getClosureDays(facilityAdmin, 'fac-1', { status: ActiveStatus.ACTIVE })).resolves.toEqual({
+      message: RESPONSE_MESSAGES.FACILITY_RETRIEVED,
+      data: closureDays,
+    });
+    expect(mockService.getClosureDays).toHaveBeenCalledWith('fac-1', { status: ActiveStatus.ACTIVE });
+  });
+
+  // Vai tro: dam bao API tao closure-day khong cho admin co so nay tao ngay nghi cho co so khac.
+  it('denies create closure day when user tries to access another facility', async () => {
+    const mockService = createService();
+    const controller = new FacilitiesController(mockService as any);
+
+    await expect(controller.createClosureDay(facilityAdmin, 'fac-2', {
+      closureDate: '2026-09-02',
+    })).rejects.toBeInstanceOf(ForbiddenException);
+    expect(mockService.createClosureDay).not.toHaveBeenCalled();
+  });
+
+  // Vai tro: dam bao API update closure-day truyen dung facilityId, closureDayId va body xuong service.
+  it('wraps update closure day response', async () => {
+    const mockService = createService();
+    const updated = {
+      id: 'closure-1',
+      facilityId: 'fac-1',
+      closureDate: '2026-09-02',
+      reason: 'Nghi le Quoc khanh',
+      status: ActiveStatus.INACTIVE,
+    };
+    mockService.updateClosureDay.mockResolvedValue(updated);
+    const controller = new FacilitiesController(mockService as any);
+
+    await expect(controller.updateClosureDay(facilityAdmin, 'fac-1', 'closure-1', {
+      status: ActiveStatus.INACTIVE,
+    })).resolves.toEqual({
+      message: RESPONSE_MESSAGES.FACILITY_UPDATED,
+      data: updated,
+    });
+    expect(mockService.updateClosureDay).toHaveBeenCalledWith('fac-1', 'closure-1', {
+      status: ActiveStatus.INACTIVE,
+    });
+  });
+
+  // Vai tro: dam bao API xoa closure-day tra lai record vua xoa de FE co the cap nhat UI ro rang.
+  it('wraps remove closure day response', async () => {
+    const mockService = createService();
+    const removed = {
+      id: 'closure-1',
+      facilityId: 'fac-1',
+      closureDate: '2026-09-02',
+      reason: 'Nghi le Quoc khanh',
+      status: ActiveStatus.ACTIVE,
+    };
+    mockService.removeClosureDay.mockResolvedValue(removed);
+    const controller = new FacilitiesController(mockService as any);
+
+    await expect(controller.removeClosureDay(facilityAdmin, 'fac-1', 'closure-1')).resolves.toEqual({
+      message: RESPONSE_MESSAGES.FACILITY_DELETED,
+      data: removed,
+    });
+    expect(mockService.removeClosureDay).toHaveBeenCalledWith('fac-1', 'closure-1');
   });
 
   // Vai tro: dam bao loi bat ngo o controller duoc chuan hoa thanh InternalServerErrorException.

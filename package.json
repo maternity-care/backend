@@ -13,7 +13,7 @@
     "build": "nest build",
     "test": "jest",
     "test:facility-rooms": "jest --runTestsByPath src/modules/facilities/facilities.service.spec.ts src/modules/rooms/rooms.service.spec.ts src/modules/facility-room-dto.spec.ts",
-    "test:doctor-shifts": "jest --runTestsByPath src/modules/doctor-shifts/doctor-shifts.spec.ts",
+    "test:shifts": "jest --runTestsByPath src/modules/shifts/shifts.spec.ts",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",

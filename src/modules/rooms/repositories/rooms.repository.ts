@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
 import { Room } from '../entities/room.entity';
 import {
+  FacilityRoomType,
   IRoomsRepository,
   RoomLookup,
   RoomTypeDetails,
@@ -36,6 +37,18 @@ export class RoomsRepository implements IRoomsRepository {
     return this.repository.manager.transaction(manager => manager.save(Room, rooms));
   }
 
+  async findCodesByFacilityAndPrefix(facilityId: string, prefix: string): Promise<string[]> {
+    const rows = await this.repository
+      .createQueryBuilder('room')
+      .withDeleted()
+      .select('room.code', 'code')
+      .where('room.facilityId = :facilityId', { facilityId })
+      .andWhere('room.code LIKE :pattern', { pattern: `${prefix}-%` })
+      .getRawMany<{ code: string }>();
+
+    return rows.map(row => row.code);
+  }
+
   findAll(filters?: SearchRoomsDto): Promise<RoomWithDetails[]> {
     return this.buildDetailsQuery(filters)
       .orderBy('room.createdAt', 'DESC')
@@ -64,7 +77,11 @@ export class RoomsRepository implements IRoomsRepository {
   }
 
   findByName(name: string): Promise<Room | null> {
-    return this.repository.findOne({ where: { name } });
+    return this.repository
+      .createQueryBuilder('room')
+      .where('LOWER(room.name) = LOWER(:name)', { name })
+      .andWhere('room.deletedAt IS NULL')
+      .getOne();
   }
 
   findByFacilityAndName(facilityId: string, name: string, excludeId?: string): Promise<Room | null> {
@@ -106,19 +123,73 @@ export class RoomsRepository implements IRoomsRepository {
   }
 
   findRoomTypeById(id: string): Promise<RoomType | null> {
-    return this.roomTypeRepository.findOne({ where: { id } });
+    return this.roomTypeRepository
+      .createQueryBuilder('roomType')
+      .where('roomType.id = :id', { id })
+      .andWhere('roomType.deletedAt IS NULL')
+      .getOne();
   }
 
   findRoomTypeByName(name: string, excludeId?: string): Promise<RoomType | null> {
     const query = this.roomTypeRepository
       .createQueryBuilder('roomType')
-      .where('LOWER(roomType.name) = LOWER(:name)', { name });
+      .where('LOWER(roomType.name) = LOWER(:name)', { name })
+      .andWhere('roomType.deletedAt IS NULL');
 
     if (excludeId) {
       query.andWhere('roomType.id != :excludeId', { excludeId });
     }
 
     return query.getOne();
+  }
+
+  async findRoomTypeCodesByPrefix(prefix: string): Promise<string[]> {
+    const rows = await this.roomTypeRepository
+      .createQueryBuilder('roomType')
+      .withDeleted()
+      .select('roomType.code', 'code')
+      .where('roomType.code LIKE :pattern', { pattern: `${prefix}%` })
+      .getRawMany<{ code: string }>();
+
+    return rows.map(row => row.code);
+  }
+
+  findRoomTypesByFacilityId(facilityId: string, filters?: LookupRoomTypesDto): Promise<FacilityRoomType[]> {
+    const query = this.roomTypeRepository
+      .createQueryBuilder('roomType')
+      .innerJoin('rooms', 'room', 'room.room_type_id = roomType.id')
+      .innerJoin('facilities', 'facility', 'facility.id = room.facility_id')
+      .select('roomType.id', 'id')
+      .addSelect('roomType.code', 'code')
+      .addSelect('roomType.name', 'name')
+      .addSelect('roomType.description', 'description')
+      .addSelect('roomType.status', 'status')
+      .addSelect('COUNT(room.id)', 'roomCount')
+      .where('room.facility_id = :facilityId', { facilityId })
+      .andWhere('room.deleted_at IS NULL')
+      .andWhere('room.status = :roomStatus', { roomStatus: ActiveStatus.ACTIVE })
+      .andWhere('roomType.deletedAt IS NULL')
+      .andWhere('facility.deleted_at IS NULL')
+      .groupBy('roomType.id')
+      .addGroupBy('roomType.code')
+      .addGroupBy('roomType.name')
+      .addGroupBy('roomType.description')
+      .addGroupBy('roomType.status')
+      .orderBy('roomType.name', 'ASC')
+      .limit(Math.max(1, Number(filters?.limit) || 50));
+
+    if (filters?.search) {
+      query.andWhere(
+        '(LOWER(roomType.name) LIKE LOWER(:search) OR LOWER(roomType.description) LIKE LOWER(:search))',
+        { search: `%${filters.search}%` },
+      );
+    }
+
+    if (filters?.status) {
+      query.andWhere('roomType.status = :status', { status: filters.status });
+    }
+
+    return query.getRawMany<FacilityRoomType>();
   }
 
   lookup(filters?: LookupRoomsDto): Promise<RoomLookup[]> {
@@ -128,6 +199,7 @@ export class RoomsRepository implements IRoomsRepository {
       status: filters?.status,
     })
       .select('room.id', 'id')
+      .addSelect('room.code', 'code')
       .addSelect('room.name', 'name')
       .addSelect('room.facilityId', 'facilityId')
       .addSelect('facility.name', 'facilityName')
@@ -146,11 +218,14 @@ export class RoomsRepository implements IRoomsRepository {
     const query = this.roomTypeRepository
       .createQueryBuilder('roomType')
       .select('roomType.id', 'id')
+      .addSelect('roomType.code', 'code')
       .addSelect('roomType.name', 'name')
       .addSelect('roomType.description', 'description')
       .addSelect('roomType.status', 'status')
       .orderBy('roomType.name', 'ASC')
       .limit(Math.max(1, Number(filters?.limit) || 20));
+
+    query.andWhere('roomType.deletedAt IS NULL');
 
     if (filters?.search) {
       query.andWhere(
@@ -229,8 +304,10 @@ export class RoomsRepository implements IRoomsRepository {
       .innerJoin('facilities', 'facility', 'facility.id = room.facilityId')
       .innerJoin('room_types', 'roomType', 'roomType.id = room.roomTypeId')
       .where('room.deletedAt IS NULL')
+      .andWhere('facility.deletedAt IS NULL')
       .select('room.id', 'id')
       .addSelect('room.facilityId', 'facilityId')
+      .addSelect('room.code', 'code')
       .addSelect('room.roomTypeId', 'roomTypeId')
       .addSelect('room.name', 'name')
       .addSelect('room.floor', 'floor')
@@ -244,6 +321,7 @@ export class RoomsRepository implements IRoomsRepository {
       .addSelect('facility.ward', 'facilityWard')
       .addSelect('facility.status', 'facilityStatus')
       .addSelect('roomType.name', 'roomTypeName')
+      .addSelect('roomType.code', 'roomTypeCode')
       .addSelect('roomType.description', 'roomTypeDescription')
       .addSelect('roomType.status', 'roomTypeStatus');
 
@@ -285,11 +363,14 @@ export class RoomsRepository implements IRoomsRepository {
     const query = this.roomTypeRepository
       .createQueryBuilder('roomType')
       .select('roomType.id', 'id')
+      .addSelect('roomType.code', 'code')
       .addSelect('roomType.name', 'name')
       .addSelect('roomType.description', 'description')
       .addSelect('roomType.status', 'status')
       .addSelect('roomType.createdAt', 'createdAt')
       .addSelect('roomType.updatedAt', 'updatedAt');
+
+    query.where('roomType.deletedAt IS NULL');
 
     if (filters?.search) {
       query.andWhere(

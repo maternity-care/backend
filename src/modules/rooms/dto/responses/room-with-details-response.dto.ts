@@ -9,6 +9,9 @@ export class RoomWithDetailsResponseDto {
   facilityId: string;
 
   @ApiProperty()
+  code: string;
+
+  @ApiProperty()
   roomTypeId: string;
 
   @ApiProperty()
@@ -48,6 +51,9 @@ export class RoomWithDetailsResponseDto {
   roomTypeName?: string;
 
   @ApiPropertyOptional()
+  roomTypeCode?: string;
+
+  @ApiPropertyOptional()
   roomTypeDescription?: string;
 
   @ApiPropertyOptional({ enum: ActiveStatus })
@@ -57,6 +63,9 @@ export class RoomWithDetailsResponseDto {
 export class RoomLookupResponseDto {
   @ApiProperty()
   id: string;
+
+  @ApiProperty()
+  code: string;
 
   @ApiProperty()
   name: string;
@@ -85,6 +94,9 @@ export class RoomTypeLookupResponseDto {
   id: string;
 
   @ApiProperty()
+  code: string;
+
+  @ApiProperty()
   name: string;
 
   @ApiProperty()
@@ -100,4 +112,9 @@ export class RoomTypeResponseDto extends RoomTypeLookupResponseDto {
 
   @ApiProperty()
   updatedAt: Date;
+}
+
+export class FacilityRoomTypeResponseDto extends RoomTypeLookupResponseDto {
+  @ApiProperty({ description: 'So phong dang hoat dong cua co so thuoc loai phong nay' })
+  roomCount: number;
 }

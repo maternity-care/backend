@@ -21,11 +21,8 @@ import {
   assertFacilityAccess,
   getActiveFacilityId,
 } from '../../common/helpers/facility-scope.helper';
+
 @ApiTags('Management - Rooms')
-// TEMP DEV: JwtAuthGuard dang duoc tam tat de test rooms khi auth module chua dong bo entity moi.
-// Khi sua xong auth, bat lai:
-// @ApiBearerAuth()
-// @UseGuards(JwtAuthGuard)
 @Controller('management/rooms')
 export class RoomsController {
   constructor(private readonly roomsService: RoomsService) {}

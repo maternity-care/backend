@@ -3,8 +3,14 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FacilitiesService } from './facilities.service';
 import { CreateFacilityDto } from './dto/requests/create-facility.dto';
 import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
+import { UpdateFacilityOperatingHoursDto } from './dto/requests/update-facility-operating-hours.dto';
+import {
+  CreateFacilityClosureDayDto,
+  SearchFacilityClosureDayDto,
+  UpdateFacilityClosureDayDto,
+} from './dto/requests/facility-closure-day.dto';
 import { LookupFacilityDto, SearchFacilityDto } from './dto/requests/search-facility.dto';
-import { FacilityLookupResponseDto, FacilityResponseDto } from './dto/responds/facilities-respond';
+import { FacilityClosureDayResponseDto, FacilityLookupResponseDto, FacilityResponseDto } from './dto/responds/facilities-respond';
 import { HttpException } from '@nestjs/common';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -13,12 +19,8 @@ import {
   assertFacilityAccess,
   getActiveFacilityId,
 } from '../../common/helpers/facility-scope.helper';
+
 @ApiTags('Management - Facilities')
-// TEMP DEV: Auth/RolesGuard dang duoc tam tat de test facility khi auth module chua dong bo entity moi.
-// Khi sua xong auth, bat lai:
-// @ApiBearerAuth()
-// @UseGuards(JwtAuthGuard, RolesGuard)
-// @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.ADMIN)
 @Controller('management/facilities')
 export class FacilitiesController {
   constructor(private readonly facilitiesService: FacilitiesService) {}
@@ -103,6 +105,42 @@ export class FacilitiesController {
     }
   }
 
+  @Get(':id/operating-hours')
+  @ApiOperation({ summary: 'Get facility operating hours grouped for display' })
+  async getOperatingHours(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITY_RETRIEVED,
+        data: await this.facilitiesService.getOperatingHours(id),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Get(':id/closure-days')
+  @ApiOperation({ summary: 'List facility closure days' })
+  @ApiResponse({ status: 200, type: [FacilityClosureDayResponseDto] })
+  async getClosureDays(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Query() query: SearchFacilityClosureDayDto,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITY_RETRIEVED,
+        data: await this.facilitiesService.getClosureDays(id, query),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get facility details' })
   @ApiResponse({ status: 200, type: FacilityResponseDto })
@@ -123,7 +161,6 @@ export class FacilitiesController {
   }
 
   @Post()
-  // TEMP DEV: route create facility tam thoi chua gan @Roles(RoleEnum.SUPER_ADMIN).
   @ApiOperation({ summary: 'Create facility' })
   @ApiResponse({ status: 201, type: FacilityResponseDto })
   async create(@Body() dto: CreateFacilityDto) {
@@ -132,6 +169,63 @@ export class FacilitiesController {
       return {
         message: RESPONSE_MESSAGES.FACILITY_CREATED,
         data: facility,
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Post(':id/closure-days')
+  @ApiOperation({ summary: 'Create a facility closure day' })
+  @ApiResponse({ status: 201, type: FacilityClosureDayResponseDto })
+  async createClosureDay(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: CreateFacilityClosureDayDto,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITY_CREATED,
+        data: await this.facilitiesService.createClosureDay(id, dto),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Patch(':id/operating-hours')
+  @ApiOperation({ summary: 'Update facility operating hours by day groups' })
+  async updateOperatingHours(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateFacilityOperatingHoursDto,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITY_UPDATED,
+        data: await this.facilitiesService.updateOperatingHours(id, dto),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Patch(':id/closure-days/:closureDayId')
+  @ApiOperation({ summary: 'Update a facility closure day' })
+  @ApiResponse({ status: 200, type: FacilityClosureDayResponseDto })
+  async updateClosureDay(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Param('closureDayId') closureDayId: string,
+    @Body() dto: UpdateFacilityClosureDayDto,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITY_UPDATED,
+        data: await this.facilitiesService.updateClosureDay(id, closureDayId, dto),
       };
     } catch (error) {
       this.handleError(error);
@@ -159,9 +253,27 @@ export class FacilitiesController {
   }
 
 
+  @Delete(':id/closure-days/:closureDayId')
+  @ApiOperation({ summary: 'Delete a facility closure day' })
+  @ApiResponse({ status: 200, type: FacilityClosureDayResponseDto })
+  async removeClosureDay(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Param('closureDayId') closureDayId: string,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITY_DELETED,
+        data: await this.facilitiesService.removeClosureDay(id, closureDayId),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
 
   @Delete(':id')
-  // TEMP DEV: route delete facility tam thoi chua gan @Roles(RoleEnum.SUPER_ADMIN).
   @ApiOperation({ summary: 'Delete facility' })
   @ApiResponse({ status: 200 })
   async remove(

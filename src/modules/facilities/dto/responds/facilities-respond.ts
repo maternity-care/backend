@@ -1,5 +1,56 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { FacilityStatus } from '../../../../common/constants/status.enum';
+import { FacilityOperatingStatus, FacilityStatus } from '../../../../common/constants/status.enum';
+
+export class FacilityOperatingHourResponseDto {
+  @ApiProperty()
+  dayOfWeek: string;
+
+  @ApiPropertyOptional()
+  openTime: string | null;
+
+  @ApiPropertyOptional()
+  closeTime: string | null;
+
+  @ApiProperty()
+  isClosed: boolean;
+}
+
+export class FacilityOperatingHourGroupResponseDto {
+  @ApiProperty({ type: [String] })
+  days: string[];
+
+  @ApiProperty()
+  dayLabel: string;
+
+  @ApiPropertyOptional()
+  openTime: string | null;
+
+  @ApiPropertyOptional()
+  closeTime: string | null;
+
+  @ApiProperty()
+  isClosed: boolean;
+
+  @ApiProperty()
+  displayTime: string;
+}
+
+export class FacilityClosureDayResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  facilityId: string;
+
+  @ApiProperty()
+  closureDate: string;
+
+  @ApiPropertyOptional()
+  reason: string | null;
+
+  @ApiProperty()
+  status: string;
+}
 
 export class FacilityResponseDto {
   @ApiProperty()
@@ -29,14 +80,14 @@ export class FacilityResponseDto {
   @ApiProperty()
   email: string;
 
-  @ApiProperty()
-  openTime: string;
+  @ApiPropertyOptional({ nullable: true })
+  openTime: string | null;
 
-  @ApiProperty()
-  closeTime: string;
+  @ApiPropertyOptional({ nullable: true })
+  closeTime: string | null;
 
-  @ApiProperty()
-  workingDays: string;
+  @ApiPropertyOptional({ nullable: true })
+  workingDays: string | null;
 
   @ApiProperty()
   address: string;
@@ -56,11 +107,32 @@ export class FacilityResponseDto {
   @ApiProperty({ enum: FacilityStatus })
   status: FacilityStatus;
 
+  @ApiPropertyOptional({ enum: FacilityOperatingStatus })
+  operatingStatus?: FacilityOperatingStatus;
+
+  @ApiPropertyOptional()
+  operatingStatusLabel?: string;
+
+  @ApiPropertyOptional()
+  isOpenNow?: boolean;
+
+  @ApiPropertyOptional({ type: FacilityOperatingHourResponseDto })
+  todayOperatingHour?: FacilityOperatingHourResponseDto | null;
+
   @ApiProperty()
   createdAt: Date;
 
   @ApiProperty()
   updatedAt: Date;
+
+  @ApiPropertyOptional({ type: [FacilityOperatingHourResponseDto] })
+  operatingHours?: FacilityOperatingHourResponseDto[];
+
+  @ApiPropertyOptional({ type: [FacilityOperatingHourGroupResponseDto] })
+  operatingHourGroups?: FacilityOperatingHourGroupResponseDto[];
+
+  @ApiPropertyOptional({ type: [FacilityClosureDayResponseDto] })
+  closureDays?: FacilityClosureDayResponseDto[];
 }
 
 export class FacilityLookupResponseDto {

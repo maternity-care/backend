@@ -21,7 +21,8 @@ import {
   trimValue,
 } from '../../../../common/helpers/dto-transform.helper';
 import { HasUniqueCsvValues, IsLaterThan } from '../../../../common/helpers/dto-validation.helper';
-import { FACILITY_TIME_PATTERN, POSITIVE_ID_PATTERN, WORKING_DAYS_PATTERN } from './create-facility.dto';
+import { POSITIVE_ID_PATTERN } from './create-facility.dto';
+import { FACILITY_TIME_PATTERN, WORKING_DAYS_PATTERN } from './facility-schedule.dto';
 
 export class UpdateFacilityDto {
   @ApiPropertyOptional()

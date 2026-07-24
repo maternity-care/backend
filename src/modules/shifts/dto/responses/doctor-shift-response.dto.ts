@@ -8,6 +8,12 @@ export class DoctorShiftResponseDto {
   @ApiProperty()
   doctorId: string;
 
+  @ApiPropertyOptional()
+  staffId?: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  slotId?: string | null;
+
   @ApiProperty()
   facilityId: string;
 
@@ -55,4 +61,16 @@ export class DoctorShiftResponseDto {
 
   @ApiPropertyOptional({ nullable: true })
   roomType?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  roomTypeId?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  roomTypeName?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  slotCode?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  slotName?: string | null;
 }

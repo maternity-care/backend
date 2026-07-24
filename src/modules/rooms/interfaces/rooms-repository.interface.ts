@@ -8,6 +8,7 @@ import {
   RoomTypeResponseDto,
   RoomTypeLookupResponseDto,
   RoomWithDetailsResponseDto,
+  FacilityRoomTypeResponseDto,
 } from '../dto/responses/room-with-details-response.dto';
 import { RoomType } from '../../../database/entities/room-type.entity';
 export const ROOMS_REPOSITORY = Symbol('ROOMS_REPOSITORY');
@@ -16,11 +17,13 @@ export type RoomWithDetails = RoomWithDetailsResponseDto;
 export type RoomLookup = RoomLookupResponseDto;
 export type RoomTypeLookup = RoomTypeLookupResponseDto;
 export type RoomTypeDetails = RoomTypeResponseDto;
+export type FacilityRoomType = FacilityRoomTypeResponseDto;
 
 export interface IRoomsRepository {
   create(data: DeepPartial<Room>): Room;
   save(room: Room): Promise<Room>;
   saveMany(rooms: Room[]): Promise<Room[]>;
+  findCodesByFacilityAndPrefix(facilityId: string, prefix: string): Promise<string[]>;
   findAll(filters?: SearchRoomsDto): Promise<RoomWithDetails[]>;
   findAllPaginated?( filters?: SearchRoomsDto): Promise<PaginationResult<RoomWithDetails>>;
   findById(id: string): Promise<Room | null>;
@@ -33,6 +36,8 @@ export interface IRoomsRepository {
   findAllRoomTypesPaginated?(filters?: SearchRoomTypesDto): Promise<PaginationResult<RoomTypeDetails>>;
   findRoomTypeById(id: string): Promise<RoomType | null>;
   findRoomTypeByName(name: string, excludeId?: string): Promise<RoomType | null>;
+  findRoomTypeCodesByPrefix(prefix: string): Promise<string[]>;
+  findRoomTypesByFacilityId(facilityId: string, filters?: LookupRoomTypesDto): Promise<FacilityRoomType[]>;
   lookup(filters?: LookupRoomsDto): Promise<RoomLookup[]>;
   lookupRoomTypes(filters?: LookupRoomTypesDto): Promise<RoomTypeLookup[]>;
   removeRoomType(roomType: RoomType): Promise<void>;

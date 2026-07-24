@@ -4,10 +4,12 @@ import { CreateRoomTypeDto } from './dto/requests/create-room-type.dto';
 import { UpdateRoomDto } from './dto/requests/update-room.dto';
 import { UpdateRoomTypeDto } from './dto/requests/update-room-type.dto';
 import { Room } from './entities/room.entity';
+import { RoomType } from '../../database/entities/room-type.entity';
 import { Facility } from '../facilities/entities/facility.entity';
 import {
   IRoomsRepository,
   ROOMS_REPOSITORY,
+  FacilityRoomType,
   RoomLookup,
   RoomTypeDetails,
   RoomTypeLookup,
@@ -29,34 +31,48 @@ export class RoomsService {
   ) {}
 
   async create(dto: CreateRoomDto): Promise<RoomWithDetails> {
-    await this.validateRoomPayload(dto);
-    const room = this.roomsRepository.create(dto);
+    const facility = await this.validateRoomPayload(dto);
+    const code = await this.generateRoomCode(facility);
+    const room = this.roomsRepository.create({ ...dto, code });
     const saved = await this.roomsRepository.save(room);
     return this.findDetailsById(saved.id);
   }
 
   async bulkCreate(dto: BulkCreateRoomsDto): Promise<RoomWithDetails[]> {
     this.ensureNoDuplicateRoomsInPayload(dto.rooms);
-    await Promise.all(dto.rooms.map(room => this.validateRoomPayload(room)));
+    const facilities = await Promise.all(dto.rooms.map(room => this.validateRoomPayload(room)));
 
-    const rooms = dto.rooms.map(room => this.roomsRepository.create(room));
+    const codeSequenceCache = new Map<string, number>();
+    const rooms = await Promise.all(dto.rooms.map(async (room, index) => this.roomsRepository.create({
+      ...room,
+      code: await this.generateRoomCode(facilities[index], codeSequenceCache),
+    })));
     const savedRooms = await this.roomsRepository.saveMany(rooms);
     return Promise.all(savedRooms.map(room => this.findDetailsById(room.id)));
   }
 
   async findAll(filters?: SearchRoomsDto): Promise<RoomWithDetails[]> {
-    return this.roomsRepository.findAll(filters);
+    const rooms = await this.roomsRepository.findAll(filters);
+    if (!rooms || rooms.length === 0) {
+      throw new NotFoundException(ROOM_CONSTANT.ROOM_NOT_FOUND);
+    }
+    return rooms;
   }
 
   async findAllPaginated(filters: SearchRoomsDto) {
     const result = await this.roomsRepository.findAllPaginated!(filters);
+    if (!result || !result.items || result.items.length === 0) {
+      throw new NotFoundException(ROOM_CONSTANT.ROOM_NOT_FOUND);
+    }
     return result;
   }
 
   async createRoomType(dto: CreateRoomTypeDto): Promise<RoomTypeDetails> {
     await this.ensureRoomTypeNameUnique(dto.name);
+    const code = await this.generateRoomTypeCode(dto.name);
     const roomType = this.roomsRepository.createRoomType({
       ...dto,
+      code,
       status: dto.status ?? ActiveStatus.ACTIVE,
     });
     return this.roomsRepository.saveRoomType(roomType);
@@ -78,7 +94,7 @@ export class RoomsService {
     return result;
   }
 
-  async findRoomTypeById(id: string): Promise<RoomTypeDetails> {
+  async findRoomTypeById(id: string): Promise<RoomType> {
     const roomType = await this.roomsRepository.findRoomTypeById(id);
     if (!roomType) {
       throw new NotFoundException(ROOM_CONSTANT.ROOM_TYPE_NOT_FOUND);
@@ -105,6 +121,9 @@ export class RoomsService {
     }
 
     roomType.status = ActiveStatus.INACTIVE;
+    roomType.deletedAt = new Date();
+    roomType.deleteReason = null;
+    roomType.deletedBy = null;
     await this.roomsRepository.saveRoomType(roomType);
     return { action: 'soft_deleted', affectedCount: dependencyCount };
   }
@@ -176,6 +195,9 @@ export class RoomsService {
     }
 
     const rooms = await this.roomsRepository.findByFacilityId(facilityId, filters);
+    if (!rooms || rooms.length === 0) {
+      throw new NotFoundException(ROOM_CONSTANT.ROOM_NOT_FOUND);
+    }
 
     return {
       facility,
@@ -236,7 +258,19 @@ export class RoomsService {
     return this.roomsRepository.lookupRoomTypes(filters);
   }
 
-  private async validateRoomPayload(dto: CreateRoomDto): Promise<void> {
+  async findRoomTypesByFacilityId(facilityId: string, filters?: LookupRoomTypesDto): Promise<FacilityRoomType[]> {
+    await this.facilitiesService.findById(facilityId);
+    const roomTypes = await this.roomsRepository.findRoomTypesByFacilityId(facilityId, filters);
+    if (!roomTypes || roomTypes.length === 0) {
+      throw new NotFoundException(ROOM_CONSTANT.ROOM_TYPE_NOT_FOUND);
+    }
+    return roomTypes.map(roomType => ({
+      ...roomType,
+      roomCount: Number(roomType.roomCount),
+    }));
+  }
+
+  private async validateRoomPayload(dto: CreateRoomDto): Promise<Facility> {
     const facility = await this.facilitiesService.findById(dto.facilityId);
     if (facility.status !== FacilityStatus.ACTIVE) {
       throw new ConflictException(RESPONSE_MESSAGES.FACILITY_NOT_FOUND);
@@ -246,6 +280,7 @@ export class RoomsService {
       this.validateRoomType(dto.roomTypeId),
       this.ensureRoomNameUnique(dto.facilityId, dto.name),
     ]);
+    return facility;
   }
 
   private async validateRoomType(roomTypeId: string): Promise<void> {
@@ -309,6 +344,7 @@ export class RoomsService {
     return {
       id: room.id,
       facilityId: room.facilityId,
+      code: room.code,
       roomTypeId: room.roomTypeId,
       name: room.name,
       floor: room.floor,
@@ -323,9 +359,65 @@ export class RoomsService {
   private toDuplicateRoomTypeData(roomType: RoomTypeDetails | { id: string; name: string; description?: string; status?: ActiveStatus }) {
     return {
       id: roomType.id,
+      code: (roomType as RoomTypeDetails).code,
       name: roomType.name,
       description: roomType.description,
       status: roomType.status,
     };
+  }
+
+  private async generateRoomCode(facility: Facility, codeSequenceCache?: Map<string, number>): Promise<string> {
+    const prefix = `R-${facility.code}`;
+    const cacheKey = `${facility.id}:${prefix}`;
+
+    if (!codeSequenceCache?.has(cacheKey)) {
+      const existingCodes = await this.roomsRepository.findCodesByFacilityAndPrefix(facility.id, prefix);
+      const nextSequence = this.getNextSequence(existingCodes, prefix, 3);
+      codeSequenceCache?.set(cacheKey, nextSequence);
+      if (!codeSequenceCache) {
+        return `${prefix}-${String(nextSequence).padStart(3, '0')}`;
+      }
+    }
+
+    const sequence = codeSequenceCache!.get(cacheKey)!;
+    codeSequenceCache!.set(cacheKey, sequence + 1);
+    return `${prefix}-${String(sequence).padStart(3, '0')}`;
+  }
+
+  private async generateRoomTypeCode(name: string): Promise<string> {
+    const prefix = this.buildCodePrefixFromName(name);
+    const existingCodes = await this.roomsRepository.findRoomTypeCodesByPrefix(prefix);
+    const nextSequence = this.getNextSequence(existingCodes, prefix, 2);
+
+    return nextSequence === 1 && !existingCodes.includes(prefix)
+      ? prefix
+      : `${prefix}_${String(nextSequence).padStart(2, '0')}`;
+  }
+
+  private buildCodePrefixFromName(name: string): string {
+    const normalized = String(name)
+      .trim()
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase();
+
+    return normalized ? normalized.split(' ').join('_').slice(0, 40) : 'ROOM_TYPE';
+  }
+
+  private getNextSequence(existingCodes: string[], prefix: string, padding: number): number {
+    const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`^${escapedPrefix}[-_](\\d+)$`);
+    const maxSequence = existingCodes.reduce((max, code) => {
+      if (code === prefix) return Math.max(max, 1);
+      const match = code.match(pattern);
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0);
+
+    return maxSequence + 1;
   }
 }
