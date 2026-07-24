@@ -1,3 +1,4 @@
+import { PaymentStatus } from './../../common/constants/status.enum';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   Column,
@@ -9,7 +10,6 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Order } from './order.entity';
-import { PaymentStatus } from 'src/common/constants/status.enum';
 
 @Entity('payments')
 export class Payment {

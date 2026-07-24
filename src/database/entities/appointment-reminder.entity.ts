@@ -1,3 +1,4 @@
+import { ReminderStatus } from './../../common/constants/status.enum';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   Column,
@@ -8,7 +9,6 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Appointment } from './appointment.entity';
-import { ReminderStatus } from 'src/common/constants/status.enum';
 
 @Entity('appointment_reminders')
 export class AppointmentReminder {

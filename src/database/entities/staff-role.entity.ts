@@ -1,5 +1,6 @@
+import { Role } from './../../modules/roles/entities/role.entity';
+import { Staff } from './../../modules/staffs/entities/staff.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Staff } from 'src/modules/staffs/entities/staff.entity';
 import {
   Column,
   CreateDateColumn,
@@ -9,7 +10,6 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Role } from 'src/modules/roles/entities/role.entity';
 
 @Entity('staff_roles')
 export class StaffRole {

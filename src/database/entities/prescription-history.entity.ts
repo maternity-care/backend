@@ -1,3 +1,4 @@
+import { Staff } from './../../modules/staffs/entities/staff.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -8,7 +9,6 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Prescription } from './prescription.entity';
-import { Staff } from 'src/modules/staffs/entities/staff.entity';
 
 @Entity('prescription_histories')
 export class PrescriptionHistory {

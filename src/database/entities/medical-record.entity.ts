@@ -1,3 +1,5 @@
+import { PregnancyProfile } from './../../modules/pregnancy-profile/entities/pregnancy-profile.entity';
+import { Staff } from './../../modules/staffs/entities/staff.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   Column,
@@ -9,8 +11,6 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Appointment } from './appointment.entity';
-import { PregnancyProfile } from 'src/modules/pregnancy-profile/entities/pregnancy-profile.entity';
-import { Staff } from 'src/modules/staffs/entities/staff.entity';
 
 @Entity('medical_records')
 export class MedicalRecord {

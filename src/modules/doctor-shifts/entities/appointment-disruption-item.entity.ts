@@ -1,3 +1,4 @@
+import { AppointmentDisruptionResolutionStatus } from './../../../common/constants/status.enum';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   Column,
@@ -8,7 +9,6 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { ShiftDisruption } from './shift-disruption.entity';
-import { AppointmentDisruptionResolutionStatus } from 'src/common/constants/status.enum';
 
 @Entity('appointment_disruption_items')
 export class AppointmentDisruptionItem {

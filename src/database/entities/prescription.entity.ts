@@ -1,3 +1,6 @@
+import { PrescriptionStatus } from './../../common/constants/status.enum';
+import { Staff } from './../../modules/staffs/entities/staff.entity';
+import { User } from './../../modules/users/entities/user.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   Column,
@@ -9,9 +12,6 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { MedicalRecord } from './medical-record.entity';
-import { PrescriptionStatus } from 'src/common/constants/status.enum';
-import { User } from 'src/modules/users/entities/user.entity';
-import { Staff } from 'src/modules/staffs/entities/staff.entity';
 
 @Entity('prescriptions')
 export class Prescription {

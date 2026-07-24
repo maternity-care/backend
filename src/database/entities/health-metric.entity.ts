@@ -1,3 +1,4 @@
+import { PregnancyProfile } from './../../modules/pregnancy-profile/entities/pregnancy-profile.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -8,7 +9,6 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { PregnancyProfile } from 'src/modules/pregnancy-profile/entities/pregnancy-profile.entity';
 
 @Entity('health_metrics')
 export class HealthMetric {

@@ -1,7 +1,7 @@
+import { PregnancyProfileStatus } from './../../../../common/constants/status.enum';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { PregnancyProfileStatus } from 'src/common/constants/status.enum';
 
 export class SearchProfileQueryDto {
   @ApiPropertyOptional({ description: 'Tìm kiếm theo tên' })

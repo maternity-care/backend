@@ -1,3 +1,4 @@
+import { RESPONSE_MESSAGES } from './../../common/constants/response-message.constant';
 import {
   Body,
   Controller,
@@ -21,7 +22,6 @@ import { UpdatePregnancyProfileDto } from './dto/request/update-pregnancy-profil
 import { PregnancyProfileResponseDto } from './dto/response/pregnancy-profile-response.dto';
 import { PermissionEnum } from '../../common/constants/permission.enum';
 import { SearchProfileQueryDto } from './dto/request/search-pregnancy-profiles.dto';
-import { RESPONSE_MESSAGES } from 'src/common/constants/response-message.constant';
 
 @ApiTags('Management - Pregnancy Profiles')
 @ApiBearerAuth()

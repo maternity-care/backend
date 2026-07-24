@@ -1,3 +1,5 @@
+import { ArticleStatus } from './../../common/constants/status.enum';
+import { Staff } from './../../modules/staffs/entities/staff.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -8,8 +10,6 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { ArticleStatus } from 'src/common/constants/status.enum';
-import { Staff } from 'src/modules/staffs/entities/staff.entity';
 
 @Entity('articles')
 export class Article {
