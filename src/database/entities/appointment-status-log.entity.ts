@@ -1,3 +1,4 @@
+import { AppointmentStatus } from './../../common/constants/status.enum';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -7,7 +8,6 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { AppointmentStatus } from 'src/common/constants/status.enum';
 import { Appointment } from './appointment.entity';
 
 @Entity('appointment_statu_logs')

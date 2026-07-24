@@ -1,7 +1,7 @@
+import { ContentReportStatus } from './../../common/constants/status.enum';
+import { Staff } from './../../modules/staffs/entities/staff.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
-import { Staff } from 'src/modules/staffs/entities/staff.entity';
-import { ContentReportStatus } from 'src/common/constants/status.enum';
 
 export enum ReportRole {
   USER = 'USER',

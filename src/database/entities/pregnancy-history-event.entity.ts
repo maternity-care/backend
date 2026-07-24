@@ -1,5 +1,5 @@
+import { PregnancyProfile } from './../../modules/pregnancy-profile/entities/pregnancy-profile.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PregnancyProfile } from 'src/modules/pregnancy-profile/entities/pregnancy-profile.entity';
 import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('pregnancy_history_events')

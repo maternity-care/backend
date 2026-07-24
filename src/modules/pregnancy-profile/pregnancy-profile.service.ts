@@ -1,3 +1,11 @@
+import { PregnancyProfileStatus, RiskLevel } from './../../common/constants/status.enum';
+import {
+  NotificationType,
+  NotificationReferenceType,
+} from './../../common/constants/notification.enum';
+import { RoleEnum } from './../../common/constants/role.enum';
+import { RESPONSE_MESSAGES } from './../../common/constants/response-message.constant';
+import { CurrentUser } from './../../common/decorators/current-user.decorator';
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CreatePregnancyProfileDto } from './dto/request/create-pregnancy-profile.dto';
 import { UpdatePregnancyProfileDto } from './dto/request/update-pregnancy-profile.dto';
@@ -6,17 +14,10 @@ import {
   IPregnancyProfileRepository,
   PREGNANCY_PROFILE_REPOSITORY,
 } from './interfaces/pregnancy-profile-repository.interface';
-import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { SearchProfileQueryDto } from './dto/request/search-pregnancy-profiles.dto';
-import { RESPONSE_MESSAGES } from 'src/common/constants/response-message.constant';
 import { IMailService, MAIL_SERVICE } from '../mail/interfaces/mail-service.interface';
 import { NotificationsService } from '../notifications/notifications.service';
-import {
-  NotificationReferenceType,
-  NotificationType,
-} from 'src/common/constants/notification.enum';
-import { RoleEnum } from 'src/common/constants/role.enum';
 
 @Injectable()
 export class PregnancyProfileService {
@@ -60,8 +61,8 @@ export class PregnancyProfileService {
       paraPremature: dto.paraPremature ?? 0,
       paraAbortion: dto.paraAbortion ?? 0,
       paraLivingChildren: dto.paraLivingChildren ?? 0,
-      riskLevel: dto.riskLevel,
-      status: dto.status,
+      riskLevel: dto.riskLevel as RiskLevel,
+      status: dto.status as PregnancyProfileStatus,
       notes: dto.notes,
       createdBy: actor.id ?? patientId, // admin hoặc thai phụ tạo
     });

@@ -1,3 +1,5 @@
+import { Facility } from './../../facilities/entities/facility.entity';
+import { MaternityPackageStatus } from './../../../common/constants/status.enum';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -8,8 +10,6 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { MaternityPackageStatus } from 'src/common/constants/status.enum';
-import { Facility } from 'src/database/entities';
 
 @Entity('maternity_packages')
 export class MaternityPackage {

@@ -1,3 +1,6 @@
+import { Staff } from './../../modules/staffs/entities/staff.entity';
+import { Service } from './../../modules/services/entities/service.entity';
+import { Room } from './../../modules/rooms/entities/room.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   Column,
@@ -8,11 +11,8 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { AppointmentStatus } from 'src/common/constants/status.enum';
-import { User } from 'src/modules/users/entities/user.entity';
-import { Room } from 'src/modules/rooms/entities/room.entity';
-import { Service } from 'src/modules/services/entities/service.entity';
-import { Staff } from 'src/modules/staffs/entities/staff.entity';
+import { AppointmentStatus } from '../../common/constants/status.enum';
+import { User } from './../../modules/users/entities/user.entity';
 
 @Entity('appointments')
 export class Appointment {

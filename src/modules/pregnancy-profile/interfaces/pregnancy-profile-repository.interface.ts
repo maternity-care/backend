@@ -1,6 +1,6 @@
-import { PregnancyProfile } from 'src/database/entities';
 import { DeepPartial } from 'typeorm';
 import { SearchProfileQueryDto } from '../dto/request/search-pregnancy-profiles.dto';
+import { PregnancyProfile } from '../entities/pregnancy-profile.entity';
 
 export const PREGNANCY_PROFILE_REPOSITORY = Symbol('PREGNANCY_PROFILE_REPOSITORY');
 

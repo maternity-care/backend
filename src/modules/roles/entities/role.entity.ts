@@ -1,6 +1,5 @@
+import { Permission } from './../../permissions/entities/permission.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Permission } from 'src/modules/permissions/entities/permission.entity';
-import { User } from 'src/modules/users/entities/user.entity';
 import {
   Column,
   CreateDateColumn,

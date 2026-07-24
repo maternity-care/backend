@@ -1,6 +1,6 @@
+import { PregnancyProfileStatus } from './../../../../common/constants/status.enum';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsDateString, IsOptional, IsString, IsInt, IsIn, Min, IsEnum } from 'class-validator';
-import { PregnancyProfileStatus } from 'src/common/constants/status.enum';
 
 export class UpdatePregnancyProfileDto {
   @ApiPropertyOptional({ description: 'Ngày kinh cuối' })
