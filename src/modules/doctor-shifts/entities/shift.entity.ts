@@ -1,6 +1,8 @@
+import { DoctorShiftStatus } from './../../../common/constants/status.enum';
+import { Facility } from './../../facilities/entities/facility.entity';
+import { Room } from './../../rooms/entities/room.entity';
+import { Staff } from './../../staffs/entities/staff.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { DoctorShiftStatus } from 'src/common/constants/status.enum';
-import { Facility, Room, Staff } from 'src/database/entities';
 import {
   Column,
   CreateDateColumn,

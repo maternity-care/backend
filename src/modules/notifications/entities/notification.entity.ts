@@ -1,8 +1,5 @@
+import { NotificationType, NotificationReferenceType } from './../../../common/constants/notification.enum';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  NotificationReferenceType,
-  NotificationType,
-} from 'src/common/constants/notification.enum';
 import {
   Column,
   CreateDateColumn,

@@ -1,3 +1,6 @@
+import { OrderStatus } from './../../common/constants/status.enum';
+import { Facility } from './../../modules/facilities/entities/facility.entity';
+import { User } from './../../modules/users/entities/user.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -8,9 +11,6 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { OrderStatus } from 'src/common/constants/status.enum';
-import { User } from 'src/modules/users/entities/user.entity';
-import { Facility } from 'src/modules/facilities/entities/facility.entity';
 
 @Entity('orders')
 export class Order {

@@ -1,6 +1,6 @@
+import { ActiveStatus } from './../../common/constants/status.enum';
+import { User } from './../../modules/users/entities/user.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ActiveStatus } from 'src/common/constants/status.enum';
-import { User } from 'src/modules/users/entities/user.entity';
 import {
   Column,
   CreateDateColumn,

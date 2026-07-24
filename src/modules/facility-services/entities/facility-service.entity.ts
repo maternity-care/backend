@@ -1,3 +1,4 @@
+import { ActiveStatus } from './../../../common/constants/status.enum';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -6,7 +7,6 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { ActiveStatus } from 'src/common/constants/status.enum';
 
 @Entity('facility_services')
 export class FacilityService {

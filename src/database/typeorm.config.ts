@@ -1,3 +1,4 @@
+import { StaffPermission } from './../modules/permissions/entities/staff-permission.entity';
 import 'reflect-metadata';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { config } from 'dotenv';
@@ -48,26 +49,9 @@ import { StaffRefreshToken } from '../modules/auth/entities/staff-refresh-token.
 import { StaffRole } from './entities/staff-role.entity';
 import { User } from '../modules/users/entities/user.entity';
 import { UserAuth } from './entities/user-auth.entity';
-// import { CreateRbacTables1710000000000 } from './migrations/1710000000000-CreateRbacTables';
-// import { CreateRefreshTokensTable1720000000000 } from './migrations/1720000000000-CreateRefreshTokensTable';
-// import { CreateSettingsTable1730000000000 } from './migrations/1730000000000-CreateSettingsTable';
-// import { CreateMaternityDomainTables1740000000000 } from './migrations/1740000000000-CreateMaternityDomainTables';
-// import { CreateUserPermissionsTable1740100000000 } from './migrations/1740100000000-CreateUserPermissionsTable';
-// import { AddSoftDeleteToRbacTables1750700000000 } from './migrations/1750700000000-AddSoftDeleteToRbacTables';
-// import { CreatePasswordResetTokensTable1750800000000 } from './migrations/1750800000000-CreatePasswordResetTokensTable';
-// import { MergeFacilityDoctorsIntoFacilityStaff1750900000000 } from './migrations/1750900000000-MergeFacilityDoctorsIntoFacilityStaff';
-// import { MoveOperationalRolesToFacilityStaff1751000000000 } from './migrations/1751000000000-MoveOperationalRolesToFacilityStaff';
-// import { SeparateUsersAndStaffs1751100000000 } from './migrations/1751100000000-SeparateUsersAndStaffs';
-// import { CreateStaffAuthTokens1751200000000 } from './migrations/1751200000000-CreateStaffAuthTokens';
-// import { RemoveStaffPosition1751300000000 } from './migrations/1751300000000-RemoveStaffPosition';
-// import { AllowMultipleFacilityStaffRoles1751400000000 } from './migrations/1751400000000-AllowMultipleFacilityStaffRoles';
-// import { ConvertStatusesToEnums1751500000000 } from './migrations/1751500000000-ConvertStatusesToEnums';
-// import { AddOperationalSoftDeleteAndDisruptions1751600000000 } from './migrations/1751600000000-AddOperationalSoftDeleteAndDisruptions';
-// import { UpdatePregnancyProfilesTable1751600000000 } from './migrations/1751600000000-UpdatePregnancyProfilesTable';
-// import { CreateNotificationsTable1760000000000 } from './migrations/1760000000000-CreateNotificationsTable';
 import { AppointmentDisruptionItem } from '../modules/doctor-shifts/entities/appointment-disruption-item.entity';
 import { Notification } from '../modules/notifications/entities/notification.entity';
-import { UpdateArchitectureDatabase1784847183545 } from './migrations/1784847183545-UpdateArchitectureDatabase';
+import { UpdateArchitectureDatabase1784909936253 } from './migrations/1784909936253-UpdateArchitectureDatabase';
 
 config();
 
@@ -130,28 +114,10 @@ export const typeOrmConfig: DataSourceOptions = {
     RolePermission,
     StaffRole,
     ShiftSlot,
+    StaffPermission,
     join(__dirname, 'entities', '*.entity{.ts,.js}'),
   ],
-  migrations: [
-    // CreateRbacTables1710000000000,
-    // CreateRefreshTokensTable1720000000000,
-    // CreateSettingsTable1730000000000,
-    // CreateMaternityDomainTables1740000000000,
-    // CreateUserPermissionsTable1740100000000,
-    // AddSoftDeleteToRbacTables1750700000000,
-    // CreatePasswordResetTokensTable1750800000000,
-    // MergeFacilityDoctorsIntoFacilityStaff1750900000000,
-    // MoveOperationalRolesToFacilityStaff1751000000000,
-    // SeparateUsersAndStaffs1751100000000,
-    // CreateStaffAuthTokens1751200000000,
-    // RemoveStaffPosition1751300000000,
-    // AllowMultipleFacilityStaffRoles1751400000000,
-    // ConvertStatusesToEnums1751500000000,
-    // AddOperationalSoftDeleteAndDisruptions1751600000000,
-    // UpdatePregnancyProfilesTable1751600000000,
-    // CreateNotificationsTable1760000000000,
-    UpdateArchitectureDatabase1784847183545,
-  ],
+  migrations: [UpdateArchitectureDatabase1784909936253],
   charset: 'utf8mb4_unicode_ci',
 };
 

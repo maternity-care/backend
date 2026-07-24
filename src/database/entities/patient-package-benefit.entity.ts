@@ -1,5 +1,5 @@
+import { Service } from './../../modules/services/entities/service.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Service } from 'src/modules/services/entities/service.entity';
 import {
   Column,
   DeleteDateColumn,

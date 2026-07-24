@@ -1,12 +1,12 @@
+import { PregnancyProfileStatus } from './../../../common/constants/status.enum';
+import { User } from './../../users/entities/user.entity';
+import { RESPONSE_MESSAGES } from './../../../common/constants/response-message.constant';
 import { NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, FindOptionsWhere, Repository } from 'typeorm';
 import { PregnancyProfile } from '../entities/pregnancy-profile.entity';
 import { IPregnancyProfileRepository } from '../interfaces/pregnancy-profile-repository.interface';
 import { SearchProfileQueryDto } from '../dto/request/search-pregnancy-profiles.dto';
-import { User } from 'src/modules/users/entities/user.entity';
-import { RESPONSE_MESSAGES } from 'src/common/constants/response-message.constant';
-import { PregnancyProfileStatus } from 'src/common/constants/status.enum';
 
 export class PregnancyProfileRepository implements IPregnancyProfileRepository {
   constructor(

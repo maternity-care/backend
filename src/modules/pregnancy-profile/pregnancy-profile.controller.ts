@@ -1,3 +1,4 @@
+import { RESPONSE_MESSAGES } from './../../common/constants/response-message.constant';
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -7,7 +8,6 @@ import { PregnancyProfileService } from './pregnancy-profile.service';
 import { CreatePregnancyProfileDto } from './dto/request/create-pregnancy-profile.dto';
 import { UpdatePregnancyProfileDto } from './dto/request/update-pregnancy-profile.dto';
 import { PregnancyProfileResponseDto } from './dto/response/pregnancy-profile-response.dto';
-import { RESPONSE_MESSAGES } from 'src/common/constants/response-message.constant';
 
 @ApiTags('Pregnancy Profile')
 @ApiBearerAuth()

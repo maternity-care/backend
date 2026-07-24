@@ -1,3 +1,4 @@
+import { ForumContentStatus } from './../../common/constants/status.enum';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -9,7 +10,6 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { ForumTopic } from './forum-topic.entity';
-import { ForumContentStatus } from 'src/common/constants/status.enum';
 
 @Entity('forum_posts')
 export class ForumPost {

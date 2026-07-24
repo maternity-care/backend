@@ -1,3 +1,4 @@
+import { CurrentUser } from './../../common/decorators/current-user.decorator';
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { plainToInstance } from 'class-transformer';
@@ -13,7 +14,6 @@ import { DoctorResponseDto } from './dto/response/doctor-response.dto';
 import { DoctorsService } from './doctors.service';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { AdminCreateUserDto } from '../users/dto/request/admin-create-user.dto';
-import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 
 @ApiTags('Management - Doctors')
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
