@@ -60,18 +60,6 @@ export class Facility {
   @Column({ name: 'email', type: 'varchar', length: 191 })
   email: string;
 
-  @ApiPropertyOptional({ type: String, nullable: true })
-  @Column({ name: 'open_time', type: 'time', nullable: true })
-  openTime: string | null;
-
-  @ApiPropertyOptional({ type: String, nullable: true })
-  @Column({ name: 'close_time', type: 'time', nullable: true })
-  closeTime: string | null;
-
-  @ApiPropertyOptional({ type: String, nullable: true })
-  @Column({ name: 'working_days', type: 'varchar', length: 255, nullable: true })
-  workingDays: string | null;
-
   @ApiProperty({ type: String })
   @Column({ name: 'address', type: 'varchar', length: 255 })
   address: string;

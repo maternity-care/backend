@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpException, InternalServerErrorException, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RoomsService } from './rooms.service';
-import { BulkCreateRoomsDto, CreateRoomDto } from './dto/requests/create-room.dto';
+import { BulkCreateRoomsDto, BulkCreateRoomsPreviewDto, CreateRoomDto } from './dto/requests/create-room.dto';
 import { CreateRoomTypeDto } from './dto/requests/create-room-type.dto';
 import { UpdateRoomDto } from './dto/requests/update-room.dto';
 import { UpdateRoomTypeDto } from './dto/requests/update-room-type.dto';
@@ -249,6 +249,46 @@ export class RoomsController {
       return {
         message: ROOM_CONSTANT.CREATED_SUCCESSFULLY,
         data: await this.roomsService.bulkCreate(dto),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Post('bulk-create/preview')
+  @ApiOperation({ summary: 'Preview bulk create rooms before saving' })
+  async previewBulkCreate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: BulkCreateRoomsPreviewDto,
+  ) {
+    try {
+      const activeFacilityId = getActiveFacilityId(user);
+      if (activeFacilityId) {
+        dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
+      }
+      return {
+        message: 'Preview tao phong hang loat thanh cong',
+        data: await this.roomsService.previewBulkCreate(dto),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Post('bulk-create/confirm')
+  @ApiOperation({ summary: 'Confirm and save valid rooms from bulk-create preview' })
+  async confirmBulkCreate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: BulkCreateRoomsPreviewDto,
+  ) {
+    try {
+      const activeFacilityId = getActiveFacilityId(user);
+      if (activeFacilityId) {
+        dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
+      }
+      return {
+        message: ROOM_CONSTANT.CREATED_SUCCESSFULLY,
+        data: await this.roomsService.confirmBulkCreate(dto),
       };
     } catch (error) {
       this.handleError(error);

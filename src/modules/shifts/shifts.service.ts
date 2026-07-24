@@ -3,6 +3,7 @@ import { DOCTOR_SHIFT_CONSTANT } from '../../common/constants/doctor-shift.const
 import { DoctorShiftStatus } from '../../common/constants/status.enum';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
 import { DoctorShift } from './entities/shift.entity';
+import { AutoGenerateShiftsDto } from './dto/requests/auto-generate-shifts.dto';
 import { BulkCreateDoctorShiftDto } from './dto/requests/bulk-create-doctor-shift.dto';
 import { CheckShiftConflictDto } from './dto/requests/check-shift-conflict.dto';
 import { CopyWeekDoctorShiftDto } from './dto/requests/copy-week-doctor-shift.dto';
@@ -27,6 +28,44 @@ import {
   IShiftsRepository,
 } from './interfaces/shifts-repository.interface';
 import { ShiftsValidator, PreparedDoctorShiftInput } from './validators/shifts.validator';
+
+interface AutoGenerateCandidate {
+  doctorId: string;
+  facilityId: string;
+  roomId?: string | null;
+  slotId?: string | null;
+  shiftDate: string;
+  startTime: string;
+  endTime: string;
+  maxAppointments?: number | null;
+  status: DoctorShiftStatus;
+}
+
+interface AutoGenerateValidItem extends AutoGenerateCandidate {
+  staffId: string;
+}
+
+interface AutoGenerateIssueItem {
+  shiftDate: string;
+  reason: string;
+  candidate: Partial<AutoGenerateCandidate>;
+  doctorConflicts?: DoctorShift[];
+  roomConflicts?: DoctorShift[];
+}
+
+interface AutoGeneratePlan {
+  canConfirm: boolean;
+  summary: {
+    totalCandidates: number;
+    valid: number;
+    skipped: number;
+    conflicted: number;
+  };
+  validShifts: AutoGenerateValidItem[];
+  skippedItems: AutoGenerateIssueItem[];
+  conflictItems: AutoGenerateIssueItem[];
+  internalValidEntities: DoctorShift[];
+}
 
 /**
  * Service chính của ca trực bác sĩ.
@@ -75,6 +114,32 @@ export class ShiftsService {
     }
 
     return this.repository.saveMany(shifts);
+  }
+
+  /** Preview auto-generate: sinh candidate theo ngay/slot nhung khong luu DB, tra ro valid/skip/conflict. */
+  async previewAutoGenerate(dto: AutoGenerateShiftsDto) {
+    const plan = await this.buildAutoGeneratePlan(dto);
+    const { internalValidEntities: _internalValidEntities, ...response } = plan;
+    return response;
+  }
+
+  /** Confirm auto-generate: chi luu cac candidate hop le trong preview, cac ngay loi van duoc tra ve trong summary. */
+  async confirmAutoGenerate(dto: AutoGenerateShiftsDto) {
+    const plan = await this.buildAutoGeneratePlan(dto);
+    if (plan.internalValidEntities.length === 0) {
+      throw new BadRequestException('Khong co ca truc hop le de tao');
+    }
+
+    if (dto.saveOnlyValid === false && (plan.skippedItems.length > 0 || plan.conflictItems.length > 0)) {
+      throw new BadRequestException('Con ca bi skip/conflict nen khong the confirm o che do strict');
+    }
+
+    const createdShifts = await this.repository.saveMany(plan.internalValidEntities);
+    const { internalValidEntities: _internalValidEntities, ...response } = plan;
+    return {
+      ...response,
+      createdShifts,
+    };
   }
 
   /** Lấy danh sách ca trực kèm thông tin join: facility, doctor, room, roomType, slot. */
@@ -293,6 +358,132 @@ export class ShiftsService {
   }
 
   /** Tạo entity lưu DB từ DTO public-facing và dữ liệu đã được validator chuẩn hóa. */
+  /** Tao plan auto-generate dung chung cho preview va confirm de hai API khong lech logic. */
+  private async buildAutoGeneratePlan(dto: AutoGenerateShiftsDto): Promise<AutoGeneratePlan> {
+    validateDateRange(dto.fromDate, dto.toDate);
+    if (dateDiffInDays(dto.fromDate, dto.toDate) > 92) {
+      throw new BadRequestException('Chi duoc auto-generate toi da trong 92 ngay moi lan');
+    }
+
+    const dates = buildShiftDates(dto.fromDate, dto.toDate, dto.workingDays);
+    if (dates.length === 0) {
+      throw new BadRequestException('Khong co ngay nao khop voi workingDays trong khoang da chon');
+    }
+
+    const closureDates = await this.validator.getActiveClosureDates(dto.facilityId, dto.fromDate, dto.toDate);
+    const validShifts: AutoGenerateValidItem[] = [];
+    const skippedItems: AutoGenerateIssueItem[] = [];
+    const conflictItems: AutoGenerateIssueItem[] = [];
+    const internalValidEntities: DoctorShift[] = [];
+
+    for (const shiftDate of dates) {
+      const payload = this.buildAutoGeneratePayload(dto, shiftDate);
+
+      if (closureDates.has(shiftDate)) {
+        skippedItems.push({
+          shiftDate,
+          reason: 'Co so dong cua trong ngay nay',
+          candidate: payload,
+        });
+        continue;
+      }
+
+      try {
+        const prepared = await this.validator.prepareForCreate(payload);
+        const candidate = this.buildAutoGenerateCandidate(payload, prepared);
+        const conflicts = await this.repository.findConflicts({
+          ...payload,
+          staffId: prepared.staffId,
+          slotId: prepared.slotId,
+          startTime: prepared.startTime,
+          endTime: prepared.endTime,
+        });
+
+        if (conflicts.doctorConflicts.length > 0 || conflicts.roomConflicts.length > 0) {
+          conflictItems.push({
+            shiftDate,
+            reason: 'Ca truc bi trung lich bac si hoac phong',
+            candidate,
+            doctorConflicts: conflicts.doctorConflicts,
+            roomConflicts: conflicts.roomConflicts,
+          });
+          continue;
+        }
+
+        validShifts.push(candidate);
+        internalValidEntities.push(this.buildShiftEntity(payload, prepared));
+      } catch (error) {
+        skippedItems.push({
+          shiftDate,
+          reason: this.extractErrorMessage(error),
+          candidate: payload,
+        });
+      }
+    }
+
+    return {
+      canConfirm: validShifts.length > 0,
+      summary: {
+        totalCandidates: dates.length,
+        valid: validShifts.length,
+        skipped: skippedItems.length,
+        conflicted: conflictItems.length,
+      },
+      validShifts,
+      skippedItems,
+      conflictItems,
+      internalValidEntities,
+    };
+  }
+
+  /** Chuyen payload auto-generate theo tung ngay thanh payload create shift binh thuong. */
+  private buildAutoGeneratePayload(dto: AutoGenerateShiftsDto, shiftDate: string): CreateDoctorShiftDto {
+    return {
+      doctorId: dto.doctorId,
+      facilityId: dto.facilityId,
+      roomId: dto.roomId,
+      slotId: dto.slotId ?? undefined,
+      shiftDate,
+      startTime: dto.startTime,
+      endTime: dto.endTime,
+      maxAppointments: dto.maxAppointments,
+      status: dto.status,
+    } as CreateDoctorShiftDto;
+  }
+
+  /** Response candidate gom ca gio da resolve tu slotId de FE biet chinh xac ca nao se duoc tao. */
+  private buildAutoGenerateCandidate(
+    payload: CreateDoctorShiftDto,
+    prepared: PreparedDoctorShiftInput,
+  ): AutoGenerateValidItem {
+    return {
+      doctorId: payload.doctorId,
+      facilityId: payload.facilityId,
+      roomId: payload.roomId ?? null,
+      slotId: prepared.slotId,
+      staffId: prepared.staffId,
+      shiftDate: payload.shiftDate,
+      startTime: prepared.startTime,
+      endTime: prepared.endTime,
+      maxAppointments: payload.maxAppointments,
+      status: payload.status,
+    };
+  }
+
+  /** Lay message ngan gon tu Nest exception hoac Error thuong de dua vao skippedItems. */
+  private extractErrorMessage(error: unknown): string {
+    if (error instanceof BadRequestException || error instanceof ConflictException || error instanceof NotFoundException) {
+      const response = error.getResponse();
+      if (typeof response === 'string') return response;
+      if (response && typeof response === 'object' && 'message' in response) {
+        const message = (response as { message?: unknown }).message;
+        return Array.isArray(message) ? message.join('; ') : String(message);
+      }
+    }
+
+    return error instanceof Error ? error.message : 'Khong the tao candidate ca truc';
+  }
+
   private buildShiftEntity(
     dto: CreateDoctorShiftDto,
     prepared: PreparedDoctorShiftInput,

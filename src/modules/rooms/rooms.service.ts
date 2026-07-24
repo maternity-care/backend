@@ -1,5 +1,5 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { BulkCreateRoomsDto, CreateRoomDto } from './dto/requests/create-room.dto';
+import { BadRequestException, ConflictException, HttpException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BulkCreateRoomsDto, BulkCreateRoomsPreviewDto, CreateRoomDto } from './dto/requests/create-room.dto';
 import { CreateRoomTypeDto } from './dto/requests/create-room-type.dto';
 import { UpdateRoomDto } from './dto/requests/update-room.dto';
 import { UpdateRoomTypeDto } from './dto/requests/update-room-type.dto';
@@ -49,6 +49,43 @@ export class RoomsService {
     })));
     const savedRooms = await this.roomsRepository.saveMany(rooms);
     return Promise.all(savedRooms.map(room => this.findDetailsById(room.id)));
+  }
+
+  /**
+   * Preview bulk-create rooms:
+   * - Kiem tra facility, roomType, trung ten trong payload/DB.
+   * - Sinh code du kien cho tung phong hop le.
+   * - Khong luu DB, chi tra plan de FE hien thi cho nguoi dung confirm.
+   */
+  async previewBulkCreate(dto: BulkCreateRoomsPreviewDto) {
+    const plan = await this.buildBulkCreatePlan(dto);
+    const { internalValidEntities: _internalValidEntities, ...response } = plan;
+    return response;
+  }
+
+  /**
+   * Confirm bulk-create rooms:
+   * - Chay lai validation nhu preview de tranh du lieu da thay doi sau luc preview.
+   * - Mac dinh saveOnlyValid=true: chi luu cac dong hop le.
+   * - Neu saveOnlyValid=false va con loi thi khong luu dong nao.
+   */
+  async confirmBulkCreate(dto: BulkCreateRoomsPreviewDto) {
+    const plan = await this.buildBulkCreatePlan(dto);
+    if (plan.internalValidEntities.length === 0) {
+      throw new BadRequestException('Khong co phong hop le de tao');
+    }
+
+    if (dto.saveOnlyValid === false && (plan.skippedItems.length > 0 || plan.conflictItems.length > 0)) {
+      throw new BadRequestException('Con phong bi skip/conflict nen khong the confirm o che do strict');
+    }
+
+    const savedRooms = await this.roomsRepository.saveMany(plan.internalValidEntities);
+    const createdRooms = await Promise.all(savedRooms.map(room => this.findDetailsById(room.id)));
+    const { internalValidEntities: _internalValidEntities, ...response } = plan;
+    return {
+      ...response,
+      createdRooms,
+    };
   }
 
   async findAll(filters?: SearchRoomsDto): Promise<RoomWithDetails[]> {
@@ -271,23 +308,124 @@ export class RoomsService {
   }
 
   private async validateRoomPayload(dto: CreateRoomDto): Promise<Facility> {
+    const { facility } = await this.validateRoomPayloadDetails(dto);
+    return facility;
+  }
+
+  private async validateRoomPayloadDetails(dto: CreateRoomDto): Promise<{ facility: Facility; roomType: RoomType }> {
     const facility = await this.facilitiesService.findById(dto.facilityId);
     if (facility.status !== FacilityStatus.ACTIVE) {
       throw new ConflictException(RESPONSE_MESSAGES.FACILITY_NOT_FOUND);
     }
 
-    await Promise.all([
+    const [roomType] = await Promise.all([
       this.validateRoomType(dto.roomTypeId),
       this.ensureRoomNameUnique(dto.facilityId, dto.name),
     ]);
-    return facility;
+    return { facility, roomType };
   }
 
-  private async validateRoomType(roomTypeId: string): Promise<void> {
+  private async validateRoomType(roomTypeId: string): Promise<RoomType> {
     const roomType = await this.roomsRepository.findRoomTypeById(roomTypeId);
     if (!roomType || roomType.status !== ActiveStatus.ACTIVE) {
       throw new NotFoundException('Loại phòng không tồn tại hoặc đang ngừng hoạt động');
     }
+    return roomType;
+  }
+
+  private async buildBulkCreatePlan(dto: BulkCreateRoomsPreviewDto) {
+    type BulkRoomPreviewItem = Record<string, unknown>;
+    const codeSequenceCache = new Map<string, number>();
+    const payloadKeys = new Set<string>();
+    const validRooms: BulkRoomPreviewItem[] = [];
+    const skippedItems: BulkRoomPreviewItem[] = [];
+    const conflictItems: BulkRoomPreviewItem[] = [];
+    const internalValidEntities: Room[] = [];
+
+    for (let index = 0; index < dto.rooms.length; index += 1) {
+      const room = dto.rooms[index];
+      const payloadKey = `${room.facilityId}:${room.name.trim().toLowerCase()}`;
+
+      // Neu trung ngay trong payload, khong can query DB nua; FE can index de highlight dung dong loi.
+      if (payloadKeys.has(payloadKey)) {
+        conflictItems.push({
+          index,
+          input: room,
+          reason: 'Ten phong bi trung trong payload tai cung co so',
+          duplicatedField: 'name',
+          duplicatedData: {
+            facilityId: room.facilityId,
+            name: room.name,
+            roomTypeId: room.roomTypeId,
+            floor: room.floor,
+            status: room.status,
+          },
+        });
+        continue;
+      }
+      payloadKeys.add(payloadKey);
+
+      try {
+        const { facility, roomType } = await this.validateRoomPayloadDetails(room);
+        const code = await this.generateRoomCode(facility, codeSequenceCache);
+        const entity = this.roomsRepository.create({ ...room, code });
+        internalValidEntities.push(entity);
+        validRooms.push({
+          index,
+          input: room,
+          generatedCode: code,
+          facility: {
+            id: facility.id,
+            code: facility.code,
+            name: facility.name,
+            status: facility.status,
+          },
+          roomType: this.toDuplicateRoomTypeData(roomType),
+        });
+      } catch (error) {
+        const errorPayload = this.toBulkCreateRoomError(error);
+        const targetItems = error instanceof ConflictException ? conflictItems : skippedItems;
+        targetItems.push({
+          index,
+          input: room,
+          ...errorPayload,
+        });
+      }
+    }
+
+    return {
+      summary: {
+        total: dto.rooms.length,
+        validCount: validRooms.length,
+        skippedCount: skippedItems.length,
+        conflictCount: conflictItems.length,
+        canConfirm: validRooms.length > 0
+          && (dto.saveOnlyValid !== false || (skippedItems.length === 0 && conflictItems.length === 0)),
+      },
+      validRooms,
+      skippedItems,
+      conflictItems,
+      internalValidEntities,
+    };
+  }
+
+  private toBulkCreateRoomError(error: unknown) {
+    if (error instanceof HttpException) {
+      const response = error.getResponse();
+      if (typeof response === 'string') {
+        return { reason: response };
+      }
+
+      const payload = response as { message?: string | string[]; data?: unknown };
+      return {
+        reason: Array.isArray(payload.message)
+          ? payload.message.join('; ')
+          : payload.message ?? 'Du lieu phong khong hop le',
+        ...(payload.data ? { ...(payload.data as object) } : {}),
+      };
+    }
+
+    return { reason: 'Khong the kiem tra phong nay' };
   }
 
   private async ensureRoomTypeNameUnique(name: string, excludeId?: string): Promise<void> {

@@ -13,9 +13,10 @@ const validFacility = {
   ownerId: '1',
   phone: '02873001234',
   email: 'contact@facility.vn',
-  openTime: '08:00',
-  closeTime: '17:30',
-  workingDays: 'MON,TUE,WED,THU,FRI',
+  schedules: [
+    { days: ['MON', 'TUE', 'WED', 'THU', 'FRI'], openTime: '08:00', closeTime: '17:30', isClosed: false },
+    { days: ['SUN'], isClosed: true },
+  ],
   address: '123 Nguyễn Thị Minh Khai',
   province: 'Hồ Chí Minh',
   ward: 'Phường 5',
@@ -51,9 +52,9 @@ describe('Facility CRUD DTO validation', () => {
     [{ ...validFacility, phone: '123' }, 'phone'],
     [{ ...validFacility, email: 'invalid-email' }, 'email'],
     [{ ...validFacility, ownerId: '0' }, 'ownerId'],
-    [{ ...validFacility, openTime: '18:00', closeTime: '08:00' }, 'closeTime'],
-    [{ ...validFacility, closeTime: undefined }, 'closeTime'],
-    [{ ...validFacility, workingDays: 'MON,MON' }, 'workingDays'],
+    [{ ...validFacility, schedules: [{ days: ['MON'], openTime: '18:00', closeTime: '08:00', isClosed: false }] }, 'schedules'],
+    [{ ...validFacility, schedules: [{ days: ['MON'], openTime: '08:00', isClosed: false }] }, 'schedules'],
+    [{ ...validFacility, schedules: [{ days: ['XXX'], openTime: '08:00', closeTime: '17:30', isClosed: false }] }, 'schedules'],
     [{ ...validFacility, latitude: '91' }, 'latitude'],
     [{ ...validFacility, longitude: undefined }, 'longitude'],
     [{ ...validFacility, status: FacilityStatus.DELETED }, 'status'],
@@ -67,11 +68,10 @@ describe('Facility CRUD DTO validation', () => {
     expect(await validate(plainToInstance(UpdateFacilityDto, { name: 'Cơ sở mới' }))).toHaveLength(0);
     const errors = await validate(plainToInstance(UpdateFacilityDto, {
       email: 'invalid',
-      openTime: '08:00',
       latitude: '10.7',
     }));
     expect(errors.map(error => error.property)).toEqual(
-      expect.arrayContaining(['email', 'closeTime', 'longitude']),
+      expect.arrayContaining(['email', 'longitude']),
     );
   });
 

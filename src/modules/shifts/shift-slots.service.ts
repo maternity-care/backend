@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, IsNull, Repository, SelectQueryBuilder } from 'typeorm';
+import { IsNull, Repository, SelectQueryBuilder } from 'typeorm';
 import { ActiveStatus, FacilityStatus } from '../../common/constants/status.enum';
 import { PaginationResult } from '../../common/helpers/pagination';
 import { ShiftSlot } from '../../database/entities/shift-slot.entity';
@@ -8,6 +8,7 @@ import { FacilitiesService } from '../facilities/facilities.service';
 import { CreateShiftSlotDto } from './dto/requests/create-shift-slot.dto';
 import { LookupShiftSlotDto, SearchShiftSlotDto } from './dto/requests/search-shift-slot.dto';
 import { UpdateShiftSlotDto } from './dto/requests/update-shift-slot.dto';
+import { normalizeTime } from './helpers/shifts.helper';
 
 const SHIFT_SLOT_NOT_FOUND = 'Khung ca khong ton tai';
 const SHIFT_SLOT_DUPLICATED = 'Khung ca da ton tai trong pham vi nay';
@@ -20,20 +21,27 @@ export class ShiftSlotsService {
     private readonly facilitiesService: FacilitiesService,
   ) {}
 
-  /** Tao khung ca mau. facilityId null nghia la slot global dung chung moi co so. */
+  /** Tao khung ca mau rieng cho tung co so, vi moi co so co the co gio truc khac nhau. */
   async create(dto: CreateShiftSlotDto): Promise<ShiftSlot> {
-    await this.ensureFacilityCanUseSlot(dto.facilityId ?? null);
-    const code = await this.generateUniqueCode(dto.name, dto.facilityId ?? null);
-    await this.ensureUniqueSlot(dto.name, dto.facilityId ?? null);
+    await this.ensureActiveFacility(dto.facilityId);
+    this.validateSlotTime(dto.startTime, dto.endTime);
+
+    const status = dto.status ?? ActiveStatus.ACTIVE;
+    const code = await this.generateUniqueCode(dto.facilityId, dto.name);
+    await this.ensureUniqueSlot(dto.facilityId, dto.name);
+    if (status === ActiveStatus.ACTIVE) {
+      await this.ensureSlotFitsFacilityOperatingHours(dto.facilityId, dto.startTime, dto.endTime);
+      await this.ensureNoTimeOverlap(dto.facilityId, dto.startTime, dto.endTime);
+    }
 
     const slot = this.repository.create({
-      facilityId: dto.facilityId ?? null,
+      facilityId: dto.facilityId,
       code,
       name: dto.name,
-      startTime: dto.startTime,
-      endTime: dto.endTime,
+      startTime: normalizeTime(dto.startTime),
+      endTime: normalizeTime(dto.endTime),
       isOvernight: dto.isOvernight ?? false,
-      status: dto.status ?? ActiveStatus.ACTIVE,
+      status,
     });
 
     return this.repository.save(slot);
@@ -65,11 +73,10 @@ export class ShiftSlotsService {
     };
   }
 
-  /** Lookup cho FE chon slot khi tao ca truc: tra slot global + slot rieng cua co so neu co facilityId. */
+  /** Lookup cho FE chon slot khi tao ca truc: neu co facilityId thi chi tra slot cua co so do. */
   async lookup(filters?: LookupShiftSlotDto): Promise<ShiftSlot[]> {
     const query = this.repository
       .createQueryBuilder('slot')
-      .leftJoinAndSelect('slot.facility', 'facility')
       .where('slot.deletedAt IS NULL')
       .andWhere('slot.status = :status', { status: filters?.status ?? ActiveStatus.ACTIVE })
       .orderBy('slot.startTime', 'ASC')
@@ -78,13 +85,7 @@ export class ShiftSlotsService {
       .take(Math.max(1, Number(filters?.limit) || 20));
 
     if (filters?.facilityId) {
-      await this.ensureFacilityCanUseSlot(filters.facilityId);
-      query.andWhere(new Brackets(qb => {
-        qb.where('slot.facilityId IS NULL')
-          .orWhere('slot.facilityId = :facilityId', { facilityId: filters.facilityId });
-      }));
-    } else {
-      query.andWhere('slot.facilityId IS NULL');
+      query.andWhere('slot.facilityId = :facilityId', { facilityId: filters.facilityId });
     }
 
     if (filters?.search) {
@@ -108,21 +109,35 @@ export class ShiftSlotsService {
     return slot;
   }
 
-  /** Cap nhat slot. Neu doi facility/name thi backend se sinh lai code neu can. */
+  /** Cap nhat slot cua co so. Neu doi ten/facility thi backend sinh lai code theo pham vi co so moi. */
   async update(id: string, dto: UpdateShiftSlotDto): Promise<ShiftSlot> {
     const slot = await this.findById(id);
-    const targetFacilityId = dto.facilityId !== undefined ? dto.facilityId ?? null : slot.facilityId;
-    await this.ensureFacilityCanUseSlot(targetFacilityId);
+    const targetFacilityId = dto.facilityId ?? slot.facilityId;
+    const targetName = dto.name ?? slot.name;
+    const targetStartTime = dto.startTime ?? slot.startTime;
+    const targetEndTime = dto.endTime ?? slot.endTime;
+    const targetStatus = dto.status ?? slot.status;
 
-    if (dto.name && (dto.name !== slot.name || targetFacilityId !== slot.facilityId)) {
-      await this.ensureUniqueSlot(dto.name, targetFacilityId, slot.id);
-      slot.code = await this.generateUniqueCode(dto.name, targetFacilityId, slot.id);
-      slot.name = dto.name;
+    if (dto.facilityId && dto.facilityId !== slot.facilityId) {
+      await this.ensureActiveFacility(dto.facilityId);
     }
 
-    if (dto.facilityId !== undefined) slot.facilityId = dto.facilityId ?? null;
-    if (dto.startTime !== undefined) slot.startTime = dto.startTime;
-    if (dto.endTime !== undefined) slot.endTime = dto.endTime;
+    this.validateSlotTime(targetStartTime, targetEndTime);
+
+    if (targetStatus === ActiveStatus.ACTIVE) {
+      await this.ensureSlotFitsFacilityOperatingHours(targetFacilityId, targetStartTime, targetEndTime);
+      await this.ensureNoTimeOverlap(targetFacilityId, targetStartTime, targetEndTime, slot.id);
+    }
+
+    if (targetName !== slot.name || targetFacilityId !== slot.facilityId) {
+      await this.ensureUniqueSlot(targetFacilityId, targetName, slot.id);
+      slot.code = await this.generateUniqueCode(targetFacilityId, targetName, slot.id);
+      slot.name = targetName;
+    }
+
+    if (targetFacilityId !== slot.facilityId) slot.facilityId = targetFacilityId;
+    if (dto.startTime !== undefined) slot.startTime = normalizeTime(dto.startTime);
+    if (dto.endTime !== undefined) slot.endTime = normalizeTime(dto.endTime);
     if (dto.isOvernight !== undefined) slot.isOvernight = dto.isOvernight;
     if (dto.status !== undefined) slot.status = dto.status;
 
@@ -171,22 +186,28 @@ export class ShiftSlotsService {
     return query;
   }
 
-  private async ensureFacilityCanUseSlot(facilityId: string | null): Promise<void> {
-    if (!facilityId) return;
+  private async ensureActiveFacility(facilityId: string): Promise<void> {
     const facility = await this.facilitiesService.findById(facilityId);
     if (facility.status !== FacilityStatus.ACTIVE) {
-      throw new BadRequestException('Co so khong ton tai hoac dang ngung hoat dong');
+      throw new BadRequestException('Co so khong hoat dong nen khong the cau hinh khung ca');
     }
   }
 
-  private async ensureUniqueSlot(name: string, facilityId: string | null, excludeId?: string): Promise<void> {
+  private validateSlotTime(startTime: string, endTime: string): void {
+    const normalizedStart = normalizeTime(startTime);
+    const normalizedEnd = normalizeTime(endTime);
+    if (normalizedStart >= normalizedEnd) {
+      throw new BadRequestException('endTime phai muon hon startTime');
+    }
+  }
+
+  private async ensureUniqueSlot(facilityId: string, name: string, excludeId?: string): Promise<void> {
     const query = this.repository
       .createQueryBuilder('slot')
-      .where('LOWER(slot.name) = LOWER(:name)', { name })
+      .where('slot.facilityId = :facilityId', { facilityId })
+      .andWhere('LOWER(slot.name) = LOWER(:name)', { name })
       .andWhere('slot.deletedAt IS NULL');
 
-    if (facilityId) query.andWhere('slot.facilityId = :facilityId', { facilityId });
-    else query.andWhere('slot.facilityId IS NULL');
     if (excludeId) query.andWhere('slot.id != :excludeId', { excludeId });
 
     const existing = await query.getOne();
@@ -201,9 +222,56 @@ export class ShiftSlotsService {
     }
   }
 
-  private async generateUniqueCode(name: string, facilityId: string | null, excludeId?: string): Promise<string> {
+  private async ensureNoTimeOverlap(
+    facilityId: string,
+    startTime: string,
+    endTime: string,
+    excludeId?: string,
+  ): Promise<void> {
+    const query = this.repository
+      .createQueryBuilder('slot')
+      .where('slot.facilityId = :facilityId', { facilityId })
+      .andWhere('slot.deletedAt IS NULL')
+      .andWhere('slot.status = :status', { status: ActiveStatus.ACTIVE })
+      .andWhere('slot.startTime < :endTime', { endTime: normalizeTime(endTime) })
+      .andWhere('slot.endTime > :startTime', { startTime: normalizeTime(startTime) });
+
+    if (excludeId) query.andWhere('slot.id != :excludeId', { excludeId });
+
+    const existing = await query.getOne();
+    if (existing) {
+      throw new ConflictException({
+        message: 'Khung gio bi chong lan voi khung ca dang active trong cung co so',
+        data: {
+          duplicatedField: 'timeRange',
+          duplicatedData: existing,
+        },
+      });
+    }
+  }
+
+  private async ensureSlotFitsFacilityOperatingHours(
+    facilityId: string,
+    startTime: string,
+    endTime: string,
+  ): Promise<void> {
+    const normalizedStart = normalizeTime(startTime);
+    const normalizedEnd = normalizeTime(endTime);
+    const schedule = await this.facilitiesService.getOperatingHours(facilityId);
+    const fitsAtLeastOneOpenDay = schedule.operatingHours.some(item => {
+      if (item.isClosed || !item.openTime || !item.closeTime) return false;
+      return normalizedStart >= normalizeTime(String(item.openTime))
+        && normalizedEnd <= normalizeTime(String(item.closeTime));
+    });
+
+    if (!fitsAtLeastOneOpenDay) {
+      throw new BadRequestException('Khung ca khong nam trong bat ky ngay mo cua nao cua co so');
+    }
+  }
+
+  private async generateUniqueCode(facilityId: string, name: string, excludeId?: string): Promise<string> {
     const baseCode = this.buildCodePrefixFromName(name);
-    const existingCodes = await this.findCodesByPrefix(baseCode, facilityId, excludeId);
+    const existingCodes = await this.findCodesByPrefix(facilityId, baseCode, excludeId);
     if (!existingCodes.includes(baseCode)) return baseCode;
 
     for (let index = 2; index <= 99; index += 1) {
@@ -214,15 +282,14 @@ export class ShiftSlotsService {
     throw new ConflictException('Khong the sinh code khung ca duy nhat');
   }
 
-  private async findCodesByPrefix(prefix: string, facilityId: string | null, excludeId?: string): Promise<string[]> {
+  private async findCodesByPrefix(facilityId: string, prefix: string, excludeId?: string): Promise<string[]> {
     const query = this.repository
       .createQueryBuilder('slot')
       .withDeleted()
       .select('slot.code', 'code')
-      .where('slot.code LIKE :pattern', { pattern: `${prefix}%` });
+      .where('slot.facilityId = :facilityId', { facilityId })
+      .andWhere('slot.code LIKE :pattern', { pattern: `${prefix}%` });
 
-    if (facilityId) query.andWhere('slot.facilityId = :facilityId', { facilityId });
-    else query.andWhere('slot.facilityId IS NULL');
     if (excludeId) query.andWhere('slot.id != :excludeId', { excludeId });
 
     const rows = await query.getRawMany<{ code: string }>();

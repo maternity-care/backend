@@ -11,20 +11,15 @@ import {
 } from 'class-validator';
 import { ActiveStatus } from '../../../../common/constants/status.enum';
 import { trimText } from '../../../../common/helpers/dto-transform.helper';
-import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
 import { SHIFT_TIME_PATTERN } from './create-doctor-shift.dto';
 import { IsLaterThan } from '../../../../common/helpers/dto-validation.helper';
+import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
 
 export class CreateShiftSlotDto {
-  @ApiPropertyOptional({
-    example: '1',
-    nullable: true,
-    description: 'Bo trong/null neu la khung ca global dung chung moi co so',
-  })
-  @IsOptional()
+  @ApiProperty({ example: '1', description: 'Co so so huu khung ca nay' })
   @IsString()
   @Matches(POSITIVE_ID_PATTERN, { message: 'facilityId phai la so nguyen duong' })
-  facilityId?: string;
+  facilityId: string;
 
   @ApiProperty({ example: 'Ca sang' })
   @Transform(({ value }) => trimText(value))

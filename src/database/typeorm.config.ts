@@ -75,6 +75,11 @@ import { ImproveFacilityRoomsSchema1785000000000 } from './migrations/1785000000
 import { OptimizeShiftSchedulingSchema1785100000000 } from './migrations/1785100000000-OptimizeShiftSchedulingSchema';
 import { CleanupLegacyShiftSlotRows1785200000000 } from './migrations/1785200000000-CleanupLegacyShiftSlotRows';
 import { RefineFacilityScheduleAndShiftSlots1785300000000 } from './migrations/1785300000000-RefineFacilityScheduleAndShiftSlots';
+import { ResetShiftSlotsToGlobalTemplates1785400000000 } from './migrations/1785400000000-ResetShiftSlotsToGlobalTemplates';
+import { RemapFacilityRoomIdsForDemoData1785500000000 } from './migrations/1785500000000-RemapFacilityRoomIdsForDemoData';
+import { NormalizeExistingRoomCodes1785600000000 } from './migrations/1785600000000-NormalizeExistingRoomCodes';
+import { DropFacilityLegacyScheduleColumns1785700000000 } from './migrations/1785700000000-DropFacilityLegacyScheduleColumns';
+import { RestoreFacilityScopedShiftSlots1785800000000 } from './migrations/1785800000000-RestoreFacilityScopedShiftSlots';
 
 config();
 
@@ -164,6 +169,11 @@ export const typeOrmConfig: DataSourceOptions = {
     OptimizeShiftSchedulingSchema1785100000000,
     CleanupLegacyShiftSlotRows1785200000000,
     RefineFacilityScheduleAndShiftSlots1785300000000,
+    ResetShiftSlotsToGlobalTemplates1785400000000,
+    RemapFacilityRoomIdsForDemoData1785500000000,
+    NormalizeExistingRoomCodes1785600000000,
+    DropFacilityLegacyScheduleColumns1785700000000,
+    RestoreFacilityScopedShiftSlots1785800000000,
   ],
   charset: 'utf8mb4_unicode_ci',
 };

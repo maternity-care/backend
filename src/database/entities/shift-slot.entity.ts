@@ -22,14 +22,14 @@ export class ShiftSlot {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: string;
 
-  @ApiPropertyOptional({ type: () => Facility, nullable: true })
-  @ManyToOne(() => Facility, { onDelete: 'SET NULL', nullable: true })
+  @ApiProperty({ type: () => Facility })
+  @ManyToOne(() => Facility, { onDelete: 'RESTRICT', nullable: false })
   @JoinColumn({ name: 'facility_id' })
-  facility: Facility | null;
+  facility: Facility;
 
-  @ApiPropertyOptional({ type: String, nullable: true })
-  @Column({ name: 'facility_id', type: 'bigint', nullable: true })
-  facilityId: string | null;
+  @ApiProperty({ type: String, example: '1' })
+  @Column({ name: 'facility_id', type: 'bigint' })
+  facilityId: string;
 
   @ApiProperty({ type: String, example: 'MORNING' })
   @Column({ name: 'code', type: 'varchar', length: 50 })

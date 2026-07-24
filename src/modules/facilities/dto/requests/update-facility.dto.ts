@@ -16,13 +16,10 @@ import {
 } from 'class-validator';
 import { FacilityStatus } from '../../../../common/constants/status.enum';
 import {
-  normalizeWorkingDays,
   trimText,
   trimValue,
 } from '../../../../common/helpers/dto-transform.helper';
-import { HasUniqueCsvValues, IsLaterThan } from '../../../../common/helpers/dto-validation.helper';
 import { POSITIVE_ID_PATTERN } from './create-facility.dto';
-import { FACILITY_TIME_PATTERN, WORKING_DAYS_PATTERN } from './facility-schedule.dto';
 
 export class UpdateFacilityDto {
   @ApiPropertyOptional()
@@ -53,30 +50,6 @@ export class UpdateFacilityDto {
   @IsEmail()
   @MaxLength(191)
   email?: string;
-
-  @ApiPropertyOptional()
-  @ValidateIf((dto: UpdateFacilityDto) => dto.openTime !== undefined || dto.closeTime !== undefined)
-  @Transform(({ value }) => trimValue(value))
-  @IsNotEmpty({ message: 'Khi cap nhat gio hoat dong phai gui ca openTime va closeTime' })
-  @Matches(FACILITY_TIME_PATTERN)
-  openTime?: string;
-
-  @ApiPropertyOptional()
-  @ValidateIf((dto: UpdateFacilityDto) => dto.openTime !== undefined || dto.closeTime !== undefined)
-  @Transform(({ value }) => trimValue(value))
-  @IsNotEmpty({ message: 'Khi cap nhat gio hoat dong phai gui ca openTime va closeTime' })
-  @Matches(FACILITY_TIME_PATTERN)
-  @IsLaterThan('openTime', { message: 'closeTime phai muon hon openTime' })
-  closeTime?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @Transform(({ value }) => normalizeWorkingDays(value))
-  @IsString()
-  @Matches(WORKING_DAYS_PATTERN)
-  @HasUniqueCsvValues({ message: 'workingDays khong duoc chua ngay trung nhau' })
-  @MaxLength(255)
-  workingDays?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

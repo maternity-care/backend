@@ -194,6 +194,24 @@ export class FacilitiesController {
     }
   }
 
+  @Post(':id/operating-hours/preview')
+  @ApiOperation({ summary: 'Preview facility operating hour changes and impacted upcoming shifts' })
+  async previewOperatingHours(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateFacilityOperatingHoursDto,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITY_RETRIEVED,
+        data: await this.facilitiesService.previewOperatingHours(id, dto),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
   @Patch(':id/operating-hours')
   @ApiOperation({ summary: 'Update facility operating hours by day groups' })
   async updateOperatingHours(
