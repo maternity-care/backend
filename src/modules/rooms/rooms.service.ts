@@ -258,14 +258,27 @@ export class RoomsService {
   private async ensureRoomTypeNameUnique(name: string, excludeId?: string): Promise<void> {
     const existing = await this.roomsRepository.findRoomTypeByName(name, excludeId);
     if (existing) {
-      throw new ConflictException(ROOM_CONSTANT.ROOM_TYPE_ALREADY_EXISTS);
+      throw new ConflictException({
+        message: ROOM_CONSTANT.ROOM_TYPE_ALREADY_EXISTS,
+        data: {
+          duplicatedField: 'name',
+          duplicatedData: this.toDuplicateRoomTypeData(existing),
+        },
+      });
     }
   }
 
   private async ensureRoomNameUnique(facilityId: string, name: string, excludeId?: string): Promise<void> {
     const existing = await this.roomsRepository.findByFacilityAndName(facilityId, name, excludeId);
     if (existing) {
-      throw new ConflictException(ROOM_CONSTANT.ROOM_ALREADY_EXISTS);
+      const existingDetails = await this.roomsRepository.findDetailsById(existing.id);
+      throw new ConflictException({
+        message: ROOM_CONSTANT.ROOM_ALREADY_EXISTS,
+        data: {
+          duplicatedField: 'name',
+          duplicatedData: this.toDuplicateRoomData(existingDetails ?? existing),
+        },
+      });
     }
   }
 
@@ -274,9 +287,45 @@ export class RoomsService {
     for (const room of rooms) {
       const key = `${room.facilityId}:${room.name.trim().toLowerCase()}`;
       if (keys.has(key)) {
-        throw new BadRequestException('Danh sách tạo phòng có phòng bị trùng tên trong cùng cơ sở');
+        throw new BadRequestException({
+          message: 'Danh sách tạo phòng có phòng bị trùng tên trong cùng cơ sở',
+          data: {
+            duplicatedField: 'name',
+            duplicatedData: {
+              facilityId: room.facilityId,
+              name: room.name,
+              roomTypeId: room.roomTypeId,
+              floor: room.floor,
+              status: room.status,
+            },
+          },
+        });
       }
       keys.add(key);
     }
+  }
+
+  private toDuplicateRoomData(room: Room | RoomWithDetails) {
+    return {
+      id: room.id,
+      facilityId: room.facilityId,
+      roomTypeId: room.roomTypeId,
+      name: room.name,
+      floor: room.floor,
+      status: room.status,
+      facilityCode: (room as RoomWithDetails).facilityCode,
+      facilityName: (room as RoomWithDetails).facilityName,
+      roomTypeName: (room as RoomWithDetails).roomTypeName,
+      roomTypeStatus: (room as RoomWithDetails).roomTypeStatus,
+    };
+  }
+
+  private toDuplicateRoomTypeData(roomType: RoomTypeDetails | { id: string; name: string; description?: string; status?: ActiveStatus }) {
+    return {
+      id: roomType.id,
+      name: roomType.name,
+      description: roomType.description,
+      status: roomType.status,
+    };
   }
 }

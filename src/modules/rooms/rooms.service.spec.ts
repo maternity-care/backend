@@ -165,6 +165,33 @@ describe('RoomsService', () => {
     expect(repository.saveMany).not.toHaveBeenCalled();
   });
 
+  // Vai tro: duplicate trong bulk-create phai tra lai payload bi trung de FE highlight dung dong nhap loi.
+  it('returns duplicated payload data when bulk-create has duplicated room name', async () => {
+    let error: any;
+    try {
+      await service.bulkCreate({
+        rooms: [
+          { facilityId: 'fac-1', name: 'Room 101', roomTypeId: 'type-1', floor: '1', status: ActiveStatus.ACTIVE },
+          { facilityId: 'fac-1', name: ' room 101 ', roomTypeId: 'type-1', floor: '1', status: ActiveStatus.ACTIVE },
+        ],
+      });
+    } catch (caughtError) {
+      error = caughtError;
+    }
+
+    expect(error?.getResponse()).toMatchObject({
+      data: {
+        duplicatedField: 'name',
+        duplicatedData: {
+          facilityId: 'fac-1',
+          name: ' room 101 ',
+          roomTypeId: 'type-1',
+        },
+      },
+    });
+    expect(repository.saveMany).not.toHaveBeenCalled();
+  });
+
   // Vai tro: dam bao facility khong ton tai thi room khong duoc tao.
   it('does not create a room when the facility is missing', async () => {
     const error = new NotFoundException('facility not found');
@@ -213,10 +240,24 @@ describe('RoomsService', () => {
 
   // Vai tro: khong cho tao 2 loai phong trung ten de FE select khong bi nham.
   it('rejects duplicated room type name during create', async () => {
-    repository.findRoomTypeByName.mockResolvedValue(createRoomType({ id: 'type-2' }));
+    const duplicatedRoomType = createRoomType({ id: 'type-2' });
+    repository.findRoomTypeByName.mockResolvedValue(duplicatedRoomType);
 
     await expect(service.createRoomType({ name: 'Consultation', description: 'Dup', status: ActiveStatus.ACTIVE } as any))
       .rejects.toBeInstanceOf(ConflictException);
+    await service.createRoomType({ name: 'Consultation', description: 'Dup', status: ActiveStatus.ACTIVE } as any).catch((error) => {
+      expect(error.getResponse()).toMatchObject({
+        message: ROOM_CONSTANT.ROOM_TYPE_ALREADY_EXISTS,
+        data: {
+          duplicatedField: 'name',
+          duplicatedData: {
+            id: 'type-2',
+            name: duplicatedRoomType.name,
+            status: duplicatedRoomType.status,
+          },
+        },
+      });
+    });
     expect(repository.saveRoomType).not.toHaveBeenCalled();
   });
 
@@ -306,6 +347,45 @@ describe('RoomsService', () => {
 
     await expect(service.update('room-1', { name: 'Room 102' } as any)).resolves.toMatchObject({ name: 'Room 102' });
     expect(repository.save).toHaveBeenCalledWith(room);
+  });
+
+  // Vai tro: khi ten room trong cung facility da ton tai, loi 409 tra kem room bi trung da join thong tin lien quan.
+  it('returns duplicated room data when room name already exists in facility', async () => {
+    const duplicatedRoom = createRoom({ id: 'room-2', name: 'Room 102' });
+    facilitiesService.findById.mockResolvedValue(createFacility());
+    repository.findByFacilityAndName.mockResolvedValue(duplicatedRoom);
+    repository.findDetailsById.mockResolvedValue({ ...duplicatedRoom, facilityName: 'Main Clinic', roomTypeName: 'Consultation' } as any);
+
+    let error: ConflictException | undefined;
+    try {
+      await service.create({
+        facilityId: 'fac-1',
+        name: 'Room 102',
+        roomTypeId: 'type-1',
+        floor: '1',
+        status: ActiveStatus.ACTIVE,
+      } as any);
+    } catch (caughtError) {
+      error = caughtError as ConflictException;
+    }
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect(error!.getResponse()).toMatchObject({
+      message: ROOM_CONSTANT.ROOM_ALREADY_EXISTS,
+      data: {
+        duplicatedField: 'name',
+        duplicatedData: {
+          id: 'room-2',
+          facilityId: 'fac-1',
+          roomTypeId: 'type-1',
+          name: 'Room 102',
+          facilityName: 'Main Clinic',
+          roomTypeName: 'Consultation',
+        },
+      },
+    });
+    expect(repository.create).not.toHaveBeenCalled();
+    expect(repository.save).not.toHaveBeenCalled();
   });
 
   // Vai tro: dam bao update room khong ton tai thi khong goi save.

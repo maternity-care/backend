@@ -120,18 +120,49 @@ export class FacilitiesService {
     dto: Partial<Pick<CreateFacilityDto, 'name' | 'email' | 'phone'>> & { code?: string },
     excludeId?: string,
   ): Promise<void> {
-    const checks: Array<Promise<Facility | null>> = [];
+    const checks: Array<{
+      field: 'code' | 'name' | 'email' | 'phone';
+      value?: string;
+      findExisting: () => Promise<Facility | null>;
+    }> = [
+      { field: 'code', value: dto.code, findExisting: () => this.facilitiesRepository.findByCode(dto.code!) },
+      { field: 'name', value: dto.name, findExisting: () => this.facilitiesRepository.findByName(dto.name!) },
+      { field: 'email', value: dto.email, findExisting: () => this.facilitiesRepository.findByEmail(dto.email!) },
+      { field: 'phone', value: dto.phone, findExisting: () => this.facilitiesRepository.findByPhone(dto.phone!) },
+    ];
 
-    if (dto.code) checks.push(this.facilitiesRepository.findByCode(dto.code));
-    if (dto.name) checks.push(this.facilitiesRepository.findByName(dto.name));
-    if (dto.email) checks.push(this.facilitiesRepository.findByEmail(dto.email));
-    if (dto.phone) checks.push(this.facilitiesRepository.findByPhone(dto.phone));
+    for (const check of checks) {
+      if (!check.value) continue;
 
-    const existingFacilities = await Promise.all(checks);
-    const duplicated = existingFacilities.some(facility => facility && facility.id !== excludeId);
-    if (duplicated) {
-      throw new ConflictException(RESPONSE_MESSAGES.FACILITY_ALREADY_EXISTS);
+      const existing = await check.findExisting();
+      if (existing && existing.id !== excludeId) {
+        this.throwDuplicateFacilityException(check.field, existing);
+      }
     }
+  }
+
+  private throwDuplicateFacilityException(field: 'code' | 'name' | 'email' | 'phone', facility: Facility): never {
+    throw new ConflictException({
+      message: RESPONSE_MESSAGES.FACILITY_ALREADY_EXISTS,
+      data: {
+        duplicatedField: field,
+        duplicatedData: this.toDuplicateFacilityData(facility),
+      },
+    });
+  }
+
+  private toDuplicateFacilityData(facility: Facility) {
+    return {
+      id: facility.id,
+      code: facility.code,
+      name: facility.name,
+      phone: facility.phone,
+      email: facility.email,
+      address: facility.address,
+      province: facility.province,
+      ward: facility.ward,
+      status: facility.status,
+    };
   }
 
   private async generateFacilityCode(province: string): Promise<string> {
