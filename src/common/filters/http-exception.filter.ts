@@ -6,12 +6,15 @@ interface NestExceptionResponse {
   message?: string | string[];
   error?: string;
   statusCode?: number;
+  errors?: Record<string, unknown>;
+  data?: unknown;
 }
 
 function normalizeError(exception: unknown): {
   status: number;
   message: string;
   errors: Record<string, unknown>;
+  data?: unknown;
 } {
   if (exception instanceof HttpException) {
     const response = exception.getResponse();
@@ -25,7 +28,8 @@ function normalizeError(exception: unknown): {
     return {
       status,
       message: Array.isArray(body.message) ? 'Validation failed' : (body.message ?? 'Error'),
-      errors: Array.isArray(body.message) ? { fields: body.message } : {},
+      errors: Array.isArray(body.message) ? { fields: body.message } : (body.errors ?? {}),
+      data: body.data,
     };
   }
 
@@ -47,6 +51,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message: normalized.message,
       errors: normalized.errors,
     };
+    if (normalized.data !== undefined) {
+      payload.data = normalized.data;
+    }
 
     response.status(normalized.status).json(payload);
   }

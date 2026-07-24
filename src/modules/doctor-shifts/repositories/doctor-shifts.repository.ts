@@ -277,7 +277,7 @@ export class DoctorShiftsRepository implements IDoctorShiftsRepository {
         status: DoctorShiftStatus.CANCELLED,
         deletedAt: new Date(),
         deletedBy: changedBy ?? null,
-        deleteReason: reason ?? null,
+        deletedReason: reason ?? null,
       });
 
       // Ghi audit log để sau này biết ai hủy, hủy từ trạng thái nào sang trạng thái nào, lý do gì.

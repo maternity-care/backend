@@ -126,6 +126,37 @@ describe('FacilitiesService', () => {
     expect(repository.save).not.toHaveBeenCalled();
   });
 
+  // Vai tro: khi validate trung facility, response loi phai tra kem record dang bi trung de FE hien thi ro.
+  it('returns duplicated facility data when create identity is duplicated', async () => {
+    const duplicatedFacility = createFacility({ id: 'fac-2', name: 'Existing Clinic' });
+    repository.findByName.mockResolvedValue(duplicatedFacility);
+
+    let error: ConflictException | undefined;
+    try {
+      await service.create(createFacility({ id: undefined as any, name: 'Existing Clinic' }) as any);
+    } catch (caughtError) {
+      error = caughtError as ConflictException;
+    }
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect(error!.getResponse()).toMatchObject({
+      message: RESPONSE_MESSAGES.FACILITY_ALREADY_EXISTS,
+      data: {
+        duplicatedField: 'name',
+        duplicatedData: {
+          id: 'fac-2',
+          code: duplicatedFacility.code,
+          name: 'Existing Clinic',
+          phone: duplicatedFacility.phone,
+          email: duplicatedFacility.email,
+          status: duplicatedFacility.status,
+        },
+      },
+    });
+    expect(repository.create).not.toHaveBeenCalled();
+    expect(repository.save).not.toHaveBeenCalled();
+  });
+
   // Vai tro: dam bao loi DB/repository khi save khong bi nuot mat o tang service.
   it('propagates repository save errors during create', async () => {
     const error = new Error('db down');

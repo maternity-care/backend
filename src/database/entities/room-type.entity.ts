@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ActiveStatus } from 'src/common/constants/status.enum';
+import { ActiveStatus } from '../../common/constants/status.enum';
 import {
   Column,
   CreateDateColumn,

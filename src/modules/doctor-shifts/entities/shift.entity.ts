@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { DoctorShiftStatus } from 'src/common/constants/status.enum';
-import { Facility, Room, Staff } from 'src/database/entities';
+import { DoctorShiftStatus } from '../../../common/constants/status.enum';
+import { Facility } from '../../facilities/entities/facility.entity';
+import { Room } from '../../rooms/entities/room.entity';
+import { Staff } from '../../staffs/entities/staff.entity';
 import {
   Column,
   CreateDateColumn,
@@ -39,7 +41,7 @@ export class Shift {
 
   @ApiProperty({ type: String })
   @Column({ name: 'staff_id', type: 'bigint' })
-  staffId: string;
+  doctorId: string;
 
   @ApiProperty({ type: String })
   @Column({ name: 'facility_id', type: 'bigint' })
@@ -89,3 +91,5 @@ export class Shift {
   @Column({ name: 'deleted_reason', type: 'text', nullable: true })
   deletedReason: string | null;
 }
+
+export { Shift as DoctorShift };

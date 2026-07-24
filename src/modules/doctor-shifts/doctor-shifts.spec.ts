@@ -1184,7 +1184,7 @@ describe('DoctorShiftsRepository unit query behavior', () => {
     expect(update).toHaveBeenCalledWith(expect.any(Function), '10', expect.objectContaining({
       status: DoctorShiftStatus.CANCELLED,
       deletedBy: '99',
-      deleteReason: 'reason',
+      deletedReason: 'reason',
     }));
     expect(manager.createQueryBuilder).toHaveBeenCalledTimes(3);
     expect(insertQb.into).toHaveBeenCalledWith('doctor_shift_change_logs');
