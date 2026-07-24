@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ActiveStatus } from 'src/common/constants/status.enum';
-import { Facility } from 'src/database/entities';
-import { RoomType } from 'src/database/entities/room-type.entity';
+import { ActiveStatus } from '../../../common/constants/status.enum';
+import { Facility } from '../../facilities/entities/facility.entity';
+import { RoomType } from '../../../database/entities/room-type.entity';
 import {
   Column,
   CreateDateColumn,

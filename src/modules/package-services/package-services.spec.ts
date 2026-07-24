@@ -26,6 +26,7 @@ describe('PackageServices DTO validation', () => {
     facilityIds: ['1', '2'],
   };
 
+  // Vai tro: dam bao DTO them service vao package hop le va convert quantity/boolean dung kieu.
   it('accepts a valid create payload and transforms primitive fields', async () => {
     const dto = plainToInstance(CreatePackageServiceDto, validPayload);
     expect(await validate(dto)).toHaveLength(0);
@@ -34,6 +35,7 @@ describe('PackageServices DTO validation', () => {
     expect(dto.isOptional).toBe(false);
   });
 
+  // Vai tro: gom cac input sai cua package-service de bat loi id, so lan, boolean, scope va facilityIds.
   it.each([
     [{ ...validPayload, packageId: '0' }, 'packageId'],
     [{ ...validPayload, serviceId: '-1' }, 'serviceId'],
@@ -46,6 +48,7 @@ describe('PackageServices DTO validation', () => {
     expect(errors.some(error => error.property === property)).toBe(true);
   });
 
+  // Vai tro: dam bao query search package-service chan filter scope va phan trang khong hop le.
   it('validates search filters and pagination', async () => {
     const dto = plainToInstance(SearchPackageServiceDto, {
       packageId: '0',
@@ -104,6 +107,7 @@ describe('PackageServicesService business logic', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
+  // Vai tro: dam bao them service vao goi se check duplicate va convert isRequired/isOptional ve 0/1 de luu DB.
   it('adds a service to a package and converts boolean flags to numbers', async () => {
     const { repo, service } = createService();
     await expect(service.create({
@@ -118,6 +122,7 @@ describe('PackageServicesService business logic', () => {
     expect(repo.saveWithFacilities).toHaveBeenCalled();
   });
 
+  // Vai tro: dam bao scope selected chi hop le khi cac facility duoc chon deu active.
   it('allows selected facility scope when all facilities are active', async () => {
     const { service } = createService();
     await expect(service.create({
@@ -132,6 +137,7 @@ describe('PackageServicesService business logic', () => {
     expect(facilitiesService.findById).toHaveBeenCalledWith('3');
   });
 
+  // Vai tro: chan cau hinh selected scope bi thieu facilityIds hoac co facility inactive.
   it('rejects selected facility scope without facility ids or with inactive facilities', async () => {
     await expect(createService().service.create({
       packageId: '1',
@@ -155,6 +161,7 @@ describe('PackageServicesService business logic', () => {
     })).rejects.toBeInstanceOf(ConflictException);
   });
 
+  // Vai tro: bao ve rule khong trung package-service va khong gan package/service inactive.
   it('rejects duplicated package-service pair and inactive references', async () => {
     const duplicateContext = createService();
     duplicateContext.repo.findByPackageAndService.mockResolvedValueOnce(entity);
@@ -188,6 +195,7 @@ describe('PackageServicesService business logic', () => {
     })).rejects.toBeInstanceOf(ConflictException);
   });
 
+  // Vai tro: dam bao update quantity khong gui facilityIds thi van giu danh sach selected facility cu.
   it('updates package service and keeps existing selected facility ids when omitted', async () => {
     const { repo, service } = createService();
     repo.findById.mockResolvedValueOnce({
@@ -204,6 +212,7 @@ describe('PackageServicesService business logic', () => {
     );
   });
 
+  // Vai tro: dam bao doi service/package trong mapping phai check trung cap moi truoc khi save.
   it('updates package/service pair when unique and rejects duplicated pair', async () => {
     const uniqueContext = createService();
     await expect(uniqueContext.service.update('10', { serviceId: '3' })).resolves.toMatchObject({
@@ -217,6 +226,7 @@ describe('PackageServicesService business logic', () => {
     expect(duplicateContext.repo.saveWithFacilities).not.toHaveBeenCalled();
   });
 
+  // Vai tro: dam bao update isRequired/isOptional convert ve 0/1 dung kieu DB.
   it('converts optional flags during update', async () => {
     const { service } = createService();
 
@@ -226,6 +236,7 @@ describe('PackageServicesService business logic', () => {
     });
   });
 
+  // Vai tro: dam bao detail package-service co join thong tin dich vu va tra 404 khi khong co.
   it('returns detail records and throws when detail does not exist', async () => {
     const { service } = createService();
     await expect(service.findDetailsById('10')).resolves.toMatchObject({ serviceName: 'SiÃªu Ã¢m' });
@@ -235,12 +246,14 @@ describe('PackageServicesService business logic', () => {
     await expect(missingContext.service.findDetailsById('99')).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  // Vai tro: dam bao id package-service khong ton tai tra 404.
   it('throws not found when package service does not exist', async () => {
     const context = createService();
     context.repo.findById.mockResolvedValueOnce(null);
     await expect(context.service.findById('99')).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  // Vai tro: dam bao cac list package-service rong deu tra 404 thay vi success rong.
   it('throws not found when package service lists are empty', async () => {
     const listContext = createService();
     listContext.repo.findAll.mockResolvedValueOnce([]);
@@ -261,6 +274,7 @@ describe('PackageServicesService business logic', () => {
     await expect(publicContext.service.findDetailsByPackageId('1')).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  // Vai tro: dam bao mapping chua sinh quyen loi co the xoa, nhung da sinh benefits thi bi chan xoa.
   it('deletes unused package service and rejects deletion after benefits are generated', async () => {
     const hardContext = createService();
     await expect(hardContext.service.remove('10')).resolves.toBeUndefined();
@@ -292,6 +306,7 @@ describe('PackageServicesController', () => {
     remove: jest.fn().mockResolvedValue(undefined),
   });
 
+  // Vai tro: dam bao controller package-service chon list thuong/phan trang va boc response dung chuan.
   it('chooses list method by query.page and wraps response', async () => {
     const service = createServiceMock();
     const controller = new PackageServicesController(service as never);
@@ -306,6 +321,7 @@ describe('PackageServicesController', () => {
     });
   });
 
+  // Vai tro: kiem tra CRUD package-service tra message/data wrapper nhat quan.
   it('wraps detail, create, update, and remove responses', async () => {
     const service = createServiceMock();
     const controller = new PackageServicesController(service as never);

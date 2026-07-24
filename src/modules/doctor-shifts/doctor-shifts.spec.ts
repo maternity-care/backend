@@ -69,6 +69,7 @@ describe('DoctorShifts DTO validation', () => {
     }))).toHaveLength(0);
   });
 
+  // Vai tro: dam bao query search ca truc bat loi id, date va page/limit khong hop le.
   it('validates search pagination and date inputs', async () => {
     const dto = plainToInstance(SearchDoctorShiftDto, {
       facilityId: '-1', dateFrom: 'invalid', page: '0', limit: '101',
@@ -78,6 +79,7 @@ describe('DoctorShifts DTO validation', () => {
     );
   });
 
+  // Vai tro: dam bao DTO tao hang loat ca truc nhan payload hop le va convert maxAppointments ve number.
   it('validates bulk-create payload', async () => {
     const dto = plainToInstance(BulkCreateDoctorShiftDto, {
       doctorId: '1',
@@ -95,6 +97,7 @@ describe('DoctorShifts DTO validation', () => {
     expect(dto.maxAppointments).toBe(8);
   });
 
+  // Vai tro: kiem tra DTO copy-week va doctor availability voi input hop le truoc khi vao service.
   it('validates copy-week and doctor availability payloads', async () => {
     expect(await validate(plainToInstance(CopyWeekDoctorShiftDto, {
       facilityId: '1',
@@ -108,6 +111,7 @@ describe('DoctorShifts DTO validation', () => {
     }))).toHaveLength(0);
   });
 
+  // Vai tro: dam bao bulk-create bat cac cau hinh workingDays rong, trung lap hoac sai enum.
   it.each([
     [[], 'empty workingDays'],
     [[ShiftWorkingDay.MON, ShiftWorkingDay.MON], 'duplicate workingDays'],
@@ -130,6 +134,7 @@ describe('DoctorShifts DTO validation', () => {
     expect(errors.some(error => error.property === 'workingDays')).toBe(true);
   });
 
+  // Vai tro: dam bao slotMinutes nam trong khoang cho phep, khong qua nho hoac qua lon.
   it.each([14, 241])('TC-UNIT-DSHIFT-057 rejects slotMinutes boundary %s', async (slotMinutes) => {
     const dto = plainToInstance(DoctorAvailabilityQueryDto, {
       facilityId: '1',
@@ -141,6 +146,7 @@ describe('DoctorShifts DTO validation', () => {
     expect(errors.some(error => error.property === 'slotMinutes')).toBe(true);
   });
 
+  // Vai tro: dam bao DTO check conflict cho phep excludeShiftId hop le khi update ca hien tai.
   it('accepts a valid conflict-check payload with excludeShiftId', async () => {
     const dto = plainToInstance(CheckShiftConflictDto, {
       ...validPayload,
@@ -150,6 +156,7 @@ describe('DoctorShifts DTO validation', () => {
     expect(await validate(dto)).toHaveLength(0);
   });
 
+  // Vai tro: dam bao excludeShiftId sai dinh dang/khong duong se bi DTO chan.
   it.each(['0', '-1', 'abc'])('rejects invalid conflict-check excludeShiftId %s', async (excludeShiftId) => {
     const dto = plainToInstance(CheckShiftConflictDto, {
       ...validPayload,
@@ -160,6 +167,7 @@ describe('DoctorShifts DTO validation', () => {
     expect(errors.some(error => error.property === 'excludeShiftId')).toBe(true);
   });
 
+  // Vai tro: dam bao query lay lich tuan hop le khi co facilityId, doctorId va weekStart.
   it('accepts a valid weekly schedule query', async () => {
     const dto = plainToInstance(WeeklyDoctorShiftDto, {
       facilityId: '1',
@@ -170,6 +178,7 @@ describe('DoctorShifts DTO validation', () => {
     expect(await validate(dto)).toHaveLength(0);
   });
 
+  // Vai tro: dam bao query lich tuan bat loi facilityId, doctorId va weekStart sai.
   it('rejects invalid weekly schedule query inputs', async () => {
     const dto = plainToInstance(WeeklyDoctorShiftDto, {
       facilityId: '0',
@@ -227,6 +236,7 @@ describe('DoctorShiftsService business validation', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
+  // Vai tro: dam bao tao ca truc phai qua check reference, bac si thuoc facility va khong conflict.
   it('creates a shift after validating references and conflicts', async () => {
     const { repo, service } = createService();
     await expect(service.create({ ...shift, id: undefined } as never)).resolves.toMatchObject({ id: '10' });
@@ -234,6 +244,7 @@ describe('DoctorShiftsService business validation', () => {
     expect(repo.findConflicts).toHaveBeenCalled();
   });
 
+  // Vai tro: dam bao so sanh gio lam viec chuan hoa HH:mm va HH:mm:ss nhu nhau.
   it('treats HH:mm shift time as equal to HH:mm:ss facility opening time', async () => {
     facilitiesService.findById.mockResolvedValueOnce({
       ...facility,
@@ -248,6 +259,7 @@ describe('DoctorShiftsService business validation', () => {
     } as never)).resolves.toMatchObject({ startTime: '07:00' });
   });
 
+  // Vai tro: chan tao ca khi facility inactive hoac bac si khong duoc gan vao facility.
   it('rejects an inactive facility or an unassigned doctor', async () => {
     facilitiesService.findById.mockResolvedValueOnce({ ...facility, status: FacilityStatus.INACTIVE });
     await expect(createService().service.create(shift as never)).rejects.toBeInstanceOf(ConflictException);
@@ -256,6 +268,7 @@ describe('DoctorShiftsService business validation', () => {
     await expect(context.service.create(shift as never)).rejects.toBeInstanceOf(ConflictException);
   });
 
+  // Vai tro: dam bao room phai thuoc facility cua ca truc va ca OFF khong duoc gan room.
   it('rejects a room from another facility and off shift with a room', async () => {
     roomsService.findById.mockResolvedValueOnce({ ...room, facilityId: '2' });
     await expect(createService().service.create(shift as never)).rejects.toBeInstanceOf(ConflictException);
@@ -264,6 +277,7 @@ describe('DoctorShiftsService business validation', () => {
     } as never)).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  // Vai tro: chan ca truc qua ngan va cac conflict trung gio cua bac si/phong.
   it('rejects invalid duration and doctor/room conflicts', async () => {
     await expect(createService().service.create({
       ...shift, startTime: '08:00', endTime: '08:10',
@@ -276,12 +290,14 @@ describe('DoctorShiftsService business validation', () => {
     await expect(roomContext.service.create(shift as never)).rejects.toBeInstanceOf(ConflictException);
   });
 
+  // Vai tro: dam bao update ca truc khong tu conflict voi chinh ca dang update.
   it('excludes the current shift when checking an update', async () => {
     const { repo, service } = createService();
     await service.update('10', { startTime: '09:00', endTime: '12:00' });
     expect(repo.findConflicts).toHaveBeenCalledWith(expect.objectContaining({ excludeShiftId: '10' }));
   });
 
+  // Vai tro: dam bao API pre-check conflict tra chi tiet conflict thay vi nem exception.
   it('returns conflict details without throwing from the pre-check API', async () => {
     const { repo, service } = createService();
     repo.findConflicts.mockResolvedValue({ doctorConflicts: [shift], roomConflicts: [] });
@@ -289,6 +305,7 @@ describe('DoctorShiftsService business validation', () => {
     expect(result).toMatchObject({ hasConflict: true, doctorConflicts: [shift] });
   });
 
+  // Vai tro: dam bao lich tuan luon gom 7 ngay va query dung khoang weekStart-weekEnd.
   it('returns seven grouped days for the weekly calendar', async () => {
     const { repo, service } = createService();
     const result = await service.getWeeklySchedule('1', '2099-07-06', '1');
@@ -297,6 +314,7 @@ describe('DoctorShiftsService business validation', () => {
     expect(repo.findWeeklyWithDetails).toHaveBeenCalledWith('1', '2099-07-06', '2099-07-12', '1');
   });
 
+  // Vai tro: dam bao bulk-create chi sinh ca vao cac ngay lam viec duoc chon.
   it('bulk creates shifts only on selected working days', async () => {
     const { repo, service } = createService();
     const result = await service.bulkCreate({
@@ -318,6 +336,7 @@ describe('DoctorShiftsService business validation', () => {
     ]));
   });
 
+  // Vai tro: dam bao copy-week bo qua ca cancelled va reset ca full ve available o tuan moi.
   it('copies a week, skips cancelled shifts, and resets full shifts to available', async () => {
     const { repo, service } = createService();
     repo.findWeekly.mockResolvedValueOnce([
@@ -338,6 +357,7 @@ describe('DoctorShiftsService business validation', () => {
     ]);
   });
 
+  // Vai tro: dam bao slot kha dung cua bac si loai bo khoang gio da co appointment giu cho.
   it('returns doctor availability slots excluding booked appointments', async () => {
     const { repo, service } = createService();
     repo.findDoctorShiftsForDate.mockResolvedValueOnce([{
@@ -362,6 +382,7 @@ describe('DoctorShiftsService business validation', () => {
     ]);
   });
 
+  // Vai tro: chan ca truc dai bat thuong qua gioi han nghiep vu 12 tieng.
   it('TC-UNIT-DSHIFT-007 rejects shifts longer than 12 hours', async () => {
     await expect(createService().service.create({
       ...shift,
@@ -370,6 +391,7 @@ describe('DoctorShiftsService business validation', () => {
     } as never)).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  // Vai tro: dam bao khong tao ca truc trong qua khu.
   it('TC-UNIT-DSHIFT-008 rejects shifts in the past', async () => {
     await expect(createService().service.create({
       ...shift,
@@ -377,6 +399,7 @@ describe('DoctorShiftsService business validation', () => {
     } as never)).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  // Vai tro: dam bao ca truc phai nam trong gio hoat dong cua facility.
   it('TC-UNIT-DSHIFT-009 rejects shifts outside facility opening hours', async () => {
     facilitiesService.findById.mockResolvedValueOnce({
       ...facility,
@@ -391,6 +414,7 @@ describe('DoctorShiftsService business validation', () => {
     } as never)).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  // Vai tro: dam bao dateFrom/fromDate khong duoc lon hon dateTo/toDate o list va bulk-create.
   it('TC-UNIT-DSHIFT-014 rejects list and bulk-create when date range is reversed', async () => {
     const { repo, service } = createService();
 
@@ -409,6 +433,7 @@ describe('DoctorShiftsService business validation', () => {
     })).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  // Vai tro: chan bulk-create neu khoang ngay khong co ngay nao khop workingDays da chon.
   it('TC-UNIT-DSHIFT-015 rejects bulk-create when no date matches workingDays', async () => {
     await expect(createService().service.bulkCreate({
       doctorId: '1',
@@ -423,6 +448,7 @@ describe('DoctorShiftsService business validation', () => {
     })).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  // Vai tro: gioi han bulk-create khong tao qua dai de tranh thao tac nham/qua tai.
   it('TC-UNIT-DSHIFT-016 rejects bulk-create ranges longer than 92 days', async () => {
     await expect(createService().service.bulkCreate({
       doctorId: '1',
@@ -437,6 +463,7 @@ describe('DoctorShiftsService business validation', () => {
     })).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  // Vai tro: dam bao bulk-create co mot ca conflict thi rollback logic va khong save bat ky ca nao.
   it('TC-UNIT-DSHIFT-017 does not save bulk payloads when one generated shift conflicts', async () => {
     const { repo, service } = createService();
     repo.findConflicts
@@ -457,6 +484,7 @@ describe('DoctorShiftsService business validation', () => {
     expect(repo.saveMany).not.toHaveBeenCalled();
   });
 
+  // Vai tro: dam bao list ca truc voi khoang ngay hop le goi repository va tra data.
   it('TC-UNIT-DSHIFT-018 returns list results when date range is valid', async () => {
     const { repo, service } = createService();
 
@@ -464,6 +492,7 @@ describe('DoctorShiftsService business validation', () => {
     expect(repo.findAll).toHaveBeenCalledWith({ dateFrom: '2099-07-01', dateTo: '2099-07-31' });
   });
 
+  // Vai tro: dam bao list phan trang ca truc tra cau truc pagination khi khoang ngay hop le.
   it('TC-UNIT-DSHIFT-020 returns paginated results when date range is valid', async () => {
     const { repo, service } = createService();
 
@@ -471,6 +500,7 @@ describe('DoctorShiftsService business validation', () => {
     expect(repo.findAllPaginated).toHaveBeenCalledWith({ page: 1, limit: 20 });
   });
 
+  // Vai tro: dam bao danh sach ca truc rong tra 404 thay vi success rong.
   it('returns not found when list or paginated list has no shifts', async () => {
     const listContext = createService();
     listContext.repo.findAll.mockResolvedValueOnce([]);
@@ -487,6 +517,7 @@ describe('DoctorShiftsService business validation', () => {
     await expect(pagedContext.service.findAllPaginated({ page: 1, limit: 20 })).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  // Vai tro: dam bao lay ca truc theo id hop le tra dung entity.
   it('TC-UNIT-DSHIFT-021 returns a shift by valid id', async () => {
     const { repo, service } = createService();
 
@@ -494,6 +525,7 @@ describe('DoctorShiftsService business validation', () => {
     expect(repo.findById).toHaveBeenCalledWith('10');
   });
 
+  // Vai tro: chan path id sai dinh dang ngay tai service, khong query DB vo ich.
   it('TC-UNIT-DSHIFT-022 rejects invalid path ids before querying repository', async () => {
     const { repo, service } = createService();
 
@@ -501,6 +533,7 @@ describe('DoctorShiftsService business validation', () => {
     expect(repo.findById).not.toHaveBeenCalled();
   });
 
+  // Vai tro: dam bao id dung dinh dang nhung khong ton tai se tra 404.
   it('TC-UNIT-DSHIFT-023 returns not found when a valid shift id does not exist', async () => {
     const { repo, service } = createService();
     repo.findById.mockResolvedValueOnce(null);
@@ -508,6 +541,7 @@ describe('DoctorShiftsService business validation', () => {
     await expect(service.findById('999')).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  // Vai tro: dam bao doi status sang cancelled khong can check conflict gio/phong.
   it('TC-UNIT-DSHIFT-025 skips conflict check when updating a shift to cancelled', async () => {
     const { repo, service } = createService();
 
@@ -517,12 +551,14 @@ describe('DoctorShiftsService business validation', () => {
     expect(repo.save).toHaveBeenCalledWith(expect.objectContaining({ status: DoctorShiftStatus.CANCELLED }));
   });
 
+  // Vai tro: chan update ca truc sang room inactive.
   it('TC-UNIT-DSHIFT-026 rejects update when target room is inactive', async () => {
     roomsService.findById.mockResolvedValueOnce({ ...room, status: ActiveStatus.INACTIVE });
 
     await expect(createService().service.update('10', { roomId: '2' })).rejects.toBeInstanceOf(ConflictException);
   });
 
+  // Vai tro: dam bao ca truc chua co appointment lien quan co the xoa cung.
   it('TC-UNIT-DSHIFT-027 hard deletes a shift without related appointments', async () => {
     const { repo, service } = createService();
 
@@ -535,6 +571,7 @@ describe('DoctorShiftsService business validation', () => {
     expect(repo.cancelShiftWithDisruption).not.toHaveBeenCalled();
   });
 
+  // Vai tro: dam bao ca truc co appointment active se cancel/disruption thay vi xoa cung.
   it('TC-UNIT-DSHIFT-028 cancels a shift with active affected appointments', async () => {
     const { repo, service } = createService();
     const relatedAppointment = {
@@ -561,6 +598,7 @@ describe('DoctorShiftsService business validation', () => {
     expect(repo.remove).not.toHaveBeenCalled();
   });
 
+  // Vai tro: dam bao ca co lich su appointment thi van cancel de giu audit, du affected active bang 0.
   it('TC-UNIT-DSHIFT-029 cancels a shift with zero active affected appointments when historical appointments exist', async () => {
     const { repo, service } = createService();
     repo.findAppointmentsForShift
@@ -580,6 +618,7 @@ describe('DoctorShiftsService business validation', () => {
     expect(repo.cancelShiftWithDisruption).toHaveBeenCalledWith(expect.any(Object), [], undefined, undefined);
   });
 
+  // Vai tro: dam bao pre-check conflict tra hasConflict=false khi khong co conflict bac si/phong.
   it('TC-UNIT-DSHIFT-030 returns hasConflict=false when pre-check arrays are empty', async () => {
     const { service } = createService();
 
@@ -590,6 +629,7 @@ describe('DoctorShiftsService business validation', () => {
     });
   });
 
+  // Vai tro: chan copy-week source va target trung nhau de tranh nhan doi/ghi de vo nghia.
   it('TC-UNIT-DSHIFT-033 rejects copying a week onto itself', async () => {
     await expect(createService().service.copyWeek({
       facilityId: '1',
@@ -598,6 +638,7 @@ describe('DoctorShiftsService business validation', () => {
     })).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  // Vai tro: dam bao source week chi co ca cancelled thi copy-week khong tao ca moi.
   it('TC-UNIT-DSHIFT-034 returns empty array when source week has only cancelled shifts', async () => {
     const { repo, service } = createService();
     repo.findWeekly.mockResolvedValueOnce([{ ...shift, status: DoctorShiftStatus.CANCELLED }]);
@@ -610,6 +651,7 @@ describe('DoctorShiftsService business validation', () => {
     expect(repo.saveMany).not.toHaveBeenCalled();
   });
 
+  // Vai tro: dam bao copy-week gap conflict o target thi khong save nua chung.
   it('TC-UNIT-DSHIFT-035 does not save copied shifts when target validation conflicts', async () => {
     const { repo, service } = createService();
     repo.findWeekly.mockResolvedValueOnce([{ ...shift, shiftDate: '2099-07-06' }]);
@@ -623,6 +665,7 @@ describe('DoctorShiftsService business validation', () => {
     expect(repo.saveMany).not.toHaveBeenCalled();
   });
 
+  // Vai tro: dam bao doctor availability dung slot 60 phut mac dinh khi client khong truyen.
   it('TC-UNIT-DSHIFT-037 defaults doctor availability slotMinutes to 60', async () => {
     const { repo, service } = createService();
     repo.findDoctorShiftsForDate.mockResolvedValueOnce([{
@@ -644,6 +687,7 @@ describe('DoctorShiftsService business validation', () => {
     ]);
   });
 
+  // Vai tro: dam bao ca full hoac da dat het slot khong con sinh slot trong.
   it('TC-UNIT-DSHIFT-038 does not generate slots for full or fully booked shifts', async () => {
     const { repo, service } = createService();
     repo.findDoctorShiftsForDate.mockResolvedValueOnce([
@@ -669,6 +713,7 @@ describe('DoctorShiftsService business validation', () => {
     ]);
   });
 
+  // Vai tro: chan xem availability neu bac si khong thuoc facility do.
   it('TC-UNIT-DSHIFT-039 rejects doctor availability for an unassigned doctor', async () => {
     const { repo, service } = createService();
     repo.isDoctorAssignedToFacility.mockResolvedValueOnce(false);
@@ -681,6 +726,7 @@ describe('DoctorShiftsService business validation', () => {
     expect(repo.findDoctorAppointmentsForDate).not.toHaveBeenCalled();
   });
 
+  // Vai tro: dam bao lich tuan mac dinh tinh theo tuan hien tai o mui gio Viet Nam khi thieu weekStart.
   it('TC-UNIT-DSHIFT-041 uses current Vietnam week when weekStart is omitted', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-07-17T00:00:00Z'));
     try {
@@ -695,6 +741,7 @@ describe('DoctorShiftsService business validation', () => {
     }
   });
 
+  // Vai tro: dam bao lich tuan khong co ca truc tra 404 thay vi success rong.
   it('returns not found when weekly schedule has no shifts', async () => {
     const { repo, service } = createService();
     repo.findWeeklyWithDetails.mockResolvedValueOnce([]);
@@ -702,6 +749,7 @@ describe('DoctorShiftsService business validation', () => {
     await expect(service.getWeeklySchedule('1', '2099-07-06')).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  // Vai tro: dam bao bac si khong co ca lam viec trong ngay thi availability tra 404.
   it('returns not found when doctor availability has no working shifts', async () => {
     const { repo, service } = createService();
     repo.findDoctorShiftsForDate.mockResolvedValueOnce([]);
@@ -712,6 +760,7 @@ describe('DoctorShiftsService business validation', () => {
     })).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  // Vai tro: dam bao check-conflict van validate input va tra result conflict thay vi nem loi nghiep vu.
   it('TC-UNIT-DSHIFT-042 validates conflict-check input without throwing on conflict details', async () => {
     const { repo, service } = createService();
     repo.findConflicts.mockResolvedValueOnce({ doctorConflicts: [shift], roomConflicts: [] });
@@ -726,6 +775,7 @@ describe('DoctorShiftsService business validation', () => {
     })).resolves.toMatchObject({ hasConflict: true });
   });
 
+  // Vai tro: dam bao ca OFF cua bac si khong can room va khong goi validate room.
   it('creates an OFF shift without requiring a room', async () => {
     const { repo, service } = createService();
 
@@ -741,6 +791,7 @@ describe('DoctorShiftsService business validation', () => {
     expect(repo.save).toHaveBeenCalledWith(expect.objectContaining({ status: DoctorShiftStatus.OFF }));
   });
 
+  // Vai tro: dam bao appointment ngoai khung gio ca truc khong lam mat slot kha dung.
   it('keeps all availability slots when appointments do not overlap the shift', async () => {
     const { repo, service } = createService();
     repo.findDoctorShiftsForDate.mockResolvedValueOnce([{
@@ -769,6 +820,7 @@ describe('DoctorShiftsService business validation', () => {
     ]);
   });
 
+  // Vai tro: dam bao availability khong sinh slot le cuoi ca neu khong du slotMinutes.
   it('does not generate a partial trailing availability slot', async () => {
     const { repo, service } = createService();
     repo.findDoctorShiftsForDate.mockResolvedValueOnce([{
@@ -790,6 +842,7 @@ describe('DoctorShiftsService business validation', () => {
     ]);
   });
 
+  // Vai tro: dam bao copy-week giu nguyen status available/off cho cac ca hop le.
   it('copies available and off shifts without changing their statuses', async () => {
     const { repo, service } = createService();
     repo.findWeekly.mockResolvedValueOnce([
@@ -809,6 +862,7 @@ describe('DoctorShiftsService business validation', () => {
     ]);
   });
 
+  // Vai tro: dam bao loi transaction khi cancel shift co appointment duoc nem ra va khong xoa cung.
   it('propagates disruption cancellation errors when removing a shift with appointments', async () => {
     const { repo, service } = createService();
     repo.findAppointmentsForShift
@@ -832,12 +886,14 @@ describe('DoctorShiftsService business validation', () => {
 });
 
 describe('DoctorShifts helper functions', () => {
+  // Vai tro: kiem tra helper so sanh overlap dung ca truong hop cham bien khong tinh la trung.
   it('TC-UNIT-DSHIFT-058 detects overlap and non-overlap at boundaries', () => {
     expect(timesOverlap('08:00', '10:00', '09:00', '11:00')).toBe(true);
     expect(timesOverlap('08:00', '10:00', '10:00', '11:00')).toBe(false);
     expect(timesOverlap('08:00', '10:00', '07:00', '08:00')).toBe(false);
   });
 
+  // Vai tro: dam bao helper sinh ngay ca truc dung theo workingDays trong khoang ngay.
   it('TC-UNIT-DSHIFT-059 builds shift dates that match selected working days', () => {
     expect(buildShiftDates('2099-07-06', '2099-07-10', [
       ShiftWorkingDay.MON,
@@ -845,15 +901,18 @@ describe('DoctorShifts helper functions', () => {
     ])).toEqual(['2099-07-06', '2099-07-08']);
   });
 
+  // Vai tro: dam bao helper lay gio tu Date ve format HH:mm:ss.
   it('TC-UNIT-DSHIFT-060 converts Date values to HH:mm:ss', () => {
     expect(dateTimeToTime(new Date(2099, 6, 7, 8, 30, 5))).toBe('08:30:05');
   });
 
+  // Vai tro: dam bao helper convert ca HH:mm va HH:mm:ss sang phut de so sanh thoi gian.
   it('converts time strings to minutes using normalized HH:mm:ss values', () => {
     expect(timeToMinutes('08:30')).toBe(510);
     expect(timeToMinutes('08:30:00')).toBe(510);
   });
 
+  // Vai tro: dam bao helper convert so phut ve HH:mm:ss dung de render slot.
   it('converts minute offsets back to HH:mm:ss', () => {
     expect(minutesToTime(0)).toBe('00:00:00');
     expect(minutesToTime(510)).toBe('08:30:00');
@@ -902,6 +961,7 @@ describe('DoctorShiftsController unit routing and scope', () => {
     return { service, controller: new DoctorShiftsController(service as never) };
   };
 
+  // Vai tro: dam bao controller chon list phan trang/khong phan trang theo query.page.
   it('TC-UNIT-DSHIFT-049 chooses paginated or non-paginated list method by query.page', async () => {
     const { service, controller } = createController();
 
@@ -915,12 +975,14 @@ describe('DoctorShiftsController unit routing and scope', () => {
     expect(service.findAll).toHaveBeenCalledWith({});
   });
 
+  // Vai tro: dam bao API weekly schedule bat buoc co facilityId de xac dinh lich co so.
   it('TC-UNIT-DSHIFT-050 rejects weekly calendar requests without facilityId', async () => {
     const { controller } = createController();
 
     await expect(controller.getWeekly(superUser as never, {} as never)).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  // Vai tro: chan user scope facility update ca truc thuoc facility khac.
   it('TC-UNIT-DSHIFT-051 checks facility scope before updating a shift', async () => {
     const { service, controller } = createController();
     service.findById.mockResolvedValueOnce({ ...shift, facilityId: '2' });
@@ -929,6 +991,7 @@ describe('DoctorShiftsController unit routing and scope', () => {
     expect(service.update).not.toHaveBeenCalled();
   });
 
+  // Vai tro: dam bao remove khong co currentUser se truyen deletedBy=null thay vi crash.
   it('TC-UNIT-DSHIFT-052 passes null deletedBy when remove is called without user', async () => {
     const { service, controller } = createController();
 
@@ -938,6 +1001,7 @@ describe('DoctorShiftsController unit routing and scope', () => {
     expect(service.remove).toHaveBeenCalledWith('10', 'cleanup', null);
   });
 
+  // Vai tro: dam bao API create doctor-shift tra wrapper message/data dung chuan.
   it('wraps create responses with the expected message and data', async () => {
     const { service, controller } = createController();
 
@@ -945,6 +1009,7 @@ describe('DoctorShiftsController unit routing and scope', () => {
     expect(service.create).toHaveBeenCalledWith(shift);
   });
 
+  // Vai tro: dam bao API detail doctor-shift goi ban detail va boc response dung format.
   it('wraps detail responses from findOne', async () => {
     const { service, controller } = createController();
 
@@ -952,6 +1017,7 @@ describe('DoctorShiftsController unit routing and scope', () => {
     expect(service.findDetailsById).toHaveBeenCalledWith('10');
   });
 
+  // Vai tro: dam bao API check-conflicts boc ket qua conflict thanh response cho FE.
   it('wraps conflict-check responses', async () => {
     const { service, controller } = createController();
     const dto = { doctorId: '1', facilityId: '1', shiftDate: '2099-07-07', startTime: '08:00', endTime: '12:00' };
@@ -962,6 +1028,7 @@ describe('DoctorShiftsController unit routing and scope', () => {
     expect(service.checkConflicts).toHaveBeenCalledWith(dto);
   });
 
+  // Vai tro: dam bao controller route dung lenh bulk-create va copy-week xuong service.
   it('routes bulk-create and copy-week commands to the service', async () => {
     const { service, controller } = createController();
     const bulkDto = {
@@ -986,6 +1053,7 @@ describe('DoctorShiftsController unit routing and scope', () => {
     expect(service.copyWeek).toHaveBeenCalledWith(copyDto);
   });
 
+  // Vai tro: dam bao controller route availability va weekly schedule hop le xuong dung service method.
   it('routes availability and valid weekly calendar requests to the service', async () => {
     const { service, controller } = createController();
 
@@ -1042,6 +1110,7 @@ describe('DoctorShiftsRepository unit query behavior', () => {
     return qb;
   };
 
+  // Vai tro: dam bao repository build query conflict bac si/phong va bo qua shift hien tai khi co excludeShiftId.
   it('TC-UNIT-DSHIFT-043 builds doctor and room conflict queries with excludeShiftId', async () => {
     const doctorQb = createQueryBuilder([{ id: 'doctor-conflict' }]);
     const roomQb = createQueryBuilder([{ id: 'room-conflict' }]);
@@ -1072,6 +1141,7 @@ describe('DoctorShiftsRepository unit query behavior', () => {
     expect(roomQb.andWhere).toHaveBeenCalledWith('doctor_shifts.id != :excludeShiftId', { excludeShiftId: '10' });
   });
 
+  // Vai tro: dam bao ca khong co roomId chi check conflict bac si, khong query room vo ich.
   it('TC-UNIT-DSHIFT-044 skips the room conflict query when roomId is absent', async () => {
     const doctorQb = createQueryBuilder([]);
     const typeormRepo = { createQueryBuilder: jest.fn().mockReturnValueOnce(doctorQb) };
@@ -1086,6 +1156,7 @@ describe('DoctorShiftsRepository unit query behavior', () => {
     expect(typeormRepo.createQueryBuilder).toHaveBeenCalledTimes(1);
   });
 
+  // Vai tro: dam bao cancel shift co appointment ghi change log, disruption va item trong cung transaction.
   it('TC-UNIT-DSHIFT-045 wraps shift cancellation, log, disruption, and items in one transaction', async () => {
     const update = jest.fn().mockResolvedValue(undefined);
     const insertQb = createQueryBuilder();
@@ -1121,6 +1192,7 @@ describe('DoctorShiftsRepository unit query behavior', () => {
     expect(insertQb.into).toHaveBeenCalledWith('appointment_disruption_items');
   });
 
+  // Vai tro: dam bao khong tao disruption/item khi cancel shift ma khong co appointment active bi anh huong.
   it('TC-UNIT-DSHIFT-046 does not create disruption records when no active appointments are affected', async () => {
     const insertQb = createQueryBuilder();
     const manager = {
@@ -1143,6 +1215,7 @@ describe('DoctorShiftsRepository unit query behavior', () => {
     expect(insertQb.into).not.toHaveBeenCalledWith('shift_disruptions');
   });
 
+  // Vai tro: dam bao availability chi tinh cac appointment status con giu slot.
   it('TC-UNIT-DSHIFT-047 queries only appointment statuses that still hold a slot', async () => {
     const qb = createQueryBuilder([]);
     const repository = new DoctorShiftsRepository({
@@ -1156,6 +1229,7 @@ describe('DoctorShiftsRepository unit query behavior', () => {
     });
   });
 
+  // Vai tro: dam bao repository chi lay ca available/full khi tinh slot kha dung.
   it('queries only available and full shifts when building doctor availability', async () => {
     const qb = createQueryBuilder([]);
     const repository = new DoctorShiftsRepository({
@@ -1170,6 +1244,7 @@ describe('DoctorShiftsRepository unit query behavior', () => {
     expect(qb.orderBy).toHaveBeenCalledWith('shift.startTime', 'ASC');
   });
 
+  // Vai tro: dam bao weekly schedule chi them filter doctorId khi client yeu cau lich cua mot bac si cu the.
   it('adds doctor filter only when finding a weekly schedule for a specific doctor', async () => {
     const allDoctorsQb = createQueryBuilder([]);
     const oneDoctorQb = createQueryBuilder([]);
@@ -1186,6 +1261,7 @@ describe('DoctorShiftsRepository unit query behavior', () => {
     expect(oneDoctorQb.andWhere).toHaveBeenCalledWith('shift.doctorId = :doctorId', { doctorId: '2' });
   });
 
+  // Vai tro: dam bao findAppointmentsForShift co activeOnly se chi lay appointment con tac dong lich.
   it('adds active appointment status filtering when finding appointments for a shift with activeOnly=true', async () => {
     const qb = createQueryBuilder([]);
     const repository = new DoctorShiftsRepository({
@@ -1199,6 +1275,7 @@ describe('DoctorShiftsRepository unit query behavior', () => {
     });
   });
 
+  // Vai tro: dam bao mac dinh findAppointmentsForShift lay ca lich su, khong tu them filter active.
   it('does not add active appointment status filtering by default when finding appointments for a shift', async () => {
     const qb = createQueryBuilder([]);
     const repository = new DoctorShiftsRepository({
@@ -1210,6 +1287,7 @@ describe('DoctorShiftsRepository unit query behavior', () => {
     expect(qb.andWhere).not.toHaveBeenCalledWith('appointment.status IN (:...statuses)', expect.any(Object));
   });
 
+  // Vai tro: dam bao check bac si duoc gan facility dua vao count assignment va convert thanh boolean dung.
   it.each([
     ['1', true],
     ['0', false],
@@ -1226,9 +1304,14 @@ describe('DoctorShiftsRepository unit query behavior', () => {
 });
 
 describe('DoctorShifts future backend unit test backlog', () => {
+  // Vai tro: backlog cho rule can bo sung lock/unique de chan tao ca trung khi request dong thoi.
   it.todo('rejects overlapping shifts created concurrently when repository/database unique or lock strategy is introduced');
+  // Vai tro: backlog de test rollback transaction khi huy ca truc that bai giua chung.
   it.todo('verifies cancellation disruption rollback leaves no partial change-log/disruption records on transaction failure');
+  // Vai tro: backlog cho rule khong cho huy ca sau moc cutoff cua chinh sach appointment.
   it.todo('blocks cancelling a shift after appointment cutoff time when appointment policy is implemented');
+  // Vai tro: backlog cho rule copy-week can biet ngay le/ngay nghi khi co holiday calendar.
   it.todo('prevents copying a source week into target dates that are holidays when holiday calendar support exists');
+  // Vai tro: backlog cho rule khong duoc ha maxAppointments thap hon so appointment active hien co.
   it.todo('validates maxAppointments against actual active appointment count before lowering capacity on update');
 });

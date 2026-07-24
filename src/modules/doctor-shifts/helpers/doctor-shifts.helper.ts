@@ -53,8 +53,11 @@ export function validateFacilityHours(
   status: DoctorShiftStatus,
 ): void {
   if (status === DoctorShiftStatus.OFF || status === DoctorShiftStatus.CANCELLED) return;
-  const openTime = facility.open_time ? normalizeTime(String(facility.open_time)) : null;
-  const closeTime = facility.close_time ? normalizeTime(String(facility.close_time)) : null;
+  const facilityTime = facility as Facility & { open_time?: string; close_time?: string };
+  const rawOpenTime = facilityTime.openTime ?? facilityTime.open_time;
+  const rawCloseTime = facilityTime.closeTime ?? facilityTime.close_time;
+  const openTime = rawOpenTime ? normalizeTime(String(rawOpenTime)) : null;
+  const closeTime = rawCloseTime ? normalizeTime(String(rawCloseTime)) : null;
   const normalizedStart = normalizeTime(startTime);
   const normalizedEnd = normalizeTime(endTime);
   if (openTime && closeTime && (normalizedStart < openTime || normalizedEnd > closeTime)) {
@@ -186,4 +189,3 @@ export function dateTimeToTime(value: Date | string): string {
   const second = date.getSeconds().toString().padStart(2, '0');
   return `${hour}:${minute}:${second}`;
 }
-

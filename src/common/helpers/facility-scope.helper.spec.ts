@@ -1,7 +1,7 @@
 import { ForbiddenException } from '@nestjs/common';
 import { AccountStatus, FacilityStatus } from '../constants/status.enum';
 import { RoleEnum } from '../constants/role.enum';
-import { AuthenticatedUser } from '../../modules/auth/interfaces/authenticated-user.interface';
+import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 import {
   assertFacilityAccess,
   requireActiveFacilityId,
