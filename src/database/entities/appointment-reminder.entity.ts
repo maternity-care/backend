@@ -38,7 +38,7 @@ export class AppointmentReminder {
   sentAt: Date | null;
 
   @ApiProperty({ enum: ReminderStatus, enumName: 'ReminderStatus' })
-  @Column({ name: 'status', type: 'enum', enum: ReminderStatus })
+  @Column({ name: 'status', type: 'enum', enum: ReminderStatus, default: ReminderStatus.PENDING })
   status: ReminderStatus;
 
   @ApiPropertyOptional({ type: String, nullable: true, required: false })

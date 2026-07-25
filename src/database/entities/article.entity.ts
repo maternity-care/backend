@@ -31,7 +31,7 @@ export class Article {
   title: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'slug', type: 'varchar', length: 255, unique: true })
+  @Column({ name: 'slug', type: 'varchar', length: 255 })
   slug: string;
 
   @ApiProperty({ type: String })
@@ -43,20 +43,20 @@ export class Article {
   content: string;
 
   @ApiProperty({ enum: ArticleStatus, enumName: 'ArticleStatus' })
-  @Column({ name: 'status', type: 'enum', enum: ArticleStatus })
+  @Column({ name: 'status', type: 'enum', enum: ArticleStatus, default: ArticleStatus.DRAFT })
   status: ArticleStatus;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'approved_by', type: 'bigint' })
-  approvedBy: string;
+  @Column({ name: 'approved_by', type: 'bigint', nullable: true })
+  approvedBy: string | null;
 
   @ApiProperty({ type: Date })
-  @Column({ name: 'approved_at', type: 'timestamp' })
-  approvedAt: Date;
+  @Column({ name: 'approved_at', type: 'timestamp', nullable: true })
+  approvedAt: Date | null;
 
   @ApiProperty({ type: Date })
-  @Column({ name: 'published_at', type: 'timestamp' })
-  publishedAt: Date;
+  @Column({ name: 'published_at', type: 'timestamp', nullable: true })
+  publishedAt: Date | null;
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })

@@ -16,13 +16,16 @@ export class PregnancyHistoryEvent {
   @Column({ name: 'pregnancy_profile_id', type: 'bigint' })
   pregnancyProfileId: string;
 
-  @ApiProperty({ type: String })
+  @ApiProperty({
+    type: String,
+    example: 'examination, ultrasound, blood tests, urine tests, schedule',
+  })
   @Column({ name: 'event_type', type: 'varchar', length: 255 })
   eventType: string;
 
   @ApiProperty({ type: String })
   @Column({ name: 'event_date', type: 'date' })
-  eventDate: string;
+  eventDate: string | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'title', type: 'varchar', length: 255 })
@@ -38,7 +41,7 @@ export class PregnancyHistoryEvent {
 
   @ApiProperty({ type: String })
   @Column({ name: 'ref_id', type: 'bigint' })
-  refId: string;
+  refId: string | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'created_by', type: 'date' })

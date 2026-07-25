@@ -1,19 +1,23 @@
+import { Staff } from './../staffs/entities/staff.entity';
+import {
+  IRedisCacheService,
+  REDIS_CACHE_SERVICE,
+} from './../../common/cache/redis-cache.interface';
 import {
   BadRequestException,
   ConflictException,
   Inject,
   Injectable,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { randomBytes, createHash } from 'crypto';
+import { randomBytes, createHash, randomInt } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
-import { RoleEnum } from '../../common/constants/role.enum';
 import { IMailService, MAIL_SERVICE } from '../mail/interfaces/mail-service.interface';
-import { IRolesService, ROLES_SERVICE } from '../roles/interfaces/roles-service.interface';
 import { USERS_REPOSITORY, IUsersRepository } from '../users/interfaces/users-repository.interface';
 import { User } from '../users/entities/user.entity';
 import { LoginDto } from './dto/request/login.dto';
@@ -29,21 +33,23 @@ import {
 } from '../staffs/interfaces/staff-profile-repository.interface';
 import { StaffRefreshToken } from './entities/staff-refresh-token.entity';
 import { StaffPasswordResetToken } from './entities/staff-password-reset-token.entity';
-import { StaffProfile } from '../staffs/entities/staff.entity';
 import { AccountStatus } from '../../common/constants/status.enum';
 import { UpdateManagementProfileDto } from './dto/request/update-management-profile.dto';
 import { ChangeManagementPasswordDto } from './dto/request/change-management-password.dto';
+import {
+  IUserAuthRepository,
+  USER_AUTH_REPOSITORY,
+} from './interfaces/user-auth-repository.interface';
 
 const PASSWORD_RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
 const PASSWORD_RESET_TOKEN_TTL_MINUTES = 30;
+const OTP_TTL = 15;
 
 @Injectable()
 export class AuthService {
   constructor(
     @Inject(USERS_REPOSITORY)
     private readonly usersRepository: IUsersRepository,
-    @Inject(ROLES_SERVICE)
-    private readonly rolesService: IRolesService,
     @Inject(MAIL_SERVICE)
     private readonly mailService: IMailService,
     @Inject(STAFF_PROFILE_REPOSITORY)
@@ -58,29 +64,134 @@ export class AuthService {
     private readonly staffPasswordResetTokenRepository: Repository<StaffPasswordResetToken>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    @Inject(USER_AUTH_REPOSITORY)
+    private readonly userAuthRepository: IUserAuthRepository,
+    @Inject(REDIS_CACHE_SERVICE)
+    private readonly cacheService: IRedisCacheService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<AuthResponseDto> {
-    const existing = await this.usersRepository.findByEmail(dto.email);
-    if (existing) {
-      throw new ConflictException('Email already exists');
+  async createUserAuth(userId: string, email: string, password: string) {
+    const saltRounds = this.configService.getOrThrow<number>('bcrypt.saltRounds');
+    const userAuth = await this.userAuthRepository.create({
+      userId,
+      email,
+      password: await bcrypt.hash(password, saltRounds),
+    });
+    const savedUserAuth = await this.userAuthRepository.save(userAuth);
+
+    return savedUserAuth;
+  }
+
+  async register(dto: RegisterDto): Promise<{ message: string }> {
+    // Validate email trước rồi mới làm tiếp
+    const otp = randomInt(0, 1000000).toString().padStart(6, '0');
+    const sendMail = this.mailService.sendOTPEmail({
+      to: dto.email,
+      name: dto.name,
+      otp,
+      expiresInMinutes: OTP_TTL,
+    });
+
+    if (!sendMail) {
+      throw new ServiceUnavailableException('Send mail fail');
+    }
+    const otpCacheKey = `verifyOtp:${dto.email}`;
+    const registerCacheKey = `register:${dto.email}`;
+    await this.cacheService.set(otpCacheKey, otp, OTP_TTL * 60 + 60);
+    await this.cacheService.set(registerCacheKey, dto, OTP_TTL * 3 * 60);
+    return {
+      message: 'Send email successfully. Please check your email to verify your account.',
+    };
+  }
+
+  async resendOtpEmail(email: string): Promise<{ message: string }> {
+    const searchInCache = (await this.cacheService.get(`register:${email}`)) as
+      | RegisterDto
+      | undefined;
+    if (!searchInCache) {
+      return {
+        message: 'Email not found',
+      };
+    }
+    const otp = randomInt(0, 1000000).toString().padStart(6, '0');
+    const sendMail = this.mailService.sendOTPEmail({
+      to: email,
+      name: searchInCache.name,
+      otp,
+      expiresInMinutes: OTP_TTL,
+    });
+    if (!sendMail) {
+      throw new ServiceUnavailableException('Send mail fail');
+    }
+    const cacheKey = `verifyOtp:${email}`;
+    await this.cacheService.set(cacheKey, otp, OTP_TTL * 60 + 60);
+    return {
+      message: 'Send email successfully. Please check your email to verify your account.',
+    };
+  }
+
+  async verifyOTP(email: string, otp: string): Promise<AuthResponseDto> {
+    const otpCacheKey = `verifyOtp:${email}`;
+    const cacheOtp = await this.cacheService.get(otpCacheKey);
+    if (!cacheOtp) {
+      throw new BadRequestException('OTP not found');
+    }
+    if (cacheOtp !== otp) {
+      throw new BadRequestException('Invalid OTP');
+    }
+    const registerCacheKey = `register:${email}`;
+    const cacheDto = (await this.cacheService.get(registerCacheKey)) as RegisterDto | undefined;
+
+    if (!cacheDto) {
+      throw new BadRequestException('Register not found');
     }
 
-    const userRole = await this.rolesService.findByName(RoleEnum.MEMBER);
-    const saltRounds = this.configService.getOrThrow<number>('bcrypt.saltRounds');
+    // xác thực otp thành công, bắt đầu tạo tài khoản
+    // tạo user, tạo user auth
+
+    const existing = await this.usersRepository.findByEmail(
+      cacheDto.email.toString().toLowerCase(),
+    );
+    if (existing) {
+      // nếu đã có email tức là đã tạo user
+      // thì chỉ cần check xem đã có accout hay chưa
+      // để tạo user account cho người dùng là được
+      if (existing.status === AccountStatus.ACTIVE) {
+        const userAuth = await this.userAuthRepository.findByEmail(
+          cacheDto.email.toString().toLowerCase(),
+        );
+        if (userAuth) {
+          throw new ConflictException('Email already exists');
+        }
+        const savedUser = await this.createUserAuth(
+          existing.id,
+          cacheDto.email.toString().toLowerCase(),
+          cacheDto.password,
+        );
+        return this.buildAuthResponse(savedUser.user);
+      }
+    }
+
     const user = this.usersRepository.create({
-      name: dto.name,
-      email: dto.email,
-      password: await bcrypt.hash(dto.password, saltRounds),
-      roles: userRole ? [userRole] : [],
+      name: cacheDto.name,
+      email: cacheDto.email.toString().toLowerCase(),
+      phone: cacheDto.phone,
     });
 
     const savedUser = await this.usersRepository.save(user);
+    await this.createUserAuth(
+      savedUser.id,
+      cacheDto.email.toString().toLowerCase(),
+      cacheDto.password,
+    );
+
+    await this.cacheService.del(otpCacheKey);
+    await this.cacheService.del(registerCacheKey);
     return this.buildAuthResponse(savedUser);
   }
 
   async login(dto: LoginDto): Promise<AuthResponseDto> {
-    const user = await this.usersRepository.findByEmailWithPassword(dto.email);
+    const user = await this.userAuthRepository.findByEmail(dto.email.toString().toLowerCase());
 
     if (!user || user.status !== AccountStatus.ACTIVE) {
       throw new UnauthorizedException('Invalid credentials');
@@ -91,7 +202,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.buildAuthResponse(user);
+    return this.buildAuthResponse(user.user);
   }
 
   async managementLogin(dto: LoginDto): Promise<AuthResponseDto> {
@@ -119,25 +230,17 @@ export class AuthService {
     return safeStaff;
   }
 
-  async changeManagementPassword(
-    email: string,
-    dto: ChangeManagementPasswordDto,
-  ): Promise<void> {
+  async changeManagementPassword(email: string, dto: ChangeManagementPasswordDto): Promise<void> {
     const staff = await this.staffRepository.findByEmailWithPassword(email);
     if (!staff) {
       throw new UnauthorizedException('Không tìm thấy tài khoản nhân viên.');
     }
-    const isCurrentPasswordValid = await bcrypt.compare(
-      dto.currentPassword,
-      staff.password,
-    );
+    const isCurrentPasswordValid = await bcrypt.compare(dto.currentPassword, staff.password);
     if (!isCurrentPasswordValid) {
       throw new BadRequestException('Mật khẩu hiện tại không chính xác.');
     }
     if (await bcrypt.compare(dto.newPassword, staff.password)) {
-      throw new BadRequestException(
-        'Mật khẩu mới phải khác mật khẩu hiện tại.',
-      );
+      throw new BadRequestException('Mật khẩu mới phải khác mật khẩu hiện tại.');
     }
     staff.password = await bcrypt.hash(
       dto.newPassword,
@@ -168,7 +271,8 @@ export class AuthService {
         usedAt: null,
       }),
     );
-    const frontendUrl = this.configService.get<string>('app.frontendUrl') ?? 'http://localhost:3000';
+    const frontendUrl =
+      this.configService.get<string>('app.frontendUrl') ?? 'http://localhost:3000';
     const resetUrl = `${frontendUrl.replace(/\/$/, '')}/management/reset-password?token=${resetToken}`;
     await this.mailService.sendPasswordResetEmail({
       to: staff.email,
@@ -273,7 +377,7 @@ export class AuthService {
         tokenHash,
         usedAt: IsNull(),
       },
-      relations: { user: { roles: true } },
+      relations: { user: true },
     });
 
     if (
@@ -284,8 +388,8 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired password reset token');
     }
 
-    const saltRounds = this.configService.getOrThrow<number>('bcrypt.saltRounds');
-    storedToken.user.password = await bcrypt.hash(password, saltRounds);
+    // const saltRounds = this.configService.getOrThrow<number>('bcrypt.saltRounds');
+    // storedToken.user.password = await bcrypt.hash(password, saltRounds);
     storedToken.usedAt = new Date();
 
     await this.usersRepository.save(storedToken.user);
@@ -312,7 +416,7 @@ export class AuthService {
         tokenHash,
         revokedAt: IsNull(),
       },
-      relations: { user: { roles: { permissions: true } } },
+      relations: { user: true },
     });
 
     if (
@@ -353,7 +457,7 @@ export class AuthService {
     return this.createAuthResponse(user, refreshToken, refreshTokenHash);
   }
 
-  private async createStaffAuthResponse(staff: StaffProfile): Promise<AuthResponseDto> {
+  private async createStaffAuthResponse(staff: Staff): Promise<AuthResponseDto> {
     const refreshToken = this.generateRefreshToken();
     const payload: JwtPayload = {
       sub: staff.id,
@@ -373,7 +477,7 @@ export class AuthService {
     return {
       access_token: await this.jwtService.signAsync(payload),
       refresh_token: refreshToken,
-      user: safeStaff as unknown as User,
+      user: safeStaff,
     };
   }
 

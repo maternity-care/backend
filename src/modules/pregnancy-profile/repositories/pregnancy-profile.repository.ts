@@ -35,7 +35,7 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
   async findById(id: string): Promise<PregnancyProfile | null> {
     const profile = await this.repository.findOne({
       where: { id },
-      relations: { user: true, userProfile: true },
+      relations: { user: true },
     });
     if (!profile) {
       throw new NotFoundException(RESPONSE_MESSAGES.PREGNANCY_PROFILES.NOT_FOUND);
@@ -46,7 +46,7 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
   async findByCode(code: string): Promise<PregnancyProfile | null> {
     const profile = await this.repository.findOne({
       where: { code },
-      relations: { user: true, userProfile: true },
+      relations: { user: true },
     });
     if (!profile) {
       throw new NotFoundException(RESPONSE_MESSAGES.PREGNANCY_PROFILES.NOT_FOUND);
@@ -56,7 +56,7 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
 
   async findAll(): Promise<{ data: PregnancyProfile[]; total: number }> {
     const [data, total] = await this.repository.findAndCount({
-      relations: { user: true, userProfile: true },
+      relations: { user: true },
       order: { id: 'DESC' },
     });
     return { data, total };
@@ -65,7 +65,7 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
   async findByPatientId(patientId: string): Promise<PregnancyProfile[]> {
     const profile = await this.repository.find({
       where: { patientId },
-      relations: { user: true, userProfile: true },
+      relations: { user: true },
       order: { id: 'DESC' },
     });
     if (!profile) {
@@ -82,7 +82,12 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
     }
     await this.repository.update(
       { id: id },
-      { deletedBy: userId, deletedReason: reason, deletedAt: new Date(), status: 'DELETED' },
+      {
+        deletedBy: userId,
+        deletedReason: reason,
+        deletedAt: new Date(),
+        status: PregnancyProfileStatus.DELETED,
+      },
     );
   }
 
@@ -143,7 +148,7 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
     }
 
     const [data, total] = await this.repository.findAndCount({
-      relations: { user: true, userProfile: true },
+      relations: { user: true },
       where: {
         ...where,
         user: {

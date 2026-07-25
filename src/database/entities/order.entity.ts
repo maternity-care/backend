@@ -45,23 +45,23 @@ export class Order {
   facilityId: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'order_type', type: 'varchar', length: 255 })
-  orderType: string;
+  @Column({ name: 'order_type', type: 'varchar', length: 255, nullable: true })
+  orderType: string | null;
 
-  @ApiProperty({ type: String })
-  @Column({ name: 'subtotal_amount', type: 'decimal', precision: 15, scale: 2 })
-  subtotalAmount: string;
+  @ApiProperty({ type: Number })
+  @Column({ name: 'subtotal_amount', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  subtotalAmount: number;
 
-  @ApiProperty({ type: String })
-  @Column({ name: 'discount_amount', type: 'decimal', precision: 15, scale: 2 })
-  discountAmount: string;
+  @ApiProperty({ type: Number })
+  @Column({ name: 'discount_amount', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  discountAmount: number | null;
 
-  @ApiProperty({ type: String })
-  @Column({ name: 'total_amount', type: 'decimal', precision: 15, scale: 2 })
-  totalAmount: string;
+  @ApiProperty({ type: Number })
+  @Column({ name: 'total_amount', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  totalAmount: number;
 
   @ApiProperty({ enum: OrderStatus, enumName: 'OrderStatus' })
-  @Column({ name: 'status', type: 'enum', enum: OrderStatus })
+  @Column({ name: 'status', type: 'enum', enum: OrderStatus, default: OrderStatus.PENDING_PAYMENT })
   status: OrderStatus;
 
   @ApiProperty({ type: Date })

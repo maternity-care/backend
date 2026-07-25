@@ -34,16 +34,16 @@ export class ForumComment {
   @Column({ name: 'author_id', type: 'bigint' })
   authorId: string;
 
-  @ApiProperty({ type: String })
+  @ApiProperty({ type: String, example: 'staff or user' })
   @Column({ name: 'author_role', type: 'varchar', length: 255 })
   authorRole: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'parent_id', type: 'bigint' })
-  parentId: string;
+  @Column({ name: 'parent_id', type: 'bigint', nullable: true })
+  parentId: string | null;
 
-  @ApiProperty({ type: String })
-  @Column({ name: 'message_type', type: 'varchar', length: 255 })
+  @ApiProperty({ type: String, example: 'text or file or image or video or audio' })
+  @Column({ name: 'message_type', type: 'varchar', length: 255, default: 'text' })
   messageType: string;
 
   @ApiProperty({ type: String })
@@ -51,7 +51,12 @@ export class ForumComment {
   content: string;
 
   @ApiProperty({ enum: ForumContentStatus, enumName: 'ForumContentStatus' })
-  @Column({ name: 'status', type: 'enum', enum: ForumContentStatus })
+  @Column({
+    name: 'status',
+    type: 'enum',
+    enum: ForumContentStatus,
+    default: ForumContentStatus.PUBLISHED,
+  })
   status: ForumContentStatus;
 
   @ApiProperty({ type: Date })

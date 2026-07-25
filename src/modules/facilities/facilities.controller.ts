@@ -1,26 +1,26 @@
-import { Body, Controller, Delete, Get, InternalServerErrorException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Body, Controller, Delete, Get, InternalServerErrorException, Param, Patch, Post, Query } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FacilitiesService } from './facilities.service';
 import { CreateFacilityDto } from './dto/requests/create-facility.dto';
 import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
-import { SearchFacilityDto } from './dto/requests/search-facility.dto';
-import { FacilityResponseDto } from './dto/responds/facilities-respond';
+import { UpdateFacilityOperatingHoursDto } from './dto/requests/update-facility-operating-hours.dto';
+import {
+  CreateFacilityClosureDayDto,
+  SearchFacilityClosureDayDto,
+  UpdateFacilityClosureDayDto,
+} from './dto/requests/facility-closure-day.dto';
+import { LookupFacilityDto, SearchFacilityDto } from './dto/requests/search-facility.dto';
+import { FacilityClosureDayResponseDto, FacilityLookupResponseDto, FacilityResponseDto } from './dto/responds/facilities-respond';
 import { HttpException } from '@nestjs/common';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import {
   assertFacilityAccess,
   getActiveFacilityId,
 } from '../../common/helpers/facility-scope.helper';
-import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { RoleEnum } from '../../common/constants/role.enum';
+
 @ApiTags('Management - Facilities')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleEnum.SUPER_ADMIN, RoleEnum.ADMIN)
 @Controller('management/facilities')
 export class FacilitiesController {
   constructor(private readonly facilitiesService: FacilitiesService) {}
@@ -29,7 +29,7 @@ export class FacilitiesController {
     if (error instanceof HttpException) {
       throw error;
     }
-    throw new InternalServerErrorException('Internal server error');
+    throw new InternalServerErrorException(RESPONSE_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 
   @Get()
@@ -42,9 +42,9 @@ export class FacilitiesController {
     try {
       const activeFacilityId = getActiveFacilityId(user);
       if (activeFacilityId) {
-        const facility = await this.facilitiesService.findById(activeFacilityId);
+        const facility = await this.facilitiesService.findDetailsById(activeFacilityId);
         return {
-          message: RESPONSE_MESSAGES.FACILITIES_RETRIEVED,
+          message: RESPONSE_MESSAGES.FACILITIES.GET_LIST_SUCCESS,
           data: query?.page
             ? { items: [facility], total: 1, page: Number(query.page), limit: 1 }
             : [facility],
@@ -55,15 +55,86 @@ export class FacilitiesController {
       if (query?.page) {
         const paged = await this.facilitiesService.findAllPaginated(query);
         return {
-          message: RESPONSE_MESSAGES.FACILITIES_RETRIEVED,
+          message: RESPONSE_MESSAGES.FACILITIES.GET_LIST_SUCCESS,
           data: paged,
         };
       }
 
       const facilities = await this.facilitiesService.findAll(query);
       return {
-        message: RESPONSE_MESSAGES.FACILITIES_RETRIEVED,
+        message: RESPONSE_MESSAGES.FACILITIES.GET_LIST_SUCCESS,
         data: facilities,
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Get('lookup')
+  @ApiOperation({ summary: 'Lookup facilities for select/autocomplete' })
+  @ApiResponse({ status: 200, type: [FacilityLookupResponseDto] })
+  async lookup(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: LookupFacilityDto,
+  ) {
+    try {
+      const activeFacilityId = getActiveFacilityId(user);
+      if (activeFacilityId) {
+        const facility = await this.facilitiesService.findDetailsById(activeFacilityId);
+        return {
+          message: RESPONSE_MESSAGES.FACILITIES.LOOKUP_SUCCESS,
+          data: [{
+            id: facility.id,
+            name: facility.name,
+            code: facility.code,
+            address: facility.address,
+            province: facility.province,
+            ward: facility.ward,
+            status: facility.status,
+            ownerName: facility.ownerName,
+          }],
+        };
+      }
+
+      return {
+        message: RESPONSE_MESSAGES.FACILITIES.LOOKUP_SUCCESS,
+        data: await this.facilitiesService.lookup(query),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Get(':id/operating-hours')
+  @ApiOperation({ summary: 'Get facility operating hours grouped for display' })
+  async getOperatingHours(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITIES.OPERATING_HOURS_GET_SUCCESS,
+        data: await this.facilitiesService.getOperatingHours(id),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Get(':id/closure-days')
+  @ApiOperation({ summary: 'List facility closure days' })
+  @ApiResponse({ status: 200, type: [FacilityClosureDayResponseDto] })
+  async getClosureDays(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Query() query: SearchFacilityClosureDayDto,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.GET_LIST_SUCCESS,
+        data: await this.facilitiesService.getClosureDays(id, query),
       };
     } catch (error) {
       this.handleError(error);
@@ -79,9 +150,9 @@ export class FacilitiesController {
   ) {
     try {
       assertFacilityAccess(user, id);
-      const facility = await this.facilitiesService.findById(id);
+      const facility = await this.facilitiesService.findDetailsById(id);
       return {
-        message: RESPONSE_MESSAGES.FACILITY_RETRIEVED,
+        message: RESPONSE_MESSAGES.FACILITIES.GET_SUCCESS,
         data: facility,
       };
     } catch (error) {
@@ -90,15 +161,89 @@ export class FacilitiesController {
   }
 
   @Post()
-  @Roles(RoleEnum.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create facility' })
   @ApiResponse({ status: 201, type: FacilityResponseDto })
   async create(@Body() dto: CreateFacilityDto) {
     try {
       const facility = await this.facilitiesService.create(dto);
       return {
-        message: RESPONSE_MESSAGES.FACILITY_CREATED,
+        message: RESPONSE_MESSAGES.FACILITIES.CREATED,
         data: facility,
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Post(':id/closure-days')
+  @ApiOperation({ summary: 'Create a facility closure day' })
+  @ApiResponse({ status: 201, type: FacilityClosureDayResponseDto })
+  async createClosureDay(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: CreateFacilityClosureDayDto,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.CREATED,
+        data: await this.facilitiesService.createClosureDay(id, dto),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Post(':id/operating-hours/preview')
+  @ApiOperation({ summary: 'Preview facility operating hour changes and impacted upcoming shifts' })
+  async previewOperatingHours(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateFacilityOperatingHoursDto,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITIES.OPERATING_HOURS_PREVIEW_SUCCESS,
+        data: await this.facilitiesService.previewOperatingHours(id, dto),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Patch(':id/operating-hours')
+  @ApiOperation({ summary: 'Update facility operating hours by day groups' })
+  async updateOperatingHours(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateFacilityOperatingHoursDto,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITIES.OPERATING_HOURS_UPDATED,
+        data: await this.facilitiesService.updateOperatingHours(id, dto),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Patch(':id/closure-days/:closureDayId')
+  @ApiOperation({ summary: 'Update a facility closure day' })
+  @ApiResponse({ status: 200, type: FacilityClosureDayResponseDto })
+  async updateClosureDay(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Param('closureDayId') closureDayId: string,
+    @Body() dto: UpdateFacilityClosureDayDto,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.UPDATED,
+        data: await this.facilitiesService.updateClosureDay(id, closureDayId, dto),
       };
     } catch (error) {
       this.handleError(error);
@@ -117,7 +262,7 @@ export class FacilitiesController {
       assertFacilityAccess(user, id);
       const data = await this.facilitiesService.update(id, dto);
       return {
-        message: RESPONSE_MESSAGES.FACILITY_UPDATED,
+        message: RESPONSE_MESSAGES.FACILITIES.UPDATED,
         data: data,
       };
     } catch (error) {
@@ -126,9 +271,27 @@ export class FacilitiesController {
   }
 
 
+  @Delete(':id/closure-days/:closureDayId')
+  @ApiOperation({ summary: 'Delete a facility closure day' })
+  @ApiResponse({ status: 200, type: FacilityClosureDayResponseDto })
+  async removeClosureDay(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Param('closureDayId') closureDayId: string,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.DELETED,
+        data: await this.facilitiesService.removeClosureDay(id, closureDayId),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
 
   @Delete(':id')
-  @Roles(RoleEnum.SUPER_ADMIN)
   @ApiOperation({ summary: 'Delete facility' })
   @ApiResponse({ status: 200 })
   async remove(
@@ -139,7 +302,7 @@ export class FacilitiesController {
     try {
       assertFacilityAccess(user, id);
       const data = await this.facilitiesService.remove(id, reason, user?.id ?? null);
-      return { message: RESPONSE_MESSAGES.FACILITY_DELETED, data };
+      return { message: RESPONSE_MESSAGES.FACILITIES.DELETED, data };
     } catch (error) {
       this.handleError(error);
     }
@@ -157,7 +320,7 @@ export class FacilitiesController {
       assertFacilityAccess(user, id);
       const data = await this.facilitiesService.deActivateFacility(id);
       return {
-        message: RESPONSE_MESSAGES.FACILITY_STATUS_UPDATED,
+        message: RESPONSE_MESSAGES.FACILITIES.STATUS_UPDATED,
         data: data,
       };
     } catch (error) {

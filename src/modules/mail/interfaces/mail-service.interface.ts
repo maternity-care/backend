@@ -18,8 +18,16 @@ export interface RequestSoftDeleteEmailInput {
   actionUrl?: string;
 }
 
+export interface SendOTPEmailInput {
+  to: string;
+  name: string;
+  otp: string;
+  expiresInMinutes: number;
+}
+
 export interface IMailService {
   sendPasswordResetEmail(input: SendPasswordResetEmailInput): Promise<void>;
   sendCreatedAccountEmail(input: CreatedAccountInterface): Promise<void>;
   sendSoftDeleteRequestEmail(input: RequestSoftDeleteEmailInput): Promise<void>;
+  sendOTPEmail(input: SendOTPEmailInput): Promise<void>;
 }

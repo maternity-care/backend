@@ -27,11 +27,11 @@ export class PackageItem {
 
   @ApiProperty({ type: Boolean })
   @Column({ name: 'is_required', type: 'boolean' })
-  isRequired: boolean;
+  isRequired: boolean | number;
 
   @ApiProperty({ type: Boolean })
   @Column({ name: 'is_optional', type: 'boolean' })
-  isOptional: boolean;
+  isOptional: boolean | number;
 
   @ApiProperty({ type: Number })
   @Column({ name: 'allowed_facility_scope', type: 'int' })

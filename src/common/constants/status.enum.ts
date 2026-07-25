@@ -15,6 +15,13 @@ export enum FacilityStatus {
   DELETED = 'deleted',
 }
 
+export enum FacilityOperatingStatus {
+  OPEN = 'open',
+  CLOSED = 'closed',
+  CLOSED_TODAY = 'closed_today',
+  INACTIVE = 'inactive',
+}
+
 export enum DoctorShiftStatus {
   AVAILABLE = 'available',
   FULL = 'full',
@@ -104,6 +111,9 @@ export enum PaymentStatus {
 }
 
 export enum InvoiceStatus {
+  PENDING = 'pending',
+  DRAFT = 'draft',
+  PAID = 'paid',
   ISSUED = 'issued',
   CANCELLED = 'cancelled',
 }

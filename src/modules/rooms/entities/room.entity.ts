@@ -7,6 +7,7 @@ import {
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -14,6 +15,11 @@ import {
 } from 'typeorm';
 
 @Entity('rooms')
+@Index('uq_rooms_facility_code', ['facilityId', 'code'], { unique: true })
+@Index('uq_rooms_facility_name', ['facilityId', 'name'], { unique: true })
+@Index('idx_rooms_facility_id', ['facilityId'])
+@Index('idx_rooms_room_type_id', ['roomTypeId'])
+@Index('idx_rooms_status', ['status'])
 export class Room {
   @ApiProperty({ type: String, example: '1' })
   @PrimaryGeneratedColumn({ type: 'bigint' })
@@ -34,6 +40,10 @@ export class Room {
   facilityId: string;
 
   @ApiProperty({ type: String })
+  @Column({ name: 'code', type: 'varchar', length: 50 })
+  code: string;
+
+  @ApiProperty({ type: String })
   @Column({ name: 'name', type: 'varchar', length: 255 })
   name: string;
 
@@ -46,7 +56,7 @@ export class Room {
   floor: string;
 
   @ApiProperty({ enum: ActiveStatus, enumName: 'RoomStatusEnum' })
-  @Column({ name: 'status', type: 'enum', enum: ActiveStatus })
+  @Column({ name: 'status', type: 'enum', enum: ActiveStatus, default: ActiveStatus.ACTIVE })
   status: ActiveStatus;
 
   @ApiProperty({ type: Date })

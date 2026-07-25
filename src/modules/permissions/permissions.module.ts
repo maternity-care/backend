@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Permission } from './entities/permission.entity';
-import { UserPermission } from './entities/staff-permission.entity';
 import { PermissionsController } from './permissions.controller';
 import { PermissionsRepository } from './repositories/permissions.repository';
 import { PERMISSIONS_REPOSITORY } from './interfaces/permissions-repository.interface';
@@ -9,7 +8,7 @@ import { PERMISSIONS_SERVICE } from './interfaces/permissions-service.interface'
 import { PermissionsService } from './permissions.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Permission, UserPermission])],
+  imports: [TypeOrmModule.forFeature([Permission])],
   controllers: [PermissionsController],
   providers: [
     PermissionsService,
