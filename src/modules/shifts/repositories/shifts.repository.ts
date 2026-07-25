@@ -221,8 +221,9 @@ export class ShiftsRepository implements IShiftsRepository {
       .addSelect('appointment.scheduled_end', 'scheduledEnd')
       .addSelect('appointment.status', 'status')
       .from('appointments', 'appointment')
-      .where('appointment.facility_id = :facilityId', { facilityId })
       .innerJoin('doctors', 'doctor', 'doctor.staff_id = appointment.doctor_id')
+      .innerJoin('staffs', 'staff', 'staff.id = doctor.staff_id')
+      .where('staff.facility_id = :facilityId', { facilityId })
       .andWhere('doctor.id = :doctorId', { doctorId })
       // DATE(...) giúp so sánh phần ngày của scheduled_start với date dạng YYYY-MM-DD.
       .andWhere('DATE(appointment.scheduled_start) = :date', { date })
@@ -243,7 +244,8 @@ export class ShiftsRepository implements IShiftsRepository {
       .addSelect('appointment.scheduled_end', 'scheduledEnd')
       .addSelect('appointment.status', 'status')
       .from('appointments', 'appointment')
-      .where('appointment.facility_id = :facilityId', { facilityId: shift.facilityId })
+      .innerJoin('staffs', 'staff', 'staff.id = appointment.doctor_id')
+      .where('staff.facility_id = :facilityId', { facilityId: shift.facilityId })
       .andWhere('appointment.doctor_id = :staffId', { staffId: shift.staffId })
       .andWhere('DATE(appointment.scheduled_start) = :shiftDate', { shiftDate: shift.shiftDate })
       // Hai dòng TIME(...) dưới kiểm tra appointment có giao với giờ của ca không.
