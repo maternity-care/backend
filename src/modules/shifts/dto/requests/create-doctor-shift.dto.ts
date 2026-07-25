@@ -38,17 +38,6 @@ export class CreateDoctorShiftDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: RESPONSE_MESSAGES.SHIFTS.SHIFT_DATE_FORMAT_INVALID })
   shiftDate: string;
 
-  @ApiPropertyOptional({ example: '08:00', description: 'Bat buoc neu khong gui slotId' })
-  @ValidateIf((dto: CreateDoctorShiftDto) => !dto.slotId)
-  @Matches(SHIFT_TIME_PATTERN)
-  startTime?: string;
-
-  @ApiPropertyOptional({ example: '12:00', description: 'Bat buoc neu khong gui slotId' })
-  @ValidateIf((dto: CreateDoctorShiftDto) => !dto.slotId)
-  @Matches(SHIFT_TIME_PATTERN)
-  @IsLaterThan('startTime', { message: RESPONSE_MESSAGES.SHIFTS.END_TIME_AFTER_START_TIME })
-  endTime?: string;
-
   @ApiPropertyOptional({ minimum: 1, maximum: 100 })
   @IsOptional()
   @Type(() => Number)
@@ -63,4 +52,9 @@ export class CreateDoctorShiftDto {
     message: RESPONSE_MESSAGES.SHIFTS.CREATE_STATUS_INVALID,
   })
   status: DoctorShiftStatus;
+
+  @ApiPropertyOptional({ default:""})
+  @IsOptional()
+  @IsString()
+  note?: string;
 }
