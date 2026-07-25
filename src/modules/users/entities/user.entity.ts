@@ -16,8 +16,8 @@ export class User {
   id: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'cccd', type: 'varchar', length: 100, unique: true })
-  cccd: string;
+  @Column({ name: 'cccd', type: 'varchar', length: 100, unique: true, nullable: true })
+  cccd: string | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'name', type: 'varchar', length: 255 })
