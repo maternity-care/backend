@@ -1,3 +1,4 @@
+import { Staff } from './../staffs/entities/staff.entity';
 import {
   BadRequestException,
   ConflictException,
@@ -15,7 +16,6 @@ import {
   PERMISSIONS_SERVICE,
   IPermissionsService,
 } from '../permissions/interfaces/permissions-service.interface';
-import { UserPermission } from '../permissions/entities/staff-permission.entity';
 import { CreateUserDto } from './dto/request/create-user.dto';
 import { UpdateProfileDto } from './dto/request/update-profile.dto';
 import { UpdateUserDto } from './dto/request/update-user.dto';
@@ -34,30 +34,14 @@ import {
 } from '../staffs/interfaces/staff-profile-repository.interface';
 import { AdminCreateUserDto } from './dto/request/admin-create-user.dto';
 import { SearchUserDto } from './dto/request/search-user.dto';
-import { parseSearch } from '../../common/helpers/search-builder';
 import { SearchUserResponseDto } from './dto/response/search-user-response.dto';
 import { IMailService, MAIL_SERVICE } from '../mail/interfaces/mail-service.interface';
-import { FacilityStaff } from '../facilities/entities/facility-staff.entity';
 import { Facility } from '../facilities/entities/facility.entity';
-import { StaffProfile } from '../staffs/entities/staff.entity';
 import { Doctor } from '../doctors/entities/doctor.entity';
 import { FacilityStaffAssignmentDto } from './dto/request/facility-staff-assignment.dto';
-import {
-  AccountStatus,
-  ActiveStatus,
-  FacilityStatus,
-} from '../../common/constants/status.enum';
+import { AccountStatus, ActiveStatus, FacilityStatus } from '../../common/constants/status.enum';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
-import {
-  getActiveFacilityId,
-  isSuperAdmin,
-} from '../../common/helpers/facility-scope.helper';
-
-const GLOBAL_USER_ROLES = new Set<string>([
-  RoleEnum.MEMBER,
-  RoleEnum.PARTNER,
-  RoleEnum.SUPER_ADMIN,
-]);
+import { getActiveFacilityId, isSuperAdmin } from '../../common/helpers/facility-scope.helper';
 
 @Injectable()
 export class UsersService implements IUsersService, IAdminManageService {
@@ -70,15 +54,11 @@ export class UsersService implements IUsersService, IAdminManageService {
     private readonly permissionsService: IPermissionsService,
     @Inject(REDIS_CACHE_SERVICE)
     private readonly cacheService: IRedisCacheService,
-    @InjectRepository(UserPermission)
-    private readonly userPermissionsRepository: Repository<UserPermission>,
     private readonly configService: ConfigService,
     @Inject(STAFF_PROFILE_REPOSITORY)
     private readonly staffProfileRepository: IStaffProfileRepository,
     @Inject(MAIL_SERVICE)
     private readonly mailService: IMailService,
-    @InjectRepository(FacilityStaff)
-    private readonly facilityStaffRepository: Repository<FacilityStaff>,
     @InjectRepository(Facility)
     private readonly facilityRepository: Repository<Facility>,
     @InjectRepository(Doctor)
@@ -91,18 +71,10 @@ export class UsersService implements IUsersService, IAdminManageService {
       throw new ConflictException('Email đã tồn tại trong hệ thống. Vui lòng sử dụng email khác.');
     }
 
-    const saltRounds = this.configService.getOrThrow<number>('bcrypt.saltRounds');
-    const roles = dto.roleIds
-      ? await this.rolesService.findByIds(dto.roleIds)
-      : [await this.rolesService.findByName(RoleEnum.MEMBER)].filter(
-          (role): role is NonNullable<typeof role> => Boolean(role),
-        );
     const user = this.usersRepository.create({
       name: dto.name,
       email: dto.email,
       phone: dto?.phone ? dto.phone : undefined,
-      password: await bcrypt.hash(dto.password, saltRounds),
-      roles,
     });
 
     const savedUser = await this.usersRepository.save(user);
@@ -159,21 +131,6 @@ export class UsersService implements IUsersService, IAdminManageService {
       }
     }
 
-    if (dto.password) {
-      const saltRounds = this.configService.getOrThrow<number>('bcrypt.saltRounds');
-      user.password = await bcrypt.hash(dto.password, saltRounds);
-    }
-
-    if (dto.roleIds) {
-      const roles = await this.rolesService.findByIds(dto.roleIds);
-      if (roles.some((role) => !GLOBAL_USER_ROLES.has(role.name))) {
-        throw new BadRequestException(
-          'Role admin, doctor, nurse và staff phải được gán theo cơ sở.',
-        );
-      }
-      user.roles = roles;
-    }
-
     user.name = dto.name ?? user.name;
     user.email = dto.email ?? user.email;
     user.phone = dto.phone ?? user.phone;
@@ -187,11 +144,6 @@ export class UsersService implements IUsersService, IAdminManageService {
 
   async updateProfile(id: string, dto: UpdateProfileDto): Promise<User> {
     const user = await this.findById(id);
-
-    if (dto.password) {
-      const saltRounds = this.configService.getOrThrow<number>('bcrypt.saltRounds');
-      user.password = await bcrypt.hash(dto.password, saltRounds);
-    }
 
     user.name = dto.name ?? user.name;
 
@@ -237,123 +189,30 @@ export class UsersService implements IUsersService, IAdminManageService {
       throw new NotFoundException('One or more permissions were not found');
     }
 
-    await this.userPermissionsRepository.delete({ userId });
-
     if (uniqueOverrides.length === 0) {
       return;
     }
-
-    await this.userPermissionsRepository.save(
-      uniqueOverrides.map((override) =>
-        this.userPermissionsRepository.create({
-          userId,
-          permissionId: override.permissionId,
-          effect: override.effect,
-        }),
-      ),
-    );
   }
 
-  async findAllUsers(
-    query: SearchUserDto,
-    actor?: AuthenticatedUser,
-  ): Promise<SearchUserResponseDto> {
-    const allStaffs = await this.staffProfileRepository.findAll();
-    const activeFacilityId = actor ? getActiveFacilityId(actor) : null;
-    const allowedStaffIds = activeFacilityId
-      ? new Set(
-          (
-            await this.facilityStaffRepository.find({
-              where: {
-                facilityId: activeFacilityId,
-                status: ActiveStatus.ACTIVE,
-              },
-              select: { staffId: true },
-            })
-          ).map((assignment) => assignment.staffId),
-        )
-      : null;
-    const parsedFilters = parseSearch(query.search);
-    const parsedValue = (field: string) =>
-      parsedFilters.find((filter) => filter.field === field)?.values;
-    const keyword = (parsedValue('keyword')?.[0] ?? query.name)?.toLowerCase();
-    const statusFilter = parsedValue('status')?.[0] ?? query.status;
-    const roleFilter = parsedValue('role')?.[0];
-    const roleAllowedStaffIds = roleFilter
-      ? new Set(
-          (
-            await this.facilityStaffRepository.find({
-              where: {
-                role: { name: roleFilter },
-                status: ActiveStatus.ACTIVE,
-              },
-              select: { staffId: true },
-            })
-          ).map((assignment) => assignment.staffId),
-        )
-      : null;
-    const staffs = allStaffs.filter((staff) => {
-      if (allowedStaffIds && !allowedStaffIds.has(staff.id)) return false;
-      if (roleAllowedStaffIds && !roleAllowedStaffIds.has(staff.id)) return false;
-      if (
-        keyword &&
-        ![staff.name, staff.email, staff.phone]
-          .filter(Boolean)
-          .some((value) => value!.toLowerCase().includes(keyword))
-      ) return false;
-      if (query.email && !staff.email.toLowerCase().includes(query.email.toLowerCase())) return false;
-      if (query.phone && !staff.phone?.includes(query.phone)) return false;
-      if (statusFilter !== undefined && staff.status !== statusFilter) return false;
-      return true;
-    });
-    const page = Number(query.page) || 1;
-    const limit = Number(query.limit) || 10;
-    const items = staffs.slice((page - 1) * limit, page * limit);
-    return {
-      users: (await Promise.all(
-        items.map((staff) => this.toManagementStaff(staff, actor)),
-      )) as unknown as User[],
-      total: staffs.length,
-    };
-  }
-
-  async findUserById(
-    id: string,
-    actor?: AuthenticatedUser,
-  ): Promise<User | null> {
+  async findUserById(id: string, actor?: AuthenticatedUser): Promise<User | null> {
     await this.assertStaffAccess(id, actor);
     const staff = await this.staffProfileRepository.findById(id);
-    return staff
-      ? (await this.toManagementStaff(staff, actor) as unknown as User)
-      : null;
+    return staff ? ((await this.toManagementStaff(staff, actor)) as unknown as User) : null;
   }
 
   async findUserByEmail(email: string): Promise<User | null> {
     return this.staffProfileRepository.findByEmail(email) as unknown as Promise<User | null>;
   }
 
-  async createUser(
-    dto: AdminCreateUserDto,
-    actor?: AuthenticatedUser,
-  ): Promise<User> {
-    const facilityAssignments = this.getScopedAssignments(
-      dto.facilityAssignments,
-      actor,
-    );
+  async createUser(dto: AdminCreateUserDto, actor?: AuthenticatedUser): Promise<User> {
+    const facilityAssignments = this.getScopedAssignments(dto.facilityAssignments, actor);
     const assignments = await this.resolveFacilityAssignments(facilityAssignments);
-    const hasDoctorRole = facilityAssignments.some(
-      (assignment) => assignment.roles.includes(RoleEnum.DOCTOR),
+    const hasDoctorRole = facilityAssignments.some((assignment) =>
+      assignment.roles.includes(RoleEnum.DOCTOR),
     );
     if (hasDoctorRole) {
-      if (
-        !dto.licenseNo ||
-        !dto.title ||
-        !dto.specialty ||
-        dto.yearsOfExperience === undefined
-      ) {
-        throw new BadRequestException(
-          'Nhân viên có chức vụ bác sĩ phải có đầy đủ hồ sơ bác sĩ.',
-        );
+      if (!dto.licenseNo || !dto.title || !dto.specialty || dto.yearsOfExperience === undefined) {
+        throw new BadRequestException('Nhân viên có chức vụ bác sĩ phải có đầy đủ hồ sơ bác sĩ.');
       }
       const existingDoctor = await this.doctorRepository.findOne({
         where: { licenseNo: dto.licenseNo },
@@ -409,16 +268,11 @@ export class UsersService implements IUsersService, IAdminManageService {
       password: password,
     });
     return {
-      ...(await this.toManagementStaff(staff, actor) as unknown as User),
-      password,
+      ...((await this.toManagementStaff(staff, actor)) as unknown as User),
     };
   }
 
-  async updateUser(
-    id: string,
-    dto: UpdateUserDto,
-    actor?: AuthenticatedUser,
-  ): Promise<User> {
+  async updateUser(id: string, dto: UpdateUserDto, actor?: AuthenticatedUser): Promise<User> {
     await this.assertStaffAccess(id, actor);
     const facilityAssignments = dto.facilityAssignments
       ? this.getScopedAssignments(dto.facilityAssignments, actor)
@@ -431,12 +285,6 @@ export class UsersService implements IUsersService, IAdminManageService {
     staff.name = dto.name ?? staff.name;
     staff.phone = dto.phone ?? staff.phone;
     staff.status = dto.status ?? staff.status;
-    if (dto.password) {
-      staff.password = await bcrypt.hash(
-        dto.password,
-        this.configService.getOrThrow<number>('bcrypt.saltRounds'),
-      );
-    }
     const updatedStaff = await this.staffProfileRepository.save(staff);
     if (assignments) {
       await this.syncFacilityAssignments(
@@ -451,11 +299,11 @@ export class UsersService implements IUsersService, IAdminManageService {
         const doctor = await this.doctorRepository.findOne({
           where: { staffId: staff.id },
         });
-        if (!doctor && (!dto.licenseNo || !dto.title || !dto.specialty ||
-          dto.yearsOfExperience === undefined)) {
-          throw new BadRequestException(
-            'Nhân viên có chức vụ bác sĩ phải có đầy đủ hồ sơ bác sĩ.',
-          );
+        if (
+          !doctor &&
+          (!dto.licenseNo || !dto.title || !dto.specialty || dto.yearsOfExperience === undefined)
+        ) {
+          throw new BadRequestException('Nhân viên có chức vụ bác sĩ phải có đầy đủ hồ sơ bác sĩ.');
         }
         await this.doctorRepository.save(
           this.doctorRepository.create({
@@ -464,15 +312,14 @@ export class UsersService implements IUsersService, IAdminManageService {
             licenseNo: dto.licenseNo ?? doctor!.licenseNo,
             title: dto.title ?? doctor!.title,
             specialty: dto.specialty ?? doctor!.specialty,
-            yearsOfExperience:
-              dto.yearsOfExperience ?? doctor!.yearsOfExperience,
+            yearsOfExperience: dto.yearsOfExperience ?? doctor!.yearsOfExperience,
             bio: dto.bio ?? doctor?.bio,
             status: doctor?.status ?? ActiveStatus.ACTIVE,
           }),
         );
       }
     }
-    return await this.toManagementStaff(updatedStaff, actor) as unknown as User;
+    return (await this.toManagementStaff(updatedStaff, actor)) as unknown as User;
   }
 
   async updateUserStatus(
@@ -495,24 +342,7 @@ export class UsersService implements IUsersService, IAdminManageService {
     staffId: string,
     assignments: ResolvedFacilityAssignment[],
     facilityScopeId: string | null = null,
-  ): Promise<void> {
-    await this.facilityStaffRepository.delete(
-      facilityScopeId
-        ? { staffId, facilityId: facilityScopeId }
-        : { staffId },
-    );
-    await this.facilityStaffRepository.save(
-      assignments.map(({ facilityId, roleId }) =>
-        this.facilityStaffRepository.create({
-          staffId,
-          facilityId,
-          roleId,
-          status: ActiveStatus.ACTIVE,
-          assignedAt: new Date(),
-        }),
-      ),
-    );
-  }
+  ): Promise<void> {}
 
   private getScopedAssignments(
     assignments: FacilityStaffAssignmentDto[],
@@ -525,35 +355,16 @@ export class UsersService implements IUsersService, IAdminManageService {
       assignments.length !== 1 ||
       String(assignments[0].facilityId) !== String(activeFacilityId)
     ) {
-      throw new ForbiddenException(
-        'Admin chỉ được phân công nhân viên tại cơ sở đang làm việc.',
-      );
+      throw new ForbiddenException('Admin chỉ được phân công nhân viên tại cơ sở đang làm việc.');
     }
     return assignments;
   }
 
-  private async assertStaffAccess(
-    staffId: string,
-    actor?: AuthenticatedUser,
-  ): Promise<void> {
+  private async assertStaffAccess(staffId: string, actor?: AuthenticatedUser): Promise<void> {
     if (!actor || isSuperAdmin(actor)) return;
     const activeFacilityId = getActiveFacilityId(actor);
     if (!activeFacilityId) {
-      throw new ForbiddenException(
-        RESPONSE_MESSAGES.FACILITY_SELECTION_REQUIRED,
-      );
-    }
-    const assignment = await this.facilityStaffRepository.findOne({
-      where: {
-        staffId,
-        facilityId: activeFacilityId,
-        status: ActiveStatus.ACTIVE,
-      },
-    });
-    if (!assignment) {
-      throw new ForbiddenException(
-        'Bạn chỉ được quản lý nhân viên thuộc cơ sở đang chọn.',
-      );
+      throw new ForbiddenException(RESPONSE_MESSAGES.FACILITY_SELECTION_REQUIRED);
     }
   }
 
@@ -602,7 +413,7 @@ export class UsersService implements IUsersService, IAdminManageService {
   }
 
   private async toManagementStaff(
-    profile: StaffProfile,
+    profile: Staff,
     actor?: AuthenticatedUser,
   ): Promise<Record<string, unknown>> {
     const staffProfile = await this.getStaffProfileSummary(profile.id, actor);
@@ -618,15 +429,6 @@ export class UsersService implements IUsersService, IAdminManageService {
   ): Promise<StaffProfileSummary | null> {
     const profile = await this.staffProfileRepository.findById(staffId);
     if (!profile) return null;
-    const activeFacilityId = actor ? getActiveFacilityId(actor) : null;
-    const assignments = await this.facilityStaffRepository.find({
-      where: {
-        staffId: profile.id,
-        status: ActiveStatus.ACTIVE,
-        ...(activeFacilityId ? { facilityId: activeFacilityId } : {}),
-      },
-      relations: { role: true },
-    });
     const doctor = await this.doctorRepository.findOne({ where: { staffId } });
     return {
       id: profile.id,
@@ -634,19 +436,7 @@ export class UsersService implements IUsersService, IAdminManageService {
       personalEmail: profile.personalEmail,
       employeeCode: profile.employeeCode,
       status: profile.status,
-      facilityAssignments: Object.values(
-        assignments.reduce<Record<string, { facilityId: string; roles: string[] }>>(
-          (result, assignment) => {
-            result[assignment.facilityId] ??= {
-              facilityId: assignment.facilityId,
-              roles: [],
-            };
-            result[assignment.facilityId].roles.push(assignment.role.name);
-            return result;
-          },
-          {},
-        ),
-      ),
+      facilityAssignments: [],
       doctor: doctor
         ? {
             id: doctor.id,
@@ -668,7 +458,6 @@ export class UsersService implements IUsersService, IAdminManageService {
     if (roles.has(RoleEnum.NURSE)) return 'NU';
     return 'ST';
   }
-
 }
 
 export interface StaffProfileSummary {

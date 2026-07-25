@@ -27,11 +27,11 @@ export class Faq {
   answer: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'category', type: 'varchar', length: 255 })
-  category: string;
+  @Column({ name: 'category', type: 'varchar', length: 255, default: 'common' })
+  category: string | null;
 
   @ApiProperty({ enum: FaqStatusEnum, enumName: 'FaqStatusEnum' })
-  @Column({ name: 'status', type: 'enum', enum: FaqStatusEnum })
+  @Column({ name: 'status', type: 'enum', enum: FaqStatusEnum, default: FaqStatusEnum.ACTIVE })
   status: FaqStatusEnum;
 
   @ApiProperty({ type: Date })

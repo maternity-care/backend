@@ -22,24 +22,24 @@ export class StaffRefreshToken {
   staff: Staff;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'staff_id', type: 'bigint' })
+  @Column({ name: 'staff_id', type: 'bigint', nullable: false })
   staffId: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'token_hash', type: 'varchar', length: 255 })
+  @Column({ name: 'token_hash', type: 'varchar', length: 255, nullable: false })
   tokenHash: string;
 
   @ApiProperty({ type: Date })
-  @Column({ name: 'expires_at', type: 'timestamp' })
+  @Column({ name: 'expires_at', type: 'timestamp', nullable: false })
   expiresAt: Date;
 
   @ApiProperty({ type: Date })
-  @Column({ name: 'revoked_at', type: 'timestamp' })
-  revokedAt: Date;
+  @Column({ name: 'revoked_at', type: 'timestamp', nullable: true })
+  revokedAt: Date | null;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'replaced_by_token_hash', type: 'varchar', length: 255 })
-  replacedByTokenHash: string;
+  @Column({ name: 'replaced_by_token_hash', type: 'varchar', length: 255, nullable: true })
+  replacedByTokenHash: string | null;
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })

@@ -5,7 +5,6 @@ import { join } from 'path';
 import { User } from '../modules/users/entities/user.entity';
 import { Role } from '../modules/roles/entities/role.entity';
 import { Permission } from '../modules/permissions/entities/permission.entity';
-import { UserPermission } from '../modules/permissions/entities/staff-permission.entity';
 import { RefreshToken } from '../modules/auth/entities/refresh-token.entity';
 
 @Module({
@@ -27,7 +26,6 @@ import { RefreshToken } from '../modules/auth/entities/refresh-token.entity';
           User,
           Role,
           Permission,
-          UserPermission,
           RefreshToken,
           join(__dirname, 'entities', '*.entity{.ts,.js}'),
         ],

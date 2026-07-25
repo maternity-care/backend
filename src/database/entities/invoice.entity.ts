@@ -30,23 +30,23 @@ export class Invoice {
   invoiceNo: string;
 
   @ApiProperty({ type: Date })
-  @Column({ name: 'issued_at', type: 'timestamp' })
-  issuedAt: Date;
+  @Column({ name: 'issued_at', type: 'timestamp', nullable: true })
+  issuedAt: Date | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'buyer_name', type: 'varchar', length: 255 })
   buyerName: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'buyer_tax_code', type: 'varchar', length: 255 })
-  buyerTaxCode: string;
+  @Column({ name: 'buyer_tax_code', type: 'varchar', length: 255, nullable: true })
+  buyerTaxCode: string | null;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'file_url', type: 'varchar', length: 500 })
-  fileUrl: string;
+  @Column({ name: 'file_url', type: 'varchar', length: 500, nullable: true })
+  fileUrl: string | null;
 
   @ApiProperty({ enum: InvoiceStatus, enumName: 'InvoiceStatus' })
-  @Column({ name: 'status', type: 'enum', enum: InvoiceStatus })
+  @Column({ name: 'status', type: 'enum', enum: InvoiceStatus, default: InvoiceStatus.PENDING })
   status: InvoiceStatus;
 
   @ApiProperty({ type: Date })

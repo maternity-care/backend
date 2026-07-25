@@ -10,8 +10,8 @@ import { UsersService } from '../users/users.service';
 export class StaffManagementService {
   constructor(private readonly usersService: UsersService) {}
 
-  findAll(query: SearchUserDto, actor: AuthenticatedUser) {
-    return this.usersService.findAllUsers(query, actor);
+  findAll(query: SearchUserDto) {
+    return this.usersService.searchUsers(query);
   }
 
   findById(id: string, actor: AuthenticatedUser) {
@@ -26,11 +26,7 @@ export class StaffManagementService {
     return this.usersService.updateUser(id, dto, actor);
   }
 
-  updateStatus(
-    id: string,
-    status: AccountStatus,
-    actor: AuthenticatedUser,
-  ) {
+  updateStatus(id: string, status: AccountStatus, actor: AuthenticatedUser) {
     return this.usersService.updateUserStatus(id, status, actor);
   }
 }

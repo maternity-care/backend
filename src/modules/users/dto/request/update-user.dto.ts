@@ -9,7 +9,6 @@ import {
   Matches,
   IsString,
   Min,
-  MinLength,
   ValidateNested,
 } from 'class-validator';
 import { UserPermissionOverrideDto } from './user-permission-override.dto';
@@ -34,22 +33,10 @@ export class UpdateUserDto {
   @IsOptional()
   phone?: string;
 
-  @ApiPropertyOptional({ minLength: 6 })
-  @IsString()
-  @MinLength(6)
-  @IsOptional()
-  password?: string;
-
   @ApiPropertyOptional({ enum: AccountStatus })
   @IsEnum(AccountStatus)
   @IsOptional()
   status?: AccountStatus;
-
-  @ApiPropertyOptional({ type: [String] })
-  @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  roleIds?: string[];
 
   @ApiPropertyOptional({ type: [FacilityStaffAssignmentDto] })
   @IsArray()

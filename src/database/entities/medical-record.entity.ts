@@ -50,8 +50,8 @@ export class MedicalRecord {
   diagnosis: string | null;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'conclusion', type: 'text' })
-  conclusion: string;
+  @Column({ name: 'conclusion', type: 'text', nullable: true })
+  conclusion: string | null;
 
   @ApiPropertyOptional({ type: String, nullable: true, required: false })
   @Column({ name: 'recommendation', type: 'text', nullable: true })

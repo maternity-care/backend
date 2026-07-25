@@ -1,0 +1,53 @@
+import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { useContainer } from 'class-validator';
+import { FacilityRoomsAppModule } from './app.facility-rooms.module';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(FacilityRoomsAppModule);
+  const configService = app.get(ConfigService);
+  const nodeEnv = configService.get<string>('app.nodeEnv') ?? 'development';
+  const corsOrigins = configService.get<string[]>('app.corsOrigins') ?? [];
+
+  useContainer(app.select(FacilityRoomsAppModule), { fallbackOnErrors: true });
+
+  app.enableCors({
+    origin: nodeEnv === 'development' ? true : corsOrigins,
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Accept',
+      'X-Facility-Id',
+    ],
+  });
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+  app.useGlobalInterceptors(new ResponseInterceptor());
+  app.useGlobalFilters(new HttpExceptionFilter());
+
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('Maternity Care API - Facility/Rooms/Shifts Dev')
+    .setDescription('Temporary isolated API for testing facilities, rooms, room types and doctor shifts')
+    .setVersion('1.0.0')
+    .build();
+
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, document);
+
+  const port = Number(process.env.FACILITY_ROOMS_PORT) || configService.getOrThrow<number>('app.port');
+  await app.listen(port);
+}
+
+void bootstrap();

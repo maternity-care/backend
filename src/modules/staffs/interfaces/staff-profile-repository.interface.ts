@@ -1,18 +1,18 @@
 import { DeepPartial } from 'typeorm';
-import { StaffProfile } from '../entities/staff.entity';
+import { Staff } from '../entities/staff.entity';
 
 export const STAFF_PROFILE_REPOSITORY = Symbol('STAFF_PROFILE_REPOSITORY');
 
 export interface IStaffProfileRepository {
-  findById(id: string): Promise<StaffProfile | null>;
-  findByEmail(email: string): Promise<StaffProfile | null>;
-  findByEmailWithPassword(email: string): Promise<StaffProfile | null>;
-  findByEmployeeCode(employeeCode: string): Promise<StaffProfile | null>;
-  findAll(): Promise<StaffProfile[]>;
-  create(data: DeepPartial<StaffProfile>): Promise<StaffProfile>;
-  save(staffProfile: StaffProfile): Promise<StaffProfile>;
-  findByPersonalEmail(email: string): Promise<StaffProfile | null>;
-  updateStaffProfile(id: string, data: DeepPartial<StaffProfile>): Promise<StaffProfile | null>;
+  findById(id: string): Promise<Staff | null>;
+  findByEmail(email: string): Promise<Staff | null>;
+  findByEmailWithPassword(email: string): Promise<Staff | null>;
+  findByEmployeeCode(employeeCode: string): Promise<Staff | null>;
+  findAll(): Promise<Staff[]>;
+  create(data: DeepPartial<Staff>): Promise<Staff>;
+  save(staff: Staff): Promise<Staff>;
+  findByPersonalEmail(email: string): Promise<Staff | null>;
+  updateStaffProfile(id: string, data: DeepPartial<Staff>): Promise<Staff | null>;
   generateStaffEmailFromName(name: string): Promise<string>;
   generateStaffPassword(): string;
   generateStaffEmployeeCode(): Promise<string>;

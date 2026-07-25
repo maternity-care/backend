@@ -1,17 +1,27 @@
 import { Staff } from './../../staffs/entities/staff.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { FacilityClosureDay } from './facility-closure-day.entity';
+import { FacilityOperatingHour } from './facility-operating-hour.entity';
 import {
   Column,
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 
 @Entity('facilities')
+@Index('uq_facilities_code', ['code'], { unique: true })
+@Index('uq_facilities_email', ['email'], { unique: true })
+@Index('uq_facilities_phone', ['phone'], { unique: true })
+@Index('idx_facilities_status', ['status'])
+@Index('idx_facilities_owner_id', ['ownerId'])
+@Index('idx_facilities_location', ['province', 'ward'])
 export class Facility {
   @ApiProperty({ type: String, example: '1' })
   @PrimaryGeneratedColumn({ type: 'bigint' })
@@ -21,6 +31,14 @@ export class Facility {
   @ManyToOne(() => Staff, { onDelete: 'RESTRICT', nullable: true })
   @JoinColumn({ name: 'owner_id' })
   owner: Staff | null;
+
+  @ApiProperty({ type: () => [FacilityOperatingHour] })
+  @OneToMany(() => FacilityOperatingHour, (operatingHour) => operatingHour.facility)
+  operatingHours?: FacilityOperatingHour[];
+
+  @ApiProperty({ type: () => [FacilityClosureDay] })
+  @OneToMany(() => FacilityClosureDay, (closureDay) => closureDay.facility)
+  closureDays?: FacilityClosureDay[];
 
   @ApiProperty({ type: String })
   @Column({ name: 'name', type: 'varchar', length: 255 })
@@ -43,18 +61,6 @@ export class Facility {
   email: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'open_time', type: 'time' })
-  openTime: string;
-
-  @ApiProperty({ type: String })
-  @Column({ name: 'close_time', type: 'time' })
-  closeTime: string;
-
-  @ApiProperty({ type: String })
-  @Column({ name: 'working_days', type: 'varchar', length: 255 })
-  workingDays: string;
-
-  @ApiProperty({ type: String })
   @Column({ name: 'address', type: 'varchar', length: 255 })
   address: string;
 
@@ -67,11 +73,11 @@ export class Facility {
   ward: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'latitude', type: 'varchar', length: 255 })
+  @Column({ name: 'latitude', type: 'decimal', precision: 10, scale: 7 })
   latitude: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'longitude', type: 'varchar', length: 255 })
+  @Column({ name: 'longitude', type: 'decimal', precision: 10, scale: 7 })
   longitude: string;
 
   @ApiProperty({ type: String })

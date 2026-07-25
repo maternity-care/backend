@@ -81,7 +81,12 @@ export class Appointment {
   checkedInAt: Date | null;
 
   @ApiProperty({ enum: AppointmentStatus, enumName: 'AppointmentStatus' })
-  @Column({ name: 'status', type: 'enum', enum: AppointmentStatus })
+  @Column({
+    name: 'status',
+    type: 'enum',
+    enum: AppointmentStatus,
+    default: AppointmentStatus.PENDING_PAYMENT,
+  })
   status: AppointmentStatus;
 
   @ApiPropertyOptional({ type: String, nullable: true, required: false })
@@ -89,8 +94,8 @@ export class Appointment {
   cancelReason: string | null;
 
   @ApiProperty({ type: Date })
-  @Column({ name: 'no_show_handled_at', type: 'timestamp' })
-  noShowHandledAt: Date;
+  @Column({ name: 'no_show_handled_at', type: 'timestamp', nullable: true })
+  noShowHandledAt: Date | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'created_by', type: 'bigint' })

@@ -6,7 +6,7 @@ import { AccountStatus } from '../../../common/constants/status.enum';
 import { User } from '../entities/user.entity';
 
 export interface IAdminManageService {
-  findAllUsers(query: SearchUserDto): Promise<SearchUserResponseDto>;
+  // findAllUsers(query: SearchUserDto): Promise<SearchUserResponseDto>;
   findUserById(id: string): Promise<User | null>;
   findUserByEmail(email: string): Promise<User | null>;
   createUser(dto: AdminCreateUserDto): Promise<User>;

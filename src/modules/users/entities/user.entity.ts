@@ -16,8 +16,8 @@ export class User {
   id: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'cccd', type: 'varchar', length: 100, unique: true })
-  cccd: string;
+  @Column({ name: 'cccd', type: 'varchar', length: 100, unique: true, nullable: true })
+  cccd: string | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'name', type: 'varchar', length: 255 })
@@ -28,32 +28,36 @@ export class User {
   phone: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'date_of_birth', type: 'date' })
-  dateOfBirth: string;
+  @Column({ name: 'email', type: 'varchar', length: 191, unique: true })
+  email: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'address', type: 'varchar', length: 255 })
-  address: string;
+  @Column({ name: 'date_of_birth', type: 'date', nullable: true })
+  dateOfBirth: string | null;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'province', type: 'varchar', length: 255 })
-  province: string;
+  @Column({ name: 'address', type: 'varchar', length: 255, nullable: true })
+  address: string | null;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'ward', type: 'varchar', length: 255 })
-  ward: string;
+  @Column({ name: 'province', type: 'varchar', length: 255, nullable: true })
+  province: string | null;
+
+  @ApiProperty({ type: String })
+  @Column({ name: 'ward', type: 'varchar', length: 255, nullable: true })
+  ward: string | null;
 
   @ApiProperty({ enum: UserStatusEnum, enumName: 'UserStatusEnum' })
-  @Column({ name: 'status', type: 'enum', enum: UserStatusEnum })
+  @Column({ name: 'status', type: 'enum', enum: UserStatusEnum, default: UserStatusEnum.ACTIVE })
   status: UserStatusEnum;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'emergency_contact_name', type: 'varchar', length: 255 })
-  emergencyContactName: string;
+  @Column({ name: 'emergency_contact_name', type: 'varchar', length: 255, nullable: true })
+  emergencyContactName: string | null;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'emergency_contact_phone', type: 'varchar', length: 20 })
-  emergencyContactPhone: string;
+  @Column({ name: 'emergency_contact_phone', type: 'varchar', length: 20, nullable: true })
+  emergencyContactPhone: string | null;
 
   @ApiPropertyOptional({ type: Object, nullable: true, required: false })
   @Column({ name: 'metadata', type: 'json', nullable: true })

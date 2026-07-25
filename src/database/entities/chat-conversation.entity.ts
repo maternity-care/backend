@@ -41,15 +41,20 @@ export class ChatConversation {
   userId: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'conversation_type', type: 'varchar', length: 255 })
+  @Column({ name: 'conversation_type', type: 'varchar', length: 255, default: 'chatting' })
   conversationType: string;
 
   @ApiProperty({ type: Number })
-  @Column({ name: 'priority', type: 'int' })
+  @Column({ name: 'priority', type: 'int', default: 0 })
   priority: number;
 
   @ApiProperty({ enum: ConversationStatus, enumName: 'ConversationStatus' })
-  @Column({ name: 'status', type: 'enum', enum: ConversationStatus })
+  @Column({
+    name: 'status',
+    type: 'enum',
+    enum: ConversationStatus,
+    default: ConversationStatus.OPEN,
+  })
   status: ConversationStatus;
 
   @ApiProperty({ type: Date })

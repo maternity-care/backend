@@ -2,13 +2,16 @@ import { ForbiddenException } from '@nestjs/common';
 import { FacilityStatus } from '../constants/status.enum';
 import { RESPONSE_MESSAGES } from '../constants/response-message.constant';
 import { RoleEnum } from '../constants/role.enum';
-import { AuthenticatedUser } from '../../modules/auth/interfaces/authenticated-user.interface';
+import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 
-export function isSuperAdmin(user: AuthenticatedUser): boolean {
+export function isSuperAdmin(user?: AuthenticatedUser): boolean {
+  if (!user) {
+    return true;
+  }
   return user.roles.some((role) => role.name === RoleEnum.SUPER_ADMIN);
 }
 
-export function getActiveFacilityId(user: AuthenticatedUser): string | null {
+export function getActiveFacilityId(user?: AuthenticatedUser): string | null {
   return requireActiveFacilityId(user);
 }
 
@@ -17,14 +20,14 @@ export function getActiveFacilityId(user: AuthenticatedUser): string | null {
  * Super admins are intentionally unscoped and therefore receive null.
  */
 export function requireActiveFacilityId(
-  user: AuthenticatedUser,
+  user?: AuthenticatedUser,
 ): string | null {
   if (isSuperAdmin(user)) {
     return null;
   }
 
-  const facilityId = user.activeFacilityId;
-  const assignedFacility = user.facilities.find(
+  const facilityId = user?.activeFacilityId;
+  const assignedFacility = user?.facilities.find(
     (facility) =>
       String(facility.id) === String(facilityId) &&
       facility.status === FacilityStatus.ACTIVE &&
@@ -41,7 +44,7 @@ export function requireActiveFacilityId(
 
 // Asserts that the user has access to the specified facility.
 export function assertFacilityAccess(
-  user: AuthenticatedUser,
+  user: AuthenticatedUser | undefined,
   facilityId: string,
 ): void {
   if (isSuperAdmin(user)) {
