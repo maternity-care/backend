@@ -12,16 +12,6 @@ export class RegisterDto {
   @IsNotEmpty()
   phone: string;
 
-  @ApiPropertyOptional({
-    description: 'Số CCCD 12 số',
-    example: '123456789012',
-    minLength: 12,
-    maxLength: 12,
-  })
-  @IsString()
-  @IsNotEmpty()
-  cccd?: string;
-
   @ApiProperty()
   @IsEmail()
   email: string;
