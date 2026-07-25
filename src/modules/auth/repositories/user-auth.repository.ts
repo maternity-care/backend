@@ -13,7 +13,13 @@ export class UserAuthRepository implements IUserAuthRepository {
     return user;
   }
   async findByEmail(email: string): Promise<UserAuth | null> {
-    const user = await this.repository.findOneBy({ email });
+    const user = await this.repository.findOne({
+      where: { email },
+      relations: {
+        user: true,
+      },
+    });
+    console.log('===========Data:', user);
     return user;
   }
   async create(UserAuth: DeepPartial<UserAuth>): Promise<UserAuth> {
