@@ -13,6 +13,8 @@ import { RegisterDto } from './dto/request/register.dto';
 import { ResetPasswordDto } from './dto/request/reset-password.dto';
 import { ForgotPasswordResponseDto } from './dto/response/forgot-password-response.dto';
 import { AuthService } from './auth.service';
+import { VerifyOtpDto } from './dto/request/verify-otp.dto';
+import { ResendOtpDto } from './dto/request/resend-otp.dto';
 
 @ApiTags('User - Auth')
 @Controller('auth')
@@ -30,15 +32,15 @@ export class AuthController {
   @Post('resend-otp')
   @ApiOperation({ summary: 'resend otp' })
   @ApiResponse({ status: 200 })
-  async verifyEmail(@Body() dto: { email: string }) {
+  async verifyEmail(@Body() dto: ResendOtpDto) {
     const data = await this.authService.resendOtpEmail(dto.email);
     return { message: data.message };
   }
 
   @Post('verify-otp')
   @ApiOperation({ summary: 'verify otp' })
-  @ApiResponse({ status: 200 })
-  async verifyOtp(@Body() dto: { email: string; otp: string }) {
+  @ApiResponse({ status: 200, type: AuthResponseDto })
+  async verifyOtp(@Body() dto: VerifyOtpDto) {
     const data = await this.authService.verifyOTP(dto.email, dto.otp);
     return { message: RESPONSE_MESSAGES.AUTH_REGISTERED, data };
   }

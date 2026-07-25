@@ -32,31 +32,31 @@ export class User {
   email: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'date_of_birth', type: 'date' })
+  @Column({ name: 'date_of_birth', type: 'date', nullable: true })
   dateOfBirth: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'address', type: 'varchar', length: 255 })
+  @Column({ name: 'address', type: 'varchar', length: 255, nullable: true })
   address: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'province', type: 'varchar', length: 255 })
+  @Column({ name: 'province', type: 'varchar', length: 255, nullable: true })
   province: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'ward', type: 'varchar', length: 255 })
+  @Column({ name: 'ward', type: 'varchar', length: 255, nullable: true })
   ward: string;
 
   @ApiProperty({ enum: UserStatusEnum, enumName: 'UserStatusEnum' })
-  @Column({ name: 'status', type: 'enum', enum: UserStatusEnum })
+  @Column({ name: 'status', type: 'enum', enum: UserStatusEnum, default: UserStatusEnum.ACTIVE })
   status: UserStatusEnum;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'emergency_contact_name', type: 'varchar', length: 255 })
+  @Column({ name: 'emergency_contact_name', type: 'varchar', length: 255, nullable: true })
   emergencyContactName: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'emergency_contact_phone', type: 'varchar', length: 20 })
+  @Column({ name: 'emergency_contact_phone', type: 'varchar', length: 20, nullable: true })
   emergencyContactPhone: string;
 
   @ApiPropertyOptional({ type: Object, nullable: true, required: false })
