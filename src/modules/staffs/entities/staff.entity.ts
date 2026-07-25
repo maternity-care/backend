@@ -77,3 +77,6 @@ export class Staff {
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
   updatedAt: Date;
 }
+
+// Alias tam thoi de cac module cu dang import StaffProfile khong bi loi sau khi doi bang ve staffs.
+export { Staff as StaffProfile };

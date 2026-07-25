@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ActiveStatus } from '../../../../common/constants/status.enum';
+import { ActiveStatus, FacilityStatus } from '../../../../common/constants/status.enum';
 
 export class RoomWithDetailsResponseDto {
   @ApiProperty()
@@ -9,13 +9,16 @@ export class RoomWithDetailsResponseDto {
   facilityId: string;
 
   @ApiProperty()
+  code: string;
+
+  @ApiProperty()
+  roomTypeId: string;
+
+  @ApiProperty()
   name: string;
 
   @ApiProperty()
-  roomType: string;
-
-  @ApiPropertyOptional({ nullable: true })
-  floor?: string | null;
+  floor: string;
 
   @ApiProperty({ enum: ActiveStatus })
   status: ActiveStatus;
@@ -39,5 +42,79 @@ export class RoomWithDetailsResponseDto {
   facilityProvince?: string;
 
   @ApiPropertyOptional()
-  facilityDistrict?: string;
+  facilityWard?: string;
+
+  @ApiPropertyOptional({ enum: FacilityStatus })
+  facilityStatus?: FacilityStatus;
+
+  @ApiPropertyOptional()
+  roomTypeName?: string;
+
+  @ApiPropertyOptional()
+  roomTypeCode?: string;
+
+  @ApiPropertyOptional()
+  roomTypeDescription?: string;
+
+  @ApiPropertyOptional({ enum: ActiveStatus })
+  roomTypeStatus?: ActiveStatus;
+}
+
+export class RoomLookupResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  code: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  facilityId: string;
+
+  @ApiPropertyOptional()
+  facilityName?: string;
+
+  @ApiProperty()
+  roomTypeId: string;
+
+  @ApiPropertyOptional()
+  roomTypeName?: string;
+
+  @ApiProperty()
+  floor: string;
+
+  @ApiProperty({ enum: ActiveStatus })
+  status: ActiveStatus;
+}
+
+export class RoomTypeLookupResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  code: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  description: string;
+
+  @ApiProperty({ enum: ActiveStatus })
+  status: ActiveStatus;
+}
+
+export class RoomTypeResponseDto extends RoomTypeLookupResponseDto {
+  @ApiProperty()
+  createdAt: Date;
+
+  @ApiProperty()
+  updatedAt: Date;
+}
+
+export class FacilityRoomTypeResponseDto extends RoomTypeLookupResponseDto {
+  @ApiProperty({ description: 'So phong dang hoat dong cua co so thuoc loai phong nay' })
+  roomCount: number;
 }

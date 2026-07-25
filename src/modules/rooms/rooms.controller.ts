@@ -1,24 +1,28 @@
-import { Body, Controller, Delete, Get, HttpException, InternalServerErrorException, Param, Patch, Post, UseGuards, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Body, Controller, Delete, Get, HttpException, InternalServerErrorException, Param, Patch, Post, Query } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RoomsService } from './rooms.service';
-import { CreateRoomDto } from './dto/requests/create-room.dto';
+import { BulkCreateRoomsDto, BulkCreateRoomsPreviewDto, CreateRoomDto } from './dto/requests/create-room.dto';
+import { CreateRoomTypeDto } from './dto/requests/create-room-type.dto';
 import { UpdateRoomDto } from './dto/requests/update-room.dto';
+import { UpdateRoomTypeDto } from './dto/requests/update-room-type.dto';
 import { RoomResponseDto } from './dto/responds/room-response.dto';
 import { RoomsWithFacilityResponseDto } from './dto/responds/rooms-with-facility-response.dto';
-import { RoomWithDetailsResponseDto } from './dto/responses/room-with-details-response.dto';
-import { SearchRoomsDto } from './dto/requests/search-rooms.dto';
-import { IsOptional } from 'class-validator';
-import { ROOM_CONSTANT } from '../../common/constants/room.constant';
+import {
+  RoomLookupResponseDto,
+  RoomTypeResponseDto,
+  RoomTypeLookupResponseDto,
+  RoomWithDetailsResponseDto,
+} from './dto/responses/room-with-details-response.dto';
+import { LookupRoomsDto, LookupRoomTypesDto, SearchRoomsDto, SearchRoomTypesDto } from './dto/requests/search-rooms.dto';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import {
   assertFacilityAccess,
   getActiveFacilityId,
 } from '../../common/helpers/facility-scope.helper';
+
 @ApiTags('Management - Rooms')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 @Controller('management/rooms')
 export class RoomsController {
   constructor(private readonly roomsService: RoomsService) {}
@@ -27,7 +31,7 @@ export class RoomsController {
     if (error instanceof HttpException) {
       throw error;
     }
-    throw new InternalServerErrorException('Internal server error');
+    throw new InternalServerErrorException(RESPONSE_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 
   @Get()
@@ -45,15 +49,130 @@ export class RoomsController {
       if (query?.page) {
         const paged = await this.roomsService.findAllPaginated(query);
         return {
-          message: ROOM_CONSTANT.ROOM_FOUND,
+          message: RESPONSE_MESSAGES.ROOMS.GET_LIST_SUCCESS,
           data: paged,
         };
       }
 
       const rooms = await this.roomsService.findAll(query);
       return {
-        message: ROOM_CONSTANT.ROOM_FOUND,
+        message: RESPONSE_MESSAGES.ROOMS.GET_LIST_SUCCESS,
         data: rooms,
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Get('lookup')
+  @ApiOperation({ summary: 'Lookup rooms for select/autocomplete' })
+  @ApiResponse({ status: 200, type: [RoomLookupResponseDto] })
+  async lookup(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: LookupRoomsDto,
+  ) {
+    try {
+      const activeFacilityId = getActiveFacilityId(user);
+      if (activeFacilityId) {
+        query.facilityId = activeFacilityId;
+      }
+      return {
+        message: RESPONSE_MESSAGES.ROOMS.LOOKUP_SUCCESS,
+        data: await this.roomsService.lookup(query),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Get('room-types/lookup')
+  @ApiOperation({ summary: 'Lookup room types for room form select/autocomplete' })
+  @ApiResponse({ status: 200, type: [RoomTypeLookupResponseDto] })
+  async lookupRoomTypes(@Query() query: LookupRoomTypesDto) {
+    try {
+      return {
+        message: RESPONSE_MESSAGES.ROOM_TYPES.LOOKUP_SUCCESS,
+        data: await this.roomsService.lookupRoomTypes(query),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Get('room-types')
+  @ApiOperation({ summary: 'List room types' })
+  @ApiResponse({ status: 200, type: [RoomTypeResponseDto] })
+  async findAllRoomTypes(@Query() query: SearchRoomTypesDto) {
+    try {
+      if (query?.page) {
+        return {
+          message: RESPONSE_MESSAGES.ROOM_TYPES.GET_LIST_SUCCESS,
+          data: await this.roomsService.findAllRoomTypesPaginated(query),
+        };
+      }
+
+      return {
+        message: RESPONSE_MESSAGES.ROOM_TYPES.GET_LIST_SUCCESS,
+        data: await this.roomsService.findAllRoomTypes(query),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Get('room-types/:id')
+  @ApiOperation({ summary: 'Get room type details' })
+  @ApiResponse({ status: 200, type: RoomTypeResponseDto })
+  async findRoomTypeById(@Param('id') id: string) {
+    try {
+      return {
+        message: RESPONSE_MESSAGES.ROOM_TYPES.GET_SUCCESS,
+        data: await this.roomsService.findRoomTypeById(id),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Post('room-types')
+  @ApiOperation({ summary: 'Create room type' })
+  @ApiResponse({ status: 201, type: RoomTypeResponseDto })
+  async createRoomType(@Body() dto: CreateRoomTypeDto) {
+    try {
+      return {
+        message: RESPONSE_MESSAGES.ROOM_TYPES.CREATED,
+        data: await this.roomsService.createRoomType(dto),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Patch('room-types/:id')
+  @ApiOperation({ summary: 'Update room type' })
+  @ApiResponse({ status: 200, type: RoomTypeResponseDto })
+  async updateRoomType(
+    @Param('id') id: string,
+    @Body() dto: UpdateRoomTypeDto,
+  ) {
+    try {
+      return {
+        message: RESPONSE_MESSAGES.ROOM_TYPES.UPDATED,
+        data: await this.roomsService.updateRoomType(id, dto),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Delete('room-types/:id')
+  @ApiOperation({ summary: 'Delete room type when unused, otherwise deactivate it' })
+  @ApiResponse({ status: 200 })
+  async removeRoomType(@Param('id') id: string) {
+    try {
+      return {
+        message: RESPONSE_MESSAGES.ROOM_TYPES.DELETED,
+        data: await this.roomsService.removeRoomType(id),
       };
     } catch (error) {
       this.handleError(error);
@@ -69,7 +188,7 @@ export class RoomsController {
       : await this.roomsService.findAllWithRooms();
 
     return {
-      message: ROOM_CONSTANT.ROOM_FOUND,
+      message: RESPONSE_MESSAGES.ROOMS.GET_LIST_SUCCESS,
       data,
     };
   }
@@ -85,7 +204,7 @@ export class RoomsController {
       const room = await this.roomsService.findDetailsById(id);
       assertFacilityAccess(user, room.facilityId);
       return {
-        message: ROOM_CONSTANT.ROOM_DETAIL_FOUND,
+        message: RESPONSE_MESSAGES.ROOMS.GET_SUCCESS,
         data: room,
       };
     } catch (error) {
@@ -107,8 +226,69 @@ export class RoomsController {
       }
       const room = await this.roomsService.create(dto);
       return {
-        message: ROOM_CONSTANT.CREATED_SUCCESSFULLY,
+        message: RESPONSE_MESSAGES.ROOMS.CREATED,
         data: room,
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Post('bulk')
+  @ApiOperation({ summary: 'Bulk create rooms' })
+  @ApiResponse({ status: 201, type: [RoomWithDetailsResponseDto] })
+  async bulkCreate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: BulkCreateRoomsDto,
+  ) {
+    try {
+      const activeFacilityId = getActiveFacilityId(user);
+      if (activeFacilityId) {
+        dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
+      }
+      return {
+        message: RESPONSE_MESSAGES.ROOMS.BULK_CONFIRM_SUCCESS,
+        data: await this.roomsService.bulkCreate(dto),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Post('bulk-create/preview')
+  @ApiOperation({ summary: 'Preview bulk create rooms before saving' })
+  async previewBulkCreate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: BulkCreateRoomsPreviewDto,
+  ) {
+    try {
+      const activeFacilityId = getActiveFacilityId(user);
+      if (activeFacilityId) {
+        dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
+      }
+      return {
+        message: RESPONSE_MESSAGES.ROOMS.BULK_PREVIEW_SUCCESS,
+        data: await this.roomsService.previewBulkCreate(dto),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Post('bulk-create/confirm')
+  @ApiOperation({ summary: 'Confirm and save valid rooms from bulk-create preview' })
+  async confirmBulkCreate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: BulkCreateRoomsPreviewDto,
+  ) {
+    try {
+      const activeFacilityId = getActiveFacilityId(user);
+      if (activeFacilityId) {
+        dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
+      }
+      return {
+        message: RESPONSE_MESSAGES.ROOMS.BULK_CONFIRM_SUCCESS,
+        data: await this.roomsService.confirmBulkCreate(dto),
       };
     } catch (error) {
       this.handleError(error);
@@ -128,7 +308,7 @@ export class RoomsController {
       assertFacilityAccess(user, existingRoom.facilityId);
       const room = await this.roomsService.update(id, dto);
       return {
-        message: ROOM_CONSTANT.UPDATED_SUCCESSFULLY,
+        message: RESPONSE_MESSAGES.ROOMS.UPDATED,
         data: room,
       };
     } catch (error) {
@@ -148,7 +328,7 @@ export class RoomsController {
       const room = await this.roomsService.findById(id);
       assertFacilityAccess(user, room.facilityId);
       const data = await this.roomsService.remove(id, reason, user?.id ?? null);
-      return { message: ROOM_CONSTANT.DELETED_SUCCESSFULLY, data };
+      return { message: RESPONSE_MESSAGES.ROOMS.DELETED, data };
     } catch (error) {
       this.handleError(error);
     }
