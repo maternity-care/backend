@@ -8,6 +8,7 @@ import {
   CreateDateColumn,
   Entity,
   JoinColumn,
+  JoinTable,
   ManyToMany,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -26,6 +27,11 @@ export class Staff {
 
   @ApiProperty({ type: () => Role, isArray: true })
   @ManyToMany(() => Role)
+  @JoinTable({
+    name: 'staff_roles',
+    joinColumn: { name: 'staff_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'role_id', referencedColumnName: 'id' },
+  })
   roles: Role[];
 
   @ApiProperty({ type: () => Facility })

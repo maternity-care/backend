@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  JoinTable,
   ManyToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -18,6 +19,11 @@ export class Role {
 
   @ApiProperty({ type: () => Permission, isArray: true })
   @ManyToMany(() => Permission)
+  @JoinTable({
+    name: 'role_permissions',
+    joinColumn: { name: 'role_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'permission_id', referencedColumnName: 'id' },
+  })
   permissions: Permission[];
 
   @ApiProperty({ type: String })
