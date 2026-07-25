@@ -39,16 +39,21 @@ export class ContentReport {
   reason: string;
 
   @ApiProperty({ enum: ContentReportStatus, enumName: 'ContentReportStatus' })
-  @Column({ name: 'status', type: 'enum', enum: ContentReportStatus })
+  @Column({
+    name: 'status',
+    type: 'enum',
+    enum: ContentReportStatus,
+    default: ContentReportStatus.PENDING,
+  })
   status: ContentReportStatus;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'resolved_by', type: 'bigint' })
-  resolvedBy: string;
+  @Column({ name: 'resolved_by', type: 'bigint', nullable: true })
+  resolvedBy: string | null;
 
   @ApiProperty({ type: Date })
-  @Column({ name: 'resolved_at', type: 'timestamp' })
-  resolvedAt: Date;
+  @Column({ name: 'resolved_at', type: 'timestamp', nullable: true })
+  resolvedAt: Date | null;
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })

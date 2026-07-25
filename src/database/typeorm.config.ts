@@ -20,7 +20,6 @@ import { Invoice } from './entities/invoice.entity';
 import { MaternityPackage } from '../modules/maternity-packages/entities/maternity-package.entity';
 import { MedicalFile } from './entities/medical-file.entity';
 import { MedicalRecord } from './entities/medical-record.entity';
-import { MedicationTakenLog } from './entities/medication-taken-log.entity';
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { PackageItem } from '../modules/package-services/entities/package-item.entity';
@@ -30,9 +29,6 @@ import { Payment } from './entities/payment.entity';
 import { Permission } from '../modules/permissions/entities/permission.entity';
 import { PregnancyHistoryEvent } from './entities/pregnancy-history-event.entity';
 import { PregnancyProfile } from '../modules/pregnancy-profile/entities/pregnancy-profile.entity';
-import { Prescription } from './entities/prescription.entity';
-import { PrescriptionHistory } from './entities/prescription-history.entity';
-import { PrescriptionItem } from './entities/prescription-item.entity';
 import { RefreshToken } from '../modules/auth/entities/refresh-token.entity';
 import { Role } from '../modules/roles/entities/role.entity';
 import { RolePermission } from './entities/role-permission.entity';
@@ -53,6 +49,7 @@ import { AppointmentDisruptionItem } from '../modules/doctor-shifts/entities/app
 import { Notification } from '../modules/notifications/entities/notification.entity';
 import { UpdateArchitectureDatabase1784909936253 } from './migrations/1784909936253-UpdateArchitectureDatabase';
 import { UpdateUser1784969133454 } from './migrations/1784969133454-UpdateUser';
+import { UpdateValidation1784977517026 } from './migrations/1784977517026-UpdateValidation';
 
 config();
 
@@ -101,7 +98,6 @@ export const typeOrmConfig: DataSourceOptions = {
     Invoice,
     MedicalFile,
     MedicalRecord,
-    MedicationTakenLog,
     Order,
     OrderItem,
     PackageItem,
@@ -109,16 +105,17 @@ export const typeOrmConfig: DataSourceOptions = {
     Payment,
     PregnancyHistoryEvent,
     PregnancyProfile,
-    Prescription,
-    PrescriptionHistory,
-    PrescriptionItem,
     RolePermission,
     StaffRole,
     ShiftSlot,
     StaffPermission,
     join(__dirname, 'entities', '*.entity{.ts,.js}'),
   ],
-  migrations: [UpdateArchitectureDatabase1784909936253, UpdateUser1784969133454],
+  migrations: [
+    UpdateArchitectureDatabase1784909936253,
+    UpdateUser1784969133454,
+    UpdateValidation1784977517026,
+  ],
   charset: 'utf8mb4_unicode_ci',
 };
 

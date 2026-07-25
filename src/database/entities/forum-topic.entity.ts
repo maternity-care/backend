@@ -35,7 +35,7 @@ export class ForumTopic {
   slug: string;
 
   @ApiProperty({ enum: ActiveStatus, enumName: 'ActiveStatus' })
-  @Column({ name: 'status', type: 'enum', enum: ActiveStatus })
+  @Column({ name: 'status', type: 'enum', enum: ActiveStatus, default: ActiveStatus.ACTIVE })
   status: ActiveStatus;
 
   @ApiProperty({ type: Date })

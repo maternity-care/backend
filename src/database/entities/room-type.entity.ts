@@ -23,7 +23,7 @@ export class RoomType {
   description: string;
 
   @ApiProperty({ enum: ActiveStatus, enumName: 'RoomTypeStatusEnum' })
-  @Column({ name: 'status', type: 'enum', enum: ActiveStatus })
+  @Column({ name: 'status', type: 'enum', enum: ActiveStatus, default: ActiveStatus.ACTIVE })
   status: ActiveStatus;
 
   @ApiProperty({ type: Date })
