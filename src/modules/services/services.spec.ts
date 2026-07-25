@@ -20,6 +20,7 @@ describe('Services DTO validation', () => {
     status: ActiveStatus.ACTIVE,
   };
 
+  // Vai tro: dam bao DTO tao service hop le va bien doi cac field string sang kieu boolean/number dung.
   it('accepts a valid create payload and transforms primitive values', async () => {
     const dto = plainToInstance(CreateServiceDto, validPayload);
     expect(await validate(dto)).toHaveLength(0);
@@ -28,6 +29,7 @@ describe('Services DTO validation', () => {
     expect(dto.requiresDoctorWarning).toBe(true);
   });
 
+  // Vai tro: gom cac input tao service sai de DTO bat loi ma, ten, loai dich vu, thoi luong, gia va status.
   it.each([
     [{ ...validPayload, code: 'bad code' }, 'code'],
     [{ ...validPayload, name: 'A' }, 'name'],
@@ -40,6 +42,7 @@ describe('Services DTO validation', () => {
     expect(errors.some(error => error.property === property)).toBe(true);
   });
 
+  // Vai tro: dam bao query search service chan enum sai va tham so phan trang ngoai gioi han.
   it('validates search pagination and enum filters', async () => {
     const dto = plainToInstance(SearchServiceDto, {
       serviceType: 'invalid',
@@ -83,6 +86,7 @@ describe('ServicesService business logic', () => {
     service: new ServicesService(repo as never),
   });
 
+  // Vai tro: dam bao tao dich vu goc phai check trung code va name truoc khi save.
   it('creates a service after checking unique code and name', async () => {
     const { repo, service } = createService();
     await expect(service.create({
@@ -98,6 +102,7 @@ describe('ServicesService business logic', () => {
     expect(repo.findByName).toHaveBeenCalledWith('Siêu âm thai 2D');
   });
 
+  // Vai tro: bao ve rule khong cho 2 dich vu goc trung code hoac trung name.
   it('rejects duplicated code or name', async () => {
     const codeContext = createService();
     codeContext.repo.findByCode.mockResolvedValueOnce(serviceEntity);
@@ -108,6 +113,7 @@ describe('ServicesService business logic', () => {
     await expect(nameContext.service.create(serviceEntity as never)).rejects.toBeInstanceOf(ConflictException);
   });
 
+  // Vai tro: dam bao update service convert flag requiresDoctorWarning ve dang DB dang dung la 0/1.
   it('updates a service and converts boolean warning flag to number', async () => {
     const { repo, service } = createService();
     await expect(service.update('1', { requiresDoctorWarning: false })).resolves.toMatchObject({
@@ -116,6 +122,7 @@ describe('ServicesService business logic', () => {
     expect(repo.save).toHaveBeenCalled();
   });
 
+  // Vai tro: kiem tra service tra dung danh sach thuong va danh sach phan trang tu repository.
   it('returns plain and paginated service lists through repository', async () => {
     const { repo, service } = createService();
     await expect(service.findAll({ serviceType: ServiceType.ULTRASOUND })).resolves.toEqual([{ ...serviceEntity }]);
@@ -127,6 +134,7 @@ describe('ServicesService business logic', () => {
     expect(repo.findAllPaginated).toHaveBeenCalledWith({ page: 1, limit: 20 });
   });
 
+  // Vai tro: dam bao update code/name moi se check duplicate truoc khi save.
   it('checks duplicated code and name when update changes those fields', async () => {
     const duplicateCodeContext = createService();
     duplicateCodeContext.repo.findByCode.mockResolvedValueOnce(serviceEntity);
@@ -139,6 +147,7 @@ describe('ServicesService business logic', () => {
     expect(duplicateNameContext.repo.save).not.toHaveBeenCalled();
   });
 
+  // Vai tro: dam bao update mot phan khong lam mat description/flag cu khi client khong gui len.
   it('preserves description and warning flag when update omits them', async () => {
     const { repo, service } = createService();
     repo.findById.mockResolvedValueOnce({ ...serviceEntity, description: 'old description', requiresDoctorWarning: 1 });
@@ -150,12 +159,14 @@ describe('ServicesService business logic', () => {
     });
   });
 
+  // Vai tro: dam bao serviceId khong ton tai tra NotFoundException ro rang.
   it('throws not found when service does not exist', async () => {
     const context = createService();
     context.repo.findById.mockResolvedValueOnce(null);
     await expect(context.service.findById('99')).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  // Vai tro: kiem tra rule xoa cung dich vu chua dung va xoa mem/inactive dich vu da co lien ket.
   it('hard deletes an unused service and soft deletes a used service', async () => {
     const hardContext = createService();
     await expect(hardContext.service.remove('1')).resolves.toEqual({
@@ -198,6 +209,7 @@ describe('ServicesController', () => {
     remove: jest.fn().mockResolvedValue({ action: 'hard_deleted', affectedCount: 0 }),
   });
 
+  // Vai tro: dam bao controller chon list phan trang khi co page va boc response dung format.
   it('chooses list method by query.page and wraps response', async () => {
     const service = createServiceMock();
     const controller = new ServicesController(service as never);
@@ -214,6 +226,7 @@ describe('ServicesController', () => {
     expect(service.findAll).toHaveBeenCalledWith({});
   });
 
+  // Vai tro: kiem tra cac API service CRUD tra message/data wrapper nhat quan cho FE.
   it('wraps detail, create, update, and remove responses', async () => {
     const service = createServiceMock();
     const controller = new ServicesController(service as never);

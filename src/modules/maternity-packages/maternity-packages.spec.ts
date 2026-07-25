@@ -21,6 +21,7 @@ describe('MaternityPackages DTO validation', () => {
     status: MaternityPackageStatus.DRAFT,
   };
 
+  // Vai tro: dam bao DTO tao package hop le va convert durationDays/priorityLevel ve number.
   it('accepts a valid create payload and transforms numeric fields', async () => {
     const dto = plainToInstance(CreateMaternityPackageDto, validPayload);
     expect(await validate(dto)).toHaveLength(0);
@@ -28,6 +29,7 @@ describe('MaternityPackages DTO validation', () => {
     expect(dto.priorityLevel).toBe(1);
   });
 
+  // Vai tro: gom cac input tao package sai de DTO bat loi code, name, price, duration, priority va status.
   it.each([
     [{ ...validPayload, code: 'bad code' }, 'code'],
     [{ ...validPayload, name: 'A' }, 'name'],
@@ -40,6 +42,7 @@ describe('MaternityPackages DTO validation', () => {
     expect(errors.some(error => error.property === property)).toBe(true);
   });
 
+  // Vai tro: dam bao query search package chan status sai va phan trang ngoai gioi han.
   it('validates search filters and pagination', async () => {
     const dto = plainToInstance(SearchMaternityPackageDto, {
       status: 'deleted',
@@ -105,6 +108,7 @@ describe('MaternityPackagesService business logic', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
+  // Vai tro: dam bao tao goi thai san phai check unique code/name truoc khi save.
   it('creates a package after checking unique code and name', async () => {
     const { repo, service } = createService();
     await expect(service.create({
@@ -120,6 +124,7 @@ describe('MaternityPackagesService business logic', () => {
     expect(repo.findByName).toHaveBeenCalledWith('Gói thai sản cơ bản');
   });
 
+  // Vai tro: bao ve rule khong cho hai goi thai san trung code hoac name.
   it('rejects duplicated code or name', async () => {
     const codeContext = createService();
     codeContext.repo.findByCode.mockResolvedValueOnce(packageEntity);
@@ -130,6 +135,7 @@ describe('MaternityPackagesService business logic', () => {
     await expect(nameContext.service.create(packageEntity as never)).rejects.toBeInstanceOf(ConflictException);
   });
 
+  // Vai tro: dam bao update package binh thuong save duoc va duplicate chi can check khi doi code/name.
   it('updates a package and checks duplicate fields only when changed', async () => {
     const { repo, service } = createService();
     await expect(service.update('1', { price: '850000.00' })).resolves.toMatchObject({
@@ -138,6 +144,7 @@ describe('MaternityPackagesService business logic', () => {
     expect(repo.save).toHaveBeenCalled();
   });
 
+  // Vai tro: dam bao list package co data tra ve dung ca dang thuong va dang phan trang.
   it('returns plain and paginated package lists when repository has items', async () => {
     const { repo, service } = createService();
 
@@ -150,6 +157,7 @@ describe('MaternityPackagesService business logic', () => {
     expect(repo.findAllPaginated).toHaveBeenCalledWith({ page: 1, limit: 20 });
   });
 
+  // Vai tro: chan update package thanh code/name da thuoc ve package khac.
   it('rejects update when changed code or name already exists', async () => {
     const codeContext = createService();
     codeContext.repo.findByCode.mockResolvedValueOnce(packageEntity);
@@ -162,6 +170,7 @@ describe('MaternityPackagesService business logic', () => {
     expect(nameContext.repo.save).not.toHaveBeenCalled();
   });
 
+  // Vai tro: dam bao update mot phan khong xoa mat description cu neu client khong gui.
   it('preserves existing description when update omits description', async () => {
     const { service } = createService();
 
@@ -171,12 +180,14 @@ describe('MaternityPackagesService business logic', () => {
     });
   });
 
+  // Vai tro: dam bao packageId khong ton tai tra 404.
   it('throws not found when package does not exist', async () => {
     const context = createService();
     context.repo.findById.mockResolvedValueOnce(null);
     await expect(context.service.findById('99')).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  // Vai tro: dam bao danh sach package rong tra 404 thay vi success voi data rong.
   it('throws not found when package lists are empty', async () => {
     const listContext = createService();
     listContext.repo.findAll.mockResolvedValueOnce([]);
@@ -193,6 +204,7 @@ describe('MaternityPackagesService business logic', () => {
     await expect(pagedContext.service.findAllPaginated({ page: 1, limit: 20 })).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  // Vai tro: kiem tra API kha dung theo facility tra goi co day du service va ho tro phan trang.
   it('returns packages available at a facility and supports pagination', async () => {
     const { repo, service } = createService();
 
@@ -212,6 +224,7 @@ describe('MaternityPackagesService business logic', () => {
     expect(repo.findAvailableByFacilityIdPaginated).toHaveBeenCalledWith('1', { page: 1, limit: 20 });
   });
 
+  // Vai tro: dam bao facility khong co package kha dung se tra 404 ro rang cho FE.
   it('throws not found when a facility has no available maternity packages', async () => {
     const plainContext = createService();
     plainContext.repo.findAvailableByFacilityId.mockResolvedValueOnce([]);
@@ -228,6 +241,7 @@ describe('MaternityPackagesService business logic', () => {
     await expect(pagedContext.service.findAvailableByFacilityIdPaginated('1', { page: 1 })).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  // Vai tro: dam bao facility inactive bi chan truoc khi query package kha dung.
   it('throws not found when facility is inactive before checking available packages', async () => {
     facilitiesService.findById.mockResolvedValueOnce({ id: '1', status: 'inactive' });
     const { repo, service } = createService();
@@ -236,6 +250,7 @@ describe('MaternityPackagesService business logic', () => {
     expect(repo.findAvailableByFacilityId).not.toHaveBeenCalled();
   });
 
+  // Vai tro: kiem tra xoa cung package chua dung va chuyen inactive khi package da co lien ket.
   it('hard deletes unused package and marks used package inactive', async () => {
     const hardContext = createService();
     await expect(hardContext.service.remove('1')).resolves.toEqual({
@@ -263,6 +278,7 @@ describe('PublicMaternityPackagesController', () => {
     status: MaternityPackageStatus.ACTIVE,
   };
 
+  // Vai tro: dam bao API public chi hien package active va van ho tro ca list thuong/phan trang.
   it('forces public list status to active and supports pagination', async () => {
     const service = {
       findAll: jest.fn().mockResolvedValue([activePackage]),
@@ -284,6 +300,7 @@ describe('PublicMaternityPackagesController', () => {
     expect(pagedQuery.status).toBe(MaternityPackageStatus.ACTIVE);
   });
 
+  // Vai tro: dam bao public detail tra package khi package dang active.
   it('returns active package detail', async () => {
     const service = {
       findById: jest.fn().mockResolvedValue(activePackage),
@@ -296,6 +313,7 @@ describe('PublicMaternityPackagesController', () => {
     });
   });
 
+  // Vai tro: dam bao public detail khong tra success cho package draft/inactive.
   it('throws not found instead of returning success with null when package is not active', async () => {
     const service = {
       findById: jest.fn().mockResolvedValue({
@@ -329,6 +347,7 @@ describe('PublicFacilityMaternityPackagesController', () => {
     }),
   });
 
+  // Vai tro: dam bao API public theo facility tra danh sach package kha dung cho facility do.
   it('lists packages available at a facility', async () => {
     const service = createServiceMock();
     const controller = new PublicFacilityMaternityPackagesController(service as never);
@@ -340,6 +359,7 @@ describe('PublicFacilityMaternityPackagesController', () => {
     expect(service.findAvailableByFacilityId).toHaveBeenCalledWith('1', {});
   });
 
+  // Vai tro: dam bao API public theo facility chon ham phan trang khi query co page.
   it('uses paginated service when query.page is present', async () => {
     const service = createServiceMock();
     const controller = new PublicFacilityMaternityPackagesController(service as never);
@@ -372,6 +392,7 @@ describe('MaternityPackagesController', () => {
     remove: jest.fn().mockResolvedValue({ action: 'hard_deleted', affectedCount: 0 }),
   });
 
+  // Vai tro: dam bao controller quan tri package chon list thuong/phan trang va boc response dung chuan.
   it('chooses list method by query.page and wraps response', async () => {
     const service = createServiceMock();
     const controller = new MaternityPackagesController(service as never);
@@ -386,6 +407,7 @@ describe('MaternityPackagesController', () => {
     });
   });
 
+  // Vai tro: kiem tra CRUD package tra message/data wrapper nhat quan cho FE.
   it('wraps detail, create, update, and remove responses', async () => {
     const service = createServiceMock();
     const controller = new MaternityPackagesController(service as never);

@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import { PermissionEnum } from '../constants/permission.enum';
 import { checkAuth, checkPermission } from '../helpers/auth.helper';
-import { AuthenticatedUser } from '../../modules/auth/interfaces/authenticated-user.interface';
+import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {

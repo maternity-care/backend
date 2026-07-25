@@ -1,6 +1,56 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Time } from 'bullmq';
-import { FacilityStatus } from '../../../../common/constants/status.enum';
+import { FacilityOperatingStatus, FacilityStatus } from '../../../../common/constants/status.enum';
+
+export class FacilityOperatingHourResponseDto {
+  @ApiProperty()
+  dayOfWeek: string;
+
+  @ApiPropertyOptional()
+  openTime: string | null;
+
+  @ApiPropertyOptional()
+  closeTime: string | null;
+
+  @ApiProperty()
+  isClosed: boolean;
+}
+
+export class FacilityOperatingHourGroupResponseDto {
+  @ApiProperty({ type: [String] })
+  days: string[];
+
+  @ApiProperty()
+  dayLabel: string;
+
+  @ApiPropertyOptional()
+  openTime: string | null;
+
+  @ApiPropertyOptional()
+  closeTime: string | null;
+
+  @ApiProperty()
+  isClosed: boolean;
+
+  @ApiProperty()
+  displayTime: string;
+}
+
+export class FacilityClosureDayResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  facilityId: string;
+
+  @ApiProperty()
+  closureDate: string;
+
+  @ApiPropertyOptional()
+  reason: string | null;
+
+  @ApiProperty()
+  status: string;
+}
 
 export class FacilityResponseDto {
   @ApiProperty()
@@ -13,19 +63,22 @@ export class FacilityResponseDto {
   code: string;
 
   @ApiProperty()
+  ownerId: string;
+
+  @ApiPropertyOptional()
+  ownerName?: string;
+
+  @ApiPropertyOptional()
+  ownerEmail?: string;
+
+  @ApiPropertyOptional()
+  ownerPhone?: string;
+
+  @ApiProperty()
   phone: string;
 
-  @ApiPropertyOptional()
-  email?: string;
-
-  @ApiPropertyOptional()
-  open_time?: Time;
-
-  @ApiPropertyOptional()
-  close_time?: Time;
-
-  @ApiPropertyOptional()
-  working_days?: string;
+  @ApiProperty()
+  email: string;
 
   @ApiProperty()
   address: string;
@@ -34,23 +87,67 @@ export class FacilityResponseDto {
   province: string;
 
   @ApiProperty()
-  district: string;
-
-  @ApiProperty()
   ward: string;
 
-  @ApiPropertyOptional()
-  latitude?: string;
-
-  @ApiPropertyOptional()
-  longitude?: string;
+  @ApiProperty()
+  latitude: string;
 
   @ApiProperty()
+  longitude: string;
+
+  @ApiProperty({ enum: FacilityStatus })
   status: FacilityStatus;
+
+  @ApiPropertyOptional({ enum: FacilityOperatingStatus })
+  operatingStatus?: FacilityOperatingStatus;
+
+  @ApiPropertyOptional()
+  operatingStatusLabel?: string;
+
+  @ApiPropertyOptional()
+  isOpenNow?: boolean;
+
+  @ApiPropertyOptional({ type: FacilityOperatingHourResponseDto })
+  todayOperatingHour?: FacilityOperatingHourResponseDto | null;
 
   @ApiProperty()
   createdAt: Date;
 
   @ApiProperty()
   updatedAt: Date;
+
+  @ApiPropertyOptional({ type: [FacilityOperatingHourResponseDto] })
+  operatingHours?: FacilityOperatingHourResponseDto[];
+
+  @ApiPropertyOptional({ type: [FacilityOperatingHourGroupResponseDto] })
+  operatingHourGroups?: FacilityOperatingHourGroupResponseDto[];
+
+  @ApiPropertyOptional({ type: [FacilityClosureDayResponseDto] })
+  closureDays?: FacilityClosureDayResponseDto[];
+}
+
+export class FacilityLookupResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  code: string;
+
+  @ApiProperty()
+  address: string;
+
+  @ApiProperty()
+  province: string;
+
+  @ApiProperty()
+  ward: string;
+
+  @ApiProperty({ enum: FacilityStatus })
+  status: FacilityStatus;
+
+  @ApiPropertyOptional()
+  ownerName?: string;
 }

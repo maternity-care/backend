@@ -1,11 +1,13 @@
 export { Doctor } from '../../modules/doctors/entities/doctor.entity';
 export { Staff } from '../../modules/staffs/entities/staff.entity';
 export { Facility } from '../../modules/facilities/entities/facility.entity';
+export { FacilityClosureDay } from '../../modules/facilities/entities/facility-closure-day.entity';
+export { FacilityOperatingHour } from '../../modules/facilities/entities/facility-operating-hour.entity';
 export { Room } from '../../modules/rooms/entities/room.entity';
-export { Shift } from '../../modules/doctor-shifts/entities/shift.entity';
-export { DoctorShiftChangeLog } from '../../modules/doctor-shifts/entities/doctor-shift-change-log.entity';
-export { ShiftDisruption } from '../../modules/doctor-shifts/entities/shift-disruption.entity';
-export { AppointmentDisruptionItem } from '../../modules/doctor-shifts/entities/appointment-disruption-item.entity';
+export { Shift } from '../../modules/shifts/entities/shift.entity';
+export { DoctorShiftChangeLog } from '../../modules/shifts/entities/doctor-shift-change-log.entity';
+export { ShiftDisruption } from '../../modules/shifts/entities/shift-disruption.entity';
+export { AppointmentDisruptionItem } from '../../modules/shifts/entities/appointment-disruption-item.entity';
 export { Service } from '../../modules/services/entities/service.entity';
 export { FacilityService } from '../../modules/facility-services/entities/facility-service.entity';
 export { MaternityPackage } from '../../modules/maternity-packages/entities/maternity-package.entity';

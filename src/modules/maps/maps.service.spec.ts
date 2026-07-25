@@ -35,6 +35,7 @@ describe('MapsService', () => {
     cache.set.mockClear();
   });
 
+  // Vai tro: dam bao service tao URL OpenStreetMap dung toa do va encode tham so an toan.
   it('creates an encoded OpenStreetMap URL', () => {
     const service = new MapsService(config, cache);
     expect(service.createOpenMapUrl('10.7756', '106.6871', 15)).toBe(
@@ -42,12 +43,14 @@ describe('MapsService', () => {
     );
   });
 
+  // Vai tro: kiem tra default zoom khi client khong truyen muc phong to.
   it('uses zoom 16 when zoom is omitted', () => {
     const service = new MapsService(config, cache);
 
     expect(service.createOpenMapUrl('10.7756', '106.6871')).toContain('#map=16/10.7756/106.6871');
   });
 
+  // Vai tro: dam bao cac ky tu dac biet trong input toa do khong pha cau truc URL.
   it('encodes special characters in coordinate values', () => {
     const service = new MapsService(config, cache);
 
@@ -56,6 +59,7 @@ describe('MapsService', () => {
     );
   });
 
+  // Vai tro: dam bao geocode uu tien cache de giam so lan goi provider ben ngoai.
   it('returns a cached geocoding result without calling the provider', async () => {
     const cached = {
       latitude: '10.7756',
@@ -73,6 +77,7 @@ describe('MapsService', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  // Vai tro: kiem tra luong goi provider lay toa do tu dia chi va ghi ket qua vao cache.
   it('geocodes an address and caches the normalized result', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValueOnce({
       ok: true,
@@ -86,6 +91,7 @@ describe('MapsService', () => {
     expect(cache.set).toHaveBeenCalledWith(expect.stringContaining('maps:geocode:'), result, 86400);
   });
 
+  // Vai tro: dam bao dia chi/countryCode duoc trim va chuan hoa truoc khi gui sang provider.
   it('normalizes address spaces and country code before calling provider', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValueOnce({
       ok: true,
@@ -99,6 +105,7 @@ describe('MapsService', () => {
     expect(url.searchParams.get('countrycodes')).toBe('vn');
   });
 
+  // Vai tro: dam bao query geocode khong chen countrycodes khi client khong truyen countryCode.
   it('omits countrycodes parameter when country code is not provided', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValueOnce({
       ok: true,
@@ -111,6 +118,7 @@ describe('MapsService', () => {
     expect(url.searchParams.has('countrycodes')).toBe(false);
   });
 
+  // Vai tro: dam bao request toi provider co Accept/User-Agent dung chuan dich vu map.
   it('sends provider headers required for JSON and User-Agent identification', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValueOnce({
       ok: true,
@@ -127,6 +135,7 @@ describe('MapsService', () => {
     });
   });
 
+  // Vai tro: dam bao cache loi doc khong lam hong geocode, service van fallback sang provider.
   it('falls back to provider when cache read fails', async () => {
     cache.get.mockRejectedValueOnce(new Error('redis down'));
     jest.spyOn(global, 'fetch').mockResolvedValueOnce({
@@ -141,6 +150,7 @@ describe('MapsService', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
+  // Vai tro: dam bao cache loi ghi khong lam fail request geocode da lay duoc ket qua.
   it('still returns geocoding result when cache write fails', async () => {
     cache.set.mockRejectedValueOnce(new Error('redis write down'));
     jest.spyOn(global, 'fetch').mockResolvedValueOnce({
@@ -151,24 +161,28 @@ describe('MapsService', () => {
     await expect(new MapsService(config, cache).geocodeAddress('Clinic')).resolves.toMatchObject({ osmId: 123 });
   });
 
+  // Vai tro: chuan hoa loi network/provider thanh ServiceUnavailable de client biet dich vu map dang loi.
   it('returns service unavailable when provider fetch throws', async () => {
     jest.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('network error'));
 
     await expect(new MapsService(config, cache).geocodeAddress('Clinic')).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
+  // Vai tro: dam bao provider tra HTTP loi thi backend tra ServiceUnavailable thay vi success sai.
   it('returns service unavailable when provider returns non-2xx status', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValueOnce({ ok: false, status: 429 } as Response);
 
     await expect(new MapsService(config, cache).geocodeAddress('Clinic')).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
+  // Vai tro: dam bao dia chi khong geocode duoc tra 404 ro rang.
   it('returns 404 when the address cannot be resolved', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValueOnce({ ok: true, json: async () => [] } as unknown as Response);
 
     await expect(new MapsService(config, cache).geocodeAddress('missing place')).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  // Vai tro: bao ve khi provider tra format bat thuong, khong coi do la ket qua hop le.
   it('returns 404 when provider response is not an array', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValueOnce({ ok: true, json: async () => ({ error: 'bad shape' }) } as Response);
 
@@ -177,6 +191,7 @@ describe('MapsService', () => {
 });
 
 describe('MapsController', () => {
+  // Vai tro: dam bao controller boc response tao map URL dung message/data.
   it('wraps generated map URL response', () => {
     const service = { createOpenMapUrl: jest.fn().mockReturnValue('https://map.example') };
     const controller = new MapsController(service as any);
@@ -188,6 +203,7 @@ describe('MapsController', () => {
     expect(service.createOpenMapUrl).toHaveBeenCalledWith('10', '106', 15);
   });
 
+  // Vai tro: dam bao controller boc response geocode dung format cho FE.
   it('wraps geocoding response', async () => {
     const result = { latitude: '10', longitude: '106' };
     const service = { geocodeAddress: jest.fn().mockResolvedValue(result) };
@@ -202,6 +218,7 @@ describe('MapsController', () => {
 });
 
 describe('Maps DTO validation', () => {
+  // Vai tro: dam bao DTO open-map nhan query hop le va convert zoom ve number.
   it('accepts valid open-map query and converts zoom to number', async () => {
     const dto = plainToInstance(OpenMapQueryDto, {
       latitude: '10.7756',
@@ -213,6 +230,7 @@ describe('Maps DTO validation', () => {
     expect(dto.zoom).toBe(17);
   });
 
+  // Vai tro: dam bao DTO open-map bat loi toa do/zoom khong hop le.
   it('rejects open-map query with invalid latitude, longitude, and zoom', async () => {
     const dto = plainToInstance(OpenMapQueryDto, {
       latitude: '91',
@@ -224,6 +242,7 @@ describe('Maps DTO validation', () => {
     expect(errors.map((error) => error.property)).toEqual(expect.arrayContaining(['latitude', 'longitude', 'zoom']));
   });
 
+  // Vai tro: dam bao DTO geocode trim address va viet thuong countryCode truoc khi service dung.
   it('trims geocode address and normalizes country code', async () => {
     const dto = plainToInstance(GeocodeAddressQueryDto, {
       address: '  Main   Clinic  ',
@@ -235,6 +254,7 @@ describe('Maps DTO validation', () => {
     expect(dto.countryCode).toBe('vn');
   });
 
+  // Vai tro: dam bao DTO geocode bat dia chi qua ngan va countryCode sai dinh dang.
   it('rejects geocode query with too-short address and invalid country code', async () => {
     const dto = plainToInstance(GeocodeAddressQueryDto, {
       address: 'ab',
