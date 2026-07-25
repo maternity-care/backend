@@ -206,9 +206,13 @@ export class AuthService {
   }
 
   async managementLogin(dto: LoginDto): Promise<AuthResponseDto> {
-    const staff = await this.staffRepository.findByEmailWithPassword(dto.email);
+    const staff = await this.staffRepository.findByEmail(dto.email);
+    console.log('staff', staff);
     if (!staff || staff.status !== AccountStatus.ACTIVE) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+    if (!staff.password) {
+      throw new UnauthorizedException('Account is not configured for password login.');
     }
     const isValidPassword = await bcrypt.compare(dto.password, staff.password);
     if (!isValidPassword) {
