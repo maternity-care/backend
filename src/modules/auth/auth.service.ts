@@ -149,29 +149,41 @@ export class AuthService {
     // xác thực otp thành công, bắt đầu tạo tài khoản
     // tạo user, tạo user auth
 
-    const existing = await this.usersRepository.findByEmail(cacheDto.email);
+    const existing = await this.usersRepository.findByEmail(
+      cacheDto.email.toString().toLowerCase(),
+    );
     if (existing) {
       // nếu đã có email tức là đã tạo user
       // thì chỉ cần check xem đã có accout hay chưa
       // để tạo user account cho người dùng là được
       if (existing.status === AccountStatus.ACTIVE) {
-        const userAuth = await this.userAuthRepository.findByEmail(cacheDto.email);
+        const userAuth = await this.userAuthRepository.findByEmail(
+          cacheDto.email.toString().toLowerCase(),
+        );
         if (userAuth) {
           throw new ConflictException('Email already exists');
         }
-        const savedUser = await this.createUserAuth(existing.id, cacheDto.email, cacheDto.password);
+        const savedUser = await this.createUserAuth(
+          existing.id,
+          cacheDto.email.toString().toLowerCase(),
+          cacheDto.password,
+        );
         return this.buildAuthResponse(savedUser.user);
       }
     }
 
     const user = this.usersRepository.create({
       name: cacheDto.name,
-      email: cacheDto.email,
+      email: cacheDto.email.toString().toLowerCase(),
       phone: cacheDto.phone,
     });
 
     const savedUser = await this.usersRepository.save(user);
-    await this.createUserAuth(savedUser.id, cacheDto.email, cacheDto.password);
+    await this.createUserAuth(
+      savedUser.id,
+      cacheDto.email.toString().toLowerCase(),
+      cacheDto.password,
+    );
 
     await this.cacheService.del(otpCacheKey);
     await this.cacheService.del(registerCacheKey);
@@ -179,7 +191,7 @@ export class AuthService {
   }
 
   async login(dto: LoginDto): Promise<AuthResponseDto> {
-    const user = await this.userAuthRepository.findByEmail(dto.email);
+    const user = await this.userAuthRepository.findByEmail(dto.email.toString().toLowerCase());
 
     if (!user || user.status !== AccountStatus.ACTIVE) {
       throw new UnauthorizedException('Invalid credentials');
