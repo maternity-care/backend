@@ -1,6 +1,6 @@
 import { DeepPartial } from 'typeorm';
 import { PaginationResult } from '../../../common/helpers/pagination';
-import { DoctorShift } from '../entities/shift.entity';
+import { Shift } from '../entities/shift.entity';
 import { SearchDoctorShiftDto } from '../dto/requests/search-doctor-shift.dto';
 import { ShiftConflicts } from './shift-conflicts.interface';
 import { ShiftConflictInput } from './shifts-conflict-input.interface';
@@ -12,27 +12,42 @@ export const DOCTOR_SHIFTS_REPOSITORY = Symbol('DOCTOR_SHIFTS_REPOSITORY');
 export type DoctorShiftWithDetails = DoctorShiftResponseDto;
 
 export interface IDoctorShiftsRepository {
-  create(data: DeepPartial<DoctorShift>): DoctorShift;
-  insertMonthlyShifts(shifts: DeepPartial<DoctorShift>[]): Promise<DoctorShift[]>;
-  saveMany(shifts: DeepPartial<DoctorShift>[]): Promise<DoctorShift[]>;
-  save(shift: DoctorShift): Promise<DoctorShift>;
-  remove(shift: DoctorShift): Promise<void>;
-  findById(id: string): Promise<DoctorShift | null>;
+  create(data: DeepPartial<Shift>): Shift;
+  insertMonthlyShifts(shifts: DeepPartial<Shift>[]): Promise<Shift[]>;
+  saveMany(shifts: DeepPartial<Shift>[]): Promise<Shift[]>;
+  save(shift: Shift): Promise<Shift>;
+  remove(shift: Shift): Promise<void>;
+  findById(id: string): Promise<Shift | null>;
   findDetailsById(id: string): Promise<DoctorShiftWithDetails | null>;
   findAll(filters?: SearchDoctorShiftDto): Promise<DoctorShiftWithDetails[]>;
-  findAllPaginated(filters?: SearchDoctorShiftDto): Promise<PaginationResult<DoctorShiftWithDetails>>;
+  findAllPaginated(
+    filters?: SearchDoctorShiftDto,
+  ): Promise<PaginationResult<DoctorShiftWithDetails>>;
   findConflicts(input: ShiftConflictInput): Promise<ShiftConflicts>;
-  findWeekly(facilityId: string, startDate: string, endDate: string, doctorId?: string): Promise<DoctorShift[]>;
-  findWeeklyWithDetails(facilityId: string, startDate: string, endDate: string, doctorId?: string): Promise<DoctorShiftWithDetails[]>;
-  findDoctorShiftsForDate(facilityId: string, doctorId: string, date: string): Promise<DoctorShift[]>;
-  findDoctorAppointmentsForDate(facilityId: string, doctorId: string, date: string): Promise<DoctorAppointmentBlock[]>;
-  findAppointmentsForShift(shift: DoctorShift, activeOnly?: boolean): Promise<DoctorAppointmentBlock[]>;
+  findWeekly(
+    facilityId: string,
+    startDate: string,
+    endDate: string,
+    doctorId?: string,
+  ): Promise<Shift[]>;
+  findWeeklyWithDetails(
+    facilityId: string,
+    startDate: string,
+    endDate: string,
+    doctorId?: string,
+  ): Promise<DoctorShiftWithDetails[]>;
+  findDoctorShiftsForDate(facilityId: string, doctorId: string, date: string): Promise<Shift[]>;
+  findDoctorAppointmentsForDate(
+    facilityId: string,
+    doctorId: string,
+    date: string,
+  ): Promise<DoctorAppointmentBlock[]>;
+  findAppointmentsForShift(shift: Shift, activeOnly?: boolean): Promise<DoctorAppointmentBlock[]>;
   cancelShiftWithDisruption(
-    shift: DoctorShift,
+    shift: Shift,
     affectedAppointments: DoctorAppointmentBlock[],
     reason?: string,
     changedBy?: string | null,
-  ): Promise<{ shift: DoctorShift; disruptionId?: string }>;
+  ): Promise<{ shift: Shift; disruptionId?: string }>;
   isDoctorAssignedToFacility(doctorId: string, facilityId: string): Promise<boolean>;
-
 }

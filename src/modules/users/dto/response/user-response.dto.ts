@@ -27,9 +27,6 @@ export class UserResponseDto {
   @ApiProperty({ type: [RoleResponseDto] })
   roles: RoleResponseDto[];
 
-  @ApiProperty({ type: [UserPermissionOverrideResponseDto] })
-  permissionOverrides: UserPermissionOverrideResponseDto[];
-
   @ApiProperty()
   createdAt: Date;
 

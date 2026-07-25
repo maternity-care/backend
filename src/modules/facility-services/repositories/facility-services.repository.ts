@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
-import { AvailabilityStatus, ActiveStatus, FacilityStatus } from '../../../common/constants/status.enum';
+import {
+  AvailabilityStatus,
+  ActiveStatus,
+  FacilityStatus,
+} from '../../../common/constants/status.enum';
 import { FacilityService } from '../entities/facility-service.entity';
 import { SearchFacilityServiceDto } from '../dto/requests/search-facility-service.dto';
 import {
@@ -38,9 +42,11 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
   }
 
   async findDetailsById(id: string): Promise<FacilityServiceWithDetails | null> {
-    return (await this.buildDetailsQuery()
-      .where('facilityService.id = :id', { id })
-      .getRawOne<FacilityServiceWithDetails>()) ?? null;
+    return (
+      (await this.buildDetailsQuery()
+        .where('facilityService.id = :id', { id })
+        .getRawOne<FacilityServiceWithDetails>()) ?? null
+    );
   }
 
   // Kiểm tra một facility đã được gán service này chưa để chống trùng unique pair.
@@ -90,16 +96,24 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
   async countDependencies(facilityId: string, serviceId: string): Promise<number> {
     const tables = [
       { table: 'appointments', facilityColumn: 'facility_id', serviceColumn: 'service_id' },
-      { table: 'patient_extra_services', facilityColumn: 'facility_id', serviceColumn: 'service_id' },
+      {
+        table: 'patient_extra_services',
+        facilityColumn: 'facility_id',
+        serviceColumn: 'service_id',
+      },
     ];
 
-    const rows = await Promise.all(tables.map(item => this.repository.manager
-      .createQueryBuilder()
-      .select('COUNT(*)', 'count')
-      .from(item.table, item.table)
-      .where(`${item.table}.${item.facilityColumn} = :facilityId`, { facilityId })
-      .andWhere(`${item.table}.${item.serviceColumn} = :serviceId`, { serviceId })
-      .getRawOne<{ count: string }>()));
+    const rows = await Promise.all(
+      tables.map((item) =>
+        this.repository.manager
+          .createQueryBuilder()
+          .select('COUNT(*)', 'count')
+          .from(item.table, item.table)
+          .where(`${item.table}.${item.facilityColumn} = :facilityId`, { facilityId })
+          .andWhere(`${item.table}.${item.serviceColumn} = :serviceId`, { serviceId })
+          .getRawOne<{ count: string }>(),
+      ),
+    );
 
     return rows.reduce((total, row) => total + Number(row?.count ?? 0), 0);
   }
@@ -112,11 +126,12 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
 
   // Query chung cho findAll và findAllPaginated.
   private buildListQuery(filters?: SearchFacilityServiceDto): SelectQueryBuilder<FacilityService> {
-    const query = this.buildDetailsQuery()
-      .orderBy('facilityService.createdAt', 'DESC');
+    const query = this.buildDetailsQuery().orderBy('facilityService.createdAt', 'DESC');
 
     if (filters?.facilityId) {
-      query.andWhere('facilityService.facilityId = :facilityId', { facilityId: filters.facilityId });
+      query.andWhere('facilityService.facilityId = :facilityId', {
+        facilityId: filters.facilityId,
+      });
     }
     if (filters?.serviceId) {
       query.andWhere('facilityService.serviceId = :serviceId', { serviceId: filters.serviceId });
@@ -171,7 +186,10 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
     const page = Math.max(1, Number(options?.page) || 1);
     const limit = Math.max(1, Number(options?.limit) || 20);
     const total = await query.clone().getCount();
-    const items = await query.offset((page - 1) * limit).limit(limit).getRawMany<T>();
+    const items = await query
+      .offset((page - 1) * limit)
+      .limit(limit)
+      .getRawMany<T>();
 
     return {
       items,

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
 import { Room } from '../entities/room.entity';
@@ -23,8 +23,7 @@ export class RoomsRepository implements IRoomsRepository {
   }
 
   async findAll(filters?: SearchRoomsDto): Promise<RoomWithDetails[]> {
-    const query = this.buildDetailsQuery()
-      .where('room.deletedAt IS NULL');
+    const query = this.buildDetailsQuery().where('room.deletedAt IS NULL');
 
     searchBuilder(query, filters?.search, {
       columns: ['name', 'roomType', 'floor', 'status', 'facilityId'],
@@ -47,30 +46,29 @@ export class RoomsRepository implements IRoomsRepository {
     return query.getRawMany<RoomWithDetails>();
   }
 
-    async findAllPaginated(filters?: SearchRoomsDto) {
-      const query = this.buildDetailsQuery()
-        .where('room.deletedAt IS NULL');
+  async findAllPaginated(filters?: SearchRoomsDto) {
+    const query = this.buildDetailsQuery().where('room.deletedAt IS NULL');
 
-      if (filters?.facilityId) {
-        query.andWhere('room.facilityId = :facilityId', { facilityId: filters.facilityId });
-      }
-
-      searchBuilder(query, filters?.search, {
-        columns: ['name', 'roomType', 'floor', 'status', 'facilityId'],
-      });
-
-      if (filters?.floor) {
-        query.andWhere('room.floor = :floor', { floor: filters.floor });
-      }
-
-      if (filters?.status) {
-        query.andWhere('room.status = :status', { status: filters.status });
-      }
-
-      query.orderBy('room.createdAt', 'DESC');
-
-      return this.paginateRaw<RoomWithDetails>(query, { page: filters?.page, limit: filters?.limit });
+    if (filters?.facilityId) {
+      query.andWhere('room.facilityId = :facilityId', { facilityId: filters.facilityId });
     }
+
+    searchBuilder(query, filters?.search, {
+      columns: ['name', 'roomType', 'floor', 'status', 'facilityId'],
+    });
+
+    if (filters?.floor) {
+      query.andWhere('room.floor = :floor', { floor: filters.floor });
+    }
+
+    if (filters?.status) {
+      query.andWhere('room.status = :status', { status: filters.status });
+    }
+
+    query.orderBy('room.createdAt', 'DESC');
+
+    return this.paginateRaw<RoomWithDetails>(query, { page: filters?.page, limit: filters?.limit });
+  }
 
   findById(id: string): Promise<Room | null> {
     return this.repository
@@ -81,10 +79,12 @@ export class RoomsRepository implements IRoomsRepository {
   }
 
   async findDetailsById(id: string): Promise<RoomWithDetails | null> {
-    return (await this.buildDetailsQuery()
-      .where('room.id = :id', { id })
-      .andWhere('room.deletedAt IS NULL')
-      .getRawOne<RoomWithDetails>()) ?? null;
+    return (
+      (await this.buildDetailsQuery()
+        .where('room.id = :id', { id })
+        .andWhere('room.deletedAt IS NULL')
+        .getRawOne<RoomWithDetails>()) ?? null
+    );
   }
 
   findByName(name: string): Promise<Room | null> {
@@ -97,12 +97,14 @@ export class RoomsRepository implements IRoomsRepository {
 
   async countDependencies(roomId: string): Promise<number> {
     const [shiftRow, appointmentRow] = await Promise.all([
-      this.repository.manager.createQueryBuilder()
+      this.repository.manager
+        .createQueryBuilder()
         .select('COUNT(*)', 'count')
         .from('doctor_shifts', 'shift')
         .where('shift.room_id = :roomId', { roomId })
         .getRawOne<{ count: string }>(),
-      this.repository.manager.createQueryBuilder()
+      this.repository.manager
+        .createQueryBuilder()
         .select('COUNT(*)', 'count')
         .from('appointments', 'appointment')
         .where('appointment.room_id = :roomId', { roomId })
@@ -116,14 +118,14 @@ export class RoomsRepository implements IRoomsRepository {
     room.status = ActiveStatus.INACTIVE;
     room.deletedAt = new Date();
     room.deletedBy = deletedBy ?? null;
-    room.deleteReason = reason ?? null;
+    room.deletedReason = reason ?? null;
     return this.repository.save(room);
   }
 
   findByFacilityId(facilityId: string, filters?: SearchRooms2Dto): Promise<RoomWithDetails[]> {
     const query = this.buildDetailsQuery()
-    .where('room.facilityId = :facilityId', { facilityId })
-    .andWhere('room.deletedAt IS NULL');
+      .where('room.facilityId = :facilityId', { facilityId })
+      .andWhere('room.deletedAt IS NULL');
 
     searchBuilder(query, filters?.search, {
       columns: ['name', 'roomType', 'floor', 'status', 'facilityId'],
@@ -188,7 +190,10 @@ export class RoomsRepository implements IRoomsRepository {
     const page = Math.max(1, Number(options?.page) || 1);
     const limit = Math.max(1, Number(options?.limit) || 20);
     const total = await query.clone().getCount();
-    const items = await query.offset((page - 1) * limit).limit(limit).getRawMany<T>();
+    const items = await query
+      .offset((page - 1) * limit)
+      .limit(limit)
+      .getRawMany<T>();
 
     return {
       items,

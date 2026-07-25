@@ -28,7 +28,7 @@ export class ServicesService {
       ...dto,
       description: dto.description ?? undefined,
       // DB đang lưu boolean dưới dạng tinyint/number, nên ép boolean về 0/1 cho rõ ràng.
-      requiresDoctorWarning: dto.requiresDoctorWarning ? 1 : 0,
+      requiresDoctorWarning: dto.requiresDoctorWarning ? true : false,
     });
     return this.repository.save(service);
   }

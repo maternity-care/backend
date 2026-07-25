@@ -1,4 +1,4 @@
-import { ActiveStatus } from './../../../common/constants/status.enum';
+import { ActiveStatus, AvailabilityStatus } from './../../../common/constants/status.enum';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -32,7 +32,7 @@ export class FacilityService {
 
   @ApiProperty({ enum: ActiveStatus, enumName: 'ActiveStatus' })
   @Column({ name: 'status', type: 'enum', enum: ActiveStatus })
-  status: ActiveStatus;
+  status: ActiveStatus | AvailabilityStatus;
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })

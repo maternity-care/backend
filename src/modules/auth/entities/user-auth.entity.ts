@@ -1,5 +1,5 @@
-import { ActiveStatus } from './../../common/constants/status.enum';
-import { User } from './../../modules/users/entities/user.entity';
+import { AccountStatus } from '../../../common/constants/status.enum';
+import { User } from '../../users/entities/user.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   Column,
@@ -35,9 +35,9 @@ export class UserAuth {
   @Column({ name: 'password', type: 'varchar', length: 255 })
   password: string;
 
-  @ApiProperty({ enum: ActiveStatus, enumName: 'ActiveStatus' })
-  @Column({ name: 'status', type: 'enum', enum: ActiveStatus })
-  status: ActiveStatus;
+  @ApiProperty({ enum: AccountStatus, enumName: 'AccountStatus' })
+  @Column({ name: 'status', type: 'enum', enum: AccountStatus, default: AccountStatus.ACTIVE })
+  status: AccountStatus;
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })

@@ -43,7 +43,7 @@ describe('PackageServices DTO validation', () => {
     [{ ...validPayload, facilityIds: [] }, 'facilityIds'],
   ])('rejects invalid create input', async (payload, property) => {
     const errors = await validate(plainToInstance(CreatePackageServiceDto, payload));
-    expect(errors.some(error => error.property === property)).toBe(true);
+    expect(errors.some((error) => error.property === property)).toBe(true);
   });
 
   it('validates search filters and pagination', async () => {
@@ -53,7 +53,7 @@ describe('PackageServices DTO validation', () => {
       page: '0',
       limit: '101',
     });
-    expect((await validate(dto)).map(error => error.property)).toEqual(
+    expect((await validate(dto)).map((error) => error.property)).toEqual(
       expect.arrayContaining(['packageId', 'allowedFacilityScope', 'page', 'limit']),
     );
   });
@@ -74,9 +74,9 @@ describe('PackageServicesService business logic', () => {
   };
 
   const createRepo = () => ({
-    create: jest.fn(data => ({ ...data })),
-    save: jest.fn(async data => ({ id: data.id ?? '10', ...data })),
-    saveWithFacilities: jest.fn(async data => ({ id: data.id ?? '10', ...data })),
+    create: jest.fn((data) => ({ ...data })),
+    save: jest.fn(async (data) => ({ id: data.id ?? '10', ...data })),
+    saveWithFacilities: jest.fn(async (data) => ({ id: data.id ?? '10', ...data })),
     replaceFacilities: jest.fn().mockResolvedValue(undefined),
     remove: jest.fn().mockResolvedValue(undefined),
     findById: jest.fn().mockResolvedValue({ ...entity }),
@@ -106,86 +106,109 @@ describe('PackageServicesService business logic', () => {
 
   it('adds a service to a package and converts boolean flags to numbers', async () => {
     const { repo, service } = createService();
-    await expect(service.create({
-      packageId: '1',
-      serviceId: '2',
-      includedQuantity: 2,
-      isRequired: true,
-      isOptional: false,
-      allowedFacilityScope: PackageServiceFacilityScope.ALL,
-    })).resolves.toMatchObject({ id: '10', isRequired: 1, isOptional: 0 });
+    await expect(
+      service.create({
+        packageId: '1',
+        serviceId: '2',
+        includedQuantity: 2,
+        isRequired: true,
+        isOptional: false,
+        allowedFacilityScope: PackageServiceFacilityScope.ALL,
+      }),
+    ).resolves.toMatchObject({ id: '10', isRequired: 1, isOptional: 0 });
     expect(repo.findByPackageAndService).toHaveBeenCalledWith('1', '2');
     expect(repo.saveWithFacilities).toHaveBeenCalled();
   });
 
   it('allows selected facility scope when all facilities are active', async () => {
     const { service } = createService();
-    await expect(service.create({
-      packageId: '1',
-      serviceId: '2',
-      includedQuantity: 1,
-      isRequired: true,
-      isOptional: false,
-      allowedFacilityScope: PackageServiceFacilityScope.SELECTED,
-      facilityIds: ['3'],
-    })).resolves.toMatchObject({ id: '10' });
+    await expect(
+      service.create({
+        packageId: '1',
+        serviceId: '2',
+        includedQuantity: 1,
+        isRequired: true,
+        isOptional: false,
+        allowedFacilityScope: PackageServiceFacilityScope.SELECTED,
+        facilityIds: ['3'],
+      }),
+    ).resolves.toMatchObject({ id: '10' });
     expect(facilitiesService.findById).toHaveBeenCalledWith('3');
   });
 
   it('rejects selected facility scope without facility ids or with inactive facilities', async () => {
-    await expect(createService().service.create({
-      packageId: '1',
-      serviceId: '2',
-      includedQuantity: 1,
-      isRequired: true,
-      isOptional: false,
-      allowedFacilityScope: PackageServiceFacilityScope.SELECTED,
-      facilityIds: [],
-    })).rejects.toBeInstanceOf(ConflictException);
+    await expect(
+      createService().service.create({
+        packageId: '1',
+        serviceId: '2',
+        includedQuantity: 1,
+        isRequired: true,
+        isOptional: false,
+        allowedFacilityScope: PackageServiceFacilityScope.SELECTED,
+        facilityIds: [],
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
 
-    facilitiesService.findById.mockResolvedValueOnce({ ...facility, status: FacilityStatus.INACTIVE });
-    await expect(createService().service.create({
-      packageId: '1',
-      serviceId: '2',
-      includedQuantity: 1,
-      isRequired: true,
-      isOptional: false,
-      allowedFacilityScope: PackageServiceFacilityScope.SELECTED,
-      facilityIds: ['3'],
-    })).rejects.toBeInstanceOf(ConflictException);
+    facilitiesService.findById.mockResolvedValueOnce({
+      ...facility,
+      status: FacilityStatus.INACTIVE,
+    });
+    await expect(
+      createService().service.create({
+        packageId: '1',
+        serviceId: '2',
+        includedQuantity: 1,
+        isRequired: true,
+        isOptional: false,
+        allowedFacilityScope: PackageServiceFacilityScope.SELECTED,
+        facilityIds: ['3'],
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('rejects duplicated package-service pair and inactive references', async () => {
     const duplicateContext = createService();
     duplicateContext.repo.findByPackageAndService.mockResolvedValueOnce(entity);
-    await expect(duplicateContext.service.create({
-      packageId: '1',
-      serviceId: '2',
-      includedQuantity: 1,
-      isRequired: true,
-      isOptional: false,
-      allowedFacilityScope: PackageServiceFacilityScope.ALL,
-    })).rejects.toBeInstanceOf(ConflictException);
+    await expect(
+      duplicateContext.service.create({
+        packageId: '1',
+        serviceId: '2',
+        includedQuantity: 1,
+        isRequired: true,
+        isOptional: false,
+        allowedFacilityScope: PackageServiceFacilityScope.ALL,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
 
-    maternityPackagesService.findById.mockResolvedValueOnce({ ...pkg, status: MaternityPackageStatus.INACTIVE });
-    await expect(createService().service.create({
-      packageId: '1',
-      serviceId: '2',
-      includedQuantity: 1,
-      isRequired: true,
-      isOptional: false,
-      allowedFacilityScope: PackageServiceFacilityScope.ALL,
-    })).rejects.toBeInstanceOf(ConflictException);
+    maternityPackagesService.findById.mockResolvedValueOnce({
+      ...pkg,
+      status: MaternityPackageStatus.INACTIVE,
+    });
+    await expect(
+      createService().service.create({
+        packageId: '1',
+        serviceId: '2',
+        includedQuantity: 1,
+        isRequired: true,
+        isOptional: false,
+        allowedFacilityScope: PackageServiceFacilityScope.ALL,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
 
-    servicesService.findById.mockResolvedValueOnce({ ...serviceEntity, status: ActiveStatus.INACTIVE });
-    await expect(createService().service.create({
-      packageId: '1',
-      serviceId: '2',
-      includedQuantity: 1,
-      isRequired: true,
-      isOptional: false,
-      allowedFacilityScope: PackageServiceFacilityScope.ALL,
-    })).rejects.toBeInstanceOf(ConflictException);
+    servicesService.findById.mockResolvedValueOnce({
+      ...serviceEntity,
+      status: ActiveStatus.INACTIVE,
+    });
+    await expect(
+      createService().service.create({
+        packageId: '1',
+        serviceId: '2',
+        includedQuantity: 1,
+        isRequired: true,
+        isOptional: false,
+        allowedFacilityScope: PackageServiceFacilityScope.ALL,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('updates package service and keeps existing selected facility ids when omitted', async () => {
@@ -213,14 +236,18 @@ describe('PackageServicesService business logic', () => {
 
     const duplicateContext = createService();
     duplicateContext.repo.findByPackageAndService.mockResolvedValueOnce({ ...entity, id: '99' });
-    await expect(duplicateContext.service.update('10', { serviceId: '3' })).rejects.toBeInstanceOf(ConflictException);
+    await expect(duplicateContext.service.update('10', { serviceId: '3' })).rejects.toBeInstanceOf(
+      ConflictException,
+    );
     expect(duplicateContext.repo.saveWithFacilities).not.toHaveBeenCalled();
   });
 
   it('converts optional flags during update', async () => {
     const { service } = createService();
 
-    await expect(service.update('10', { isRequired: false, isOptional: true })).resolves.toMatchObject({
+    await expect(
+      service.update('10', { isRequired: false, isOptional: true }),
+    ).resolves.toMatchObject({
       isRequired: 0,
       isOptional: 1,
     });
@@ -228,11 +255,15 @@ describe('PackageServicesService business logic', () => {
 
   it('returns detail records and throws when detail does not exist', async () => {
     const { service } = createService();
-    await expect(service.findDetailsById('10')).resolves.toMatchObject({ serviceName: 'SiÃªu Ã¢m' });
+    await expect(service.findDetailsById('10')).resolves.toMatchObject({
+      serviceName: 'SiÃªu Ã¢m',
+    });
 
     const missingContext = createService();
     missingContext.repo.findDetailsById.mockResolvedValueOnce(null);
-    await expect(missingContext.service.findDetailsById('99')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(missingContext.service.findDetailsById('99')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('throws not found when package service does not exist', async () => {
@@ -244,7 +275,9 @@ describe('PackageServicesService business logic', () => {
   it('throws not found when package service lists are empty', async () => {
     const listContext = createService();
     listContext.repo.findAll.mockResolvedValueOnce([]);
-    await expect(listContext.service.findAll({ packageId: '1' })).rejects.toBeInstanceOf(NotFoundException);
+    await expect(listContext.service.findAll({ packageId: '1' })).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
 
     const pagedContext = createService();
     pagedContext.repo.findAllPaginated.mockResolvedValueOnce({
@@ -254,11 +287,15 @@ describe('PackageServicesService business logic', () => {
       limit: 20,
       totalPages: 0,
     });
-    await expect(pagedContext.service.findAllPaginated({ page: 1, limit: 20 })).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      pagedContext.service.findAllPaginated({ page: 1, limit: 20 }),
+    ).rejects.toBeInstanceOf(NotFoundException);
 
     const publicContext = createService();
     publicContext.repo.findDetailsByPackageId.mockResolvedValueOnce([]);
-    await expect(publicContext.service.findDetailsByPackageId('1')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(publicContext.service.findDetailsByPackageId('1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('deletes unused package service and rejects deletion after benefits are generated', async () => {
@@ -310,8 +347,13 @@ describe('PackageServicesController', () => {
     const service = createServiceMock();
     const controller = new PackageServicesController(service as never);
 
-    await expect(controller.findOne('10')).resolves.toMatchObject({ message: PACKAGE_SERVICE_CONSTANT.DETAIL_FOUND });
-    await expect(controller.create(entity as never)).resolves.toMatchObject({ message: PACKAGE_SERVICE_CONSTANT.CREATED, data: entity });
+    await expect(controller.findOne('10')).resolves.toMatchObject({
+      message: PACKAGE_SERVICE_CONSTANT.DETAIL_FOUND,
+    });
+    await expect(controller.create(entity as never)).resolves.toMatchObject({
+      message: PACKAGE_SERVICE_CONSTANT.CREATED,
+      data: entity,
+    });
     await expect(controller.update('10', { includedQuantity: 3 })).resolves.toMatchObject({
       message: PACKAGE_SERVICE_CONSTANT.UPDATED,
       data: { includedQuantity: 3 },
