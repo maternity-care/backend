@@ -15,6 +15,12 @@ import {
   RoomTypeLookup,
   RoomWithDetails,
 } from './interfaces/rooms-repository.interface';
+import {
+  BulkCreateRoomsConfirmResult,
+  BulkCreateRoomsPlan,
+  BulkCreateRoomsPreviewResult,
+  BulkRoomPreviewItem,
+} from './interfaces/bulk-create-rooms.interface';
 import { FacilitiesService } from '../facilities/facilities.service';
 import { LookupRoomsDto, LookupRoomTypesDto, SearchRoomsDto, SearchRoomTypesDto } from './dto/requests/search-rooms.dto';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
@@ -56,7 +62,7 @@ export class RoomsService {
    * - Sinh code du kien cho tung phong hop le.
    * - Khong luu DB, chi tra plan de FE hien thi cho nguoi dung confirm.
    */
-  async previewBulkCreate(dto: BulkCreateRoomsPreviewDto) {
+  async previewBulkCreate(dto: BulkCreateRoomsPreviewDto): Promise<BulkCreateRoomsPreviewResult> {
     const plan = await this.buildBulkCreatePlan(dto);
     const { internalValidEntities: _internalValidEntities, ...response } = plan;
     return response;
@@ -68,7 +74,7 @@ export class RoomsService {
    * - Mac dinh saveOnlyValid=true: chi luu cac dong hop le.
    * - Neu saveOnlyValid=false va con loi thi khong luu dong nao.
    */
-  async confirmBulkCreate(dto: BulkCreateRoomsPreviewDto) {
+  async confirmBulkCreate(dto: BulkCreateRoomsPreviewDto): Promise<BulkCreateRoomsConfirmResult> {
     const plan = await this.buildBulkCreatePlan(dto);
     if (plan.internalValidEntities.length === 0) {
       throw new BadRequestException(RESPONSE_MESSAGES.ROOMS.BULK_NO_VALID_ROOM);
@@ -332,8 +338,7 @@ export class RoomsService {
     return roomType;
   }
 
-  private async buildBulkCreatePlan(dto: BulkCreateRoomsPreviewDto) {
-    type BulkRoomPreviewItem = Record<string, unknown>;
+  private async buildBulkCreatePlan(dto: BulkCreateRoomsPreviewDto): Promise<BulkCreateRoomsPlan> {
     const codeSequenceCache = new Map<string, number>();
     const payloadKeys = new Set<string>();
     const validRooms: BulkRoomPreviewItem[] = [];
