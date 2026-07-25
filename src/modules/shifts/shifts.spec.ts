@@ -98,6 +98,42 @@ describe('DoctorShifts DTO validation', () => {
     expect(dto.maxAppointments).toBe(8);
   });
 
+  // Vai tro: dam bao FE co the gui so ngay can render, backend khong bat buoc nhap toDate.
+  it('validates bulk-create payload with durationDays instead of toDate', async () => {
+    const dto = plainToInstance(BulkCreateDoctorShiftDto, {
+      doctorId: '1',
+      facilityId: '1',
+      roomId: '2',
+      durationDays: '14',
+      workingDays: [ShiftWorkingDay.MON, ShiftWorkingDay.WED],
+      startTime: '08:00',
+      endTime: '12:00',
+      maxAppointments: '8',
+      status: DoctorShiftStatus.AVAILABLE,
+    });
+
+    expect(await validate(dto)).toHaveLength(0);
+    expect(dto.durationDays).toBe(14);
+  });
+
+  // Vai tro: chan tao hang loat voi so ngay qua ngan; bulk phai toi thieu 7 ngay.
+  it('rejects bulk-create durationDays smaller than 7', async () => {
+    const dto = plainToInstance(BulkCreateDoctorShiftDto, {
+      doctorId: '1',
+      facilityId: '1',
+      roomId: '2',
+      durationDays: 6,
+      workingDays: [ShiftWorkingDay.MON],
+      startTime: '08:00',
+      endTime: '12:00',
+      maxAppointments: 8,
+      status: DoctorShiftStatus.AVAILABLE,
+    });
+
+    const errors = await validate(dto);
+    expect(errors.some(error => error.property === 'durationDays')).toBe(true);
+  });
+
   // Vai tro: kiem tra DTO copy-week va doctor availability voi input hop le truoc khi vao service.
   it('validates copy-week and doctor availability payloads', async () => {
     expect(await validate(plainToInstance(CopyWeekDoctorShiftDto, {
@@ -249,6 +285,7 @@ describe('ShiftsService business validation', () => {
   });
 
   beforeEach(() => jest.clearAllMocks());
+  afterEach(() => jest.useRealTimers());
 
   // Vai tro: dam bao tao ca truc phai qua check reference, bac si thuoc facility va khong conflict.
   it('creates a shift after validating references and conflicts', async () => {
@@ -335,7 +372,7 @@ describe('ShiftsService business validation', () => {
       facilityId: '1',
       roomId: '2',
       fromDate: '2099-07-06',
-      toDate: '2099-07-10',
+      toDate: '2099-07-12',
       workingDays: [ShiftWorkingDay.MON, ShiftWorkingDay.WED],
       startTime: '08:00',
       endTime: '12:00',
@@ -347,6 +384,47 @@ describe('ShiftsService business validation', () => {
       expect.objectContaining({ shiftDate: '2099-07-06' }),
       expect.objectContaining({ shiftDate: '2099-07-08' }),
     ]));
+  });
+
+  // Vai tro: dam bao bulk-create co the lay fromDate la ngay hien tai va tinh toDate tu durationDays.
+  it('bulk creates shifts from today when durationDays is provided without fromDate', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-25T03:00:00.000Z'));
+    const { repo, service } = createService();
+
+    const result = await service.bulkCreate({
+      doctorId: '1',
+      facilityId: '1',
+      roomId: '2',
+      durationDays: 7,
+      workingDays: [ShiftWorkingDay.SAT, ShiftWorkingDay.FRI],
+      startTime: '08:00',
+      endTime: '12:00',
+      maxAppointments: 8,
+      status: DoctorShiftStatus.AVAILABLE,
+    });
+
+    expect(result).toHaveLength(2);
+    expect(repo.saveMany).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ shiftDate: '2026-07-25' }),
+      expect.objectContaining({ shiftDate: '2026-07-31' }),
+    ]));
+  });
+
+  // Vai tro: tranh nhap nhang khi FE vua gui toDate vua gui durationDays.
+  it('rejects bulk-create when both toDate and durationDays are provided', async () => {
+    await expect(createService().service.bulkCreate({
+      doctorId: '1',
+      facilityId: '1',
+      roomId: '2',
+      fromDate: '2099-07-06',
+      toDate: '2099-07-12',
+      durationDays: 7,
+      workingDays: [ShiftWorkingDay.MON],
+      startTime: '08:00',
+      endTime: '12:00',
+      maxAppointments: 8,
+      status: DoctorShiftStatus.AVAILABLE,
+    })).rejects.toBeInstanceOf(BadRequestException);
   });
 
   // Vai tro: preview auto-generate phai phan tach ca hop le, ngay dong cua va ca bi conflict thay vi dung o loi dau tien.
@@ -364,7 +442,7 @@ describe('ShiftsService business validation', () => {
       facilityId: '1',
       roomId: '2',
       fromDate: '2099-07-06',
-      toDate: '2099-07-10',
+      toDate: '2099-07-12',
       workingDays: [ShiftWorkingDay.MON, ShiftWorkingDay.WED, ShiftWorkingDay.FRI],
       startTime: '08:00',
       endTime: '12:00',
@@ -391,7 +469,7 @@ describe('ShiftsService business validation', () => {
       facilityId: '1',
       roomId: '2',
       fromDate: '2099-07-06',
-      toDate: '2099-07-08',
+      toDate: '2099-07-12',
       workingDays: [ShiftWorkingDay.MON, ShiftWorkingDay.WED],
       startTime: '08:00',
       endTime: '12:00',
@@ -504,15 +582,15 @@ describe('ShiftsService business validation', () => {
     })).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  // Vai tro: chan bulk-create neu khoang ngay khong co ngay nao khop workingDays da chon.
-  it('TC-UNIT-DSHIFT-015 rejects bulk-create when no date matches workingDays', async () => {
+  // Vai tro: chan bulk-create neu khoang ngay ngan hon 7 ngay.
+  it('TC-UNIT-DSHIFT-015 rejects bulk-create ranges shorter than 7 days', async () => {
     await expect(createService().service.bulkCreate({
       doctorId: '1',
       facilityId: '1',
       roomId: '2',
       fromDate: '2099-07-06',
       toDate: '2099-07-06',
-      workingDays: [ShiftWorkingDay.SUN],
+      workingDays: [ShiftWorkingDay.MON],
       startTime: '08:00',
       endTime: '12:00',
       status: DoctorShiftStatus.AVAILABLE,
@@ -546,7 +624,7 @@ describe('ShiftsService business validation', () => {
       facilityId: '1',
       roomId: '2',
       fromDate: '2099-07-06',
-      toDate: '2099-07-08',
+      toDate: '2099-07-12',
       workingDays: [ShiftWorkingDay.MON, ShiftWorkingDay.WED],
       startTime: '08:00',
       endTime: '12:00',

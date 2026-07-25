@@ -3,7 +3,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RoomsService } from './rooms.service';
 import { LookupRoomTypesDto } from './dto/requests/search-rooms.dto';
 import { FacilityRoomTypeResponseDto } from './dto/responses/room-with-details-response.dto';
-import { ROOM_CONSTANT } from '../../common/constants/room.constant';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { assertFacilityAccess } from '../../common/helpers/facility-scope.helper';
@@ -17,7 +17,7 @@ export class FacilityRoomTypesController {
     if (error instanceof HttpException) {
       throw error;
     }
-    throw new InternalServerErrorException('Internal server error');
+    throw new InternalServerErrorException(RESPONSE_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 
   @Get(':facilityId/room-types')
@@ -31,7 +31,7 @@ export class FacilityRoomTypesController {
     try {
       assertFacilityAccess(user, facilityId);
       return {
-        message: ROOM_CONSTANT.ROOM_TYPE_FOUND,
+        message: RESPONSE_MESSAGES.ROOM_TYPES.GET_BY_FACILITY_SUCCESS,
         data: await this.roomsService.findRoomTypesByFacilityId(facilityId, query),
       };
     } catch (error) {

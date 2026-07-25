@@ -14,6 +14,7 @@ import {
 } from 'class-validator';
 import { trimValue } from '../../../../common/helpers/dto-transform.helper';
 import { IsLaterThan } from '../../../../common/helpers/dto-validation.helper';
+import { RESPONSE_MESSAGES } from '../../../../common/constants/response-message.constant';
 import { FacilityDayOfWeek } from '../../entities/facility-operating-hour.entity';
 
 export const FACILITY_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/;
@@ -40,16 +41,16 @@ export class FacilityOperatingHourGroupDto {
   @ApiProperty({ example: '07:00', required: false })
   @ValidateIf((dto: FacilityOperatingHourGroupDto) => dto.isClosed !== true)
   @Transform(({ value }) => trimValue(value))
-  @IsNotEmpty({ message: 'openTime bat buoc khi ngay khong dong cua' })
-  @Matches(FACILITY_TIME_PATTERN, { message: 'openTime phai co dinh dang HH:mm hoac HH:mm:ss' })
+  @IsNotEmpty({ message: RESPONSE_MESSAGES.FACILITIES.OPEN_TIME_REQUIRED })
+  @Matches(FACILITY_TIME_PATTERN, { message: RESPONSE_MESSAGES.FACILITIES.OPEN_TIME_FORMAT_INVALID })
   openTime?: string;
 
   @ApiProperty({ example: '19:00', required: false })
   @ValidateIf((dto: FacilityOperatingHourGroupDto) => dto.isClosed !== true)
   @Transform(({ value }) => trimValue(value))
-  @IsNotEmpty({ message: 'closeTime bat buoc khi ngay khong dong cua' })
-  @Matches(FACILITY_TIME_PATTERN, { message: 'closeTime phai co dinh dang HH:mm hoac HH:mm:ss' })
-  @IsLaterThan('openTime', { message: 'closeTime phai muon hon openTime' })
+  @IsNotEmpty({ message: RESPONSE_MESSAGES.FACILITIES.CLOSE_TIME_REQUIRED })
+  @Matches(FACILITY_TIME_PATTERN, { message: RESPONSE_MESSAGES.FACILITIES.CLOSE_TIME_FORMAT_INVALID })
+  @IsLaterThan('openTime', { message: RESPONSE_MESSAGES.FACILITIES.CLOSE_TIME_AFTER_OPEN_TIME })
   closeTime?: string;
 }
 

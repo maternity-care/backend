@@ -14,7 +14,7 @@ import {
   RoomWithDetailsResponseDto,
 } from './dto/responses/room-with-details-response.dto';
 import { LookupRoomsDto, LookupRoomTypesDto, SearchRoomsDto, SearchRoomTypesDto } from './dto/requests/search-rooms.dto';
-import { ROOM_CONSTANT } from '../../common/constants/room.constant';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import {
@@ -31,7 +31,7 @@ export class RoomsController {
     if (error instanceof HttpException) {
       throw error;
     }
-    throw new InternalServerErrorException('Internal server error');
+    throw new InternalServerErrorException(RESPONSE_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 
   @Get()
@@ -49,14 +49,14 @@ export class RoomsController {
       if (query?.page) {
         const paged = await this.roomsService.findAllPaginated(query);
         return {
-          message: ROOM_CONSTANT.ROOM_FOUND,
+          message: RESPONSE_MESSAGES.ROOMS.GET_LIST_SUCCESS,
           data: paged,
         };
       }
 
       const rooms = await this.roomsService.findAll(query);
       return {
-        message: ROOM_CONSTANT.ROOM_FOUND,
+        message: RESPONSE_MESSAGES.ROOMS.GET_LIST_SUCCESS,
         data: rooms,
       };
     } catch (error) {
@@ -77,7 +77,7 @@ export class RoomsController {
         query.facilityId = activeFacilityId;
       }
       return {
-        message: ROOM_CONSTANT.ROOM_FOUND,
+        message: RESPONSE_MESSAGES.ROOMS.LOOKUP_SUCCESS,
         data: await this.roomsService.lookup(query),
       };
     } catch (error) {
@@ -91,7 +91,7 @@ export class RoomsController {
   async lookupRoomTypes(@Query() query: LookupRoomTypesDto) {
     try {
       return {
-        message: ROOM_CONSTANT.ROOM_FOUND,
+        message: RESPONSE_MESSAGES.ROOM_TYPES.LOOKUP_SUCCESS,
         data: await this.roomsService.lookupRoomTypes(query),
       };
     } catch (error) {
@@ -106,13 +106,13 @@ export class RoomsController {
     try {
       if (query?.page) {
         return {
-          message: ROOM_CONSTANT.ROOM_TYPE_FOUND,
+          message: RESPONSE_MESSAGES.ROOM_TYPES.GET_LIST_SUCCESS,
           data: await this.roomsService.findAllRoomTypesPaginated(query),
         };
       }
 
       return {
-        message: ROOM_CONSTANT.ROOM_TYPE_FOUND,
+        message: RESPONSE_MESSAGES.ROOM_TYPES.GET_LIST_SUCCESS,
         data: await this.roomsService.findAllRoomTypes(query),
       };
     } catch (error) {
@@ -126,7 +126,7 @@ export class RoomsController {
   async findRoomTypeById(@Param('id') id: string) {
     try {
       return {
-        message: ROOM_CONSTANT.ROOM_TYPE_DETAIL_FOUND,
+        message: RESPONSE_MESSAGES.ROOM_TYPES.GET_SUCCESS,
         data: await this.roomsService.findRoomTypeById(id),
       };
     } catch (error) {
@@ -140,7 +140,7 @@ export class RoomsController {
   async createRoomType(@Body() dto: CreateRoomTypeDto) {
     try {
       return {
-        message: ROOM_CONSTANT.ROOM_TYPE_CREATED_SUCCESSFULLY,
+        message: RESPONSE_MESSAGES.ROOM_TYPES.CREATED,
         data: await this.roomsService.createRoomType(dto),
       };
     } catch (error) {
@@ -157,7 +157,7 @@ export class RoomsController {
   ) {
     try {
       return {
-        message: ROOM_CONSTANT.ROOM_TYPE_UPDATED_SUCCESSFULLY,
+        message: RESPONSE_MESSAGES.ROOM_TYPES.UPDATED,
         data: await this.roomsService.updateRoomType(id, dto),
       };
     } catch (error) {
@@ -171,7 +171,7 @@ export class RoomsController {
   async removeRoomType(@Param('id') id: string) {
     try {
       return {
-        message: ROOM_CONSTANT.ROOM_TYPE_DELETED_SUCCESSFULLY,
+        message: RESPONSE_MESSAGES.ROOM_TYPES.DELETED,
         data: await this.roomsService.removeRoomType(id),
       };
     } catch (error) {
@@ -188,7 +188,7 @@ export class RoomsController {
       : await this.roomsService.findAllWithRooms();
 
     return {
-      message: ROOM_CONSTANT.ROOM_FOUND,
+      message: RESPONSE_MESSAGES.ROOMS.GET_LIST_SUCCESS,
       data,
     };
   }
@@ -204,7 +204,7 @@ export class RoomsController {
       const room = await this.roomsService.findDetailsById(id);
       assertFacilityAccess(user, room.facilityId);
       return {
-        message: ROOM_CONSTANT.ROOM_DETAIL_FOUND,
+        message: RESPONSE_MESSAGES.ROOMS.GET_SUCCESS,
         data: room,
       };
     } catch (error) {
@@ -226,7 +226,7 @@ export class RoomsController {
       }
       const room = await this.roomsService.create(dto);
       return {
-        message: ROOM_CONSTANT.CREATED_SUCCESSFULLY,
+        message: RESPONSE_MESSAGES.ROOMS.CREATED,
         data: room,
       };
     } catch (error) {
@@ -247,7 +247,7 @@ export class RoomsController {
         dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
       }
       return {
-        message: ROOM_CONSTANT.CREATED_SUCCESSFULLY,
+        message: RESPONSE_MESSAGES.ROOMS.BULK_CONFIRM_SUCCESS,
         data: await this.roomsService.bulkCreate(dto),
       };
     } catch (error) {
@@ -267,7 +267,7 @@ export class RoomsController {
         dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
       }
       return {
-        message: 'Preview tao phong hang loat thanh cong',
+        message: RESPONSE_MESSAGES.ROOMS.BULK_PREVIEW_SUCCESS,
         data: await this.roomsService.previewBulkCreate(dto),
       };
     } catch (error) {
@@ -287,7 +287,7 @@ export class RoomsController {
         dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
       }
       return {
-        message: ROOM_CONSTANT.CREATED_SUCCESSFULLY,
+        message: RESPONSE_MESSAGES.ROOMS.BULK_CONFIRM_SUCCESS,
         data: await this.roomsService.confirmBulkCreate(dto),
       };
     } catch (error) {
@@ -308,7 +308,7 @@ export class RoomsController {
       assertFacilityAccess(user, existingRoom.facilityId);
       const room = await this.roomsService.update(id, dto);
       return {
-        message: ROOM_CONSTANT.UPDATED_SUCCESSFULLY,
+        message: RESPONSE_MESSAGES.ROOMS.UPDATED,
         data: room,
       };
     } catch (error) {
@@ -328,7 +328,7 @@ export class RoomsController {
       const room = await this.roomsService.findById(id);
       assertFacilityAccess(user, room.facilityId);
       const data = await this.roomsService.remove(id, reason, user?.id ?? null);
-      return { message: ROOM_CONSTANT.DELETED_SUCCESSFULLY, data };
+      return { message: RESPONSE_MESSAGES.ROOMS.DELETED, data };
     } catch (error) {
       this.handleError(error);
     }

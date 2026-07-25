@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository, SelectQueryBuilder } from 'typeorm';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { ActiveStatus, FacilityStatus } from '../../common/constants/status.enum';
 import { PaginationResult } from '../../common/helpers/pagination';
 import { ShiftSlot } from '../../database/entities/shift-slot.entity';
@@ -9,9 +10,6 @@ import { CreateShiftSlotDto } from './dto/requests/create-shift-slot.dto';
 import { LookupShiftSlotDto, SearchShiftSlotDto } from './dto/requests/search-shift-slot.dto';
 import { UpdateShiftSlotDto } from './dto/requests/update-shift-slot.dto';
 import { normalizeTime } from './helpers/shifts.helper';
-
-const SHIFT_SLOT_NOT_FOUND = 'Khung ca khong ton tai';
-const SHIFT_SLOT_DUPLICATED = 'Khung ca da ton tai trong pham vi nay';
 
 @Injectable()
 export class ShiftSlotsService {
@@ -105,7 +103,7 @@ export class ShiftSlotsService {
       where: { id, deletedAt: IsNull() },
       relations: { facility: true },
     });
-    if (!slot) throw new NotFoundException(SHIFT_SLOT_NOT_FOUND);
+    if (!slot) throw new NotFoundException(RESPONSE_MESSAGES.SHIFT_SLOTS.NOT_FOUND);
     return slot;
   }
 
@@ -189,7 +187,7 @@ export class ShiftSlotsService {
   private async ensureActiveFacility(facilityId: string): Promise<void> {
     const facility = await this.facilitiesService.findById(facilityId);
     if (facility.status !== FacilityStatus.ACTIVE) {
-      throw new BadRequestException('Co so khong hoat dong nen khong the cau hinh khung ca');
+      throw new BadRequestException(RESPONSE_MESSAGES.SHIFT_SLOTS.FACILITY_INACTIVE);
     }
   }
 
@@ -197,7 +195,7 @@ export class ShiftSlotsService {
     const normalizedStart = normalizeTime(startTime);
     const normalizedEnd = normalizeTime(endTime);
     if (normalizedStart >= normalizedEnd) {
-      throw new BadRequestException('endTime phai muon hon startTime');
+      throw new BadRequestException(RESPONSE_MESSAGES.SHIFT_SLOTS.END_TIME_AFTER_START_TIME);
     }
   }
 
@@ -213,7 +211,7 @@ export class ShiftSlotsService {
     const existing = await query.getOne();
     if (existing) {
       throw new ConflictException({
-        message: SHIFT_SLOT_DUPLICATED,
+        message: RESPONSE_MESSAGES.SHIFT_SLOTS.DUPLICATED,
         data: {
           duplicatedField: 'name',
           duplicatedData: existing,
@@ -241,7 +239,7 @@ export class ShiftSlotsService {
     const existing = await query.getOne();
     if (existing) {
       throw new ConflictException({
-        message: 'Khung gio bi chong lan voi khung ca dang active trong cung co so',
+        message: RESPONSE_MESSAGES.SHIFT_SLOTS.TIME_OVERLAP,
         data: {
           duplicatedField: 'timeRange',
           duplicatedData: existing,
@@ -265,7 +263,7 @@ export class ShiftSlotsService {
     });
 
     if (!fitsAtLeastOneOpenDay) {
-      throw new BadRequestException('Khung ca khong nam trong bat ky ngay mo cua nao cua co so');
+      throw new BadRequestException(RESPONSE_MESSAGES.SHIFT_SLOTS.OUTSIDE_FACILITY_HOURS);
     }
   }
 
@@ -279,7 +277,7 @@ export class ShiftSlotsService {
       if (!existingCodes.includes(code)) return code;
     }
 
-    throw new ConflictException('Khong the sinh code khung ca duy nhat');
+    throw new ConflictException(RESPONSE_MESSAGES.SHIFT_SLOTS.CODE_GENERATE_FAILED);
   }
 
   private async findCodesByPrefix(facilityId: string, prefix: string, excludeId?: string): Promise<string[]> {
@@ -324,13 +322,13 @@ export class ShiftSlotsService {
 
   private validateId(id: string): void {
     if (!/^[1-9]\d*$/.test(id)) {
-      throw new BadRequestException('shiftSlotId phai la so nguyen duong');
+      throw new BadRequestException(RESPONSE_MESSAGES.SHIFT_SLOTS.ID_INVALID);
     }
   }
 
   private ensureFound(slots: ShiftSlot[]): void {
     if (!slots || slots.length === 0) {
-      throw new NotFoundException(SHIFT_SLOT_NOT_FOUND);
+      throw new NotFoundException(RESPONSE_MESSAGES.SHIFT_SLOTS.NOT_FOUND);
     }
   }
 }

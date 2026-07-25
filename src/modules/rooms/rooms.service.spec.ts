@@ -8,6 +8,7 @@ import {
 import { FacilityStatus, ActiveStatus } from '../../common/constants/status.enum';
 import { RoleEnum } from '../../common/constants/role.enum';
 import { ROOM_CONSTANT } from '../../common/constants/room.constant';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { Facility } from '../facilities/entities/facility.entity';
 import { Room } from './entities/room.entity';
 import { FacilityRoomTypesController } from './facility-room-types.controller';
@@ -746,7 +747,7 @@ describe('RoomsController', () => {
     const controller = new RoomsController(service as any);
 
     await expect(controller.create(facilityAdmin, dto)).resolves.toMatchObject({
-      message: ROOM_CONSTANT.CREATED_SUCCESSFULLY,
+      message: RESPONSE_MESSAGES.ROOMS.CREATED,
       data: { facilityId: 'fac-1' },
     });
     expect(dto.facilityId).toBe('fac-1');
@@ -764,7 +765,7 @@ describe('RoomsController', () => {
     const controller = new RoomsController(service as any);
 
     await expect(controller.bulkCreate(facilityAdmin, dto)).resolves.toMatchObject({
-      message: ROOM_CONSTANT.CREATED_SUCCESSFULLY,
+      message: RESPONSE_MESSAGES.ROOMS.BULK_CONFIRM_SUCCESS,
       data: [room],
     });
     expect(service.bulkCreate).toHaveBeenCalledWith({
@@ -805,7 +806,7 @@ describe('RoomsController', () => {
     const controller = new RoomsController(service as any);
 
     await expect(controller.findAllRoomTypes({ search: 'consult' } as any)).resolves.toEqual({
-      message: ROOM_CONSTANT.ROOM_TYPE_FOUND,
+      message: RESPONSE_MESSAGES.ROOM_TYPES.GET_LIST_SUCCESS,
       data: [roomType],
     });
     expect(service.findAllRoomTypes).toHaveBeenCalledWith({ search: 'consult' });
@@ -819,7 +820,7 @@ describe('RoomsController', () => {
     const controller = new RoomsController(service as any);
 
     await expect(controller.findAllRoomTypes({ page: 1 } as any)).resolves.toEqual({
-      message: ROOM_CONSTANT.ROOM_TYPE_FOUND,
+      message: RESPONSE_MESSAGES.ROOM_TYPES.GET_LIST_SUCCESS,
       data: paged,
     });
   });
@@ -948,7 +949,7 @@ describe('FacilityRoomTypesController', () => {
     const controller = new FacilityRoomTypesController(service as any);
 
     await expect(controller.findRoomTypesByFacility(facilityAdmin, 'fac-1', { search: 'consult' })).resolves.toEqual({
-      message: ROOM_CONSTANT.ROOM_TYPE_FOUND,
+      message: RESPONSE_MESSAGES.ROOM_TYPES.GET_BY_FACILITY_SUCCESS,
       data,
     });
     expect(service.findRoomTypesByFacilityId).toHaveBeenCalledWith('fac-1', { search: 'consult' });

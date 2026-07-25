@@ -10,7 +10,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { DOCTOR_SHIFT_CONSTANT } from '../../common/constants/doctor-shift.constant';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { assertFacilityAccess, getActiveFacilityId } from '../../common/helpers/facility-scope.helper';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
@@ -23,6 +23,10 @@ import { DoctorAvailabilityQueryDto } from './dto/requests/doctor-availability.d
 import { SearchDoctorShiftDto, WeeklyDoctorShiftDto } from './dto/requests/search-doctor-shift.dto';
 import { UpdateDoctorShiftDto } from './dto/requests/update-doctor-shift.dto';
 import { DoctorShiftResponseDto } from './dto/responses/doctor-shift-response.dto';
+import {
+  AutoGenerateConfirmApiResponse,
+  AutoGeneratePreviewApiResponse,
+} from './interfaces/auto-generate-shifts.interface';
 import { ShiftsService } from './shifts.service';
 
 @ApiTags('Management - Shifts')
@@ -45,7 +49,7 @@ export class ShiftsController {
     const data = query.page
       ? await this.service.findAllPaginated(query)
       : await this.service.findAll(query);
-    return { message: DOCTOR_SHIFT_CONSTANT.FOUND, data };
+    return { message: RESPONSE_MESSAGES.SHIFTS.FOUND, data };
   }
 
   @Post('check-conflicts')
@@ -58,7 +62,7 @@ export class ShiftsController {
     if (activeFacilityId) dto.facilityId = activeFacilityId;
     else assertFacilityAccess(user, dto.facilityId);
     return {
-      message: 'Kiểm tra xung đột ca trực thành công',
+      message: RESPONSE_MESSAGES.SHIFTS.CHECK_CONFLICT_SUCCESS,
       data: await this.service.checkConflicts(dto),
     };
   }
@@ -67,43 +71,51 @@ export class ShiftsController {
   @ApiOperation({ summary: 'Create many shifts by date range and working days' })
   async bulkCreate(@Body() dto: BulkCreateDoctorShiftDto) {
     return {
-      message: 'Tạo ca trực hàng loạt thành công',
+      message: RESPONSE_MESSAGES.SHIFTS.BULK_CREATED,
       data: await this.service.bulkCreate(dto),
     };
   }
 
   @Post('auto-generate/preview')
   @ApiOperation({ summary: 'Preview auto-generated shifts before saving' })
-  async previewAutoGenerate(@Body() dto: AutoGenerateShiftsDto) {
+  async previewAutoGenerate(
+    @Body() dto: AutoGenerateShiftsDto,
+  ): Promise<AutoGeneratePreviewApiResponse> {
     return {
-      message: 'Preview tao lich truc tu dong thanh cong',
+      message: RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_PREVIEW_SUCCESS,
       data: await this.service.previewAutoGenerate(dto),
     };
   }
 
   @Post('auto-generate/confirm')
   @ApiOperation({ summary: 'Confirm and save valid auto-generated shifts' })
-  async confirmAutoGenerate(@Body() dto: AutoGenerateShiftsDto) {
+  async confirmAutoGenerate(
+    @Body() dto: AutoGenerateShiftsDto,
+  ): Promise<AutoGenerateConfirmApiResponse> {
     return {
-      message: 'Tao lich truc tu dong thanh cong',
+      message: RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_CONFIRM_SUCCESS,
       data: await this.service.confirmAutoGenerate(dto),
     };
   }
 
   @Post('bulk-generate/preview')
   @ApiOperation({ summary: 'Preview bulk generated shifts before saving' })
-  async previewBulkGenerate(@Body() dto: AutoGenerateShiftsDto) {
+  async previewBulkGenerate(
+    @Body() dto: AutoGenerateShiftsDto,
+  ): Promise<AutoGeneratePreviewApiResponse> {
     return {
-      message: 'Preview tao lich truc hang loat thanh cong',
+      message: RESPONSE_MESSAGES.SHIFTS.BULK_GENERATE_PREVIEW_SUCCESS,
       data: await this.service.previewAutoGenerate(dto),
     };
   }
 
   @Post('bulk-generate/confirm')
   @ApiOperation({ summary: 'Confirm and save valid bulk generated shifts' })
-  async confirmBulkGenerate(@Body() dto: AutoGenerateShiftsDto) {
+  async confirmBulkGenerate(
+    @Body() dto: AutoGenerateShiftsDto,
+  ): Promise<AutoGenerateConfirmApiResponse> {
     return {
-      message: 'Tao lich truc hang loat thanh cong',
+      message: RESPONSE_MESSAGES.SHIFTS.BULK_GENERATE_CONFIRM_SUCCESS,
       data: await this.service.confirmAutoGenerate(dto),
     };
   }
@@ -112,7 +124,7 @@ export class ShiftsController {
   @ApiOperation({ summary: 'Copy shift schedule from one week to another week' })
   async copyWeek(@Body() dto: CopyWeekDoctorShiftDto) {
     return {
-      message: 'Copy lịch trực theo tuần thành công',
+      message: RESPONSE_MESSAGES.SHIFTS.COPY_WEEK_SUCCESS,
       data: await this.service.copyWeek(dto),
     };
   }
@@ -124,7 +136,7 @@ export class ShiftsController {
     @Query() query: DoctorAvailabilityQueryDto,
   ) {
     return {
-      message: 'Lấy lịch trống của bác sĩ thành công',
+      message: RESPONSE_MESSAGES.SHIFTS.AVAILABILITY_SUCCESS,
       data: await this.service.getDoctorAvailability(doctorId, query),
     };
   }
@@ -139,10 +151,10 @@ export class ShiftsController {
     const facilityId =
      getActiveFacilityId(user) ?? 
      query.facilityId;
-    if (!facilityId) throw new BadRequestException('facilityId là bắt buộc');
+    if (!facilityId) throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.FACILITY_ID_REQUIRED);
      assertFacilityAccess(user, facilityId);
     return {
-      message: 'Lấy lịch trực theo tuần thành công',
+      message: RESPONSE_MESSAGES.SHIFTS.WEEKLY_SUCCESS,
       data: await this.service.getWeeklySchedule(facilityId, query.weekStart, query.doctorId),
     };
   }
@@ -155,7 +167,7 @@ export class ShiftsController {
      @Param('id') id: string) {
     const shift = await this.service.findDetailsById(id);
     assertFacilityAccess(user, shift.facilityId);
-    return { message: DOCTOR_SHIFT_CONSTANT.DETAIL_FOUND, data: shift };
+    return { message: RESPONSE_MESSAGES.SHIFTS.DETAIL_FOUND, data: shift };
   }
 
   @Post()
@@ -166,7 +178,7 @@ export class ShiftsController {
   ) {
      const activeFacilityId = getActiveFacilityId(user);
     if (activeFacilityId) dto.facilityId = activeFacilityId;
-    return { message: DOCTOR_SHIFT_CONSTANT.CREATED, data: await this.service.create(dto) };
+    return { message: RESPONSE_MESSAGES.SHIFTS.CREATED, data: await this.service.create(dto) };
   }
 
   @Patch(':id')
@@ -180,7 +192,7 @@ export class ShiftsController {
     assertFacilityAccess(user, existing.facilityId);
     const activeFacilityId = getActiveFacilityId(user);
     if (activeFacilityId) dto.facilityId = activeFacilityId;
-    return { message: DOCTOR_SHIFT_CONSTANT.UPDATED, data: await this.service.update(id, dto) };
+    return { message: RESPONSE_MESSAGES.SHIFTS.UPDATED, data: await this.service.update(id, dto) };
   }
 
   @Delete(':id')
@@ -193,6 +205,6 @@ export class ShiftsController {
     const existing = await this.service.findById(id);
     if (user) assertFacilityAccess(user, existing.facilityId);
     const data = await this.service.remove(id, reason, user?.id ?? null);
-    return { message: DOCTOR_SHIFT_CONSTANT.DELETED, data };
+    return { message: RESPONSE_MESSAGES.SHIFTS.DELETED, data };
   }
 }

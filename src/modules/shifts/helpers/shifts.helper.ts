@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { DoctorShiftStatus } from '../../../common/constants/status.enum';
-import { DOCTOR_SHIFT_CONSTANT } from '../../../common/constants/doctor-shift.constant';
+import { RESPONSE_MESSAGES } from '../../../common/constants/response-message.constant';
 import { ShiftConflicts } from '../interfaces/shift-conflicts.interface';
 import { ShiftWorkingDay } from '../dto/requests/bulk-create-doctor-shift.dto';
 
@@ -11,10 +11,17 @@ export interface FacilityOperatingHourLike {
   isClosed: boolean;
 }
 
+/** Input toi thieu de resolve khoang ngay cho cac API tao ca hang loat. */
+export interface BulkCreateDateRangeInput {
+  fromDate?: string;
+  toDate?: string;
+  durationDays?: number;
+}
+
 /** Kiểm tra id nhận từ path trước khi truy vấn database. */
 export function validateShiftId(id: string): void {
   if (!/^[1-9]\d*$/.test(id)) {
-    throw new BadRequestException('shiftId phải là số nguyên dương');
+    throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.SHIFT_ID_INVALID);
   }
 }
 
@@ -28,16 +35,16 @@ export function validateSchedule(
   const normalizedStart = normalizeTime(startTime);
   const normalizedEnd = normalizeTime(endTime);
   if (normalizedStart >= normalizedEnd) {
-    throw new BadRequestException('endTime phải muộn hơn startTime');
+    throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.END_TIME_AFTER_START_TIME);
   }
   const [startHour, startMinute] = normalizedStart.split(':').map(Number);
   const [endHour, endMinute] = normalizedEnd.split(':').map(Number);
   const duration = endHour * 60 + endMinute - (startHour * 60 + startMinute);
   if (duration < 15 || duration > 12 * 60) {
-    throw new BadRequestException('Thời lượng ca trực phải từ 15 phút đến 12 giờ');
+    throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.DURATION_INVALID);
   }
   if (requireFuture && shiftDate < todayInVietnam()) {
-    throw new BadRequestException('Không thể tạo hoặc kiểm tra ca trực trong quá khứ');
+    throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.PAST_DATE_INVALID);
   }
 }
 
@@ -47,7 +54,7 @@ export function validateStatusDetails(
   roomId?: string | null,
 ): void {
   if (status === DoctorShiftStatus.OFF && roomId) {
-    throw new BadRequestException('Ca off không được gán phòng');
+    throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.OFF_SHIFT_CANNOT_HAVE_ROOM);
   }
 }
 
@@ -61,20 +68,20 @@ export function validateFacilityHours(
   if (status === DoctorShiftStatus.OFF || status === DoctorShiftStatus.CANCELLED) return;
 
   if (!operatingHour || operatingHour.isClosed) {
-    throw new BadRequestException('Cơ sở đóng cửa trong ngày được chọn');
+    throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.FACILITY_CLOSED_ON_DATE);
   }
 
   const openTime = operatingHour.openTime ? normalizeTime(String(operatingHour.openTime)) : null;
   const closeTime = operatingHour.closeTime ? normalizeTime(String(operatingHour.closeTime)) : null;
   if (!openTime || !closeTime) {
-    throw new BadRequestException('Cơ sở chưa cấu hình đầy đủ giờ hoạt động cho ngày được chọn');
+    throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.FACILITY_HOURS_NOT_CONFIGURED);
   }
 
   const normalizedStart = normalizeTime(startTime);
   const normalizedEnd = normalizeTime(endTime);
   if (normalizedStart < openTime || normalizedEnd > closeTime) {
     throw new BadRequestException(
-      `Ca trực phải nằm trong giờ hoạt động của cơ sở (${openTime} - ${closeTime})`,
+      `${RESPONSE_MESSAGES.SHIFTS.FACILITY_HOURS_INVALID} (${openTime} - ${closeTime})`,
     );
   }
 }
@@ -87,10 +94,10 @@ export function normalizeTime(value: string): string {
 /** Chuyển kết quả conflict của repository thành HTTP 409 phù hợp. */
 export function throwIfConflicted(conflicts: ShiftConflicts): void {
   if (conflicts.doctorConflicts.length > 0) {
-    throw new ConflictException(DOCTOR_SHIFT_CONSTANT.DOCTOR_CONFLICT);
+    throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.DOCTOR_CONFLICT);
   }
   if (conflicts.roomConflicts.length > 0) {
-    throw new ConflictException(DOCTOR_SHIFT_CONSTANT.ROOM_CONFLICT);
+    throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.ROOM_CONFLICT);
   }
 }
 
@@ -99,7 +106,7 @@ export function throwIfConflicted(conflicts: ShiftConflicts): void {
 /** Kiểm tra khoảng ngày dùng cho API tìm kiếm. */
 export function validateDateRange(dateFrom?: string, dateTo?: string): void {
   if (dateFrom && dateTo && dateFrom > dateTo) {
-    throw new BadRequestException('dateFrom phải sớm hơn hoặc bằng dateTo');
+    throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.DATE_RANGE_INVALID);
   }
 }
 
@@ -200,4 +207,40 @@ export function dateTimeToTime(value: Date | string): string {
   const minute = date.getMinutes().toString().padStart(2, '0');
   const second = date.getSeconds().toString().padStart(2, '0');
   return `${hour}:${minute}:${second}`;
+}
+
+/** Chan viec dung API bulk cho khoang qua ngan; tao hang loat toi thieu phai tu 7 ngay tro len. */
+export function validateBulkCreateRangeLength(fromDate: string, toDate: string): void {
+  const totalDays = dateDiffInDays(fromDate, toDate) + 1;
+  if (totalDays < 7) {
+    throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.BULK_RANGE_TOO_SHORT);
+  }
+}
+
+/**
+ * Chuan hoa khoang ngay cho cac API tao hang loat:
+ * - Neu FE khong gui fromDate, backend lay ngay hien tai theo gio Viet Nam.
+ * - FE gui 1 trong 2 kieu: toDate thu cong hoac durationDays.
+ * - durationDays tinh inclusive: 7 ngay tu 2026-07-25 se ket thuc 2026-07-31.
+ */
+export function resolveBulkCreateDateRange(
+  input: BulkCreateDateRangeInput,
+): { fromDate: string; toDate: string } {
+  const fromDate = input.fromDate ?? todayInVietnam();
+  const hasToDate = input.toDate !== undefined && input.toDate !== null;
+  const hasDurationDays = input.durationDays !== undefined && input.durationDays !== null;
+
+  if (!hasToDate && !hasDurationDays) {
+    throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.BULK_RANGE_REQUIRED);
+  }
+
+  if (hasToDate && hasDurationDays) {
+    throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.BULK_RANGE_AMBIGUOUS);
+  }
+
+  if (hasToDate) {
+    return { fromDate, toDate: input.toDate as string };
+  }
+
+  return { fromDate, toDate: addDays(fromDate, (input.durationDays as number) - 1) };
 }
