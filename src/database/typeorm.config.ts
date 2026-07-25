@@ -52,6 +52,7 @@ import { UserAuth } from '../modules/auth/entities/user-auth.entity';
 import { AppointmentDisruptionItem } from '../modules/doctor-shifts/entities/appointment-disruption-item.entity';
 import { Notification } from '../modules/notifications/entities/notification.entity';
 import { UpdateArchitectureDatabase1784909936253 } from './migrations/1784909936253-UpdateArchitectureDatabase';
+import { UpdateUser1784969133454 } from './migrations/1784969133454-UpdateUser';
 
 config();
 
@@ -117,7 +118,7 @@ export const typeOrmConfig: DataSourceOptions = {
     StaffPermission,
     join(__dirname, 'entities', '*.entity{.ts,.js}'),
   ],
-  migrations: [UpdateArchitectureDatabase1784909936253],
+  migrations: [UpdateArchitectureDatabase1784909936253, UpdateUser1784969133454],
   charset: 'utf8mb4_unicode_ci',
 };
 
