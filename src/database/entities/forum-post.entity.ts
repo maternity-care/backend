@@ -30,8 +30,8 @@ export class ForumPost {
   @Column({ name: 'author_id', type: 'bigint' })
   authorId: string;
 
-  @ApiProperty({ type: String })
-  @Column({ name: 'author_role', type: 'varchar', length: 255 })
+  @ApiProperty({ type: String, example: 'staff or user' })
+  @Column({ name: 'author_role', type: 'varchar', length: 255, default: 'user' })
   authorRole: string;
 
   @ApiProperty({ type: String })
@@ -51,11 +51,16 @@ export class ForumPost {
   content: string;
 
   @ApiProperty({ type: Boolean })
-  @Column({ name: 'commentable', type: 'boolean' })
-  commentable: boolean;
+  @Column({ name: 'commentable', type: 'boolean', default: true })
+  commentable: boolean | number;
 
   @ApiProperty({ enum: ForumContentStatus, enumName: 'ForumContentStatus' })
-  @Column({ name: 'status', type: 'enum', enum: ForumContentStatus })
+  @Column({
+    name: 'status',
+    type: 'enum',
+    enum: ForumContentStatus,
+    default: ForumContentStatus.PUBLISHED,
+  })
   status: ForumContentStatus;
 
   @ApiProperty({ type: Date })

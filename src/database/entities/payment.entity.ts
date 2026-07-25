@@ -26,24 +26,24 @@ export class Payment {
   @Column({ name: 'order_id', type: 'bigint' })
   orderId: string;
 
-  @ApiProperty({ type: String })
-  @Column({ name: 'payment_method', type: 'varchar', length: 255 })
+  @ApiProperty({ type: String, description: 'type: cash, bank' })
+  @Column({ name: 'payment_method', type: 'varchar', length: 255, nullable: true })
   paymentMethod: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'provider', type: 'varchar', length: 255 })
-  provider: string;
+  @Column({ name: 'provider', type: 'varchar', length: 255, nullable: true })
+  provider: string | null;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'provider_transaction_id', type: 'varchar', length: 255 })
-  providerTransactionId: string;
+  @Column({ name: 'provider_transaction_id', type: 'varchar', length: 255, nullable: true })
+  providerTransactionId: string | null;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'amount', type: 'decimal', precision: 15, scale: 2 })
-  amount: string;
+  @Column({ name: 'amount', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  amount: number;
 
   @ApiProperty({ enum: PaymentStatus, enumName: 'PaymentStatus' })
-  @Column({ name: 'status', type: 'enum', enum: PaymentStatus })
+  @Column({ name: 'status', type: 'enum', enum: PaymentStatus, default: PaymentStatus.PENDING })
   status: PaymentStatus;
 
   @ApiPropertyOptional({ type: Date, nullable: true, required: false })
@@ -52,7 +52,7 @@ export class Payment {
 
   @ApiProperty({ type: Object })
   @Column({ name: 'raw_response', type: 'json' })
-  rawResponse: Record<string, unknown>;
+  rawResponse: Record<string, unknown> | null;
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })

@@ -35,11 +35,11 @@ export class Doctor {
   title: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'specialty', type: 'varchar', length: 255 })
+  @Column({ name: 'specialty', type: 'varchar', length: 255, default: 'obstetrics and gynecology' })
   specialty: string;
 
   @ApiProperty({ type: Number })
-  @Column({ name: 'years_of_experience', type: 'int' })
+  @Column({ name: 'years_of_experience', type: 'int', default: 0 })
   yearsOfExperience: number;
 
   @ApiProperty({ type: String })
@@ -47,7 +47,7 @@ export class Doctor {
   bio: string;
 
   @ApiProperty({ enum: ActiveStatus, enumName: 'ActiveStatus' })
-  @Column({ name: 'status', type: 'enum', enum: ActiveStatus })
+  @Column({ name: 'status', type: 'enum', enum: ActiveStatus, default: ActiveStatus.ACTIVE })
   status: ActiveStatus;
 
   @ApiProperty({ type: Date })

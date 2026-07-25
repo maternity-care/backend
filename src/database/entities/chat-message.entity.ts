@@ -15,25 +15,25 @@ export class ChatMessage {
   @Column({ name: 'sender_id', type: 'bigint' })
   senderId: string;
 
-  @ApiProperty({ type: String })
+  @ApiProperty({ type: String, example: 'user or staff' })
   @Column({ name: 'sender_type', type: 'varchar', length: 255 })
-  senderType: string;
+  senderType: 'user' | 'staff';
 
-  @ApiProperty({ type: String })
-  @Column({ name: 'message_type', type: 'varchar', length: 255 })
+  @ApiProperty({ type: String, example: 'text or file or image or video or audio' })
+  @Column({ name: 'message_type', type: 'varchar', length: 255, default: 'text' })
   messageType: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'content', type: 'text' })
-  content: string;
+  @Column({ name: 'content', type: 'text', nullable: true })
+  content: string | null;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'file_url', type: 'varchar', length: 500 })
-  fileUrl: string;
+  @Column({ name: 'file_url', type: 'varchar', length: 500, nullable: true })
+  fileUrl: string | null;
 
   @ApiProperty({ type: Date })
-  @Column({ name: 'read_at', type: 'timestamp' })
-  readAt: Date;
+  @Column({ name: 'read_at', type: 'timestamp', nullable: true })
+  readAt: Date | null;
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })

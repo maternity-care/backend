@@ -168,7 +168,6 @@ export class AuthService {
       name: cacheDto.name,
       email: cacheDto.email,
       phone: cacheDto.phone,
-      cccd: cacheDto?.cccd,
     });
 
     const savedUser = await this.usersRepository.save(user);

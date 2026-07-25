@@ -29,7 +29,7 @@ export class OrderItem {
   @Column({ name: 'order_id', type: 'bigint' })
   orderId: string;
 
-  @ApiProperty({ type: String })
+  @ApiProperty({ type: String, description: 'type: normalService, extraService, package' })
   @Column({ name: 'item_type', type: 'varchar', length: 255 })
   itemType: string;
 
@@ -42,20 +42,20 @@ export class OrderItem {
   name: string;
 
   @ApiProperty({ type: Number })
-  @Column({ name: 'quantity', type: 'int' })
+  @Column({ name: 'quantity', type: 'int', default: 1 })
   quantity: number;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'unit_price', type: 'decimal', precision: 15, scale: 2 })
+  @Column({ name: 'unit_price', type: 'decimal', precision: 15, scale: 2, default: 0 })
   unitPrice: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'total_price', type: 'decimal', precision: 15, scale: 2 })
+  @Column({ name: 'total_price', type: 'decimal', precision: 15, scale: 2, default: 0 })
   totalPrice: string;
 
   @ApiProperty({ type: Object })
-  @Column({ name: 'metadata', type: 'json' })
-  metadata: Record<string, unknown>;
+  @Column({ name: 'metadata', type: 'json', nullable: true })
+  metadata: Record<string, unknown> | null;
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })

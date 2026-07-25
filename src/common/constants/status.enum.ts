@@ -104,6 +104,9 @@ export enum PaymentStatus {
 }
 
 export enum InvoiceStatus {
+  PENDING = 'pending',
+  DRAFT = 'draft',
+  PAID = 'paid',
   ISSUED = 'issued',
   CANCELLED = 'cancelled',
 }

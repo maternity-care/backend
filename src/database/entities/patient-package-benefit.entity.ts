@@ -30,15 +30,15 @@ export class PatientPackageBenefit {
   serviceId: string;
 
   @ApiProperty({ type: Number })
-  @Column({ name: 'total_quantity', type: 'int' })
+  @Column({ name: 'total_quantity', type: 'int', default: 0 })
   totalQuantity: number;
 
   @ApiProperty({ type: Number })
-  @Column({ name: 'used_quantity', type: 'int' })
+  @Column({ name: 'used_quantity', type: 'int', default: 0 })
   usedQuantity: number;
 
   @ApiProperty({ type: Number })
-  @Column({ name: 'remaining_quantity', type: 'int' })
+  @Column({ name: 'remaining_quantity', type: 'int', default: 0 })
   remainingQuantity: number;
 
   @ApiPropertyOptional({ type: Date, nullable: true })

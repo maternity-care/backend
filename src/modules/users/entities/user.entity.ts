@@ -16,7 +16,7 @@ export class User {
   id: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'cccd', type: 'varchar', length: 100, unique: true })
+  @Column({ name: 'cccd', type: 'varchar', length: 100, unique: true, nullable: true })
   cccd: string;
 
   @ApiProperty({ type: String })
@@ -33,19 +33,19 @@ export class User {
 
   @ApiProperty({ type: String })
   @Column({ name: 'date_of_birth', type: 'date', nullable: true })
-  dateOfBirth: string;
+  dateOfBirth: string | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'address', type: 'varchar', length: 255, nullable: true })
-  address: string;
+  address: string | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'province', type: 'varchar', length: 255, nullable: true })
-  province: string;
+  province: string | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'ward', type: 'varchar', length: 255, nullable: true })
-  ward: string;
+  ward: string | null;
 
   @ApiProperty({ enum: UserStatusEnum, enumName: 'UserStatusEnum' })
   @Column({ name: 'status', type: 'enum', enum: UserStatusEnum, default: UserStatusEnum.ACTIVE })
@@ -53,11 +53,11 @@ export class User {
 
   @ApiProperty({ type: String })
   @Column({ name: 'emergency_contact_name', type: 'varchar', length: 255, nullable: true })
-  emergencyContactName: string;
+  emergencyContactName: string | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'emergency_contact_phone', type: 'varchar', length: 20, nullable: true })
-  emergencyContactPhone: string;
+  emergencyContactPhone: string | null;
 
   @ApiPropertyOptional({ type: Object, nullable: true, required: false })
   @Column({ name: 'metadata', type: 'json', nullable: true })
