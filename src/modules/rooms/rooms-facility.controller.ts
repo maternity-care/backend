@@ -6,6 +6,7 @@ import { SearchRooms2Dto } from './dto/requests/search-room-2';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { assertFacilityAccess } from '../../common/helpers/facility-scope.helper';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 
 @ApiTags('Management - Rooms')
 @Controller('management/facility')
@@ -17,7 +18,7 @@ export class RoomsFacilityController {
     if (error instanceof HttpException) {
       throw error;
     }
-    throw new InternalServerErrorException('Internal server error');
+    throw new InternalServerErrorException(RESPONSE_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 
 
@@ -33,7 +34,7 @@ export class RoomsFacilityController {
       assertFacilityAccess(user, facilityId);
       const rooms = await this.roomsService.findByFacilityId(facilityId, filters);
       return {
-        message: 'Lấy danh sách phòng theo cơ sở thành công',
+        message: RESPONSE_MESSAGES.ROOMS.GET_BY_FACILITY_SUCCESS,
         data: rooms,
       };
     } catch (error) {

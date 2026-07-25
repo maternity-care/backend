@@ -251,7 +251,7 @@ describe('FacilitiesService', () => {
     await expect(service.findDetailsById('fac-1')).resolves.toMatchObject({
       id: 'fac-1',
       operatingStatus: FacilityOperatingStatus.OPEN,
-      operatingStatusLabel: 'Dang mo cua',
+      operatingStatusLabel: RESPONSE_MESSAGES.FACILITIES.OPERATING_STATUS_OPEN,
       isOpenNow: true,
       todayOperatingHour: expect.objectContaining({
         dayOfWeek: 'WED',
@@ -269,7 +269,7 @@ describe('FacilitiesService', () => {
 
     await expect(service.findDetailsById('fac-1')).resolves.toMatchObject({
       operatingStatus: FacilityOperatingStatus.CLOSED,
-      operatingStatusLabel: 'Da dong cua',
+      operatingStatusLabel: RESPONSE_MESSAGES.FACILITIES.OPERATING_STATUS_CLOSED,
       isOpenNow: false,
       todayOperatingHour: expect.objectContaining({ dayOfWeek: 'WED' }),
     });
@@ -289,7 +289,7 @@ describe('FacilitiesService', () => {
 
     await expect(service.findDetailsById('fac-1')).resolves.toMatchObject({
       operatingStatus: FacilityOperatingStatus.CLOSED_TODAY,
-      operatingStatusLabel: 'Hom nay dong cua',
+      operatingStatusLabel: RESPONSE_MESSAGES.FACILITIES.OPERATING_STATUS_CLOSED_TODAY,
       isOpenNow: false,
     });
   });
@@ -302,7 +302,7 @@ describe('FacilitiesService', () => {
     await expect(service.findDetailsById('fac-1')).resolves.toMatchObject({
       status: FacilityStatus.INACTIVE,
       operatingStatus: FacilityOperatingStatus.INACTIVE,
-      operatingStatusLabel: 'Co so dang ngung hoat dong',
+      operatingStatusLabel: RESPONSE_MESSAGES.FACILITIES.OPERATING_STATUS_INACTIVE,
       isOpenNow: false,
     });
   });
@@ -710,7 +710,7 @@ describe('FacilitiesService', () => {
 
     expect(error).toBeInstanceOf(ConflictException);
     expect(error!.getResponse()).toMatchObject({
-      message: 'Ngay dong cua cua co so da ton tai',
+      message: RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.ALREADY_EXISTS,
       data: {
         duplicatedField: 'closureDate',
         duplicatedData: {
@@ -855,7 +855,7 @@ describe('FacilitiesController', () => {
     const controller = new FacilitiesController(mockService as any);
 
     await expect(controller.create({ code: 'FAC-001' } as any)).resolves.toEqual({
-      message: RESPONSE_MESSAGES.FACILITY_CREATED,
+      message: RESPONSE_MESSAGES.FACILITIES.CREATED,
       data: facility,
     });
   });
@@ -876,7 +876,7 @@ describe('FacilitiesController', () => {
     const controller = new FacilitiesController(mockService as any);
 
     await expect(controller.remove(facilityAdmin, 'fac-1', 'duplicate')).resolves.toEqual({
-      message: RESPONSE_MESSAGES.FACILITY_DELETED,
+      message: RESPONSE_MESSAGES.FACILITIES.DELETED,
       data: { action: 'soft_deleted', affectedCount: 2 },
     });
     expect(mockService.remove).toHaveBeenCalledWith('fac-1', 'duplicate', 'user-admin');
@@ -909,7 +909,7 @@ describe('FacilitiesController', () => {
     const controller = new FacilitiesController(mockService as any);
 
     await expect(controller.getClosureDays(facilityAdmin, 'fac-1', { status: ActiveStatus.ACTIVE })).resolves.toEqual({
-      message: RESPONSE_MESSAGES.FACILITY_RETRIEVED,
+      message: RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.GET_LIST_SUCCESS,
       data: closureDays,
     });
     expect(mockService.getClosureDays).toHaveBeenCalledWith('fac-1', { status: ActiveStatus.ACTIVE });
@@ -932,7 +932,7 @@ describe('FacilitiesController', () => {
     };
 
     await expect(controller.previewOperatingHours(facilityAdmin, 'fac-1', dto)).resolves.toEqual({
-      message: RESPONSE_MESSAGES.FACILITY_RETRIEVED,
+      message: RESPONSE_MESSAGES.FACILITIES.OPERATING_HOURS_PREVIEW_SUCCESS,
       data: preview,
     });
     expect(mockService.previewOperatingHours).toHaveBeenCalledWith('fac-1', dto);
@@ -965,7 +965,7 @@ describe('FacilitiesController', () => {
     await expect(controller.updateClosureDay(facilityAdmin, 'fac-1', 'closure-1', {
       status: ActiveStatus.INACTIVE,
     })).resolves.toEqual({
-      message: RESPONSE_MESSAGES.FACILITY_UPDATED,
+      message: RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.UPDATED,
       data: updated,
     });
     expect(mockService.updateClosureDay).toHaveBeenCalledWith('fac-1', 'closure-1', {
@@ -987,7 +987,7 @@ describe('FacilitiesController', () => {
     const controller = new FacilitiesController(mockService as any);
 
     await expect(controller.removeClosureDay(facilityAdmin, 'fac-1', 'closure-1')).resolves.toEqual({
-      message: RESPONSE_MESSAGES.FACILITY_DELETED,
+      message: RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.DELETED,
       data: removed,
     });
     expect(mockService.removeClosureDay).toHaveBeenCalledWith('fac-1', 'closure-1');

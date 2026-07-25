@@ -17,7 +17,6 @@ import {
 } from './interfaces/rooms-repository.interface';
 import { FacilitiesService } from '../facilities/facilities.service';
 import { LookupRoomsDto, LookupRoomTypesDto, SearchRoomsDto, SearchRoomTypesDto } from './dto/requests/search-rooms.dto';
-import {ROOM_CONSTANT} from '../../common/constants/room.constant';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
 import { ActiveStatus, FacilityStatus } from '../../common/constants/status.enum';
@@ -72,11 +71,11 @@ export class RoomsService {
   async confirmBulkCreate(dto: BulkCreateRoomsPreviewDto) {
     const plan = await this.buildBulkCreatePlan(dto);
     if (plan.internalValidEntities.length === 0) {
-      throw new BadRequestException('Khong co phong hop le de tao');
+      throw new BadRequestException(RESPONSE_MESSAGES.ROOMS.BULK_NO_VALID_ROOM);
     }
 
     if (dto.saveOnlyValid === false && (plan.skippedItems.length > 0 || plan.conflictItems.length > 0)) {
-      throw new BadRequestException('Con phong bi skip/conflict nen khong the confirm o che do strict');
+      throw new BadRequestException(RESPONSE_MESSAGES.ROOMS.BULK_STRICT_HAS_ISSUES);
     }
 
     const savedRooms = await this.roomsRepository.saveMany(plan.internalValidEntities);
@@ -91,7 +90,7 @@ export class RoomsService {
   async findAll(filters?: SearchRoomsDto): Promise<RoomWithDetails[]> {
     const rooms = await this.roomsRepository.findAll(filters);
     if (!rooms || rooms.length === 0) {
-      throw new NotFoundException(ROOM_CONSTANT.ROOM_NOT_FOUND);
+      throw new NotFoundException(RESPONSE_MESSAGES.ROOMS.NOT_FOUND);
     }
     return rooms;
   }
@@ -99,7 +98,7 @@ export class RoomsService {
   async findAllPaginated(filters: SearchRoomsDto) {
     const result = await this.roomsRepository.findAllPaginated!(filters);
     if (!result || !result.items || result.items.length === 0) {
-      throw new NotFoundException(ROOM_CONSTANT.ROOM_NOT_FOUND);
+      throw new NotFoundException(RESPONSE_MESSAGES.ROOMS.NOT_FOUND);
     }
     return result;
   }
@@ -118,7 +117,7 @@ export class RoomsService {
   async findAllRoomTypes(filters?: SearchRoomTypesDto): Promise<RoomTypeDetails[]> {
     const roomTypes = await this.roomsRepository.findAllRoomTypes(filters);
     if (!roomTypes || roomTypes.length === 0) {
-      throw new NotFoundException(ROOM_CONSTANT.ROOM_TYPE_NOT_FOUND);
+      throw new NotFoundException(RESPONSE_MESSAGES.ROOM_TYPES.NOT_FOUND);
     }
     return roomTypes;
   }
@@ -126,7 +125,7 @@ export class RoomsService {
   async findAllRoomTypesPaginated(filters?: SearchRoomTypesDto) {
     const result = await this.roomsRepository.findAllRoomTypesPaginated!(filters);
     if (!result || !result.items || result.items.length === 0) {
-      throw new NotFoundException(ROOM_CONSTANT.ROOM_TYPE_NOT_FOUND);
+      throw new NotFoundException(RESPONSE_MESSAGES.ROOM_TYPES.NOT_FOUND);
     }
     return result;
   }
@@ -134,7 +133,7 @@ export class RoomsService {
   async findRoomTypeById(id: string): Promise<RoomType> {
     const roomType = await this.roomsRepository.findRoomTypeById(id);
     if (!roomType) {
-      throw new NotFoundException(ROOM_CONSTANT.ROOM_TYPE_NOT_FOUND);
+      throw new NotFoundException(RESPONSE_MESSAGES.ROOM_TYPES.NOT_FOUND);
     }
     return roomType;
   }
@@ -168,7 +167,7 @@ export class RoomsService {
   async findById(id: string): Promise<Room> {
     const room = await this.roomsRepository.findById(id);
     if (!room) {
-      throw new NotFoundException(ROOM_CONSTANT.ROOM_NOT_FOUND);
+      throw new NotFoundException(RESPONSE_MESSAGES.ROOMS.NOT_FOUND);
     }
     return room;
   }
@@ -176,7 +175,7 @@ export class RoomsService {
   async findDetailsById(id: string): Promise<RoomWithDetails> {
     const room = await this.roomsRepository.findDetailsById(id);
     if (!room) {
-      throw new NotFoundException(ROOM_CONSTANT.ROOM_NOT_FOUND);
+      throw new NotFoundException(RESPONSE_MESSAGES.ROOMS.NOT_FOUND);
     }
     return room;
   }
@@ -223,7 +222,7 @@ export class RoomsService {
     if (filters?.page) {
       const paged = await this.roomsRepository.findByFacilityIdPaginated!(facilityId, filters);
       if (!paged || !paged.items || paged.items.length === 0) {
-        throw new NotFoundException(ROOM_CONSTANT.ROOM_NOT_FOUND);
+        throw new NotFoundException(RESPONSE_MESSAGES.ROOMS.NOT_FOUND);
       }
       return {
         facility,
@@ -233,7 +232,7 @@ export class RoomsService {
 
     const rooms = await this.roomsRepository.findByFacilityId(facilityId, filters);
     if (!rooms || rooms.length === 0) {
-      throw new NotFoundException(ROOM_CONSTANT.ROOM_NOT_FOUND);
+      throw new NotFoundException(RESPONSE_MESSAGES.ROOMS.NOT_FOUND);
     }
 
     return {
@@ -299,7 +298,7 @@ export class RoomsService {
     await this.facilitiesService.findById(facilityId);
     const roomTypes = await this.roomsRepository.findRoomTypesByFacilityId(facilityId, filters);
     if (!roomTypes || roomTypes.length === 0) {
-      throw new NotFoundException(ROOM_CONSTANT.ROOM_TYPE_NOT_FOUND);
+      throw new NotFoundException(RESPONSE_MESSAGES.ROOM_TYPES.NOT_FOUND);
     }
     return roomTypes.map(roomType => ({
       ...roomType,
@@ -315,7 +314,7 @@ export class RoomsService {
   private async validateRoomPayloadDetails(dto: CreateRoomDto): Promise<{ facility: Facility; roomType: RoomType }> {
     const facility = await this.facilitiesService.findById(dto.facilityId);
     if (facility.status !== FacilityStatus.ACTIVE) {
-      throw new ConflictException(RESPONSE_MESSAGES.FACILITY_NOT_FOUND);
+      throw new ConflictException(RESPONSE_MESSAGES.ROOMS.FACILITY_INACTIVE);
     }
 
     const [roomType] = await Promise.all([
@@ -328,7 +327,7 @@ export class RoomsService {
   private async validateRoomType(roomTypeId: string): Promise<RoomType> {
     const roomType = await this.roomsRepository.findRoomTypeById(roomTypeId);
     if (!roomType || roomType.status !== ActiveStatus.ACTIVE) {
-      throw new NotFoundException('Loại phòng không tồn tại hoặc đang ngừng hoạt động');
+      throw new NotFoundException(RESPONSE_MESSAGES.ROOM_TYPES.ACTIVE_NOT_FOUND);
     }
     return roomType;
   }
@@ -351,7 +350,7 @@ export class RoomsService {
         conflictItems.push({
           index,
           input: room,
-          reason: 'Ten phong bi trung trong payload tai cung co so',
+          reason: RESPONSE_MESSAGES.ROOMS.BULK_DUPLICATED_REASON,
           duplicatedField: 'name',
           duplicatedData: {
             facilityId: room.facilityId,
@@ -420,19 +419,19 @@ export class RoomsService {
       return {
         reason: Array.isArray(payload.message)
           ? payload.message.join('; ')
-          : payload.message ?? 'Du lieu phong khong hop le',
+          : payload.message ?? RESPONSE_MESSAGES.ROOMS.BULK_INVALID_ROOM_DATA,
         ...(payload.data ? { ...(payload.data as object) } : {}),
       };
     }
 
-    return { reason: 'Khong the kiem tra phong nay' };
+    return { reason: RESPONSE_MESSAGES.ROOMS.BULK_CHECK_FAILED };
   }
 
   private async ensureRoomTypeNameUnique(name: string, excludeId?: string): Promise<void> {
     const existing = await this.roomsRepository.findRoomTypeByName(name, excludeId);
     if (existing) {
       throw new ConflictException({
-        message: ROOM_CONSTANT.ROOM_TYPE_ALREADY_EXISTS,
+        message: RESPONSE_MESSAGES.ROOM_TYPES.ALREADY_EXISTS,
         data: {
           duplicatedField: 'name',
           duplicatedData: this.toDuplicateRoomTypeData(existing),
@@ -446,7 +445,7 @@ export class RoomsService {
     if (existing) {
       const existingDetails = await this.roomsRepository.findDetailsById(existing.id);
       throw new ConflictException({
-        message: ROOM_CONSTANT.ROOM_ALREADY_EXISTS,
+        message: RESPONSE_MESSAGES.ROOMS.ALREADY_EXISTS,
         data: {
           duplicatedField: 'name',
           duplicatedData: this.toDuplicateRoomData(existingDetails ?? existing),
@@ -461,7 +460,7 @@ export class RoomsService {
       const key = `${room.facilityId}:${room.name.trim().toLowerCase()}`;
       if (keys.has(key)) {
         throw new BadRequestException({
-          message: 'Danh sách tạo phòng có phòng bị trùng tên trong cùng cơ sở',
+          message: RESPONSE_MESSAGES.ROOMS.BULK_DUPLICATED_IN_PAYLOAD,
           data: {
             duplicatedField: 'name',
             duplicatedData: {

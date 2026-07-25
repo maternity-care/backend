@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Inject, Injectable } from '@nestjs/common';
 import { ActiveStatus, DoctorShiftStatus, FacilityStatus } from '../../../common/constants/status.enum';
-import { DOCTOR_SHIFT_CONSTANT } from '../../../common/constants/doctor-shift.constant';
+import { RESPONSE_MESSAGES } from '../../../common/constants/response-message.constant';
 import { Facility } from '../../facilities/entities/facility.entity';
 import { FacilitiesService } from '../../facilities/facilities.service';
 import { RoomsService } from '../../rooms/rooms.service';
@@ -112,7 +112,7 @@ export class ShiftsValidator {
   ): Promise<void> {
     await this.ensureActiveFacility(query.facilityId);
     if (!await this.repository.isDoctorAssignedToFacility(doctorId, query.facilityId)) {
-      throw new ConflictException(DOCTOR_SHIFT_CONSTANT.DOCTOR_NOT_ASSIGNED);
+      throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.DOCTOR_NOT_ASSIGNED);
     }
   }
 
@@ -124,7 +124,7 @@ export class ShiftsValidator {
   ): Promise<{ start: string; end: string }> {
     await this.ensureActiveFacility(facilityId);
     if (doctorId && !await this.repository.isDoctorAssignedToFacility(doctorId, facilityId)) {
-      throw new ConflictException(DOCTOR_SHIFT_CONSTANT.DOCTOR_NOT_ASSIGNED);
+      throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.DOCTOR_NOT_ASSIGNED);
     }
     const start = weekStart ?? currentWeekStart();
     return { start, end: addDays(start, 6) };
@@ -154,13 +154,13 @@ export class ShiftsValidator {
       ? await repository.findDoctorStaffId(doctorId, facilityId)
       : await this.resolveStaffIdWithLegacyRepository(doctorId, facilityId);
     if (!staffId) {
-      throw new ConflictException(DOCTOR_SHIFT_CONSTANT.DOCTOR_NOT_ASSIGNED);
+      throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.DOCTOR_NOT_ASSIGNED);
     }
 
     if (roomId) {
       const room = await this.roomsService.findById(roomId);
       if (room.facilityId !== facilityId || room.status !== ActiveStatus.ACTIVE) {
-        throw new ConflictException(DOCTOR_SHIFT_CONSTANT.ROOM_INVALID);
+        throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.ROOM_INVALID);
       }
     }
 
@@ -183,16 +183,16 @@ export class ShiftsValidator {
     const timeWasProvided = options?.timeWasProvided ?? Boolean(input.startTime || input.endTime);
 
     if (slotWasProvided && input.slotId && timeWasProvided) {
-      throw new BadRequestException('Khi dùng slotId thì không gửi startTime/endTime để tránh lệch dữ liệu khung ca');
+      throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.SLOT_TIME_SENT_WITH_SLOT_ID);
     }
 
     if (input.slotId) {
       const slot = await this.repository.findShiftSlotById(input.slotId);
       if (!slot || slot.status !== ActiveStatus.ACTIVE) {
-        throw new BadRequestException('Khung ca không tồn tại hoặc đã ngừng hoạt động');
+        throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.SLOT_INACTIVE_OR_NOT_FOUND);
       }
       if (slot.facilityId !== input.facilityId) {
-        throw new BadRequestException('Khung ca khong thuoc co so dang tao lich truc');
+        throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.SLOT_NOT_BELONG_TO_FACILITY);
       }
       return {
         slotId: input.slotId,
@@ -202,7 +202,7 @@ export class ShiftsValidator {
     }
 
     if (requireTimes && (!input.startTime || !input.endTime)) {
-      throw new BadRequestException('Cần gửi startTime và endTime khi không dùng slotId');
+      throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.TIME_REQUIRED_WITHOUT_SLOT);
     }
 
     return {
@@ -232,7 +232,7 @@ export class ShiftsValidator {
   private async ensureActiveFacility(facilityId: string): Promise<Facility> {
     const facility = await this.facilitiesService.findById(facilityId);
     if (facility.status !== FacilityStatus.ACTIVE) {
-      throw new ConflictException(DOCTOR_SHIFT_CONSTANT.FACILITY_INACTIVE);
+      throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.FACILITY_INACTIVE);
     }
     return facility;
   }

@@ -18,6 +18,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { FacilityStatus } from '../../../../common/constants/status.enum';
+import { RESPONSE_MESSAGES } from '../../../../common/constants/response-message.constant';
 import {
   trimText,
   trimValue,
@@ -37,20 +38,20 @@ export class CreateFacilityDto {
 
   @ApiProperty({ example: '1', description: 'Staff id cua nguoi phu trach/chu co so' })
   @IsString()
-  @Matches(POSITIVE_ID_PATTERN, { message: 'ownerId phai la so nguyen duong' })
+  @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.FACILITIES.OWNER_ID_INVALID })
   ownerId: string;
 
   @ApiProperty({ example: '02873001234' })
   @Transform(({ value }) => trimValue(value))
   @IsString()
   @Matches(/^\+?\d{7,15}$/, {
-    message: 'phone phai gom 7-15 chu so va co the bat dau bang dau +',
+    message: RESPONSE_MESSAGES.FACILITIES.PHONE_INVALID,
   })
   phone: string;
 
   @ApiProperty({ example: 'contact@facility.vn' })
   @Transform(({ value }) => typeof value === 'string' ? value.trim().toLowerCase() : value)
-  @IsEmail({}, { message: 'email khong dung dinh dang' })
+  @IsEmail({}, { message: RESPONSE_MESSAGES.FACILITIES.EMAIL_INVALID })
   @MaxLength(191)
   email: string;
 
@@ -90,19 +91,19 @@ export class CreateFacilityDto {
   @ApiProperty({ example: '21.0285' })
   @Transform(({ value }) => trimValue(value))
   @IsNotEmpty()
-  @IsLatitude({ message: 'latitude phai nam trong khoang -90 den 90' })
+  @IsLatitude({ message: RESPONSE_MESSAGES.FACILITIES.LATITUDE_INVALID })
   latitude: string;
 
   @ApiProperty({ example: '105.8542' })
   @Transform(({ value }) => trimValue(value))
   @IsNotEmpty()
-  @IsLongitude({ message: 'longitude phai nam trong khoang -180 den 180' })
+  @IsLongitude({ message: RESPONSE_MESSAGES.FACILITIES.LONGITUDE_INVALID })
   longitude: string;
 
   @ApiProperty({ enum: [FacilityStatus.ACTIVE, FacilityStatus.INACTIVE] })
   @IsEnum(FacilityStatus)
   @IsIn([FacilityStatus.ACTIVE, FacilityStatus.INACTIVE], {
-    message: 'Khong the tao co so voi trang thai deleted',
+    message: RESPONSE_MESSAGES.FACILITIES.CREATE_DELETED_STATUS_INVALID,
   })
   status: FacilityStatus;
 }

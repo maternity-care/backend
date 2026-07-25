@@ -46,7 +46,7 @@ export class FacilitiesService {
   async findAll(query?: SearchFacilityDto): Promise<FacilityWithDetails[]> {
     const facilities = await this.facilitiesRepository.findAll(query);
     if (!facilities || facilities.length === 0) {
-      throw new NotFoundException(RESPONSE_MESSAGES.FACILITY_NOT_FOUND);
+      throw new NotFoundException(RESPONSE_MESSAGES.FACILITIES.NOT_FOUND);
     }
     return Promise.all(facilities.map(facility => this.attachFacilitySchedule(facility)));
   }
@@ -54,7 +54,7 @@ export class FacilitiesService {
   async findAllPaginated(query?: SearchFacilityDto) {
     const result = await this.facilitiesRepository.findAllPaginated!(query);
     if (!result || !result.items || result.items.length === 0) {
-      throw new NotFoundException(RESPONSE_MESSAGES.FACILITY_NOT_FOUND);
+      throw new NotFoundException(RESPONSE_MESSAGES.FACILITIES.NOT_FOUND);
     }
     return {
       ...result,
@@ -65,7 +65,7 @@ export class FacilitiesService {
   async findById(id: string): Promise<Facility> {
     const facility = await this.facilitiesRepository.findById(id);
     if (!facility) {
-      throw new NotFoundException(RESPONSE_MESSAGES.FACILITY_NOT_FOUND);
+      throw new NotFoundException(RESPONSE_MESSAGES.FACILITIES.NOT_FOUND);
     }
 
     return facility;
@@ -74,7 +74,7 @@ export class FacilitiesService {
   async findDetailsById(id: string): Promise<FacilityWithDetails> {
     const facility = await this.facilitiesRepository.findDetailsById(id);
     if (!facility) {
-      throw new NotFoundException(RESPONSE_MESSAGES.FACILITY_NOT_FOUND);
+      throw new NotFoundException(RESPONSE_MESSAGES.FACILITIES.NOT_FOUND);
     }
 
     return this.attachFacilitySchedule(facility);
@@ -222,7 +222,7 @@ export class FacilitiesService {
 
     const ownerExists = await this.facilitiesRepository.existsActiveOwner(ownerId);
     if (!ownerExists) {
-      throw new BadRequestException('ownerId khong ton tai hoac staff dang ngung hoat dong');
+      throw new BadRequestException(RESPONSE_MESSAGES.FACILITIES.OWNER_INVALID);
     }
   }
 
@@ -255,7 +255,7 @@ export class FacilitiesService {
     if (!query?.fromDate || !query?.toDate) return;
 
     if (query.fromDate > query.toDate) {
-      throw new BadRequestException('fromDate phai nho hon hoac bang toDate');
+      throw new BadRequestException(RESPONSE_MESSAGES.FACILITIES.DATE_RANGE_INVALID);
     }
   }
 
@@ -267,7 +267,7 @@ export class FacilitiesService {
     const existing = await this.facilitiesRepository.findClosureDayByDate(facilityId, closureDate);
     if (existing && existing.id !== excludeId) {
       throw new ConflictException({
-        message: 'Ngay dong cua cua co so da ton tai',
+        message: RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.ALREADY_EXISTS,
         data: {
           duplicatedField: 'closureDate',
           duplicatedData: this.toClosureDayResponse(existing),
@@ -279,7 +279,7 @@ export class FacilitiesService {
   private async findClosureDayOrFail(facilityId: string, closureDayId: string): Promise<FacilityClosureDay> {
     const closureDay = await this.facilitiesRepository.findClosureDayById(facilityId, closureDayId);
     if (!closureDay) {
-      throw new NotFoundException('Ngay dong cua cua co so khong ton tai');
+      throw new NotFoundException(RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.NOT_FOUND);
     }
     return closureDay;
   }
@@ -296,7 +296,7 @@ export class FacilitiesService {
 
   private throwDuplicateFacilityException(field: 'code' | 'name' | 'email' | 'phone', facility: Facility): never {
     throw new ConflictException({
-      message: RESPONSE_MESSAGES.FACILITY_ALREADY_EXISTS,
+      message: RESPONSE_MESSAGES.FACILITIES.ALREADY_EXISTS,
       data: {
         duplicatedField: field,
         duplicatedData: this.toDuplicateFacilityData(facility),
@@ -432,7 +432,7 @@ export class FacilitiesService {
       for (const day of schedule.days) {
         if (seenDays.has(day)) {
           throw new BadRequestException({
-            message: 'Mot ngay khong duoc khai bao trung trong nhieu khung gio',
+            message: RESPONSE_MESSAGES.FACILITIES.SCHEDULE_DAY_DUPLICATED,
             data: {
               duplicatedField: 'days',
               duplicatedData: { dayOfWeek: day },
@@ -470,7 +470,7 @@ export class FacilitiesService {
     if (impactedShifts.length === 0) return;
 
     throw new ConflictException({
-      message: 'Khong the cap nhat gio hoat dong vi con ca truc sap toi nam ngoai khung gio moi',
+      message: RESPONSE_MESSAGES.FACILITIES.OPERATING_HOURS_HAS_IMPACTED_SHIFTS,
       data: {
         duplicatedField: 'operatingHours',
         impactedShifts,
@@ -655,10 +655,10 @@ export class FacilitiesService {
 
   private getOperatingStatusLabel(status: FacilityOperatingStatus): string {
     const labels: Record<FacilityOperatingStatus, string> = {
-      [FacilityOperatingStatus.OPEN]: 'Dang mo cua',
-      [FacilityOperatingStatus.CLOSED]: 'Da dong cua',
-      [FacilityOperatingStatus.CLOSED_TODAY]: 'Hom nay dong cua',
-      [FacilityOperatingStatus.INACTIVE]: 'Co so dang ngung hoat dong',
+      [FacilityOperatingStatus.OPEN]: RESPONSE_MESSAGES.FACILITIES.OPERATING_STATUS_OPEN,
+      [FacilityOperatingStatus.CLOSED]: RESPONSE_MESSAGES.FACILITIES.OPERATING_STATUS_CLOSED,
+      [FacilityOperatingStatus.CLOSED_TODAY]: RESPONSE_MESSAGES.FACILITIES.OPERATING_STATUS_CLOSED_TODAY,
+      [FacilityOperatingStatus.INACTIVE]: RESPONSE_MESSAGES.FACILITIES.OPERATING_STATUS_INACTIVE,
     };
 
     return labels[status];

@@ -15,6 +15,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { ActiveStatus } from '../../../../common/constants/status.enum';
+import { RESPONSE_MESSAGES } from '../../../../common/constants/response-message.constant';
 import { trimText } from '../../../../common/helpers/dto-transform.helper';
 
 export const POSITIVE_ID_PATTERN = /^[1-9]\d*$/;
@@ -22,7 +23,7 @@ export const POSITIVE_ID_PATTERN = /^[1-9]\d*$/;
 export class CreateRoomDto {
   @ApiProperty({ example: '1' })
   @IsString()
-  @Matches(POSITIVE_ID_PATTERN, { message: 'facilityId phai la so nguyen duong' })
+  @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.ROOMS.FACILITY_ID_INVALID })
   facilityId: string;
 
   @ApiProperty({ example: 'Phong kham thai 201' })
@@ -35,7 +36,7 @@ export class CreateRoomDto {
 
   @ApiProperty({ example: '1', description: 'ID trong bang room_types' })
   @IsString()
-  @Matches(POSITIVE_ID_PATTERN, { message: 'roomTypeId phai la so nguyen duong' })
+  @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.ROOMS.ROOM_TYPE_ID_INVALID })
   roomTypeId: string;
 
   @ApiProperty({ example: 'Tang 2' })

@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsDateString, IsEnum, IsIn, IsInt, IsOptional, IsString, Matches, Max, Min, ValidateIf } from 'class-validator';
 import { DoctorShiftStatus } from '../../../../common/constants/status.enum';
+import { RESPONSE_MESSAGES } from '../../../../common/constants/response-message.constant';
 import { IsLaterThan } from '../../../../common/helpers/dto-validation.helper';
 import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
 //shiftTime định dạng: HH:mm hoặc HH:mm:ss
@@ -34,7 +35,7 @@ export class CreateDoctorShiftDto {
 
   @ApiProperty({ example: '2026-07-07' })
   @IsDateString({ strict: true })
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'shiftDate phải có định dạng YYYY-MM-DD' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: RESPONSE_MESSAGES.SHIFTS.SHIFT_DATE_FORMAT_INVALID })
   shiftDate: string;
 
   @ApiPropertyOptional({ example: '08:00', description: 'Bat buoc neu khong gui slotId' })
@@ -45,7 +46,7 @@ export class CreateDoctorShiftDto {
   @ApiPropertyOptional({ example: '12:00', description: 'Bat buoc neu khong gui slotId' })
   @ValidateIf((dto: CreateDoctorShiftDto) => !dto.slotId)
   @Matches(SHIFT_TIME_PATTERN)
-  @IsLaterThan('startTime', { message: 'endTime phải muộn hơn startTime' })
+  @IsLaterThan('startTime', { message: RESPONSE_MESSAGES.SHIFTS.END_TIME_AFTER_START_TIME })
   endTime?: string;
 
   @ApiPropertyOptional({ minimum: 1, maximum: 100 })
@@ -59,7 +60,7 @@ export class CreateDoctorShiftDto {
   @ApiProperty({ enum: [DoctorShiftStatus.AVAILABLE, DoctorShiftStatus.OFF] })
   @IsEnum(DoctorShiftStatus)
   @IsIn([DoctorShiftStatus.AVAILABLE, DoctorShiftStatus.OFF], {
-    message: 'Ca mới chỉ có thể ở trạng thái available hoặc off',
+    message: RESPONSE_MESSAGES.SHIFTS.CREATE_STATUS_INVALID,
   })
   status: DoctorShiftStatus;
 }

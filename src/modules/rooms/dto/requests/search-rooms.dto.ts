@@ -2,6 +2,7 @@ import { Transform, Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { ActiveStatus } from '../../../../common/constants/status.enum';
+import { RESPONSE_MESSAGES } from '../../../../common/constants/response-message.constant';
 import { trimText } from '../../../../common/helpers/dto-transform.helper';
 import { POSITIVE_ID_PATTERN } from './create-room.dto';
 
@@ -28,13 +29,13 @@ export class SearchRoomsDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @Matches(POSITIVE_ID_PATTERN, { message: 'facilityId phai la so nguyen duong' })
+  @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.ROOMS.FACILITY_ID_INVALID })
   facilityId?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @Matches(POSITIVE_ID_PATTERN, { message: 'roomTypeId phai la so nguyen duong' })
+  @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.ROOMS.ROOM_TYPE_ID_INVALID })
   roomTypeId?: string;
 
   @ApiPropertyOptional({ minimum: 1 })
@@ -64,7 +65,7 @@ export class LookupRoomsDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @Matches(POSITIVE_ID_PATTERN, { message: 'facilityId phai la so nguyen duong' })
+  @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.ROOMS.FACILITY_ID_INVALID })
   facilityId?: string;
 
   @ApiPropertyOptional({ enum: ActiveStatus })

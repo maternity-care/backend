@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { CreateShiftSlotDto } from './dto/requests/create-shift-slot.dto';
 import { LookupShiftSlotDto, SearchShiftSlotDto } from './dto/requests/search-shift-slot.dto';
 import { UpdateShiftSlotDto } from './dto/requests/update-shift-slot.dto';
@@ -19,7 +20,7 @@ export class ShiftSlotsController {
       ? await this.service.findAllPaginated(query)
       : await this.service.findAll(query);
     return {
-      message: 'Lay danh sach khung ca thanh cong',
+      message: RESPONSE_MESSAGES.SHIFT_SLOTS.GET_LIST_SUCCESS,
       data,
     };
   }
@@ -29,7 +30,7 @@ export class ShiftSlotsController {
   @ApiResponse({ status: 200, type: [ShiftSlotLookupResponseDto] })
   async lookup(@Query() query: LookupShiftSlotDto) {
     return {
-      message: 'Lay goi y khung ca thanh cong',
+      message: RESPONSE_MESSAGES.SHIFT_SLOTS.LOOKUP_SUCCESS,
       data: await this.service.lookup(query),
     };
   }
@@ -39,7 +40,7 @@ export class ShiftSlotsController {
   @ApiResponse({ status: 200, type: ShiftSlotResponseDto })
   async findOne(@Param('id') id: string) {
     return {
-      message: 'Lay chi tiet khung ca thanh cong',
+      message: RESPONSE_MESSAGES.SHIFT_SLOTS.GET_SUCCESS,
       data: await this.service.findById(id),
     };
   }
@@ -49,7 +50,7 @@ export class ShiftSlotsController {
   @ApiResponse({ status: 201, type: ShiftSlotResponseDto })
   async create(@Body() dto: CreateShiftSlotDto) {
     return {
-      message: 'Tao khung ca thanh cong',
+      message: RESPONSE_MESSAGES.SHIFT_SLOTS.CREATED,
       data: await this.service.create(dto),
     };
   }
@@ -62,7 +63,7 @@ export class ShiftSlotsController {
     @Body() dto: UpdateShiftSlotDto,
   ) {
     return {
-      message: 'Cap nhat khung ca thanh cong',
+      message: RESPONSE_MESSAGES.SHIFT_SLOTS.UPDATED,
       data: await this.service.update(id, dto),
     };
   }
@@ -72,7 +73,7 @@ export class ShiftSlotsController {
   @ApiResponse({ status: 200 })
   async remove(@Param('id') id: string) {
     return {
-      message: 'Xoa khung ca thanh cong',
+      message: RESPONSE_MESSAGES.SHIFT_SLOTS.DELETED,
       data: await this.service.remove(id),
     };
   }

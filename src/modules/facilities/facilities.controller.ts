@@ -29,7 +29,7 @@ export class FacilitiesController {
     if (error instanceof HttpException) {
       throw error;
     }
-    throw new InternalServerErrorException('Internal server error');
+    throw new InternalServerErrorException(RESPONSE_MESSAGES.INTERNAL_SERVER_ERROR);
   }
 
   @Get()
@@ -44,7 +44,7 @@ export class FacilitiesController {
       if (activeFacilityId) {
         const facility = await this.facilitiesService.findDetailsById(activeFacilityId);
         return {
-          message: RESPONSE_MESSAGES.FACILITIES_RETRIEVED,
+          message: RESPONSE_MESSAGES.FACILITIES.GET_LIST_SUCCESS,
           data: query?.page
             ? { items: [facility], total: 1, page: Number(query.page), limit: 1 }
             : [facility],
@@ -55,14 +55,14 @@ export class FacilitiesController {
       if (query?.page) {
         const paged = await this.facilitiesService.findAllPaginated(query);
         return {
-          message: RESPONSE_MESSAGES.FACILITIES_RETRIEVED,
+          message: RESPONSE_MESSAGES.FACILITIES.GET_LIST_SUCCESS,
           data: paged,
         };
       }
 
       const facilities = await this.facilitiesService.findAll(query);
       return {
-        message: RESPONSE_MESSAGES.FACILITIES_RETRIEVED,
+        message: RESPONSE_MESSAGES.FACILITIES.GET_LIST_SUCCESS,
         data: facilities,
       };
     } catch (error) {
@@ -82,7 +82,7 @@ export class FacilitiesController {
       if (activeFacilityId) {
         const facility = await this.facilitiesService.findDetailsById(activeFacilityId);
         return {
-          message: RESPONSE_MESSAGES.FACILITIES_RETRIEVED,
+          message: RESPONSE_MESSAGES.FACILITIES.LOOKUP_SUCCESS,
           data: [{
             id: facility.id,
             name: facility.name,
@@ -97,7 +97,7 @@ export class FacilitiesController {
       }
 
       return {
-        message: RESPONSE_MESSAGES.FACILITIES_RETRIEVED,
+        message: RESPONSE_MESSAGES.FACILITIES.LOOKUP_SUCCESS,
         data: await this.facilitiesService.lookup(query),
       };
     } catch (error) {
@@ -114,7 +114,7 @@ export class FacilitiesController {
     try {
       assertFacilityAccess(user, id);
       return {
-        message: RESPONSE_MESSAGES.FACILITY_RETRIEVED,
+        message: RESPONSE_MESSAGES.FACILITIES.OPERATING_HOURS_GET_SUCCESS,
         data: await this.facilitiesService.getOperatingHours(id),
       };
     } catch (error) {
@@ -133,7 +133,7 @@ export class FacilitiesController {
     try {
       assertFacilityAccess(user, id);
       return {
-        message: RESPONSE_MESSAGES.FACILITY_RETRIEVED,
+        message: RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.GET_LIST_SUCCESS,
         data: await this.facilitiesService.getClosureDays(id, query),
       };
     } catch (error) {
@@ -152,7 +152,7 @@ export class FacilitiesController {
       assertFacilityAccess(user, id);
       const facility = await this.facilitiesService.findDetailsById(id);
       return {
-        message: RESPONSE_MESSAGES.FACILITY_RETRIEVED,
+        message: RESPONSE_MESSAGES.FACILITIES.GET_SUCCESS,
         data: facility,
       };
     } catch (error) {
@@ -167,7 +167,7 @@ export class FacilitiesController {
     try {
       const facility = await this.facilitiesService.create(dto);
       return {
-        message: RESPONSE_MESSAGES.FACILITY_CREATED,
+        message: RESPONSE_MESSAGES.FACILITIES.CREATED,
         data: facility,
       };
     } catch (error) {
@@ -186,7 +186,7 @@ export class FacilitiesController {
     try {
       assertFacilityAccess(user, id);
       return {
-        message: RESPONSE_MESSAGES.FACILITY_CREATED,
+        message: RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.CREATED,
         data: await this.facilitiesService.createClosureDay(id, dto),
       };
     } catch (error) {
@@ -204,7 +204,7 @@ export class FacilitiesController {
     try {
       assertFacilityAccess(user, id);
       return {
-        message: RESPONSE_MESSAGES.FACILITY_RETRIEVED,
+        message: RESPONSE_MESSAGES.FACILITIES.OPERATING_HOURS_PREVIEW_SUCCESS,
         data: await this.facilitiesService.previewOperatingHours(id, dto),
       };
     } catch (error) {
@@ -222,7 +222,7 @@ export class FacilitiesController {
     try {
       assertFacilityAccess(user, id);
       return {
-        message: RESPONSE_MESSAGES.FACILITY_UPDATED,
+        message: RESPONSE_MESSAGES.FACILITIES.OPERATING_HOURS_UPDATED,
         data: await this.facilitiesService.updateOperatingHours(id, dto),
       };
     } catch (error) {
@@ -242,7 +242,7 @@ export class FacilitiesController {
     try {
       assertFacilityAccess(user, id);
       return {
-        message: RESPONSE_MESSAGES.FACILITY_UPDATED,
+        message: RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.UPDATED,
         data: await this.facilitiesService.updateClosureDay(id, closureDayId, dto),
       };
     } catch (error) {
@@ -262,7 +262,7 @@ export class FacilitiesController {
       assertFacilityAccess(user, id);
       const data = await this.facilitiesService.update(id, dto);
       return {
-        message: RESPONSE_MESSAGES.FACILITY_UPDATED,
+        message: RESPONSE_MESSAGES.FACILITIES.UPDATED,
         data: data,
       };
     } catch (error) {
@@ -282,7 +282,7 @@ export class FacilitiesController {
     try {
       assertFacilityAccess(user, id);
       return {
-        message: RESPONSE_MESSAGES.FACILITY_DELETED,
+        message: RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.DELETED,
         data: await this.facilitiesService.removeClosureDay(id, closureDayId),
       };
     } catch (error) {
@@ -302,7 +302,7 @@ export class FacilitiesController {
     try {
       assertFacilityAccess(user, id);
       const data = await this.facilitiesService.remove(id, reason, user?.id ?? null);
-      return { message: RESPONSE_MESSAGES.FACILITY_DELETED, data };
+      return { message: RESPONSE_MESSAGES.FACILITIES.DELETED, data };
     } catch (error) {
       this.handleError(error);
     }
@@ -320,7 +320,7 @@ export class FacilitiesController {
       assertFacilityAccess(user, id);
       const data = await this.facilitiesService.deActivateFacility(id);
       return {
-        message: RESPONSE_MESSAGES.FACILITY_STATUS_UPDATED,
+        message: RESPONSE_MESSAGES.FACILITIES.STATUS_UPDATED,
         data: data,
       };
     } catch (error) {

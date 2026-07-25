@@ -282,7 +282,7 @@ export class FacilitiesRepository implements IFacilitiesRepository {
   async updateStatus(id: string, status: FacilityStatus): Promise<Facility> {
     const facility = await this.findById(id);
     if (!facility) {
-      throw new Error(RESPONSE_MESSAGES.FACILITY_NOT_FOUND);
+      throw new Error(RESPONSE_MESSAGES.FACILITIES.NOT_FOUND);
     }
     facility.status = status;
     return this.repository.save(facility);
