@@ -33,19 +33,14 @@ import { StaffManagementService } from './staff-management.service';
 @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.ADMIN)
 @Controller('management/staffs')
 export class ManagementStaffsController {
-  constructor(
-    private readonly staffManagementService: StaffManagementService,
-  ) {}
+  constructor(private readonly staffManagementService: StaffManagementService) {}
 
   @Get()
   @Permissions(PermissionEnum.USER_VIEW)
   @ApiOperation({ summary: 'List staff accounts' })
   @ApiResponse({ status: 200, type: SearchUserResponseDto })
-  async findAll(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Query() query: SearchUserDto,
-  ) {
-    const data = await this.staffManagementService.findAll(query, actor);
+  async findAll(@CurrentUser() actor: AuthenticatedUser, @Query() query: SearchUserDto) {
+    const data = await this.staffManagementService.findAll(query);
     return { data, message: 'Lấy danh sách nhân viên thành công.' };
   }
 
@@ -53,20 +48,14 @@ export class ManagementStaffsController {
   @Permissions(PermissionEnum.USER_CREATE)
   @ApiOperation({ summary: 'Create staff account' })
   @ApiResponse({ status: 201, type: UserResponseDto })
-  async create(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Body() dto: AdminCreateUserDto,
-  ) {
+  async create(@CurrentUser() actor: AuthenticatedUser, @Body() dto: AdminCreateUserDto) {
     const data = await this.staffManagementService.create(dto, actor);
     return { data, message: 'Tạo nhân viên thành công.' };
   }
 
   @Get(':id')
   @Permissions(PermissionEnum.USER_VIEW)
-  async findOne(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('id') id: string,
-  ) {
+  async findOne(@CurrentUser() actor: AuthenticatedUser, @Param('id') id: string) {
     const data = await this.staffManagementService.findById(id, actor);
     return { data, message: 'Lấy thông tin nhân viên thành công.' };
   }
@@ -84,15 +73,8 @@ export class ManagementStaffsController {
 
   @Delete(':id')
   @Permissions(PermissionEnum.USER_DELETE)
-  async remove(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('id') id: string,
-  ) {
-    await this.staffManagementService.updateStatus(
-      id,
-      UserStatusEnum.INACTIVE,
-      actor,
-    );
+  async remove(@CurrentUser() actor: AuthenticatedUser, @Param('id') id: string) {
+    await this.staffManagementService.updateStatus(id, UserStatusEnum.INACTIVE, actor);
     return { data: null, message: 'Đã khóa tài khoản nhân viên.' };
   }
 }

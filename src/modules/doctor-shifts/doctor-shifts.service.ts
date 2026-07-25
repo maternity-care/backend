@@ -2,7 +2,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from '@nes
 import { DOCTOR_SHIFT_CONSTANT } from '../../common/constants/doctor-shift.constant';
 import { DoctorShiftStatus } from '../../common/constants/status.enum';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
-import { DoctorShift } from './entities/shift.entity';
+import { Shift } from './entities/shift.entity';
 import { BulkCreateDoctorShiftDto } from './dto/requests/bulk-create-doctor-shift.dto';
 import { CheckShiftConflictDto } from './dto/requests/check-shift-conflict.dto';
 import { CopyWeekDoctorShiftDto } from './dto/requests/copy-week-doctor-shift.dto';
@@ -40,12 +40,12 @@ export class DoctorShiftsService {
     private readonly validator: DoctorShiftsValidator,
   ) {}
 
-  async create(dto: CreateDoctorShiftDto): Promise<DoctorShift> {
+  async create(dto: CreateDoctorShiftDto): Promise<Shift> {
     await this.validator.validateForCreate(dto);
     return this.repository.save(this.repository.create(dto));
   }
 
-  async bulkCreate(dto: BulkCreateDoctorShiftDto): Promise<DoctorShift[]> {
+  async bulkCreate(dto: BulkCreateDoctorShiftDto): Promise<Shift[]> {
     validateDateRange(dto.fromDate, dto.toDate);
     const dates = buildShiftDates(dto.fromDate, dto.toDate, dto.workingDays);
     if (dates.length === 0) {
@@ -55,7 +55,7 @@ export class DoctorShiftsService {
       throw new BadRequestException('Chỉ được tạo ca hàng loạt tối đa trong 92 ngày mỗi lần');
     }
 
-    const payloads = dates.map(shiftDate => ({
+    const payloads = dates.map((shiftDate) => ({
       doctorId: dto.doctorId,
       facilityId: dto.facilityId,
       roomId: dto.roomId,
@@ -70,7 +70,7 @@ export class DoctorShiftsService {
       await this.validator.validateForCreate(payload);
     }
 
-    return this.repository.saveMany(payloads.map(payload => this.repository.create(payload)));
+    return this.repository.saveMany(payloads.map((payload) => this.repository.create(payload)));
   }
 
   async findAll(filters?: SearchDoctorShiftDto): Promise<DoctorShiftWithDetails[]> {
@@ -87,7 +87,7 @@ export class DoctorShiftsService {
     return result;
   }
 
-  async findById(id: string): Promise<DoctorShift> {
+  async findById(id: string): Promise<Shift> {
     validateShiftId(id);
     const shift = await this.repository.findById(id);
     if (!shift) throw new NotFoundException(DOCTOR_SHIFT_CONSTANT.NOT_FOUND);
@@ -101,11 +101,11 @@ export class DoctorShiftsService {
     return shift;
   }
 
-  async update(id: string, dto: UpdateDoctorShiftDto): Promise<DoctorShift> {
+  async update(id: string, dto: UpdateDoctorShiftDto): Promise<Shift> {
     const shift = await this.findById(id);
     // Merged: tạo một đối tượng mới bằng cách kết hợp các thuộc tính của shift và dto.
-    
-    const merged = { ...shift, ...dto } as DoctorShift;
+
+    const merged = { ...shift, ...dto } as Shift;
     await this.validator.validateForUpdate(merged);
     Object.assign(shift, dto);
     return this.repository.save(shift);
@@ -139,13 +139,13 @@ export class DoctorShiftsService {
     return {
       hasConflict: conflicts.doctorConflicts.length > 0 || conflicts.roomConflicts.length > 0,
       // ...: spread operator: dùng để sao chép tất cả các thuộc tính của một đối tượng vào một đối tượng khác.
-      // Trong trường hợp này, nó được sử dụng để sao chép tất cả 
+      // Trong trường hợp này, nó được sử dụng để sao chép tất cả
       // các thuộc tính của đối tượng conflicts vào đối tượng mới được trả về.
       ...conflicts,
     };
   }
 
-  async copyWeek(dto: CopyWeekDoctorShiftDto): Promise<DoctorShift[]> {
+  async copyWeek(dto: CopyWeekDoctorShiftDto): Promise<Shift[]> {
     if (dto.sourceWeekStart === dto.targetWeekStart) {
       throw new BadRequestException('targetWeekStart phải khác sourceWeekStart');
     }
@@ -159,27 +159,27 @@ export class DoctorShiftsService {
       sourceEnd,
       dto.doctorId,
     );
-    const copyableShifts = sourceShifts.filter(shift => shift.status !== DoctorShiftStatus.CANCELLED);
+    const copyableShifts = sourceShifts.filter(
+      (shift) => shift.status !== DoctorShiftStatus.CANCELLED,
+    );
     if (copyableShifts.length === 0) return [];
 
-    const payloads = copyableShifts.map(shift => ({
-      doctorId: shift.doctorId,
+    const payloads = copyableShifts.map((shift) => ({
+      doctorId: shift.staffId,
       facilityId: shift.facilityId,
       roomId: shift.roomId,
       shiftDate: addDays(shift.shiftDate, dayOffset),
       startTime: shift.startTime,
       endTime: shift.endTime,
       maxAppointments: shift.maxAppointments,
-      status: shift.status === DoctorShiftStatus.FULL
-        ? DoctorShiftStatus.AVAILABLE
-        : shift.status,
+      status: shift.status === DoctorShiftStatus.FULL ? DoctorShiftStatus.AVAILABLE : shift.status,
     })) as CreateDoctorShiftDto[];
 
     for (const payload of payloads) {
       await this.validator.validateForCreate(payload);
     }
 
-    return this.repository.saveMany(payloads.map(payload => this.repository.create(payload)));
+    return this.repository.saveMany(payloads.map((payload) => this.repository.create(payload)));
   }
 
   async getDoctorAvailability(doctorId: string, query: DoctorAvailabilityQueryDto) {
@@ -198,17 +198,20 @@ export class DoctorShiftsService {
       facilityId: query.facilityId,
       date: query.date,
       slotMinutes,
-      shifts: shifts.map(shift => {
-        const appointmentBlocks = appointments.filter(appointment => timesOverlap(
-          shift.startTime,
-          shift.endTime,
-          dateTimeToTime(appointment.scheduledStart),
-          dateTimeToTime(appointment.scheduledEnd),
-        ));
+      shifts: shifts.map((shift) => {
+        const appointmentBlocks = appointments.filter((appointment) =>
+          timesOverlap(
+            shift.startTime,
+            shift.endTime,
+            dateTimeToTime(appointment.scheduledStart),
+            dateTimeToTime(appointment.scheduledEnd),
+          ),
+        );
         const fullyBookedByLimit = Boolean(
           shift.maxAppointments && appointmentBlocks.length >= shift.maxAppointments,
         );
-        const canGenerateSlots = shift.status === DoctorShiftStatus.AVAILABLE && !fullyBookedByLimit;
+        const canGenerateSlots =
+          shift.status === DoctorShiftStatus.AVAILABLE && !fullyBookedByLimit;
 
         return {
           shiftId: shift.id,
@@ -227,11 +230,7 @@ export class DoctorShiftsService {
   }
 
   async getWeeklySchedule(facilityId: string, weekStart?: string, doctorId?: string) {
-    const { start, end } = await this.validator.prepareWeeklyRange(
-      facilityId,
-      weekStart,
-      doctorId,
-    );
+    const { start, end } = await this.validator.prepareWeeklyRange(facilityId, weekStart, doctorId);
     const shifts = await this.repository.findWeeklyWithDetails(facilityId, start, end, doctorId);
     this.ensureShiftsFound(shifts);
     return {
@@ -240,13 +239,13 @@ export class DoctorShiftsService {
       weekEnd: end,
       days: Array.from({ length: 7 }, (_, index) => {
         const date = addDays(start, index);
-        return { date, shifts: shifts.filter(shift => shift.shiftDate === date) };
+        return { date, shifts: shifts.filter((shift) => shift.shiftDate === date) };
       }),
     };
   }
 
   private buildAvailableSlots(
-    shift: DoctorShift,
+    shift: Shift,
     appointmentBlocks: { scheduledStart: Date | string; scheduledEnd: Date | string }[],
     slotMinutes: number,
   ) {
@@ -258,12 +257,14 @@ export class DoctorShiftsService {
       const end = start + slotMinutes;
       const startTime = minutesToTime(start);
       const endTime = minutesToTime(end);
-      const isBooked = appointmentBlocks.some(appointment => timesOverlap(
-        startTime,
-        endTime,
-        dateTimeToTime(appointment.scheduledStart),
-        dateTimeToTime(appointment.scheduledEnd),
-      ));
+      const isBooked = appointmentBlocks.some((appointment) =>
+        timesOverlap(
+          startTime,
+          endTime,
+          dateTimeToTime(appointment.scheduledStart),
+          dateTimeToTime(appointment.scheduledEnd),
+        ),
+      );
       if (!isBooked) slots.push({ startTime, endTime });
     }
 
@@ -275,8 +276,4 @@ export class DoctorShiftsService {
       throw new NotFoundException(DOCTOR_SHIFT_CONSTANT.NOT_FOUND);
     }
   }
-
-  
 }
-
-

@@ -24,6 +24,22 @@ export class AuthController {
   @ApiResponse({ status: 201, type: AuthResponseDto })
   async register(@Body() dto: RegisterDto) {
     const data = await this.authService.register(dto);
+    return data;
+  }
+
+  @Post('resend-otp')
+  @ApiOperation({ summary: 'resend otp' })
+  @ApiResponse({ status: 200 })
+  async verifyEmail(@Body() dto: { email: string }) {
+    const data = await this.authService.resendOtpEmail(dto.email);
+    return { message: data.message };
+  }
+
+  @Post('verify-otp')
+  @ApiOperation({ summary: 'verify otp' })
+  @ApiResponse({ status: 200 })
+  async verifyOtp(@Body() dto: { email: string; otp: string }) {
+    const data = await this.authService.verifyOTP(dto.email, dto.otp);
     return { message: RESPONSE_MESSAGES.AUTH_REGISTERED, data };
   }
 

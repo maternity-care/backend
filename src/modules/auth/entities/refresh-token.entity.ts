@@ -22,7 +22,7 @@ export class RefreshToken {
   user: User;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'user_id', type: 'bigint' })
+  @Column({ name: 'user_id', type: 'bigint', nullable: false })
   userId: string;
 
   @ApiProperty({ type: String })
@@ -30,16 +30,16 @@ export class RefreshToken {
   tokenHash: string;
 
   @ApiProperty({ type: Date })
-  @Column({ name: 'expires_at', type: 'timestamp' })
+  @Column({ name: 'expires_at', type: 'timestamp', nullable: false })
   expiresAt: Date;
 
   @ApiProperty({ type: Date })
-  @Column({ name: 'revoked_at', type: 'timestamp' })
-  revokedAt: Date;
+  @Column({ name: 'revoked_at', type: 'timestamp', nullable: true })
+  revokedAt: Date | null;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'replaced_by_token_hash', type: 'varchar', length: 255 })
-  replacedByTokenHash: string;
+  @Column({ name: 'replaced_by_token_hash', type: 'varchar', length: 255, nullable: true })
+  replacedByTokenHash: string | null;
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })

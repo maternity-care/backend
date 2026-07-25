@@ -36,10 +36,7 @@ export function validateSchedule(
 }
 
 /** Ca nghỉ không sử dụng phòng khám. */
-export function validateStatusDetails(
-  status: DoctorShiftStatus,
-  roomId?: string | null,
-): void {
+export function validateStatusDetails(status: DoctorShiftStatus, roomId?: string | null): void {
   if (status === DoctorShiftStatus.OFF && roomId) {
     throw new BadRequestException('Ca off không được gán phòng');
   }
@@ -53,8 +50,8 @@ export function validateFacilityHours(
   status: DoctorShiftStatus,
 ): void {
   if (status === DoctorShiftStatus.OFF || status === DoctorShiftStatus.CANCELLED) return;
-  const openTime = facility.open_time ? normalizeTime(String(facility.open_time)) : null;
-  const closeTime = facility.close_time ? normalizeTime(String(facility.close_time)) : null;
+  const openTime = facility.openTime ? normalizeTime(String(facility.openTime)) : null;
+  const closeTime = facility.closeTime ? normalizeTime(String(facility.closeTime)) : null;
   const normalizedStart = normalizeTime(startTime);
   const normalizedEnd = normalizeTime(endTime);
   if (openTime && closeTime && (normalizedStart < openTime || normalizedEnd > closeTime)) {
@@ -79,17 +76,12 @@ export function throwIfConflicted(conflicts: ShiftConflicts): void {
   }
 }
 
-
-
 /** Kiểm tra khoảng ngày dùng cho API tìm kiếm. */
 export function validateDateRange(dateFrom?: string, dateTo?: string): void {
   if (dateFrom && dateTo && dateFrom > dateTo) {
     throw new BadRequestException('dateFrom phải sớm hơn hoặc bằng dateTo');
   }
 }
-
-
-
 
 /** Lấy ngày hiện tại theo UTC+7 dưới dạng YYYY-MM-DD. */
 export function todayInVietnam(): string {
@@ -111,7 +103,6 @@ export function addDays(date: string, days: number): string {
   return value.toISOString().slice(0, 10);
 }
 
-
 // Tính số ngày giữa hai ngày, không phụ thuộc timezone
 export function dateDiffInDays(fromDate: string, toDate: string): number {
   const from = new Date(`${fromDate}T00:00:00Z`).getTime();
@@ -132,7 +123,6 @@ export function workingDayOf(date: string): ShiftWorkingDay {
   ][day];
 }
 
-
 // Xây dựng danh sách các ngày làm việc trong khoảng thời gian cho trước
 export function buildShiftDates(
   fromDate: string,
@@ -141,7 +131,7 @@ export function buildShiftDates(
 ): string[] {
   // tính số ngày
   const diff = dateDiffInDays(fromDate, toDate);
-  // tạo mảng các ngày từ fromDate đến toDate, 
+  // tạo mảng các ngày từ fromDate đến toDate,
   // sau đó lọc ra những ngày mà thứ của nó nằm trong workingDays
   // const dates: string[] = [];
   // // lặp qua từng ngày trong khoảng từ fromDate đến toDate
@@ -153,8 +143,9 @@ export function buildShiftDates(
   // }
   // return dates;
   // (_, index) => addDays(fromDate, index): tạo một mảng các ngày từ fromDate đến toDate
-  return Array.from({ length: diff + 1 }, (_, index) => addDays(fromDate, index))
-    .filter(date => workingDays.includes(workingDayOf(date)));
+  return Array.from({ length: diff + 1 }, (_, index) => addDays(fromDate, index)).filter((date) =>
+    workingDays.includes(workingDayOf(date)),
+  );
 }
 
 export function timeToMinutes(value: string): number {
@@ -163,7 +154,9 @@ export function timeToMinutes(value: string): number {
 }
 
 export function minutesToTime(value: number): string {
-  const hour = Math.floor(value / 60).toString().padStart(2, '0');
+  const hour = Math.floor(value / 60)
+    .toString()
+    .padStart(2, '0');
   const minute = (value % 60).toString().padStart(2, '0');
   return `${hour}:${minute}:00`;
 }
@@ -175,8 +168,10 @@ export function timesOverlap(
   secondStart: string,
   secondEnd: string,
 ): boolean {
-  return normalizeTime(firstStart) < normalizeTime(secondEnd)
-    && normalizeTime(firstEnd) > normalizeTime(secondStart);
+  return (
+    normalizeTime(firstStart) < normalizeTime(secondEnd) &&
+    normalizeTime(firstEnd) > normalizeTime(secondStart)
+  );
 }
 
 export function dateTimeToTime(value: Date | string): string {
@@ -186,4 +181,3 @@ export function dateTimeToTime(value: Date | string): string {
   const second = date.getSeconds().toString().padStart(2, '0');
   return `${hour}:${minute}:${second}`;
 }
-

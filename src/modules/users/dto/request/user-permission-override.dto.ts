@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsIn, IsString } from 'class-validator';
-import { UserPermissionEffect } from '../../../permissions/entities/staff-permission.entity';
 
 export class UserPermissionOverrideDto {
   @ApiProperty()
@@ -9,5 +8,5 @@ export class UserPermissionOverrideDto {
 
   @ApiProperty({ enum: ['allow', 'deny'] })
   @IsIn(['allow', 'deny'])
-  effect: UserPermissionEffect;
+  effect: 'allow' | 'deny';
 }

@@ -7,7 +7,6 @@ import {
   IsBoolean,
   IsEnum,
   IsInt,
-  IsOptional,
   IsString,
   Matches,
   Max,
@@ -59,8 +58,14 @@ export class CreatePackageServiceDto {
   @IsEnum(PackageServiceFacilityScope)
   allowedFacilityScope: PackageServiceFacilityScope;
 
-  @ApiPropertyOptional({ example: ['1', '2'], description: 'Bắt buộc khi allowedFacilityScope = selected' })
-  @ValidateIf((dto: CreatePackageServiceDto) => dto.allowedFacilityScope === PackageServiceFacilityScope.SELECTED)
+  @ApiPropertyOptional({
+    example: ['1', '2'],
+    description: 'Bắt buộc khi allowedFacilityScope = selected',
+  })
+  @ValidateIf(
+    (dto: CreatePackageServiceDto) =>
+      dto.allowedFacilityScope === PackageServiceFacilityScope.SELECTED,
+  )
   @IsArray()
   @ArrayNotEmpty()
   @ArrayUnique()

@@ -28,6 +28,10 @@ export class User {
   phone: string;
 
   @ApiProperty({ type: String })
+  @Column({ name: 'email', type: 'varchar', length: 191, unique: true })
+  email: string;
+
+  @ApiProperty({ type: String })
   @Column({ name: 'date_of_birth', type: 'date' })
   dateOfBirth: string;
 

@@ -1,6 +1,14 @@
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import { ActiveStatus } from '../../../../common/constants/status.enum';
 import { trimText } from '../../../../common/helpers/dto-transform.helper';
 
@@ -40,4 +48,3 @@ export class CreateRoomDto {
   @IsEnum(ActiveStatus)
   status: ActiveStatus;
 }
-

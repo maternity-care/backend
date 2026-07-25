@@ -1,7 +1,6 @@
-import { DoctorShift } from '../entities/shift.entity';
-import { SearchDoctorShiftDto } from '../dto/requests/search-doctor-shift.dto';
+import { Shift } from '../entities/shift.entity';
 
 export interface ShiftConflicts {
-  doctorConflicts: DoctorShift[];
-  roomConflicts: DoctorShift[];
+  doctorConflicts: Shift[];
+  roomConflicts: Shift[];
 }

@@ -1,4 +1,4 @@
-import { StaffProfile } from '../../../staffs/entities/staff.entity';
+import { Staff } from '../../../staffs/entities/staff.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ActiveStatus } from '../../../../common/constants/status.enum';
 
@@ -33,5 +33,5 @@ export class DoctorResponseDto {
   @ApiProperty()
   updatedAt: Date;
 
-  staff: StaffProfile;
+  staff: Staff;
 }

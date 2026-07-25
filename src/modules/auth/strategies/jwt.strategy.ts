@@ -1,3 +1,4 @@
+import { Staff } from './../../staffs/entities/staff.entity';
 import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Request } from 'express';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -9,14 +10,8 @@ import { UsersService } from '../../users/users.service';
 import { JwtPayload } from '../interfaces/jwt-payload.interface';
 import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 import { RoleEnum } from '../../../common/constants/role.enum';
-import { StaffProfile } from '../../staffs/entities/staff.entity';
-import { FacilityStaff } from '../../facilities/entities/facility-staff.entity';
 import { Facility } from '../../facilities/entities/facility.entity';
-import {
-  AccountStatus,
-  ActiveStatus,
-  FacilityStatus,
-} from '../../../common/constants/status.enum';
+import { AccountStatus, ActiveStatus, FacilityStatus } from '../../../common/constants/status.enum';
 import { RESPONSE_MESSAGES } from '../../../common/constants/response-message.constant';
 
 @Injectable()
@@ -24,10 +19,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
-    @InjectRepository(StaffProfile)
-    private readonly staffProfileRepository: Repository<StaffProfile>,
-    @InjectRepository(FacilityStaff)
-    private readonly facilityStaffRepository: Repository<FacilityStaff>,
+    @InjectRepository(Staff)
+    private readonly staffProfileRepository: Repository<Staff>,
     @InjectRepository(Facility)
     private readonly facilityRepository: Repository<Facility>,
   ) {
@@ -53,22 +46,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       id: user.id,
       name: user.name,
       email: user.email,
+      roles: [],
       status: user.status,
-      roles: (user.roles ?? []).map((role) => ({
-        id: role.id,
-        name: role.name,
-        permissions: (role.permissions ?? []).map((permission) => ({
-          id: permission.id,
-          name: permission.name,
-        })),
-      })),
-      permissionOverrides: (user.permissionOverrides ?? []).map((permissionOverride) => ({
-        effect: permissionOverride.effect,
-        permission: {
-          id: permissionOverride.permission.id,
-          name: permissionOverride.permission.name,
-        },
-      })),
+      permissionOverrides: [],
       facilities: [],
       facilityRole: null,
       facilityRoles: [],
@@ -76,10 +56,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     };
   }
 
-  private async validateStaff(
-    request: Request,
-    payload: JwtPayload,
-  ): Promise<AuthenticatedUser> {
+  private async validateStaff(request: Request, payload: JwtPayload): Promise<AuthenticatedUser> {
     const staff = await this.staffProfileRepository.findOne({
       where: { id: payload.sub, status: AccountStatus.ACTIVE },
       relations: { roles: { permissions: true } },
@@ -88,77 +65,61 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Invalid or inactive staff');
     }
 
-    const isSuperAdmin = staff.roles?.some(
-      (role) => role.name === RoleEnum.SUPER_ADMIN,
-    );
-    const assignments = await this.facilityStaffRepository.find({
-      where: { staffId: staff.id, status: ActiveStatus.ACTIVE },
-      relations: { role: { permissions: true } },
-    });
-    const facilities = await this.facilityRepository.find({
-      where: {
-        id: In(assignments.map((item) => item.facilityId)),
-        status: FacilityStatus.ACTIVE,
-      },
-      select: { id: true, name: true, code: true, status: true },
-      order: { name: 'ASC' },
-    });
-    const assignmentsByFacility = assignments.reduce<
-      Map<string, FacilityStaff[]>
-    >((result, assignment) => {
-      const facilityId = String(assignment.facilityId);
-      result.set(facilityId, [
-        ...(result.get(facilityId) ?? []),
-        assignment,
-      ]);
-      return result;
-    }, new Map());
+    const isSuperAdmin = staff.roles?.some((role) => role.name === RoleEnum.SUPER_ADMIN);
+    // const assignments = await this.facilityStaffRepository.find({
+    //   where: { staffId: staff.id, status: ActiveStatus.ACTIVE },
+    //   relations: { role: { permissions: true } },
+    // });
+    // const facilities = await this.facilityRepository.find({
+    //   where: {
+    //     id: In(assignments.map((item) => item.facilityId)),
+    //     status: FacilityStatus.ACTIVE,
+    //   },
+    //   select: { id: true, name: true, code: true, status: true },
+    //   order: { name: 'ASC' },
+    // });
+    // const assignmentsByFacility = assignments.reduce<Map<string, FacilityStaff[]>>(
+    //   (result, assignment) => {
+    //     const facilityId = String(assignment.facilityId);
+    //     result.set(facilityId, [...(result.get(facilityId) ?? []), assignment]);
+    //     return result;
+    //   },
+    //   new Map(),
+    // );
 
-    const mappedFacilities = facilities.map((facility) => {
-      const facilityAssignments =
-        assignmentsByFacility.get(String(facility.id)) ?? [];
-      const roles = facilityAssignments.map((assignment) => ({
-        id: assignment.role.id,
-        name: assignment.role.name,
-        permissions: (assignment.role.permissions ?? []).map((permission) => ({
-          id: permission.id,
-          name: permission.name,
-        })),
-      }));
-      return {
-        id: facility.id,
-        name: facility.name,
-        code: facility.code,
-        status: facility.status,
-        role: roles[0],
-        roles,
-      };
-    });
-    const requestedFacilityId = request.header('x-facility-id') ?? null;
-    const activeFacility =
-      mappedFacilities.find(
-        (facility) => String(facility.id) === String(requestedFacilityId),
-      ) ?? null;
-    const isBootstrapRequest = request.path.endsWith('/auth/me');
+    // const mappedFacilities = facilities.map((facility) => {
+    //   const facilityAssignments = assignmentsByFacility.get(String(facility.id)) ?? [];
+    //   const roles = facilityAssignments.map((assignment) => ({
+    //     id: assignment.role.id,
+    //     name: assignment.role.name,
+    //     permissions: (assignment.role.permissions ?? []).map((permission) => ({
+    //       id: permission.id,
+    //       name: permission.name,
+    //     })),
+    //   }));
+    //   return {
+    //     id: facility.id,
+    //     name: facility.name,
+    //     code: facility.code,
+    //     status: facility.status,
+    //     role: roles[0],
+    //     roles,
+    //   };
+    // });
+    // const requestedFacilityId = request.header('x-facility-id') ?? null;
+    // const activeFacility =
+    //   mappedFacilities.find((facility) => String(facility.id) === String(requestedFacilityId)) ??
+    //   null;
+    // const isBootstrapRequest = request.path.endsWith('/auth/me');
 
-    if (
-      !isSuperAdmin &&
-      mappedFacilities.length > 0 &&
-      !requestedFacilityId &&
-      !isBootstrapRequest
-    ) {
-      throw new ForbiddenException(
-        RESPONSE_MESSAGES.FACILITY_SELECTION_REQUIRED,
-      );
-    }
-    if (
-      !isSuperAdmin &&
-      requestedFacilityId &&
-      !activeFacility &&
-      !isBootstrapRequest
-    ) {
-      throw new ForbiddenException(RESPONSE_MESSAGES.FACILITY_NOT_ASSIGNED);
-    }
+    // if (!isSuperAdmin &&
+    //   mappedFacilities.length > 0 && !requestedFacilityId && !isBootstrapRequest
+    // ) {
+    //   throw new ForbiddenException(RESPONSE_MESSAGES.FACILITY_SELECTION_REQUIRED);
+    // }
+    // if (!isSuperAdmin && requestedFacilityId && !activeFacility && !isBootstrapRequest) {
+    //   throw new ForbiddenException(RESPONSE_MESSAGES.FACILITY_NOT_ASSIGNED);
+    // }
 
     return {
       id: staff.id,
@@ -174,10 +135,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         permissions: (role.permissions ?? []).map(({ id, name }) => ({ id, name })),
       })),
       permissionOverrides: [],
-      facilities: mappedFacilities,
-      facilityRole: activeFacility?.role ?? null,
-      facilityRoles: activeFacility?.roles ?? [],
-      activeFacilityId: isSuperAdmin ? null : requestedFacilityId,
+      facilities: [],
+      facilityRole: null,
+      facilityRoles: [],
+      activeFacilityId: null,
     };
   }
 }

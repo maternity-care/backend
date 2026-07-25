@@ -1,12 +1,16 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateRoomDto } from './dto/requests/create-room.dto';
 import { UpdateRoomDto } from './dto/requests/update-room.dto';
 import { Room } from './entities/room.entity';
 import { Facility } from '../facilities/entities/facility.entity';
-import { IRoomsRepository, ROOMS_REPOSITORY, RoomWithDetails } from './interfaces/rooms-repository.interface';
+import {
+  IRoomsRepository,
+  ROOMS_REPOSITORY,
+  RoomWithDetails,
+} from './interfaces/rooms-repository.interface';
 import { FacilitiesService } from '../facilities/facilities.service';
 import { SearchRoomsDto } from './dto/requests/search-rooms.dto';
-import {ROOM_CONSTANT} from '../../common/constants/room.constant';
+import { ROOM_CONSTANT } from '../../common/constants/room.constant';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
 
@@ -20,7 +24,13 @@ export class RoomsService {
 
   async create(dto: CreateRoomDto): Promise<Room> {
     await this.facilitiesService.findById(dto.facilityId);
-    const room = this.roomsRepository.create(dto);
+    const room = this.roomsRepository.create({
+      facilityId: dto.facilityId,
+      name: dto.name,
+      roomTypeId: dto.roomType,
+      floor: dto.floor,
+      status: dto.status,
+    });
     return this.roomsRepository.save(room);
   }
 
@@ -79,7 +89,10 @@ export class RoomsService {
     return { action: 'soft_deleted', affectedCount: dependencyCount };
   }
 
-  async findByFacilityId(facilityId: string, filters?: SearchRoomsDto): Promise<{ facility: Facility; rooms: RoomWithDetails[] }> {
+  async findByFacilityId(
+    facilityId: string,
+    filters?: SearchRoomsDto,
+  ): Promise<{ facility: Facility; rooms: RoomWithDetails[] }> {
     const facility = await this.facilitiesService.findById(facilityId);
     if (!facility) {
       throw new NotFoundException(RESPONSE_MESSAGES.FACILITY_NOT_FOUND);
@@ -93,7 +106,7 @@ export class RoomsService {
       }
       return {
         facility,
-        rooms: (paged as any),
+        rooms: paged as any,
       } as any;
     }
 
@@ -105,15 +118,23 @@ export class RoomsService {
     };
   }
 
-  async findAllWithRooms(facility?: string, opts?: { facilityPage?: number; facilityLimit?: number; roomPage?: number; roomLimit?: number }):
-    Promise<any> {
+  async findAllWithRooms(
+    facility?: string,
+    opts?: { facilityPage?: number; facilityLimit?: number; roomPage?: number; roomLimit?: number },
+  ): Promise<any> {
     // nếu paginate facilities
     if (opts?.facilityPage) {
-      const facilitiesPaged = await this.facilitiesService.findAllPaginated({ page: opts.facilityPage, limit: opts.facilityLimit } as any);
+      const facilitiesPaged = await this.facilitiesService.findAllPaginated({
+        page: opts.facilityPage,
+        limit: opts.facilityLimit,
+      } as any);
       const items = await Promise.all(
         facilitiesPaged.items.map(async (facility) => {
           if (opts?.roomPage || opts?.roomLimit) {
-            const roomsPaged = await this.roomsRepository.findByFacilityIdPaginated!(facility.id, { page: opts.roomPage, limit: opts.roomLimit } as any);
+            const roomsPaged = await this.roomsRepository.findByFacilityIdPaginated!(facility.id, {
+              page: opts.roomPage,
+              limit: opts.roomLimit,
+            } as any);
             return { facility, rooms: roomsPaged };
           }
           const rooms = await this.roomsRepository.findByFacilityId(facility.id);
@@ -136,7 +157,10 @@ export class RoomsService {
       facilities.map(async (facility) => {
         try {
           if (opts?.roomPage || opts?.roomLimit) {
-            const roomsPaged = await this.roomsRepository.findByFacilityIdPaginated!(facility.id, { page: opts.roomPage, limit: opts.roomLimit } as any);
+            const roomsPaged = await this.roomsRepository.findByFacilityIdPaginated!(facility.id, {
+              page: opts.roomPage,
+              limit: opts.roomLimit,
+            } as any);
             return { facility, rooms: roomsPaged };
           }
           const rooms = await this.roomsRepository.findByFacilityId(facility.id);

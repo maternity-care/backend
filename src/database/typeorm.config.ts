@@ -48,7 +48,7 @@ import { StaffPasswordResetToken } from '../modules/auth/entities/staff-password
 import { StaffRefreshToken } from '../modules/auth/entities/staff-refresh-token.entity';
 import { StaffRole } from './entities/staff-role.entity';
 import { User } from '../modules/users/entities/user.entity';
-import { UserAuth } from './entities/user-auth.entity';
+import { UserAuth } from '../modules/auth/entities/user-auth.entity';
 import { AppointmentDisruptionItem } from '../modules/doctor-shifts/entities/appointment-disruption-item.entity';
 import { Notification } from '../modules/notifications/entities/notification.entity';
 import { UpdateArchitectureDatabase1784909936253 } from './migrations/1784909936253-UpdateArchitectureDatabase';

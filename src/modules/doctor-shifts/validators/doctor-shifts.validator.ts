@@ -1,10 +1,14 @@
 import { ConflictException, Inject, Injectable } from '@nestjs/common';
-import { ActiveStatus, DoctorShiftStatus, FacilityStatus } from '../../../common/constants/status.enum';
+import {
+  ActiveStatus,
+  DoctorShiftStatus,
+  FacilityStatus,
+} from '../../../common/constants/status.enum';
 import { DOCTOR_SHIFT_CONSTANT } from '../../../common/constants/doctor-shift.constant';
 import { Facility } from '../../facilities/entities/facility.entity';
 import { FacilitiesService } from '../../facilities/facilities.service';
 import { RoomsService } from '../../rooms/rooms.service';
-import { DoctorShift } from '../entities/shift.entity';
+import { Shift } from '../entities/shift.entity';
 import { CheckShiftConflictDto } from '../dto/requests/check-shift-conflict.dto';
 import { CreateDoctorShiftDto } from '../dto/requests/create-doctor-shift.dto';
 import { DoctorAvailabilityQueryDto } from '../dto/requests/doctor-availability.dto';
@@ -32,30 +36,31 @@ export class DoctorShiftsValidator {
   ) {}
 
   async validateForCreate(dto: CreateDoctorShiftDto): Promise<void> {
-    
     const facility = await this.validateReferences(dto.doctorId, dto.facilityId, dto.roomId);
 
     validateSchedule(dto.shiftDate, dto.startTime, dto.endTime, true);
     validateStatusDetails(dto.status, dto.roomId);
     validateFacilityHours(facility, dto.startTime, dto.endTime, dto.status);
-    
+
     throwIfConflicted(await this.repository.findConflicts(dto));
   }
 
-  async validateForUpdate(shift: DoctorShift): Promise<void> {
-    const facility = await this.validateReferences(shift.doctorId, shift.facilityId, shift.roomId);
+  async validateForUpdate(shift: Shift): Promise<void> {
+    const facility = await this.validateReferences(shift.staffId, shift.facilityId, shift.roomId);
     validateSchedule(shift.shiftDate, shift.startTime, shift.endTime, false);
     validateStatusDetails(shift.status, shift.roomId);
     validateFacilityHours(facility, shift.startTime, shift.endTime, shift.status);
     if (shift.status !== DoctorShiftStatus.CANCELLED) {
-      throwIfConflicted(await this.repository.findConflicts({
-        doctorId: shift.doctorId,
-        roomId: shift.roomId,
-        shiftDate: shift.shiftDate,
-        startTime: shift.startTime,
-        endTime: shift.endTime,
-        excludeShiftId: shift.id,
-      }));
+      throwIfConflicted(
+        await this.repository.findConflicts({
+          doctorId: shift.staffId,
+          roomId: shift.roomId,
+          shiftDate: shift.shiftDate,
+          startTime: shift.startTime,
+          endTime: shift.endTime,
+          excludeShiftId: shift.id,
+        }),
+      );
     }
   }
 
@@ -73,13 +78,13 @@ export class DoctorShiftsValidator {
     query: DoctorAvailabilityQueryDto,
   ): Promise<void> {
     await this.ensureActiveFacility(query.facilityId);
-    if (!await this.repository.isDoctorAssignedToFacility(doctorId, query.facilityId)) {
+    if (!(await this.repository.isDoctorAssignedToFacility(doctorId, query.facilityId))) {
       throw new ConflictException(DOCTOR_SHIFT_CONSTANT.DOCTOR_NOT_ASSIGNED);
     }
   }
 
-  // trả về start, end của tuần, 
-  // đồng thời kiểm tra xem cơ sở y tế có hợp lệ không, 
+  // trả về start, end của tuần,
+  // đồng thời kiểm tra xem cơ sở y tế có hợp lệ không,
   // nếu không hợp lệ thì ném ra lỗi xung đột.
   async prepareWeeklyRange(
     facilityId: string,
@@ -88,7 +93,7 @@ export class DoctorShiftsValidator {
   ): Promise<{ start: string; end: string }> {
     await this.ensureActiveFacility(facilityId);
     // nếu có doctorId nhưng bác sĩ không được chỉ định cho cơ sở y tế, ném ra lỗi xung đột.
-    if (doctorId && !await this.repository.isDoctorAssignedToFacility(doctorId, facilityId)) {
+    if (doctorId && !(await this.repository.isDoctorAssignedToFacility(doctorId, facilityId))) {
       throw new ConflictException(DOCTOR_SHIFT_CONSTANT.DOCTOR_NOT_ASSIGNED);
     }
     const start = weekStart ?? currentWeekStart();
@@ -103,7 +108,7 @@ export class DoctorShiftsValidator {
     roomId?: string | null,
   ): Promise<Facility> {
     const facility = await this.ensureActiveFacility(facilityId);
-    if (!await this.repository.isDoctorAssignedToFacility(doctorId, facilityId)) {
+    if (!(await this.repository.isDoctorAssignedToFacility(doctorId, facilityId))) {
       throw new ConflictException(DOCTOR_SHIFT_CONSTANT.DOCTOR_NOT_ASSIGNED);
     }
     if (roomId) {
@@ -114,7 +119,6 @@ export class DoctorShiftsValidator {
     }
     return facility;
   }
-
 
   //kiem tra status facility
   private async ensureActiveFacility(facilityId: string): Promise<Facility> {
