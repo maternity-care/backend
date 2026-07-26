@@ -10,7 +10,12 @@ import {
   UpdateFacilityClosureDayDto,
 } from './dto/requests/facility-closure-day.dto';
 import { LookupFacilityDto, SearchFacilityDto } from './dto/requests/search-facility.dto';
-import { FacilityClosureDayResponseDto, FacilityLookupResponseDto, FacilityResponseDto } from './dto/responds/facilities-respond';
+import {
+  FacilityClosureDayResponseDto,
+  FacilityLookupResponseDto,
+  FacilityPaginatedResponseDto,
+  FacilityResponseDto,
+} from './dto/responds/facilities-respond';
 import { HttpException } from '@nestjs/common';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -34,7 +39,7 @@ export class FacilitiesController {
 
   @Get()
   @ApiOperation({ summary: 'List facilities' })
-  @ApiResponse({ status: 200, description: 'Facilities found', type: [FacilityResponseDto] })
+  @ApiResponse({ status: 200, description: 'Facilities found', type: FacilityPaginatedResponseDto })
   async findAll(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: SearchFacilityDto,

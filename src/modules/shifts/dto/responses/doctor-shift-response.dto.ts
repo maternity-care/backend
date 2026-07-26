@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DoctorShiftStatus } from '../../../../common/constants/status.enum';
+import { PaginationMetaResponseDto } from '../../../../common/dto/pagination-response.dto';
 
 export class DoctorShiftResponseDto {
   @ApiProperty()
@@ -73,4 +74,9 @@ export class DoctorShiftResponseDto {
 
   @ApiPropertyOptional({ nullable: true })
   slotName?: string | null;
+}
+
+export class DoctorShiftPaginatedResponseDto extends PaginationMetaResponseDto {
+  @ApiProperty({ type: [DoctorShiftResponseDto] })
+  items: DoctorShiftResponseDto[];
 }
