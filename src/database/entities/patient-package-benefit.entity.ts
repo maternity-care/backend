@@ -1,3 +1,4 @@
+import { User } from './../../modules/users/entities/user.entity';
 import { Service } from './../../modules/services/entities/service.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
@@ -24,6 +25,13 @@ export class PatientPackageBenefit {
   @ApiProperty({ type: String })
   @Column({ name: 'user_id', type: 'bigint' })
   userId: string;
+
+  @ManyToOne(() => User, (user) => user.packageBenefits, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'user_id' })
+  user: User;
 
   @ApiProperty({ type: String })
   @Column({ name: 'service_id', type: 'bigint' })

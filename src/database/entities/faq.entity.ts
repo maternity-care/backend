@@ -1,9 +1,11 @@
+import { Staff } from './../../modules/staffs/entities/staff.entity';
 import { FaqStatusEnum } from './../../common/constants/status.enum';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
   CreateDateColumn,
   Entity,
+  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -13,6 +15,10 @@ export class Faq {
   @ApiProperty({ type: String, example: '1' })
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: string;
+
+  @ApiProperty({ type: String })
+  @ManyToOne(() => Staff, { nullable: true })
+  author: string;
 
   @ApiProperty({ type: String })
   @Column({ name: 'author_id', type: 'bigint' })

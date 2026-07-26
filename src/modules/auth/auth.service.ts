@@ -207,6 +207,7 @@ export class AuthService {
 
   async managementLogin(dto: LoginDto): Promise<AuthResponseDto> {
     const staff = await this.staffRepository.findByEmailWithPassword(dto.email);
+    console.log("==============data: ", staff);
     if (!staff || staff.status !== AccountStatus.ACTIVE) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -214,6 +215,7 @@ export class AuthService {
     if (!isValidPassword) {
       throw new UnauthorizedException('Invalid credentials');
     }
+    console.log("=============Here=============");
 
     return this.createStaffAuthResponse(staff);
   }
@@ -459,11 +461,13 @@ export class AuthService {
 
   private async createStaffAuthResponse(staff: Staff): Promise<AuthResponseDto> {
     const refreshToken = this.generateRefreshToken();
+    console.log("=============Here2=============");
     const payload: JwtPayload = {
       sub: staff.id,
       email: staff.email,
       accountType: 'staff',
     };
+    console.log("=============Here3=============");
     await this.staffRefreshTokenRepository.save(
       this.staffRefreshTokenRepository.create({
         staffId: staff.id,
@@ -473,6 +477,7 @@ export class AuthService {
         replacedByTokenHash: null,
       }),
     );
+    console.log("=============Here4=============");
     const { password: _password, ...safeStaff } = staff;
     return {
       access_token: await this.jwtService.signAsync(payload),

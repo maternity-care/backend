@@ -4,15 +4,20 @@ import {
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { StaffPermission } from './staff-permission.entity';
 
 @Entity('permissions')
 export class Permission {
   @ApiProperty({ type: String, example: '1' })
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: string;
+
+  @OneToMany(() => StaffPermission, (staffPermission) => staffPermission.permissionId)
+  staffPermissions: StaffPermission[];
 
   @ApiProperty({ type: String })
   @Column({ name: 'name', type: 'varchar', length: 150, unique: true })
