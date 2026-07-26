@@ -169,7 +169,6 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
       .addSelect('facility.name', 'facilityName')
       .addSelect('facility.address', 'facilityAddress')
       .addSelect('facility.province', 'facilityProvince')
-      .addSelect('facility.district', 'facilityDistrict')
       .addSelect('service.code', 'serviceCode')
       .addSelect('service.name', 'serviceName')
       .addSelect('service.description', 'serviceDescription')
