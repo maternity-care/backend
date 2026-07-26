@@ -224,8 +224,10 @@ export class ShiftsValidator {
 
     const schedule = await this.facilitiesService.getOperatingHours(facilityId);
     const dayOfWeek = workingDayOf(shiftDate);
+    const nextDayOfWeek = workingDayOf(addDays(shiftDate, 1));
     const operatingHour = schedule.operatingHours.find(item => item.dayOfWeek === dayOfWeek);
-    validateFacilityHours(operatingHour, startTime, endTime, status);
+    const nextOperatingHour = schedule.operatingHours.find(item => item.dayOfWeek === nextDayOfWeek);
+    validateFacilityHours(operatingHour, startTime, endTime, status, nextOperatingHour);
   }
 
   /** Chỉ cho xếp lịch ở facility đang hoạt động. */

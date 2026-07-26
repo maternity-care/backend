@@ -46,18 +46,9 @@ export class RoomsController {
       if (activeFacilityId) {
         query.facilityId = activeFacilityId;
       }
-      if (query?.page) {
-        const paged = await this.roomsService.findAllPaginated(query);
-        return {
-          message: RESPONSE_MESSAGES.ROOMS.GET_LIST_SUCCESS,
-          data: paged,
-        };
-      }
-
-      const rooms = await this.roomsService.findAll(query);
       return {
         message: RESPONSE_MESSAGES.ROOMS.GET_LIST_SUCCESS,
-        data: rooms,
+        data: await this.roomsService.findAllPaginated(query),
       };
     } catch (error) {
       this.handleError(error);
@@ -104,16 +95,9 @@ export class RoomsController {
   @ApiResponse({ status: 200, type: [RoomTypeResponseDto] })
   async findAllRoomTypes(@Query() query: SearchRoomTypesDto) {
     try {
-      if (query?.page) {
-        return {
-          message: RESPONSE_MESSAGES.ROOM_TYPES.GET_LIST_SUCCESS,
-          data: await this.roomsService.findAllRoomTypesPaginated(query),
-        };
-      }
-
       return {
         message: RESPONSE_MESSAGES.ROOM_TYPES.GET_LIST_SUCCESS,
-        data: await this.roomsService.findAllRoomTypes(query),
+        data: await this.roomsService.findAllRoomTypesPaginated(query),
       };
     } catch (error) {
       this.handleError(error);

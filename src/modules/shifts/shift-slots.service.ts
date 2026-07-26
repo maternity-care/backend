@@ -9,7 +9,12 @@ import { FacilitiesService } from '../facilities/facilities.service';
 import { CreateShiftSlotDto } from './dto/requests/create-shift-slot.dto';
 import { LookupShiftSlotDto, SearchShiftSlotDto } from './dto/requests/search-shift-slot.dto';
 import { UpdateShiftSlotDto } from './dto/requests/update-shift-slot.dto';
-import { normalizeTime } from './helpers/shifts.helper';
+import {
+  getTimeRangeDurationMinutes,
+  isOvernightRange,
+  normalizeTime,
+  timesOverlap,
+} from './helpers/shifts.helper';
 
 @Injectable()
 export class ShiftSlotsService {
@@ -25,6 +30,7 @@ export class ShiftSlotsService {
     this.validateSlotTime(dto.startTime, dto.endTime);
 
     const status = dto.status ?? ActiveStatus.ACTIVE;
+    const isOvernight = isOvernightRange(dto.startTime, dto.endTime);
     const code = await this.generateUniqueCode(dto.facilityId, dto.name);
     await this.ensureUniqueSlot(dto.facilityId, dto.name);
     if (status === ActiveStatus.ACTIVE) {
@@ -38,7 +44,7 @@ export class ShiftSlotsService {
       name: dto.name,
       startTime: normalizeTime(dto.startTime),
       endTime: normalizeTime(dto.endTime),
-      isOvernight: dto.isOvernight ?? false,
+      isOvernight,
       status,
     });
 
@@ -121,6 +127,7 @@ export class ShiftSlotsService {
     }
 
     this.validateSlotTime(targetStartTime, targetEndTime);
+    const targetIsOvernight = isOvernightRange(targetStartTime, targetEndTime);
 
     if (targetStatus === ActiveStatus.ACTIVE) {
       await this.ensureSlotFitsFacilityOperatingHours(targetFacilityId, targetStartTime, targetEndTime);
@@ -136,7 +143,7 @@ export class ShiftSlotsService {
     if (targetFacilityId !== slot.facilityId) slot.facilityId = targetFacilityId;
     if (dto.startTime !== undefined) slot.startTime = normalizeTime(dto.startTime);
     if (dto.endTime !== undefined) slot.endTime = normalizeTime(dto.endTime);
-    if (dto.isOvernight !== undefined) slot.isOvernight = dto.isOvernight;
+    slot.isOvernight = targetIsOvernight;
     if (dto.status !== undefined) slot.status = dto.status;
 
     return this.repository.save(slot);
@@ -194,8 +201,12 @@ export class ShiftSlotsService {
   private validateSlotTime(startTime: string, endTime: string): void {
     const normalizedStart = normalizeTime(startTime);
     const normalizedEnd = normalizeTime(endTime);
-    if (normalizedStart >= normalizedEnd) {
+    if (normalizedStart === normalizedEnd) {
       throw new BadRequestException(RESPONSE_MESSAGES.SHIFT_SLOTS.END_TIME_AFTER_START_TIME);
+    }
+    const duration = getTimeRangeDurationMinutes(normalizedStart, normalizedEnd);
+    if (duration < 15 || duration > 12 * 60) {
+      throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.DURATION_INVALID);
     }
   }
 
@@ -230,13 +241,13 @@ export class ShiftSlotsService {
       .createQueryBuilder('slot')
       .where('slot.facilityId = :facilityId', { facilityId })
       .andWhere('slot.deletedAt IS NULL')
-      .andWhere('slot.status = :status', { status: ActiveStatus.ACTIVE })
-      .andWhere('slot.startTime < :endTime', { endTime: normalizeTime(endTime) })
-      .andWhere('slot.endTime > :startTime', { startTime: normalizeTime(startTime) });
+      .andWhere('slot.status = :status', { status: ActiveStatus.ACTIVE });
 
     if (excludeId) query.andWhere('slot.id != :excludeId', { excludeId });
 
-    const existing = await query.getOne();
+    const existing = (await query.getMany()).find(slot =>
+      timesOverlap(startTime, endTime, slot.startTime, slot.endTime),
+    );
     if (existing) {
       throw new ConflictException({
         message: RESPONSE_MESSAGES.SHIFT_SLOTS.TIME_OVERLAP,
@@ -256,10 +267,21 @@ export class ShiftSlotsService {
     const normalizedStart = normalizeTime(startTime);
     const normalizedEnd = normalizeTime(endTime);
     const schedule = await this.facilitiesService.getOperatingHours(facilityId);
-    const fitsAtLeastOneOpenDay = schedule.operatingHours.some(item => {
+    const operatingHours = schedule.operatingHours;
+    const fitsAtLeastOneOpenDay = operatingHours.some((item, index) => {
       if (item.isClosed || !item.openTime || !item.closeTime) return false;
-      return normalizedStart >= normalizeTime(String(item.openTime))
-        && normalizedEnd <= normalizeTime(String(item.closeTime));
+      const openTime = normalizeTime(String(item.openTime));
+      const closeTime = normalizeTime(String(item.closeTime));
+      if (!isOvernightRange(normalizedStart, normalizedEnd)) {
+        return normalizedStart >= openTime && normalizedEnd <= closeTime;
+      }
+
+      const nextItem = operatingHours[(index + 1) % operatingHours.length];
+      if (!nextItem || nextItem.isClosed || !nextItem.openTime || !nextItem.closeTime) return false;
+      return normalizedStart >= openTime
+        && '23:59:00' <= closeTime
+        && '00:00:00' >= normalizeTime(String(nextItem.openTime))
+        && normalizedEnd <= normalizeTime(String(nextItem.closeTime));
     });
 
     if (!fitsAtLeastOneOpenDay) {
