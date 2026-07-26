@@ -172,9 +172,9 @@ export class PregnancyProfileService {
 
     if (confirmed) {
       await this.pregnancyProfileRepository.softDelete(
-        profile.deletedBy,
+        profile.deletedBy as string,
         pregnancyId,
-        profile.deletedReason,
+        profile.deletedReason as string,
       );
       return profile;
     } else {

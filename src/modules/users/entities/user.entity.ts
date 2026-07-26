@@ -62,10 +62,10 @@ export class User {
   @Column({ name: 'emergency_contact_phone', type: 'varchar', length: 20, nullable: true })
   emergencyContactPhone: string | null;
 
-  @OneToMany(() => Notification, (notification) => notification.user)
+  @OneToMany(() => Notification, (notification) => notification.userId)
   notifications: Notification[];
 
-  @OneToMany(() => PatientPackageBenefit, (packageBenefits) => packageBenefits.user)
+  @OneToMany(() => PatientPackageBenefit, (packageBenefits) => packageBenefits.userId)
   packageBenefits: PatientPackageBenefit[];
 
   @ApiPropertyOptional({ type: Object, nullable: true, required: false })

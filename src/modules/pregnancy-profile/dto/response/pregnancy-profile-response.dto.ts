@@ -1,3 +1,5 @@
+import { MedicalRecord } from '../../../medical-records/entities/medical-record.entity';
+import { User } from './../../../users/entities/user.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class PregnancyProfileResponseDto {
@@ -59,27 +61,8 @@ export class PregnancyProfileResponseDto {
   deletedReason?: string;
 
   @ApiPropertyOptional()
-  user?: {
-    id: string;
-    name: string;
-    email: string;
-    phone: string;
-    status: string;
-    createdAt: Date;
-    updatedAt: Date;
-  };
+  user?: User;
 
   @ApiPropertyOptional()
-  userProfile?: {
-    dateOfBirth: string;
-    address: string;
-    province: string;
-    district: string;
-    ward: string;
-    emergencyContactName: string;
-    emergencyContactPhone: string;
-    metadata: Record<string, unknown>;
-    createdAt: Date;
-    updatedAt: Date;
-  };
+  medicalRecords?: MedicalRecord[];
 }

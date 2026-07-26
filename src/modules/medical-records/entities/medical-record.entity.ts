@@ -1,5 +1,5 @@
-import { PregnancyProfile } from './../../modules/pregnancy-profile/entities/pregnancy-profile.entity';
-import { Staff } from './../../modules/staffs/entities/staff.entity';
+import { PregnancyProfile } from '../../pregnancy-profile/entities/pregnancy-profile.entity';
+import { Staff } from '../../staffs/entities/staff.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   Column,
@@ -7,10 +7,12 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Appointment } from './appointment.entity';
+import { Appointment } from '../../../database/entities/appointment.entity';
+import { MedicalFile } from '../../../database/entities/medical-file.entity';
 
 @Entity('medical_records')
 export class MedicalRecord {
@@ -60,6 +62,9 @@ export class MedicalRecord {
   @ApiPropertyOptional({ type: Date, nullable: true, required: false })
   @Column({ name: 'next_appointment_suggested_at', type: 'timestamp', nullable: true })
   nextAppointmentSuggestedAt: Date | null;
+
+  @OneToMany(() => MedicalFile, (file) => file.medicalRecord, { nullable: true })
+  files: MedicalFile[];
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })

@@ -89,7 +89,7 @@ export class Facility {
   @Column({ name: 'status', type: 'varchar', length: 50 })
   status: string;
 
-  @OneToMany(() => Appointment, (appointment) => appointment.facility)
+  @OneToMany(() => Appointment, (appointment) => appointment.facilityId)
   appointments: Appointment[];
 
   @ApiProperty({ type: Date })
