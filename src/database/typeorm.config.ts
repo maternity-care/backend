@@ -46,7 +46,6 @@ import { ShiftSlot } from './entities/shift-slot.entity';
 import { Staff } from '../modules/staffs/entities/staff.entity';
 import { StaffPasswordResetToken } from '../modules/auth/entities/staff-password-reset-token.entity';
 import { StaffRefreshToken } from '../modules/auth/entities/staff-refresh-token.entity';
-import { StaffRole } from './entities/staff-role.entity';
 import { User } from '../modules/users/entities/user.entity';
 import { UserAuth } from '../modules/auth/entities/user-auth.entity';
 import { Notification } from '../modules/notifications/entities/notification.entity';
@@ -108,12 +107,11 @@ export const typeOrmConfig: DataSourceOptions = {
     PregnancyHistoryEvent,
     PregnancyProfile,
     RolePermission,
-    StaffRole,
     ShiftSlot,
     StaffPermission,
     join(__dirname, 'entities', '*.entity{.ts,.js}'),
   ],
-  migrations: [join(__dirname, 'migrations', '*.ts')],
+  migrations: [],
   charset: 'utf8mb4_unicode_ci',
 };
 

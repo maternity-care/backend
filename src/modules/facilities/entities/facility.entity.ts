@@ -1,3 +1,5 @@
+import { Appointment } from './../../../database/entities/appointment.entity';
+import { FacilityService } from './../../facility-services/entities/facility-service.entity';
 import { Staff } from './../../staffs/entities/staff.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { FacilityClosureDay } from './facility-closure-day.entity';
@@ -60,6 +62,9 @@ export class Facility {
   @Column({ name: 'email', type: 'varchar', length: 191 })
   email: string;
 
+  @OneToMany(() => FacilityService, (facilityService) => facilityService.facility)
+  facilityServices: FacilityService[];
+
   @ApiProperty({ type: String })
   @Column({ name: 'address', type: 'varchar', length: 255 })
   address: string;
@@ -83,6 +88,9 @@ export class Facility {
   @ApiProperty({ type: String })
   @Column({ name: 'status', type: 'varchar', length: 50 })
   status: string;
+
+  @OneToMany(() => Appointment, (appointment) => appointment.facilityId)
+  appointments: Appointment[];
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
