@@ -1,3 +1,4 @@
+import { MedicalRecord } from '../../medical-records/entities/medical-record.entity';
 import { PregnancyProfileStatus, RiskLevel } from './../../../common/constants/status.enum';
 import { User } from './../../users/entities/user.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -8,6 +9,7 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -77,8 +79,14 @@ export class PregnancyProfile {
   status: PregnancyProfileStatus;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'notes', type: 'text' })
-  notes: string;
+  @Column({ name: 'notes', type: 'text', nullable: true })
+  notes: string | null;
+
+  @ApiProperty({ type: [MedicalRecord] })
+  @OneToMany(() => MedicalRecord, (medicalRecord) => medicalRecord.pregnancyProfile, {
+    nullable: true,
+  })
+  medicalRecords: MedicalRecord[] | null;
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
@@ -97,10 +105,10 @@ export class PregnancyProfile {
   deletedAt: Date | null;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'deleted_by', type: 'bigint' })
-  deletedBy: string;
+  @Column({ name: 'deleted_by', type: 'bigint', nullable: true })
+  deletedBy: string | null;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'deleted_reason', type: 'text' })
-  deletedReason: string;
+  @Column({ name: 'deleted_reason', type: 'text', nullable: true })
+  deletedReason: string | null;
 }

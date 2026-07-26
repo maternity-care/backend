@@ -24,7 +24,7 @@ export class Service {
   @Column({ name: 'name', type: 'varchar', length: 255 })
   name: string;
 
-  @OneToMany(() => FacilityService, (facilityService) => facilityService.service)
+  @OneToMany(() => FacilityService, (facilityService) => facilityService.serviceId)
   facilityServices: FacilityService[];
 
   @ApiProperty({ type: String })

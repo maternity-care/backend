@@ -7,7 +7,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { MedicalRecord } from './medical-record.entity';
+import { MedicalRecord } from '../../modules/medical-records/entities/medical-record.entity';
 
 @Entity('medical_files')
 export class MedicalFile {
