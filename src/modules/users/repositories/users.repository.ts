@@ -44,11 +44,6 @@ export class UsersRepository implements IUsersRepository {
   findByEmailWithPassword(email: string): Promise<User | null> {
     return this.repository
       .createQueryBuilder('user')
-      .addSelect('user.password')
-      .leftJoinAndSelect('user.roles', 'role')
-      .leftJoinAndSelect('role.permissions', 'permission')
-      .leftJoinAndSelect('user.permissionOverrides', 'permissionOverride')
-      .leftJoinAndSelect('permissionOverride.permission', 'overridePermission')
       .where('user.email = :email', { email })
       .getOne();
   }
@@ -65,12 +60,7 @@ export class UsersRepository implements IUsersRepository {
   async searchUsers(query: SearchUserDto): Promise<SearchUserResponseDto> {
     const offset = Number(((Number(query?.page) || 1) - 1) * (query?.limit || 10)) || 0;
     const limit = Number(query.limit) || 10;
-    const qb = this.repository
-      .createQueryBuilder('user')
-      .leftJoinAndSelect('user.roles', 'role')
-      .leftJoinAndSelect('role.permissions', 'permission')
-      .leftJoinAndSelect('user.permissionOverrides', 'permissionOverride')
-      .leftJoinAndSelect('permissionOverride.permission', 'overridePermission');
+    const qb = this.repository.createQueryBuilder('user');
 
     const keyword = parseSearch(query.search).find((filter) => filter.field === 'keyword')
       ?.values[0];
@@ -82,7 +72,6 @@ export class UsersRepository implements IUsersRepository {
     }
     searchBuilder(qb, query.search, {
       columns: ['name', 'email', 'phone', 'status'],
-      relations: { roles: ['id', 'name'] },
     });
 
     if (query.name) {
@@ -106,12 +95,6 @@ export class UsersRepository implements IUsersRepository {
     if (query.status !== undefined) {
       qb.andWhere('user.status = :status', {
         status: query.status,
-      });
-    }
-
-    if (query.roleId) {
-      qb.andWhere('role.id = :roleId', {
-        roleId: query.roleId,
       });
     }
 
