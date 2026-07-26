@@ -46,9 +46,7 @@ export class ShiftsController {
    @Query() query: SearchDoctorShiftDto) {
     const activeFacilityId = getActiveFacilityId(user);
     if (activeFacilityId) query.facilityId = activeFacilityId;
-    const data = query.page
-      ? await this.service.findAllPaginated(query)
-      : await this.service.findAll(query);
+    const data = await this.service.findAllPaginated(query);
     return { message: RESPONSE_MESSAGES.SHIFTS.FOUND, data };
   }
 

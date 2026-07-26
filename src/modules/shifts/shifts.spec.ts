@@ -13,7 +13,10 @@ import { UpdateDoctorShiftDto } from './dto/requests/update-doctor-shift.dto';
 import {
   buildShiftDates,
   dateTimeToTime,
+  getTimeRangeDurationMinutes,
+  isOvernightRange,
   minutesToTime,
+  shiftIntervalsOverlap,
   timesOverlap,
   timeToMinutes,
 } from './helpers/shifts.helper';
@@ -34,7 +37,7 @@ import { ShiftSlotsService } from './shift-slots.service';
 describe('DoctorShifts DTO validation', () => {
   const validPayload = {
     doctorId: '1', facilityId: '1', roomId: '2', shiftDate: '2099-07-07',
-    startTime: '08:00', endTime: '12:00', maxAppointments: 10,
+    slotId: '1', maxAppointments: 10,
     status: DoctorShiftStatus.AVAILABLE,
   };
 
@@ -51,8 +54,7 @@ describe('DoctorShifts DTO validation', () => {
   it.each([
     [{ ...validPayload, doctorId: '0' }, 'doctorId'],
     [{ ...validPayload, shiftDate: '07/07/2099' }, 'shiftDate'],
-    [{ ...validPayload, startTime: '25:00' }, 'startTime'],
-    [{ ...validPayload, endTime: '07:00' }, 'endTime'],
+    [{ ...validPayload, slotId: '0' }, 'slotId'],
     [{ ...validPayload, maxAppointments: 101 }, 'maxAppointments'],
     [{ ...validPayload, status: DoctorShiftStatus.FULL }, 'status'],
   ])('rejects invalid create input', async (payload, property) => {
@@ -343,7 +345,7 @@ describe('ShiftsService business validation', () => {
   // Vai tro: dam bao update ca truc khong tu conflict voi chinh ca dang update.
   it('excludes the current shift when checking an update', async () => {
     const { repo, service } = createService();
-    await service.update('10', { startTime: '09:00', endTime: '12:00' });
+    await service.update('10', { startTime: '09:00', endTime: '12:00' } as any);
     expect(repo.findConflicts).toHaveBeenCalledWith(expect.objectContaining({ excludeShiftId: '10' }));
   });
 
@@ -921,7 +923,7 @@ describe('ShiftsService business validation', () => {
       shiftDate: '2099-07-07',
       startTime: '08:00',
       endTime: '12:00',
-    })).resolves.toMatchObject({ hasConflict: true });
+    } as any)).resolves.toMatchObject({ hasConflict: true });
   });
 
   // Vai tro: dam bao ca OFF cua bac si khong can room va khong goi validate room.
@@ -1042,6 +1044,33 @@ describe('DoctorShifts helper functions', () => {
     expect(timesOverlap('08:00', '10:00', '07:00', '08:00')).toBe(false);
   });
 
+  // Vai tro: dam bao ca dem duoc hieu la bat dau hom nay va ket thuc sang ngay mai.
+  it('detects overnight ranges and calculates their duration across midnight', () => {
+    expect(isOvernightRange('18:00', '03:00')).toBe(true);
+    expect(getTimeRangeDurationMinutes('18:00', '03:00')).toBe(9 * 60);
+    expect(minutesToTime(24 * 60 + 30)).toBe('00:30:00');
+  });
+
+  // Vai tro: dam bao conflict ca dem bat duoc ca giao nhau o ngay ke tiep.
+  it('detects absolute overlap between overnight shifts and next-day shifts', () => {
+    expect(shiftIntervalsOverlap(
+      '2099-07-07',
+      '18:00',
+      '03:00',
+      '2099-07-08',
+      '02:00',
+      '04:00',
+    )).toBe(true);
+    expect(shiftIntervalsOverlap(
+      '2099-07-07',
+      '18:00',
+      '03:00',
+      '2099-07-08',
+      '04:00',
+      '06:00',
+    )).toBe(false);
+  });
+
   // Vai tro: dam bao helper sinh ngay ca truc dung theo workingDays trong khoang ngay.
   it('TC-UNIT-DSHIFT-059 builds shift dates that match selected working days', () => {
     expect(buildShiftDates('2099-07-06', '2099-07-10', [
@@ -1112,18 +1141,19 @@ describe('ShiftsController unit routing and scope', () => {
     return { service, controller: new ShiftsController(service as never) };
   };
 
-  // Vai tro: dam bao controller chon list phan trang/khong phan trang theo query.page.
-  it('TC-UNIT-DSHIFT-049 chooses paginated or non-paginated list method by query.page', async () => {
+  // Vai tro: dam bao controller list ca truc luon tra response phan trang de FE dung mot shape duy nhat.
+  it('TC-UNIT-DSHIFT-049 always uses paginated list response', async () => {
     const { service, controller } = createController();
 
     await expect(controller.findAll(superUser as never, { page: 1 } as never)).resolves.toMatchObject({
       data: { total: 1 },
     });
     await expect(controller.findAll(superUser as never, {} as never)).resolves.toMatchObject({
-      data: [shift],
+      data: { items: [shift], total: 1 },
     });
     expect(service.findAllPaginated).toHaveBeenCalledWith({ page: 1 });
-    expect(service.findAll).toHaveBeenCalledWith({});
+    expect(service.findAllPaginated).toHaveBeenCalledWith({});
+    expect(service.findAll).not.toHaveBeenCalled();
   });
 
   // Vai tro: dam bao API weekly schedule bat buoc co facilityId de xac dinh lich co so.
@@ -1138,7 +1168,7 @@ describe('ShiftsController unit routing and scope', () => {
     const { service, controller } = createController();
     service.findById.mockResolvedValueOnce({ ...shift, facilityId: '2' });
 
-    await expect(controller.update(scopedUser as never, '10', { startTime: '09:00' })).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(controller.update(scopedUser as never, '10', { startTime: '09:00' } as any)).rejects.toBeInstanceOf(ForbiddenException);
     expect(service.update).not.toHaveBeenCalled();
   });
 
@@ -1416,7 +1446,8 @@ describe('ShiftsRepository unit query behavior', () => {
     expect(qb.andWhere).toHaveBeenCalledWith('shift.status IN (:...statuses)', {
       statuses: [DoctorShiftStatus.AVAILABLE, DoctorShiftStatus.FULL],
     });
-    expect(qb.orderBy).toHaveBeenCalledWith('shift.startTime', 'ASC');
+    expect(qb.orderBy).toHaveBeenCalledWith('shift.shiftDate', 'ASC');
+    expect(qb.addOrderBy).toHaveBeenCalledWith('shift.startTime', 'ASC');
   });
 
   // Vai tro: dam bao weekly schedule chi them filter doctorId khi client yeu cau lich cua mot bac si cu the.

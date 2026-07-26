@@ -16,9 +16,7 @@ export class ShiftSlotsController {
   @ApiOperation({ summary: 'List shift slots for management' })
   @ApiResponse({ status: 200, type: [ShiftSlotResponseDto] })
   async findAll(@Query() query: SearchShiftSlotDto) {
-    const data = query.page
-      ? await this.service.findAllPaginated(query)
-      : await this.service.findAll(query);
+    const data = await this.service.findAllPaginated(query);
     return {
       message: RESPONSE_MESSAGES.SHIFT_SLOTS.GET_LIST_SUCCESS,
       data,
