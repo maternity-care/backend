@@ -9,8 +9,10 @@ import { RoomResponseDto } from './dto/responds/room-response.dto';
 import { RoomsWithFacilityResponseDto } from './dto/responds/rooms-with-facility-response.dto';
 import {
   RoomLookupResponseDto,
+  RoomPaginatedResponseDto,
   RoomTypeResponseDto,
   RoomTypeLookupResponseDto,
+  RoomTypePaginatedResponseDto,
   RoomWithDetailsResponseDto,
 } from './dto/responses/room-with-details-response.dto';
 import { LookupRoomsDto, LookupRoomTypesDto, SearchRoomsDto, SearchRoomTypesDto } from './dto/requests/search-rooms.dto';
@@ -36,7 +38,7 @@ export class RoomsController {
 
   @Get()
   @ApiOperation({ summary: 'List rooms' })
-  @ApiResponse({ status: 200, description: 'Rooms found', type: [RoomWithDetailsResponseDto] })
+  @ApiResponse({ status: 200, description: 'Rooms found', type: RoomPaginatedResponseDto })
   async findAll(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: SearchRoomsDto,
@@ -92,7 +94,7 @@ export class RoomsController {
 
   @Get('room-types')
   @ApiOperation({ summary: 'List room types' })
-  @ApiResponse({ status: 200, type: [RoomTypeResponseDto] })
+  @ApiResponse({ status: 200, type: RoomTypePaginatedResponseDto })
   async findAllRoomTypes(@Query() query: SearchRoomTypesDto) {
     try {
       return {

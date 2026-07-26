@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ActiveStatus, FacilityStatus } from '../../../../common/constants/status.enum';
+import { PaginationMetaResponseDto } from '../../../../common/dto/pagination-response.dto';
 
 export class RoomWithDetailsResponseDto {
   @ApiProperty()
@@ -117,4 +118,14 @@ export class RoomTypeResponseDto extends RoomTypeLookupResponseDto {
 export class FacilityRoomTypeResponseDto extends RoomTypeLookupResponseDto {
   @ApiProperty({ description: 'So phong dang hoat dong cua co so thuoc loai phong nay' })
   roomCount: number;
+}
+
+export class RoomPaginatedResponseDto extends PaginationMetaResponseDto {
+  @ApiProperty({ type: [RoomWithDetailsResponseDto] })
+  items: RoomWithDetailsResponseDto[];
+}
+
+export class RoomTypePaginatedResponseDto extends PaginationMetaResponseDto {
+  @ApiProperty({ type: [RoomTypeResponseDto] })
+  items: RoomTypeResponseDto[];
 }

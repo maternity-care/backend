@@ -10,6 +10,7 @@ import { RoleEnum } from '../../common/constants/role.enum';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { FacilitiesController } from './facilities.controller';
 import { FacilitiesService } from './facilities.service';
+import { PublicFacilitiesController } from './public.facilities.controller';
 import { Facility } from './entities/facility.entity';
 import { FacilityClosureDay } from './entities/facility-closure-day.entity';
 
@@ -1001,5 +1002,35 @@ describe('FacilitiesController', () => {
     const controller = new FacilitiesController(mockService as any);
 
     await expect(controller.findAll(superAdmin, {} as any)).rejects.toBeInstanceOf(InternalServerErrorException);
+  });
+});
+
+describe('PublicFacilitiesController', () => {
+  const createService = () => ({
+    findAllPaginated: jest.fn(),
+    findDetailsById: jest.fn(),
+  });
+
+  it('returns paginated active facilities for public list', async () => {
+    const service = createService();
+    const paged = { items: [createFacility()], total: 1, page: 1, limit: 20, totalPages: 1 };
+    service.findAllPaginated.mockResolvedValue(paged);
+    const controller = new PublicFacilitiesController(service as any);
+    const query = {} as any;
+
+    await expect(controller.findAll(query)).resolves.toEqual({
+      message: RESPONSE_MESSAGES.FACILITIES.GET_LIST_SUCCESS,
+      data: paged,
+    });
+    expect(query.status).toBe(FacilityStatus.ACTIVE);
+    expect(service.findAllPaginated).toHaveBeenCalledWith(query);
+  });
+
+  it('hides inactive facility detail from public users', async () => {
+    const service = createService();
+    service.findDetailsById.mockResolvedValue(createFacility({ status: FacilityStatus.INACTIVE }));
+    const controller = new PublicFacilitiesController(service as any);
+
+    await expect(controller.findById('fac-1')).rejects.toBeInstanceOf(NotFoundException);
   });
 });

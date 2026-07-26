@@ -4,7 +4,11 @@ import { RESPONSE_MESSAGES } from '../../common/constants/response-message.const
 import { CreateShiftSlotDto } from './dto/requests/create-shift-slot.dto';
 import { LookupShiftSlotDto, SearchShiftSlotDto } from './dto/requests/search-shift-slot.dto';
 import { UpdateShiftSlotDto } from './dto/requests/update-shift-slot.dto';
-import { ShiftSlotLookupResponseDto, ShiftSlotResponseDto } from './dto/responses/shift-slot-response.dto';
+import {
+  ShiftSlotLookupResponseDto,
+  ShiftSlotPaginatedResponseDto,
+  ShiftSlotResponseDto,
+} from './dto/responses/shift-slot-response.dto';
 import { ShiftSlotsService } from './shift-slots.service';
 
 @ApiTags('Management - Shift Slots')
@@ -14,7 +18,7 @@ export class ShiftSlotsController {
 
   @Get()
   @ApiOperation({ summary: 'List shift slots for management' })
-  @ApiResponse({ status: 200, type: [ShiftSlotResponseDto] })
+  @ApiResponse({ status: 200, type: ShiftSlotPaginatedResponseDto })
   async findAll(@Query() query: SearchShiftSlotDto) {
     const data = await this.service.findAllPaginated(query);
     return {

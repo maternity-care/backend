@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ActiveStatus } from '../../../../common/constants/status.enum';
+import { PaginationMetaResponseDto } from '../../../../common/dto/pagination-response.dto';
 
 export class ShiftSlotResponseDto {
   @ApiProperty()
@@ -62,4 +63,9 @@ export class ShiftSlotLookupResponseDto {
   @ApiProperty({ enum: ActiveStatus })
   status: ActiveStatus;
 
+}
+
+export class ShiftSlotPaginatedResponseDto extends PaginationMetaResponseDto {
+  @ApiProperty({ type: [ShiftSlotResponseDto] })
+  items: ShiftSlotResponseDto[];
 }
