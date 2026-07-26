@@ -50,4 +50,6 @@ export class CreateShiftSlotDto {
   @IsEnum(ActiveStatus)
   status?: ActiveStatus = ActiveStatus.ACTIVE;
 
+
+
 }
