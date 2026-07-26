@@ -28,6 +28,7 @@ import { RefreshToken } from '../modules/auth/entities/refresh-token.entity';
           Permission,
           RefreshToken,
           join(__dirname, 'entities', '*.entity{.ts,.js}'),
+          join(__dirname, '..', 'modules', '**', 'entities', '*.entity{.ts,.js}'),
         ],
         autoLoadEntities: true,
         charset: 'utf8mb4_unicode_ci',

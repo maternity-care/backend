@@ -56,7 +56,7 @@ export class MaternityPackage {
   @Column({ name: 'status', type: 'enum', enum: MaternityPackageStatus })
   status: MaternityPackageStatus;
 
-  @OneToMany(() => PackageItem, (item) => item.packageId, {
+  @OneToMany(() => PackageItem, (item) => item.package, {
     onDelete: 'CASCADE',
   })
   packageItems: PackageItem[];

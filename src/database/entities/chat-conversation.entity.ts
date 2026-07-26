@@ -60,7 +60,7 @@ export class ChatConversation {
   status: ConversationStatus;
 
   @ApiProperty({ type: () => [ChatMessage] })
-  @OneToMany(() => ChatMessage, (message) => message.conversationId)
+  @OneToMany(() => ChatMessage, (message) => message.conversation)
   messages: ChatMessage[];
 
   @ApiProperty({ type: Date })

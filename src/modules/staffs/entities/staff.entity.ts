@@ -78,7 +78,7 @@ export class Staff {
   status: AccountStatus;
 
   @ApiProperty({ type: StaffPermission, isArray: true })
-  @OneToMany(() => StaffPermission, (permissions) => permissions.staffId)
+  @OneToMany(() => StaffPermission, (permissions) => permissions.staff)
   permissions: StaffPermission[];
 
   @ApiProperty({ type: Date })

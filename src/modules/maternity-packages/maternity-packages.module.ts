@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MaternityPackage } from './entities/maternity-package.entity';
+import { PackageItem } from '../package-services/entities/package-item.entity';
 import { FacilitiesModule } from '../facilities/facilities.module';
 import { MATERNITY_PACKAGES_REPOSITORY } from './interfaces/maternity-packages-repository.interface';
 import { MaternityPackagesController } from './maternity-packages.controller';
@@ -10,7 +11,7 @@ import { PublicFacilityMaternityPackagesController } from './public-facility-mat
 import { PublicMaternityPackagesController } from './public-maternity-packages.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([MaternityPackage]), FacilitiesModule],
+  imports: [TypeOrmModule.forFeature([MaternityPackage, PackageItem]), FacilitiesModule],
   controllers: [
     MaternityPackagesController,
     PublicMaternityPackagesController,

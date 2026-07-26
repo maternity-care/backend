@@ -4,6 +4,9 @@ import { Staff } from '../entities/staff.entity';
 import { IStaffProfileRepository } from '../interfaces/staff-profile-repository.interface';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { parseSearch } from '../../../common/helpers/search-builder';
+import { SearchUserDto } from '../../users/dto/request/search-user.dto';
+import { SearchUserResponseDto } from '../../users/dto/response/search-user-response.dto';
 
 export class StaffProfileRepository implements IStaffProfileRepository {
   constructor(
@@ -35,6 +38,61 @@ export class StaffProfileRepository implements IStaffProfileRepository {
       relations: { roles: { permissions: true } },
       order: { id: 'ASC' },
     });
+  }
+
+  async searchStaffs(query: SearchUserDto): Promise<SearchUserResponseDto> {
+    const offset = Number(((Number(query?.page) || 1) - 1) * (query?.limit || 10)) || 0;
+    const limit = Number(query.limit) || 10;
+    const qb = this.repository
+      .createQueryBuilder('staff')
+      .leftJoinAndSelect('staff.roles', 'role')
+      .leftJoinAndSelect('role.permissions', 'permission');
+
+    const filters = parseSearch(query.search);
+    const keyword = filters.find((filter) => filter.field === 'keyword')?.values[0];
+    if (keyword) {
+      qb.andWhere(
+        '(staff.name LIKE :keyword OR staff.email LIKE :keyword OR staff.personalEmail LIKE :keyword OR staff.phone LIKE :keyword OR staff.employeeCode LIKE :keyword)',
+        { keyword: `%${keyword}%` },
+      );
+    }
+
+    const role = filters.find((filter) => filter.field === 'role')?.values[0];
+    if (role) {
+      qb.andWhere('role.name = :role', { role });
+    }
+
+    const status = filters.find((filter) => filter.field === 'status')?.values[0] ?? query.status;
+    if (status) {
+      qb.andWhere('staff.status = :status', { status });
+    }
+
+    if (query.name) {
+      qb.andWhere('staff.name LIKE :name', { name: `%${query.name}%` });
+    }
+
+    if (query.email) {
+      qb.andWhere('(staff.email LIKE :email OR staff.personalEmail LIKE :email)', {
+        email: `%${query.email}%`,
+      });
+    }
+
+    if (query.phone) {
+      qb.andWhere('staff.phone LIKE :phone', { phone: `%${query.phone}%` });
+    }
+
+    if (query.roleId) {
+      qb.andWhere('role.id = :roleId', { roleId: query.roleId });
+    }
+
+    qb.orderBy('staff.id', query.sort === 'DESC' ? 'DESC' : 'ASC');
+
+    const [users, total] = await qb.skip(offset).take(limit).getManyAndCount();
+
+    return {
+      users: users as never,
+      total,
+    };
   }
 
   async findById(id: string): Promise<Staff | null> {
