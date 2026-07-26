@@ -1,10 +1,16 @@
-import { NotificationType, NotificationReferenceType } from './../../../common/constants/notification.enum';
+import { User } from './../../users/entities/user.entity';
+import {
+  NotificationType,
+  NotificationReferenceType,
+} from './../../../common/constants/notification.enum';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   Column,
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -22,6 +28,13 @@ export class Notification {
   @ApiProperty({ type: String })
   @Column({ name: 'user_id', type: 'bigint' })
   userId: string;
+
+  @ManyToOne(() => User, (user) => user.notifications, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'user_id' })
+  user: User;
 
   @ApiProperty({ enum: NotificationType, enumName: 'NotificationType' })
   @Column({ name: 'type', type: 'enum', enum: NotificationType })

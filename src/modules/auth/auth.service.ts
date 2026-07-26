@@ -207,7 +207,6 @@ export class AuthService {
 
   async managementLogin(dto: LoginDto): Promise<AuthResponseDto> {
     const staff = await this.staffRepository.findByEmail(dto.email);
-    console.log('staff', staff);
     if (!staff || staff.status !== AccountStatus.ACTIVE) {
       throw new UnauthorizedException('Invalid credentials');
     }

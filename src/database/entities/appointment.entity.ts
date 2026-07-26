@@ -1,3 +1,4 @@
+import { Facility } from './../../modules/facilities/entities/facility.entity';
 import { Staff } from './../../modules/staffs/entities/staff.entity';
 import { Service } from './../../modules/services/entities/service.entity';
 import { Room } from './../../modules/rooms/entities/room.entity';
@@ -30,6 +31,11 @@ export class Appointment {
   @JoinColumn({ name: 'room_id' })
   room: Room;
 
+  @ApiProperty({ type: () => Facility })
+  @ManyToOne(() => Facility, { onDelete: 'RESTRICT', nullable: false })
+  @JoinColumn({ name: 'facility_id' })
+  facility: Facility;
+
   @ApiProperty({ type: () => Service })
   @ManyToOne(() => Service, { onDelete: 'RESTRICT', nullable: false })
   @JoinColumn({ name: 'service_id' })
@@ -51,6 +57,10 @@ export class Appointment {
   @ApiProperty({ type: String })
   @Column({ name: 'room_id', type: 'bigint' })
   roomId: string;
+
+  @ApiProperty({ type: String })
+  @Column({ name: 'facility_id', type: 'bigint' })
+  facilityId: string;
 
   @ApiProperty({ type: String })
   @Column({ name: 'doctor_id', type: 'bigint' })

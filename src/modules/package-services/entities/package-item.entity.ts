@@ -1,8 +1,12 @@
+import { FacilityService } from './../../facility-services/entities/facility-service.entity';
+import { MaternityPackage } from './../../maternity-packages/entities/maternity-package.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -17,9 +21,23 @@ export class PackageItem {
   @Column({ name: 'package_id', type: 'bigint' })
   packageId: string;
 
+  @ManyToOne(() => MaternityPackage, (item) => item.packageItems, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'package_id' })
+  package: MaternityPackage;
+
   @ApiProperty({ type: String })
   @Column({ name: 'facility_service_id', type: 'bigint' })
   facilityServiceId: string;
+
+  @ManyToOne(() => FacilityService, (service) => service.packageItems, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'facility_service_id' })
+  facilityService: FacilityService;
 
   @ApiProperty({ type: Number })
   @Column({ name: 'included_quantity', type: 'int' })

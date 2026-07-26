@@ -1,9 +1,12 @@
+import { PatientPackageBenefit } from './../../../database/entities/patient-package-benefit.entity';
+import { Notification } from './../../notifications/entities/notification.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   Column,
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -58,6 +61,12 @@ export class User {
   @ApiProperty({ type: String })
   @Column({ name: 'emergency_contact_phone', type: 'varchar', length: 20, nullable: true })
   emergencyContactPhone: string | null;
+
+  @OneToMany(() => Notification, (notification) => notification.userId)
+  notifications: Notification[];
+
+  @OneToMany(() => PatientPackageBenefit, (packageBenefits) => packageBenefits.userId)
+  packageBenefits: PatientPackageBenefit[];
 
   @ApiPropertyOptional({ type: Object, nullable: true, required: false })
   @Column({ name: 'metadata', type: 'json', nullable: true })

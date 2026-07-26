@@ -1,3 +1,4 @@
+import { StaffPermission } from './../../permissions/entities/staff-permission.entity';
 import { AccountStatus } from './../../../common/constants/status.enum';
 import { Role } from './../../roles/entities/role.entity';
 import { Facility } from './../../facilities/entities/facility.entity';
@@ -11,6 +12,7 @@ import {
   JoinTable,
   ManyToMany,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -52,8 +54,8 @@ export class Staff {
   employeeCode: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'facility_id', type: 'bigint' })
-  facilityId: string;
+  @Column({ name: 'facility_id', type: 'bigint', nullable: true })
+  facilityId: string | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'email', type: 'varchar', length: 191, unique: true })
@@ -74,6 +76,10 @@ export class Staff {
   @ApiProperty({ enum: AccountStatus, enumName: 'AccountStatus' })
   @Column({ name: 'status', type: 'enum', enum: AccountStatus })
   status: AccountStatus;
+
+  @ApiProperty({ type: StaffPermission, isArray: true })
+  @OneToMany(() => StaffPermission, (permissions) => permissions.staffId)
+  permissions: StaffPermission[];
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })

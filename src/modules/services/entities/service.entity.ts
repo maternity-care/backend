@@ -1,9 +1,11 @@
+import { FacilityService } from './../../facility-services/entities/facility-service.entity';
 import { ActiveStatus } from './../../../common/constants/status.enum';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
   CreateDateColumn,
   Entity,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -21,6 +23,9 @@ export class Service {
   @ApiProperty({ type: String })
   @Column({ name: 'name', type: 'varchar', length: 255 })
   name: string;
+
+  @OneToMany(() => FacilityService, (facilityService) => facilityService.serviceId)
+  facilityServices: FacilityService[];
 
   @ApiProperty({ type: String })
   @Column({ name: 'description', type: 'text' })

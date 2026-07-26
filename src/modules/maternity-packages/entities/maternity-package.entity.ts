@@ -1,3 +1,4 @@
+import { PackageItem } from './../../package-services/entities/package-item.entity';
 import { Facility } from './../../facilities/entities/facility.entity';
 import { MaternityPackageStatus } from './../../../common/constants/status.enum';
 import { ApiProperty } from '@nestjs/swagger';
@@ -7,6 +8,7 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -53,6 +55,11 @@ export class MaternityPackage {
   @ApiProperty({ enum: MaternityPackageStatus, enumName: 'MaternityPackageStatus' })
   @Column({ name: 'status', type: 'enum', enum: MaternityPackageStatus })
   status: MaternityPackageStatus;
+
+  @OneToMany(() => PackageItem, (item) => item.packageId, {
+    onDelete: 'CASCADE',
+  })
+  packageItems: PackageItem[];
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
