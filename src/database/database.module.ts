@@ -2,10 +2,6 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
-import { User } from '../modules/users/entities/user.entity';
-import { Role } from '../modules/roles/entities/role.entity';
-import { Permission } from '../modules/permissions/entities/permission.entity';
-import { RefreshToken } from '../modules/auth/entities/refresh-token.entity';
 
 @Module({
   imports: [
@@ -23,10 +19,6 @@ import { RefreshToken } from '../modules/auth/entities/refresh-token.entity';
         migrationsRun: false,
         logging: configService.get<string>('app.nodeEnv') === 'development',
         entities: [
-          User,
-          Role,
-          Permission,
-          RefreshToken,
           join(__dirname, 'entities', '*.entity{.ts,.js}'),
           join(__dirname, '..', 'modules', '**', 'entities', '*.entity{.ts,.js}'),
         ],
