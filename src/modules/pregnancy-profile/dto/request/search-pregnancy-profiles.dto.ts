@@ -19,6 +19,11 @@ export class SearchProfileQueryDto {
   @IsOptional()
   phone?: string;
 
+  @ApiPropertyOptional({ description: 'Tìm kiếm theo email' })
+  @IsString()
+  @IsOptional()
+  email?: string;
+
   @ApiPropertyOptional({
     description: 'Lọc theo trạng thái thai phụ',
     enum: PregnancyProfileStatus,

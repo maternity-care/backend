@@ -23,7 +23,7 @@ import { HealthMetric } from './entities/health-metric.entity';
 import { Invoice } from './entities/invoice.entity';
 import { MaternityPackage } from '../modules/maternity-packages/entities/maternity-package.entity';
 import { MedicalFile } from './entities/medical-file.entity';
-import { MedicalRecord } from './entities/medical-record.entity';
+import { MedicalRecord } from '../modules/medical-records/entities/medical-record.entity';
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { PackageItem } from '../modules/package-services/entities/package-item.entity';

@@ -65,7 +65,7 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
   async findByPatientId(patientId: string): Promise<PregnancyProfile[]> {
     const profile = await this.repository.find({
       where: { patientId },
-      relations: { user: true },
+      relations: { user: true, medicalRecords: true },
       order: { id: 'DESC' },
     });
     if (!profile) {
@@ -127,6 +127,10 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
   async searchProfiles(
     query: SearchProfileQueryDto,
   ): Promise<{ data: PregnancyProfile[]; total: number }> {
+    query.limit =
+      query.limit && Number(query.limit) > 0 && Number(query.limit) <= 50
+        ? Number(query.limit)
+        : 10;
     const where: FindOptionsWhere<PregnancyProfile> = {};
 
     if (query?.code) {
@@ -147,8 +151,12 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
       userWhere.phone = query.phone;
     }
 
+    if (query?.email) {
+      userWhere.email = query.email;
+    }
+
     const [data, total] = await this.repository.findAndCount({
-      relations: { user: true },
+      relations: { user: true, medicalRecords: true },
       where: {
         ...where,
         user: {

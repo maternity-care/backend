@@ -16,7 +16,9 @@ export class Permission {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: string;
 
-  @OneToMany(() => StaffPermission, (staffPermission) => staffPermission.permissionId)
+  @OneToMany(() => StaffPermission, (staffPermission) => staffPermission.permission, {
+    onDelete: 'CASCADE',
+  })
   staffPermissions: StaffPermission[];
 
   @ApiProperty({ type: String })

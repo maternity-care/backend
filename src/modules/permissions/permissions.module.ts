@@ -6,9 +6,10 @@ import { PermissionsRepository } from './repositories/permissions.repository';
 import { PERMISSIONS_REPOSITORY } from './interfaces/permissions-repository.interface';
 import { PERMISSIONS_SERVICE } from './interfaces/permissions-service.interface';
 import { PermissionsService } from './permissions.service';
+import { StaffPermission } from './entities/staff-permission.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Permission])],
+  imports: [TypeOrmModule.forFeature([Permission, StaffPermission])],
   controllers: [PermissionsController],
   providers: [
     PermissionsService,
