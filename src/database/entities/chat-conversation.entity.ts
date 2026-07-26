@@ -8,9 +8,11 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { ChatMessage } from './chat-message.entity';
 
 @Entity('chat_conversations')
 export class ChatConversation {
@@ -56,6 +58,10 @@ export class ChatConversation {
     default: ConversationStatus.OPEN,
   })
   status: ConversationStatus;
+
+  @ApiProperty({ type: () => [ChatMessage] })
+  @OneToMany(() => ChatMessage, (message) => message.conversationId)
+  messages: ChatMessage[];
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
