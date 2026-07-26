@@ -18,7 +18,7 @@ import { PackageServicesService } from './package-services.service';
 describe('PackageServices DTO validation', () => {
   const validPayload = {
     packageId: '1',
-    serviceId: '2',
+    facilityServiceId: '2',
     includedQuantity: '2',
     isRequired: 'true',
     isOptional: 'false',
@@ -38,7 +38,7 @@ describe('PackageServices DTO validation', () => {
   // Vai tro: gom cac input sai cua package-service de bat loi id, so lan, boolean, scope va facilityIds.
   it.each([
     [{ ...validPayload, packageId: '0' }, 'packageId'],
-    [{ ...validPayload, serviceId: '-1' }, 'serviceId'],
+    [{ ...validPayload, facilityServiceId: '-1' }, 'facilityServiceId'],
     [{ ...validPayload, includedQuantity: 0 }, 'includedQuantity'],
     [{ ...validPayload, isRequired: 'not-boolean' }, 'isRequired'],
     [{ ...validPayload, allowedFacilityScope: 'facility' }, 'allowedFacilityScope'],
@@ -69,7 +69,7 @@ describe('PackageServicesService business logic', () => {
   const entity = {
     id: '10',
     packageId: '1',
-    serviceId: '2',
+    facilityServiceId: '2',
     includedQuantity: 2,
     isRequired: 1,
     isOptional: 0,
@@ -113,7 +113,7 @@ describe('PackageServicesService business logic', () => {
     await expect(
       service.create({
         packageId: '1',
-        serviceId: '2',
+        facilityServiceId: '2',
         includedQuantity: 2,
         isRequired: true,
         isOptional: false,
@@ -130,7 +130,7 @@ describe('PackageServicesService business logic', () => {
     await expect(
       service.create({
         packageId: '1',
-        serviceId: '2',
+        facilityServiceId: '2',
         includedQuantity: 1,
         isRequired: true,
         isOptional: false,
@@ -146,7 +146,7 @@ describe('PackageServicesService business logic', () => {
     await expect(
       createService().service.create({
         packageId: '1',
-        serviceId: '2',
+        facilityServiceId: '2',
         includedQuantity: 1,
         isRequired: true,
         isOptional: false,
@@ -162,7 +162,7 @@ describe('PackageServicesService business logic', () => {
     await expect(
       createService().service.create({
         packageId: '1',
-        serviceId: '2',
+        facilityServiceId: '2',
         includedQuantity: 1,
         isRequired: true,
         isOptional: false,
@@ -179,7 +179,7 @@ describe('PackageServicesService business logic', () => {
     await expect(
       duplicateContext.service.create({
         packageId: '1',
-        serviceId: '2',
+        facilityServiceId: '2',
         includedQuantity: 1,
         isRequired: true,
         isOptional: false,
@@ -194,7 +194,7 @@ describe('PackageServicesService business logic', () => {
     await expect(
       createService().service.create({
         packageId: '1',
-        serviceId: '2',
+        facilityServiceId: '2',
         includedQuantity: 1,
         isRequired: true,
         isOptional: false,
@@ -209,7 +209,7 @@ describe('PackageServicesService business logic', () => {
     await expect(
       createService().service.create({
         packageId: '1',
-        serviceId: '2',
+        facilityServiceId: '2',
         includedQuantity: 1,
         isRequired: true,
         isOptional: false,
@@ -238,14 +238,14 @@ describe('PackageServicesService business logic', () => {
   // Vai tro: dam bao doi service/package trong mapping phai check trung cap moi truoc khi save.
   it('updates package/service pair when unique and rejects duplicated pair', async () => {
     const uniqueContext = createService();
-    await expect(uniqueContext.service.update('10', { serviceId: '3' })).resolves.toMatchObject({
-      serviceId: '3',
+    await expect(uniqueContext.service.update('10', { facilityServiceId: '3' })).resolves.toMatchObject({
+      facilityServiceId: '3',
     });
     expect(uniqueContext.repo.findByPackageAndService).toHaveBeenCalledWith('1', '3');
 
     const duplicateContext = createService();
     duplicateContext.repo.findByPackageAndService.mockResolvedValueOnce({ ...entity, id: '99' });
-    await expect(duplicateContext.service.update('10', { serviceId: '3' })).rejects.toBeInstanceOf(
+    await expect(duplicateContext.service.update('10', { facilityServiceId: '3' })).rejects.toBeInstanceOf(
       ConflictException,
     );
     expect(duplicateContext.repo.saveWithFacilities).not.toHaveBeenCalled();
@@ -327,7 +327,7 @@ describe('PackageServicesController', () => {
   const entity = {
     id: '10',
     packageId: '1',
-    serviceId: '2',
+    facilityServiceId: '2',
     includedQuantity: 2,
     isRequired: 1,
     isOptional: 0,

@@ -10,6 +10,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { PackageServiceFacilityScope } from '../dto/requests/create-package-service.dto';
 
 @Entity('package_items')
 export class PackageItem {
@@ -51,9 +52,18 @@ export class PackageItem {
   @Column({ name: 'is_optional', type: 'boolean' })
   isOptional: boolean | number;
 
+  @ApiProperty({ enum: PackageServiceFacilityScope })
+  @Column({
+    name: 'allowed_facility_scope',
+    type: 'varchar',
+    length: 20,
+    default: PackageServiceFacilityScope.ALL,
+  })
+  allowedFacilityScope: PackageServiceFacilityScope;
+
   @ApiProperty({ type: Number })
-  @Column({ name: 'allowed_facility_scope', type: 'int' })
-  allowedFacilityScope: number;
+  @Column({ name: 'sort_order', type: 'int', default: 0 })
+  sortOrder: number;
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })

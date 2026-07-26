@@ -1,6 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsArray,
   IsEnum,
   IsInt,
   IsNotEmpty,
@@ -11,12 +12,25 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
 import { MaternityPackageStatus } from '../../../../common/constants/status.enum';
 import { normalizeCode, trimText, trimValue } from '../../../../common/helpers/dto-transform.helper';
+import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
+import { PackageServiceItemInputDto } from '../../../package-services/dto/requests/create-package-service.dto';
 import { MONEY_PATTERN } from '../../../services/dto/requests/create-service.dto';
 
+export enum MaternityPackageType {
+  QUANTITY = 'quantity',
+  SCHEDULE = 'schedule',
+}
+
 export class CreateMaternityPackageDto {
+  @ApiProperty({ example: '1' })
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  facilityId: string;
+
   @ApiProperty({ example: 'PKG_BASIC' })
   @Transform(({ value }) => normalizeCode(value))
   @IsString()
@@ -33,12 +47,25 @@ export class CreateMaternityPackageDto {
   @MaxLength(200)
   name: string;
 
-  @ApiPropertyOptional({ example: 'Gói theo dõi thai kỳ cơ bản cho thai phụ', nullable: true })
+  @ApiPropertyOptional({
+    example: 'Gói theo dõi thai kỳ cơ bản cho thai phụ',
+    nullable: true,
+  })
   @IsOptional()
   @Transform(({ value }) => trimText(value))
   @IsString()
   @MaxLength(3000)
   description?: string;
+
+  @ApiPropertyOptional({
+    enum: MaternityPackageType,
+    example: MaternityPackageType.QUANTITY,
+    default: MaternityPackageType.QUANTITY,
+    description: 'quantity = gói theo số lượt; schedule = gói theo lịch trình tuần thai/sau sinh',
+  })
+  @IsOptional()
+  @IsEnum(MaternityPackageType)
+  packageType?: MaternityPackageType;
 
   @ApiProperty({ example: '900000.00' })
   @Transform(({ value }) => trimValue(value))
@@ -67,4 +94,14 @@ export class CreateMaternityPackageDto {
   @ApiProperty({ enum: MaternityPackageStatus, example: MaternityPackageStatus.DRAFT })
   @IsEnum(MaternityPackageStatus)
   status: MaternityPackageStatus;
+
+  @ApiPropertyOptional({
+    type: [PackageServiceItemInputDto],
+    description: 'Danh sách dịch vụ trong gói; dùng facilityServiceId để giữ đúng giá/thời lượng theo cơ sở',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PackageServiceItemInputDto)
+  services?: PackageServiceItemInputDto[];
 }

@@ -19,6 +19,6 @@ export interface IFacilityServicesRepository {
   findAll(filters?: SearchFacilityServiceDto): Promise<FacilityServiceWithDetails[]>;
   findAllPaginated(filters?: SearchFacilityServiceDto): Promise<PaginationResult<FacilityServiceWithDetails>>;
   findPublicByFacilityId(facilityId: string, filters?: SearchFacilityServiceDto): Promise<FacilityServiceWithDetails[]>;
-  countDependencies(facilityId: string, serviceId: string): Promise<number>;
+  countDependencies(facilityId: string, serviceId: string, facilityServiceId?: string): Promise<number>;
   updateStatus(entity: FacilityService, status: AvailabilityStatus): Promise<FacilityService>;
 }

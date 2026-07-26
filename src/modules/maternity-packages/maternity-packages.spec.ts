@@ -12,6 +12,7 @@ import { PublicMaternityPackagesController } from './public-maternity-packages.c
 
 describe('MaternityPackages DTO validation', () => {
   const validPayload = {
+    facilityId: '1',
     code: 'PKG_BASIC',
     name: 'Gói thai sản cơ bản',
     description: 'Gói theo dõi thai kỳ cơ bản',
@@ -58,6 +59,7 @@ describe('MaternityPackages DTO validation', () => {
 describe('MaternityPackagesService business logic', () => {
   const packageEntity = {
     id: '1',
+    facilityId: '1',
     code: 'PKG_BASIC',
     name: 'Gói thai sản cơ bản',
     description: 'Gói theo dõi thai kỳ cơ bản',
@@ -112,6 +114,7 @@ describe('MaternityPackagesService business logic', () => {
   it('creates a package after checking unique code and name', async () => {
     const { repo, service } = createService();
     await expect(service.create({
+      facilityId: '1',
       code: 'PKG_BASIC',
       name: 'Gói thai sản cơ bản',
       description: 'Gói theo dõi thai kỳ cơ bản',
@@ -303,7 +306,7 @@ describe('PublicMaternityPackagesController', () => {
   // Vai tro: dam bao public detail tra package khi package dang active.
   it('returns active package detail', async () => {
     const service = {
-      findById: jest.fn().mockResolvedValue(activePackage),
+      findDetailsById: jest.fn().mockResolvedValue(activePackage),
     };
     const controller = new PublicMaternityPackagesController(service as never);
 
@@ -316,7 +319,7 @@ describe('PublicMaternityPackagesController', () => {
   // Vai tro: dam bao public detail khong tra success cho package draft/inactive.
   it('throws not found instead of returning success with null when package is not active', async () => {
     const service = {
-      findById: jest.fn().mockResolvedValue({
+      findDetailsById: jest.fn().mockResolvedValue({
         id: '1',
         status: MaternityPackageStatus.DRAFT,
       }),
@@ -388,6 +391,7 @@ describe('MaternityPackagesController', () => {
     findAll: jest.fn().mockResolvedValue([packageEntity]),
     findAllPaginated: jest.fn().mockResolvedValue({ items: [packageEntity], total: 1 }),
     findById: jest.fn().mockResolvedValue(packageEntity),
+    findDetailsById: jest.fn().mockResolvedValue(packageEntity),
     update: jest.fn().mockResolvedValue({ ...packageEntity, price: '850000.00' }),
     remove: jest.fn().mockResolvedValue({ action: 'hard_deleted', affectedCount: 0 }),
   });

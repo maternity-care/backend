@@ -15,10 +15,11 @@ export interface IPackageServicesRepository {
   remove(entity: PackageItem): Promise<void>;
   findById(id: string): Promise<PackageItem | null>;
   findDetailsById(id: string): Promise<PackageServiceWithDetails | null>;
-  findByPackageAndService(packageId: string, serviceId: string): Promise<PackageItem | null>;
+  findByPackageAndService(packageId: string, facilityServiceId: string): Promise<PackageItem | null>;
   findAll(filters?: SearchPackageServiceDto): Promise<PackageServiceWithDetails[]>;
+  findDetailsByPackageId?(packageId: string): Promise<PackageServiceWithDetails[]>;
   findFacilityIds(packageServiceId: string): Promise<string[]>;
-  countGeneratedBenefits(packageId: string, serviceId: string): Promise<number>;
+  countGeneratedBenefits(packageId: string, facilityServiceId: string): Promise<number>;
   findAllPaginated(
     filters?: SearchPackageServiceDto,
   ): Promise<{ items: PackageServiceWithDetails[]; total: number }>;

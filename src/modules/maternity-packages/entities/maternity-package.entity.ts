@@ -2,6 +2,7 @@ import { PackageItem } from './../../package-services/entities/package-item.enti
 import { Facility } from './../../facilities/entities/facility.entity';
 import { MaternityPackageStatus } from './../../../common/constants/status.enum';
 import { ApiProperty } from '@nestjs/swagger';
+import { MaternityPackageType } from '../dto/requests/create-maternity-package.dto';
 import {
   Column,
   CreateDateColumn,
@@ -40,6 +41,15 @@ export class MaternityPackage {
   @Column({ name: 'description', type: 'text' })
   description: string;
 
+  @ApiProperty({ enum: MaternityPackageType, enumName: 'MaternityPackageType' })
+  @Column({
+    name: 'package_type',
+    type: 'enum',
+    enum: MaternityPackageType,
+    default: MaternityPackageType.QUANTITY,
+  })
+  packageType: MaternityPackageType;
+
   @ApiProperty({ type: String })
   @Column({ name: 'price', type: 'decimal', precision: 15, scale: 2 })
   price: string;
@@ -56,7 +66,7 @@ export class MaternityPackage {
   @Column({ name: 'status', type: 'enum', enum: MaternityPackageStatus })
   status: MaternityPackageStatus;
 
-  @OneToMany(() => PackageItem, (item) => item.packageId, {
+  @OneToMany(() => PackageItem, (item) => item.package, {
     onDelete: 'CASCADE',
   })
   packageItems: PackageItem[];

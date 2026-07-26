@@ -3,7 +3,7 @@ import { ActiveStatus } from '../../common/constants/status.enum';
 import { SERVICE_CONSTANT } from '../../common/constants/service.constant';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
 import { Service } from './entities/service.entity';
-import { CreateServiceDto } from './dto/requests/create-service.dto';
+import { CreateServiceDto, ServiceSaleMode } from './dto/requests/create-service.dto';
 import { SearchServiceDto } from './dto/requests/search-service.dto';
 import { UpdateServiceDto } from './dto/requests/update-service.dto';
 import {
@@ -26,7 +26,8 @@ export class ServicesService {
 
     const service = this.repository.create({
       ...dto,
-      description: dto.description ?? undefined,
+      saleMode: dto.saleMode ?? ServiceSaleMode.BOTH,
+      description: dto.description ?? '',
       // DB đang lưu boolean dưới dạng tinyint/number, nên ép boolean về 0/1 cho rõ ràng.
       requiresDoctorWarning: dto.requiresDoctorWarning ? true : false,
     });

@@ -2,7 +2,7 @@ import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { ActiveStatus } from '../../../../common/constants/status.enum';
-import { ServiceType } from './create-service.dto';
+import { ServiceSaleMode, ServiceType } from './create-service.dto';
 
 export class SearchServiceDto {
   @ApiPropertyOptional({ description: 'Tìm theo code, name hoặc description' })
@@ -14,6 +14,11 @@ export class SearchServiceDto {
   @IsOptional()
   @IsEnum(ServiceType)
   serviceType?: ServiceType;
+
+  @ApiPropertyOptional({ enum: ServiceSaleMode })
+  @IsOptional()
+  @IsEnum(ServiceSaleMode)
+  saleMode?: ServiceSaleMode;
 
   @ApiPropertyOptional({ enum: ActiveStatus })
   @IsOptional()
