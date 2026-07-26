@@ -45,22 +45,18 @@ export class FacilitiesController {
         const facility = await this.facilitiesService.findDetailsById(activeFacilityId);
         return {
           message: RESPONSE_MESSAGES.FACILITIES.GET_LIST_SUCCESS,
-          data: query?.page
-            ? { items: [facility], total: 1, page: Number(query.page), limit: 1 }
-            : [facility],
+          data: {
+            items: [facility],
+            total: 1,
+            page: Math.max(1, Number(query?.page) || 1),
+            limit: Math.max(1, Number(query?.limit) || 20),
+            totalPages: 1,
+          },
         };
       }
 
       // nếu client gửi page => trả về kết quả phân trang
-      if (query?.page) {
-        const paged = await this.facilitiesService.findAllPaginated(query);
-        return {
-          message: RESPONSE_MESSAGES.FACILITIES.GET_LIST_SUCCESS,
-          data: paged,
-        };
-      }
-
-      const facilities = await this.facilitiesService.findAll(query);
+      const facilities = await this.facilitiesService.findAllPaginated(query);
       return {
         message: RESPONSE_MESSAGES.FACILITIES.GET_LIST_SUCCESS,
         data: facilities,

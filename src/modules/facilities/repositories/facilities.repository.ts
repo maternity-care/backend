@@ -248,7 +248,11 @@ export class FacilitiesRepository implements IFacilitiesRepository {
   }
 
   async remove(facility: Facility): Promise<void> {
-    await this.repository.remove(facility);
+    await this.repository.manager.transaction(async manager => {
+      await manager.delete(FacilityOperatingHour, { facilityId: facility.id });
+      await manager.delete(FacilityClosureDay, { facilityId: facility.id });
+      await manager.remove(Facility, facility);
+    });
   }
 
   async countDependencies(facilityId: string): Promise<number> {
@@ -261,14 +265,13 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       { table: 'facility_services', column: 'facility_id' },
     ];
 
-    const rows = await Promise.all(tables.map(item => this.repository.manager
-      .createQueryBuilder()
-      .select('COUNT(*)', 'count')
-      .from(item.table, item.table)
-      .where(`${item.table}.${item.column} = :facilityId`, { facilityId })
-      .getRawOne<{ count: string }>()));
+    const rows = await Promise.all(tables.map(item => this.countRowsIfTableExists(
+      item.table,
+      item.column,
+      facilityId,
+    )));
 
-    return rows.reduce((total, row) => total + Number(row?.count ?? 0), 0);
+    return rows.reduce((total, count) => total + count, 0);
   }
 
   async softDelete(facility: Facility, reason?: string, deletedBy?: string | null): Promise<Facility> {
@@ -365,5 +368,24 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  private async countRowsIfTableExists(table: string, column: string, facilityId: string): Promise<number> {
+    try {
+      const row = await this.repository.manager
+        .createQueryBuilder()
+        .select('COUNT(*)', 'count')
+        .from(table, table)
+        .where(`${table}.${column} = :facilityId`, { facilityId })
+        .getRawOne<{ count: string }>();
+
+      return Number(row?.count ?? 0);
+    } catch (error) {
+      const driverError = error as { code?: string; errno?: number };
+      if (driverError.code === 'ER_NO_SUCH_TABLE' || driverError.errno === 1146) {
+        return 0;
+      }
+      throw error;
+    }
   }
 }

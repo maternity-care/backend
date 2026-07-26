@@ -16,6 +16,8 @@ import { FacilityClosureDay } from './entities/facility-closure-day.entity';
 const createFacility = (overrides: Partial<Facility> = {}): Facility => ({
   id: 'fac-1',
   owner: null,
+  facilityServices: [],
+  appointments: [],
   name: 'Main Clinic',
   code: 'FAC-001',
   ownerId: 'staff-1',
@@ -312,7 +314,6 @@ describe('FacilitiesService', () => {
     const facility = createFacility();
     repository.findById.mockResolvedValue(facility);
     repository.findOperatingHoursByFacilityId
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         { dayOfWeek: 'MON', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false },
         { dayOfWeek: 'TUE', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false },
@@ -806,7 +807,7 @@ describe('FacilitiesController', () => {
 
     await expect(controller.findAll(facilityAdmin, { page: 2 } as any)).resolves.toEqual({
       message: RESPONSE_MESSAGES.FACILITIES_RETRIEVED,
-      data: { items: [facility], total: 1, page: 2, limit: 1 },
+      data: { items: [facility], total: 1, page: 2, limit: 20, totalPages: 1 },
     });
     expect(mockService.findAllPaginated).not.toHaveBeenCalled();
   });
@@ -824,18 +825,19 @@ describe('FacilitiesController', () => {
     });
   });
 
-  // Vai tro: kiem tra controller dung service danh sach thuong khi khong co page.
-  it('uses non-paginated service for super admin when page is omitted', async () => {
+  // Vai tro: management list luon tra object phan trang, ke ca khi FE khong gui page.
+  it('uses paginated service for super admin when page is omitted', async () => {
     const mockService = createService();
-    const facilities = [createFacility()];
-    mockService.findAll.mockResolvedValue(facilities);
+    const paged = { items: [createFacility()], total: 1, page: 1, limit: 20, totalPages: 1 };
+    mockService.findAllPaginated.mockResolvedValue(paged);
     const controller = new FacilitiesController(mockService as any);
 
     await expect(controller.findAll(superAdmin, {} as any)).resolves.toEqual({
       message: RESPONSE_MESSAGES.FACILITIES_RETRIEVED,
-      data: facilities,
+      data: paged,
     });
-    expect(mockService.findAll).toHaveBeenCalledWith({});
+    expect(mockService.findAllPaginated).toHaveBeenCalledWith({});
+    expect(mockService.findAll).not.toHaveBeenCalled();
   });
 
   // Vai tro: chan user co scope facility truy cap chi tiet facility khac.
@@ -996,7 +998,7 @@ describe('FacilitiesController', () => {
   // Vai tro: dam bao loi bat ngo o controller duoc chuan hoa thanh InternalServerErrorException.
   it('converts unknown controller errors to internal server error', async () => {
     const mockService = createService();
-    mockService.findAll.mockRejectedValue(new Error('unexpected'));
+    mockService.findAllPaginated.mockRejectedValue(new Error('unexpected'));
     const controller = new FacilitiesController(mockService as any);
 
     await expect(controller.findAll(superAdmin, {} as any)).rejects.toBeInstanceOf(InternalServerErrorException);

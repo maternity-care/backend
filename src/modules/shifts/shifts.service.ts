@@ -16,8 +16,10 @@ import {
   buildShiftDates,
   dateDiffInDays,
   dateTimeToTime,
+  getTimeRangeEndMinute,
   minutesToTime,
   resolveBulkCreateDateRange,
+  shiftIntervalsOverlap,
   timeToMinutes,
   timesOverlap,
   validateBulkCreateRangeLength,
@@ -284,12 +286,9 @@ export class ShiftsService {
       date: query.date,
       slotMinutes,
       shifts: shifts.map(shift => {
-        const appointmentBlocks = appointments.filter(appointment => timesOverlap(
-          shift.startTime,
-          shift.endTime,
-          dateTimeToTime(appointment.scheduledStart),
-          dateTimeToTime(appointment.scheduledEnd),
-        ));
+        const appointmentBlocks = appointments.filter(appointment =>
+          this.appointmentOverlapsShift(shift, appointment),
+        );
         const fullyBookedByLimit = Boolean(
           shift.maxAppointments && appointmentBlocks.length >= shift.maxAppointments,
         );
@@ -493,7 +492,7 @@ export class ShiftsService {
     slotMinutes: number,
   ) {
     const shiftStart = timeToMinutes(shift.startTime);
-    const shiftEnd = timeToMinutes(shift.endTime);
+    const shiftEnd = getTimeRangeEndMinute(shift.startTime, shift.endTime);
     const slots: { startTime: string; endTime: string }[] = [];
 
     for (let start = shiftStart; start + slotMinutes <= shiftEnd; start += slotMinutes) {
@@ -513,6 +512,30 @@ export class ShiftsService {
   }
 
   /** Các API list/weekly/availability phải báo 404 khi không có ca nào phù hợp. */
+  private appointmentOverlapsShift(
+    shift: DoctorShift,
+    appointment: { scheduledStart: Date | string; scheduledEnd: Date | string },
+  ): boolean {
+    return shiftIntervalsOverlap(
+      this.toDateOnly(shift.shiftDate),
+      shift.startTime,
+      shift.endTime,
+      this.toDateOnly(appointment.scheduledStart),
+      dateTimeToTime(appointment.scheduledStart),
+      dateTimeToTime(appointment.scheduledEnd),
+    );
+  }
+
+  private toDateOnly(value: string | Date): string {
+    if (value instanceof Date) {
+      const year = value.getFullYear();
+      const month = String(value.getMonth() + 1).padStart(2, '0');
+      const day = String(value.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    return String(value).slice(0, 10);
+  }
+
   private ensureShiftsFound(shifts?: unknown[] | null): void {
     if (!shifts || shifts.length === 0) {
       throw new NotFoundException(RESPONSE_MESSAGES.SHIFTS.NOT_FOUND);
