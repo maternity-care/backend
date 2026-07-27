@@ -8,7 +8,7 @@ export class PackageServiceResponseDto {
   packageId: string;
 
   @ApiProperty()
-  serviceId: string;
+  facilityServiceId: string;
 
   @ApiProperty()
   includedQuantity: number;

@@ -2,7 +2,10 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestj
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FACILITY_SERVICE_CONSTANT } from '../../common/constants/facility-service.constant';
 import { CreateFacilityServiceDto } from './dto/requests/create-facility-service.dto';
-import { FacilityServiceResponseDto } from './dto/responses/facility-service-response.dto';
+import {
+  FacilityServicePaginatedResponseDto,
+  FacilityServiceResponseDto,
+} from './dto/responses/facility-service-response.dto';
 import { SearchFacilityServiceDto } from './dto/requests/search-facility-service.dto';
 import { UpdateFacilityServiceDto } from './dto/requests/update-facility-service.dto';
 import { FacilityServicesService } from './facility-services.service';
@@ -15,7 +18,7 @@ export class FacilityServicesController {
   // Lấy danh sách dịch vụ theo từng facility; dùng cho màn hình quản trị giá/thời lượng.
   @Get()
   @ApiOperation({ summary: 'List facility services' })
-  @ApiResponse({ status: 200, type: [FacilityServiceResponseDto] })
+  @ApiResponse({ status: 200, type: FacilityServicePaginatedResponseDto })
   async findAll(@Query() query: SearchFacilityServiceDto) {
     const data = query.page
       ? await this.facilityServicesService.findAllPaginated(query)
@@ -61,6 +64,19 @@ export class FacilityServicesController {
     return {
       message: FACILITY_SERVICE_CONSTANT.DELETED,
       data: await this.facilityServicesService.remove(id),
+    };
+  }
+
+  // Unassign theo facilityId + serviceId; tiện cho màn hình chi tiết cơ sở khi FE không giữ facilityServiceId.
+  @Delete('facility/:facilityId/service/:serviceId')
+  @ApiOperation({ summary: 'Unassign a service from a facility by pair' })
+  async removeByFacilityAndService(
+    @Param('facilityId') facilityId: string,
+    @Param('serviceId') serviceId: string,
+  ) {
+    return {
+      message: FACILITY_SERVICE_CONSTANT.DELETED,
+      data: await this.facilityServicesService.removeByFacilityAndService(facilityId, serviceId),
     };
   }
 }

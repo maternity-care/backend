@@ -1,6 +1,7 @@
 import { FacilityService } from './../../facility-services/entities/facility-service.entity';
 import { ActiveStatus } from './../../../common/constants/status.enum';
 import { ApiProperty } from '@nestjs/swagger';
+import { ServiceSaleMode } from '../dto/requests/create-service.dto';
 import {
   Column,
   CreateDateColumn,
@@ -24,7 +25,7 @@ export class Service {
   @Column({ name: 'name', type: 'varchar', length: 255 })
   name: string;
 
-  @OneToMany(() => FacilityService, (facilityService) => facilityService.serviceId)
+  @OneToMany(() => FacilityService, (facilityService) => facilityService.service)
   facilityServices: FacilityService[];
 
   @ApiProperty({ type: String })
@@ -34,6 +35,15 @@ export class Service {
   @ApiProperty({ type: String })
   @Column({ name: 'service_type', type: 'varchar', length: 255 })
   serviceType: string;
+
+  @ApiProperty({ enum: ServiceSaleMode, enumName: 'ServiceSaleMode' })
+  @Column({
+    name: 'sale_mode',
+    type: 'enum',
+    enum: ServiceSaleMode,
+    default: ServiceSaleMode.BOTH,
+  })
+  saleMode: ServiceSaleMode;
 
   @ApiProperty({ type: Number })
   @Column({ name: 'default_duration_minutes', type: 'int' })

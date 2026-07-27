@@ -27,7 +27,7 @@ export class MaternityPackagesController {
   async findOne(@Param('id') id: string) {
     return {
       message: MATERNITY_PACKAGE_CONSTANT.DETAIL_FOUND,
-      data: await this.maternityPackagesService.findById(id),
+      data: await this.maternityPackagesService.findDetailsById(id),
     };
   }
 

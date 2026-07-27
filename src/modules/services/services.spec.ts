@@ -97,7 +97,7 @@ describe('ServicesService business logic', () => {
       basePrice: '300000.00',
       requiresDoctorWarning: true,
       status: ActiveStatus.ACTIVE,
-    })).resolves.toMatchObject({ id: '1', requiresDoctorWarning: 1 });
+    })).resolves.toMatchObject({ id: '1', requiresDoctorWarning: true });
     expect(repo.findByCode).toHaveBeenCalledWith('US_2D');
     expect(repo.findByName).toHaveBeenCalledWith('Siêu âm thai 2D');
   });

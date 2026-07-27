@@ -26,6 +26,14 @@ export enum ServiceType {
   OTHER = 'other',
 }
 
+// Quy định service có được bán lẻ hay chỉ được dùng bên trong gói.
+// Field này giúp FE/booking không hiển thị nhầm service "chỉ trong gói" ở màn mua dịch vụ lẻ.
+export enum ServiceSaleMode {
+  STANDALONE = 'standalone',
+  PACKAGE_ONLY = 'package_only',
+  BOTH = 'both',
+}
+
 // Giá lưu dạng DECIMAL trong DB nên DTO nhận string để tránh lỗi làm tròn floating point của JS.
 export const MONEY_PATTERN = /^(0|[1-9]\d{0,12})(\.\d{1,2})?$/;
 
@@ -56,6 +64,16 @@ export class CreateServiceDto {
   @ApiProperty({ enum: ServiceType, example: ServiceType.ULTRASOUND })
   @IsEnum(ServiceType)
   serviceType: ServiceType;
+
+  @ApiPropertyOptional({
+    enum: ServiceSaleMode,
+    example: ServiceSaleMode.BOTH,
+    default: ServiceSaleMode.BOTH,
+    description: 'standalone = chỉ bán lẻ, package_only = chỉ nằm trong gói, both = cả hai',
+  })
+  @IsOptional()
+  @IsEnum(ServiceSaleMode)
+  saleMode?: ServiceSaleMode;
 
   @ApiProperty({ example: 30, minimum: 5, maximum: 480 })
   @Type(() => Number)

@@ -49,6 +49,7 @@ import { StaffRefreshToken } from '../modules/auth/entities/staff-refresh-token.
 import { User } from '../modules/users/entities/user.entity';
 import { UserAuth } from '../modules/auth/entities/user-auth.entity';
 import { Notification } from '../modules/notifications/entities/notification.entity';
+import { UpdateServicePackageDesign1785120000000 } from './migrations/1785120000000-UpdateServicePackageDesign';
 
 config();
 
@@ -111,7 +112,7 @@ export const typeOrmConfig: DataSourceOptions = {
     StaffPermission,
     join(__dirname, 'entities', '*.entity{.ts,.js}'),
   ],
-  migrations: [],
+  migrations: [UpdateServicePackageDesign1785120000000],
   charset: 'utf8mb4_unicode_ci',
 };
 

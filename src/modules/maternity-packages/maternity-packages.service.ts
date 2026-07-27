@@ -1,17 +1,28 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { MATERNITY_PACKAGE_CONSTANT } from '../../common/constants/maternity-package.constant';
-import { FacilityStatus, MaternityPackageStatus } from '../../common/constants/status.enum';
+import {
+  ActiveStatus,
+  AvailabilityStatus,
+  FacilityStatus,
+  MaternityPackageStatus,
+} from '../../common/constants/status.enum';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
 import { MaternityPackage } from './entities/maternity-package.entity';
 import { FacilitiesService } from '../facilities/facilities.service';
-import { CreateMaternityPackageDto } from './dto/requests/create-maternity-package.dto';
+import {
+  CreateMaternityPackageDto,
+  MaternityPackageType,
+} from './dto/requests/create-maternity-package.dto';
 import { SearchMaternityPackageDto } from './dto/requests/search-maternity-package.dto';
 import { UpdateMaternityPackageDto } from './dto/requests/update-maternity-package.dto';
-import { AvailableMaternityPackageResponseDto } from './dto/responses/available-maternity-package-response.dto';
+import { MaternityPackageResponseDto } from './dto/responses/maternity-package-response.dto';
 import {
   IMaternityPackagesRepository,
   MATERNITY_PACKAGES_REPOSITORY,
 } from './interfaces/maternity-packages-repository.interface';
+import { FacilityServicesService } from '../facility-services/facility-services.service';
+import { PackageServiceItemInputDto } from '../package-services/dto/requests/create-package-service.dto';
+import { PackageItem } from '../package-services/entities/package-item.entity';
 
 @Injectable()
 export class MaternityPackagesService {
@@ -20,24 +31,33 @@ export class MaternityPackagesService {
     @Inject(MATERNITY_PACKAGES_REPOSITORY)
     private readonly repository: IMaternityPackagesRepository,
     private readonly facilitiesService: FacilitiesService,
+    @Optional()
+    private readonly facilityServicesService?: FacilityServicesService,
   ) {}
 
   // Tạo "vỏ gói" dịch vụ: code/name/price/duration/status.
   // Các dịch vụ con của gói sẽ được gắn sau bằng module package-services.
-  async create(dto: CreateMaternityPackageDto): Promise<MaternityPackage> {
+  async create(dto: CreateMaternityPackageDto): Promise<MaternityPackageResponseDto> {
     await this.ensureUniqueCode(dto.code);
     await this.ensureUniqueName(dto.name);
+    await this.ensureActiveFacility(dto.facilityId);
 
     const entity = this.repository.create({
       ...dto,
-      description: dto.description ?? undefined,
+      description: dto.description ?? '',
       priorityLevel: dto.priorityLevel ?? 0,
+      packageType: dto.packageType ?? MaternityPackageType.QUANTITY,
     });
-    return this.repository.save(entity);
+
+    const packageItems = await this.buildPackageItems(dto.facilityId, dto.services);
+    const saved = typeof this.repository.saveWithItems === 'function'
+      ? await this.repository.saveWithItems(entity, packageItems)
+      : await this.repository.save(entity);
+    return this.findDetailsOrEntity(saved);
   }
 
   // Lấy danh sách gói cho management/public tùy controller gọi filter status thế nào.
-  async findAll(filters?: SearchMaternityPackageDto): Promise<MaternityPackage[]> {
+  async findAll(filters?: SearchMaternityPackageDto): Promise<MaternityPackageResponseDto[]> {
     const packages = await this.repository.findAll(filters);
     this.ensurePackagesFound(packages);
     return packages;
@@ -54,7 +74,7 @@ export class MaternityPackagesService {
   async findAvailableByFacilityId(
     facilityId: string,
     filters?: SearchMaternityPackageDto,
-  ): Promise<AvailableMaternityPackageResponseDto[]> {
+  ): Promise<MaternityPackageResponseDto[]> {
     await this.ensureActiveFacility(facilityId);
     const packages = await this.repository.findAvailableByFacilityId(facilityId, filters);
     this.ensurePackagesFound(packages);
@@ -79,8 +99,16 @@ export class MaternityPackagesService {
     return entity;
   }
 
+  async findDetailsById(id: string): Promise<MaternityPackageResponseDto> {
+    const entity = await this.repository.findDetailsById(id);
+    if (!entity) {
+      throw new NotFoundException(MATERNITY_PACKAGE_CONSTANT.NOT_FOUND);
+    }
+    return entity;
+  }
+
   // Cập nhật thông tin gói; nếu đổi code/name thì kiểm tra trùng lại.
-  async update(id: string, dto: UpdateMaternityPackageDto): Promise<MaternityPackage> {
+  async update(id: string, dto: UpdateMaternityPackageDto): Promise<MaternityPackageResponseDto> {
     const entity = await this.findById(id);
 
     if (dto.code && dto.code !== entity.code) {
@@ -90,11 +118,26 @@ export class MaternityPackagesService {
       await this.ensureUniqueName(dto.name);
     }
 
+    const nextFacilityId = dto.facilityId ?? entity.facilityId;
+    if (dto.facilityId && dto.facilityId !== entity.facilityId) {
+      await this.ensureActiveFacility(dto.facilityId);
+    }
+
     Object.assign(entity, {
       ...dto,
       description: dto.description ?? entity.description,
+      packageType: dto.packageType ?? entity.packageType,
     });
-    return this.repository.save(entity);
+
+    const saved = await this.repository.save(entity);
+    if (dto.services) {
+      const packageItems = await this.buildPackageItems(nextFacilityId, dto.services);
+      if (typeof this.repository.replaceItems === 'function') {
+        await this.repository.replaceItems(saved.id, packageItems);
+      }
+    }
+
+    return this.findDetailsOrEntity(saved);
   }
 
   // Xóa an toàn: gói chưa được dùng thì hard delete; đã có service con/người mua thì chuyển inactive.
@@ -136,5 +179,65 @@ export class MaternityPackagesService {
     if (!packages || packages.length === 0) {
       throw new NotFoundException(MATERNITY_PACKAGE_CONSTANT.NOT_FOUND);
     }
+  }
+
+  private async findDetailsOrEntity(
+    entity: MaternityPackage,
+  ): Promise<MaternityPackageResponseDto> {
+    if (typeof this.repository.findDetailsById === 'function') {
+      const details = await this.repository.findDetailsById(entity.id);
+      if (details) {
+        return details;
+      }
+    }
+    return entity as unknown as MaternityPackageResponseDto;
+  }
+
+  private async buildPackageItems(
+    packageFacilityId: string,
+    services?: PackageServiceItemInputDto[],
+  ): Promise<Partial<PackageItem>[]> {
+    if (!services || services.length === 0) {
+      return [];
+    }
+
+    if (!this.facilityServicesService) {
+      throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_INVALID);
+    }
+
+    const duplicatedFacilityServiceId = services.find((service, index) =>
+      services.some((item, itemIndex) =>
+        itemIndex !== index && item.facilityServiceId === service.facilityServiceId,
+      ),
+    );
+
+    if (duplicatedFacilityServiceId) {
+      throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.PACKAGE_ITEM_DUPLICATED);
+    }
+
+    const items: Partial<PackageItem>[] = [];
+    for (const [index, item] of services.entries()) {
+      const facilityService = await this.facilityServicesService.findDetailsById(item.facilityServiceId);
+      if (facilityService.facilityId !== packageFacilityId) {
+        throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_NOT_IN_PACKAGE_FACILITY);
+      }
+      if (facilityService.status !== AvailabilityStatus.AVAILABLE) {
+        throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_UNAVAILABLE);
+      }
+      if (facilityService.service.status !== ActiveStatus.ACTIVE) {
+        throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_INVALID);
+      }
+
+      items.push({
+        facilityServiceId: item.facilityServiceId,
+        includedQuantity: item.includedQuantity,
+        isRequired: item.isRequired,
+        isOptional: item.isOptional,
+        allowedFacilityScope: item.allowedFacilityScope,
+        sortOrder: item.sortOrder ?? index + 1,
+      });
+    }
+
+    return items;
   }
 }

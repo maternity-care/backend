@@ -16,7 +16,7 @@ export class SearchPackageServiceDto {
   @IsOptional()
   @IsString()
   @Matches(POSITIVE_ID_PATTERN)
-  serviceId?: string;
+  facilityServiceId?: string;
 
   @ApiPropertyOptional({ enum: ServiceType })
   @IsOptional()

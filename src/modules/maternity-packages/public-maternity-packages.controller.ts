@@ -25,7 +25,7 @@ export class PublicMaternityPackagesController {
   @Get(':id')
   @ApiOperation({ summary: 'Get active maternity package details' })
   async findOne(@Param('id') id: string) {
-    const pkg = await this.maternityPackagesService.findById(id);
+    const pkg = await this.maternityPackagesService.findDetailsById(id);
     if (pkg.status !== MaternityPackageStatus.ACTIVE) {
       throw new NotFoundException(MATERNITY_PACKAGE_CONSTANT.NOT_FOUND);
     }

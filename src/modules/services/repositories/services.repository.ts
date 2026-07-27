@@ -62,26 +62,63 @@ export class ServicesRepository implements IServicesRepository {
   // Đếm các bảng đang dùng service này để quyết định hard delete hay chuyển inactive.
   async countDependencies(serviceId: string): Promise<number> {
     const tables = [
-      { table: 'package_services', column: 'service_id' },
       { table: 'appointments', column: 'service_id' },
       { table: 'patient_extra_services', column: 'service_id' },
       { table: 'patient_package_benefits', column: 'service_id' },
     ];
 
-    const rows = await Promise.all(tables.map(item => this.repository.manager
-      .createQueryBuilder()
-      .select('COUNT(*)', 'count')
-      .from(item.table, item.table)
-      .where(`${item.table}.${item.column} = :serviceId`, { serviceId })
-      .getRawOne<{ count: string }>()));
+    const rows = await Promise.all(
+      tables.map(item => this.countRowsIfTableExists(item.table, item.column, serviceId)),
+    );
 
-    return rows.reduce((total, row) => total + Number(row?.count ?? 0), 0);
+    const packageItemCount = await this.countPackageItemsByServiceIfTableExists(serviceId);
+
+    return rows.reduce((total, count) => total + count, packageItemCount);
   }
 
   // Chuyển trạng thái, ví dụ service đã được dùng thì delete sẽ đổi thành inactive.
   updateStatus(service: Service, status: ActiveStatus): Promise<Service> {
     service.status = status;
     return this.repository.save(service);
+  }
+
+  private async countRowsIfTableExists(
+    table: string,
+    column: string,
+    serviceId: string,
+  ): Promise<number> {
+    try {
+      const row = await this.repository.manager
+        .createQueryBuilder()
+        .select('COUNT(*)', 'count')
+        .from(table, table)
+        .where(`${table}.${column} = :serviceId`, { serviceId })
+        .getRawOne<{ count: string }>();
+      return Number(row?.count ?? 0);
+    } catch (error) {
+      if ((error as { code?: string; errno?: number }).code === 'ER_NO_SUCH_TABLE' || (error as { errno?: number }).errno === 1146) {
+        return 0;
+      }
+      throw error;
+    }
+  }
+
+  private async countPackageItemsByServiceIfTableExists(serviceId: string): Promise<number> {
+    try {
+      const row = await this.repository.manager
+        .createQueryBuilder()
+        .select('COUNT(*)', 'count')
+        .from('package_items', 'packageItem')
+        .innerJoin('facility_services', 'facilityService', 'facilityService.id = packageItem.facility_service_id')
+        .where('facilityService.service_id = :serviceId', { serviceId })
+        .getRawOne<{ count: string }>();
+      return Number(row?.count ?? 0);
+    } catch (error) {
+      if ((error as { code?: string; errno?: number }).code === 'ER_NO_SUCH_TABLE' || (error as { errno?: number }).errno === 1146) {
+        return 0;
+      }
+      throw error;
+    }
   }
 
   // Gom toàn bộ filter vào một query builder để findAll và findAllPaginated dùng chung.
@@ -94,6 +131,10 @@ export class ServicesRepository implements IServicesRepository {
 
     if (filters?.serviceType) {
       query.andWhere('service.serviceType = :serviceType', { serviceType: filters.serviceType });
+    }
+
+    if (filters?.saleMode) {
+      query.andWhere('service.saleMode = :saleMode', { saleMode: filters.saleMode });
     }
 
     if (filters?.status) {

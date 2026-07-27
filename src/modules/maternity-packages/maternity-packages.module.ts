@@ -8,9 +8,15 @@ import { MaternityPackagesRepository } from './repositories/maternity-packages.r
 import { MaternityPackagesService } from './maternity-packages.service';
 import { PublicFacilityMaternityPackagesController } from './public-facility-maternity-packages.controller';
 import { PublicMaternityPackagesController } from './public-maternity-packages.controller';
+import { PackageItem } from '../package-services/entities/package-item.entity';
+import { FacilityServicesModule } from '../facility-services/facility-services.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([MaternityPackage]), FacilitiesModule],
+  imports: [
+    TypeOrmModule.forFeature([MaternityPackage, PackageItem]),
+    FacilitiesModule,
+    FacilityServicesModule,
+  ],
   controllers: [
     MaternityPackagesController,
     PublicMaternityPackagesController,
