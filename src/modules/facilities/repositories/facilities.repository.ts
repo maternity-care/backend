@@ -67,7 +67,9 @@ export class FacilitiesRepository implements IFacilitiesRepository {
     return this.repository.manager
       .createQueryBuilder()
       .select('shift.id', 'id')
-      .addSelect('shift.shift_date', 'shiftDate')
+      // DATE column khi đi qua MySQL driver đôi lúc bị ép thành Date object rồi lệch ngày khi toISOString().
+      // Format thẳng ở DB để validate operating-hours luôn dùng đúng ngày YYYY-MM-DD như dữ liệu trong MySQL.
+      .addSelect("DATE_FORMAT(shift.shift_date, '%Y-%m-%d')", 'shiftDate')
       .addSelect('shift.start_time', 'startTime')
       .addSelect('shift.end_time', 'endTime')
       .addSelect('shift.status', 'status')
