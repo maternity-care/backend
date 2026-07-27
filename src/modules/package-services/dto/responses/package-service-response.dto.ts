@@ -8,6 +8,9 @@ export class PackageServiceResponseDto {
   @ApiProperty()
   packageId: string;
 
+  @ApiPropertyOptional({ nullable: true })
+  packageStageId?: string | null;
+
   @ApiProperty()
   facilityServiceId: string;
 
@@ -43,6 +46,12 @@ export class PackageServiceResponseDto {
 
   @ApiPropertyOptional()
   packageStatus?: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  stageName?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  stageType?: string | null;
 
   @ApiPropertyOptional()
   serviceCode?: string;

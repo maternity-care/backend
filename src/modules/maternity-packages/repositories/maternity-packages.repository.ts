@@ -12,7 +12,11 @@ import { PackageServiceFacilityScope } from '../../package-services/dto/requests
 import { MaternityPackageResponseDto } from '../dto/responses/maternity-package-response.dto';
 import { SearchMaternityPackageDto } from '../dto/requests/search-maternity-package.dto';
 import { MaternityPackage } from '../entities/maternity-package.entity';
-import { IMaternityPackagesRepository } from '../interfaces/maternity-packages-repository.interface';
+import { PackageStage } from '../entities/package-stage.entity';
+import {
+  IMaternityPackagesRepository,
+  PackageStageWithItemsInput,
+} from '../interfaces/maternity-packages-repository.interface';
 
 @Injectable()
 export class MaternityPackagesRepository implements IMaternityPackagesRepository {
@@ -21,6 +25,8 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
     private readonly repository: Repository<MaternityPackage>,
     @InjectRepository(PackageItem)
     private readonly packageItemRepository: Repository<PackageItem>,
+    @InjectRepository(PackageStage)
+    private readonly packageStageRepository: Repository<PackageStage>,
   ) {}
 
   // Tạo entity trong memory, chưa ghi DB cho tới khi gọi save().
@@ -53,6 +59,36 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
     });
   }
 
+  async saveWithStagesAndItems(
+    entity: MaternityPackage,
+    stages: PackageStageWithItemsInput[] = [],
+  ): Promise<MaternityPackage> {
+    return this.repository.manager.transaction(async (manager) => {
+      const savedPackage = await manager.save(MaternityPackage, entity);
+
+      for (const stageInput of stages) {
+        const savedStage = await manager.save(
+          PackageStage,
+          manager.create(PackageStage, {
+            ...stageInput.stage,
+            packageId: savedPackage.id,
+          }),
+        );
+
+        if (stageInput.items.length > 0) {
+          const packageItems = stageInput.items.map(item => manager.create(PackageItem, {
+            ...item,
+            packageId: savedPackage.id,
+            packageStageId: savedStage.id,
+          }));
+          await manager.save(PackageItem, packageItems);
+        }
+      }
+
+      return savedPackage;
+    });
+  }
+
   // Thay toàn bộ dịch vụ trong gói; dùng khi admin chỉnh cấu hình gói trước khi mở bán.
   async replaceItems(
     packageId: string,
@@ -60,6 +96,7 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
   ): Promise<void> {
     await this.repository.manager.transaction(async (manager) => {
       await manager.delete(PackageItem, { packageId });
+      await manager.delete(PackageStage, { packageId });
 
       if (items.length > 0) {
         const packageItems = items.map(item => manager.create(PackageItem, {
@@ -67,6 +104,35 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
           packageId,
         }));
         await manager.save(PackageItem, packageItems);
+      }
+    });
+  }
+
+  async replaceStagesAndItems(
+    packageId: string,
+    stages: PackageStageWithItemsInput[] = [],
+  ): Promise<void> {
+    await this.repository.manager.transaction(async (manager) => {
+      await manager.delete(PackageItem, { packageId });
+      await manager.delete(PackageStage, { packageId });
+
+      for (const stageInput of stages) {
+        const savedStage = await manager.save(
+          PackageStage,
+          manager.create(PackageStage, {
+            ...stageInput.stage,
+            packageId,
+          }),
+        );
+
+        if (stageInput.items.length > 0) {
+          const packageItems = stageInput.items.map(item => manager.create(PackageItem, {
+            ...item,
+            packageId,
+            packageStageId: savedStage.id,
+          }));
+          await manager.save(PackageItem, packageItems);
+        }
       }
     });
   }
@@ -84,7 +150,9 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
   async findDetailsById(id: string): Promise<MaternityPackageResponseDto | null> {
     const rows = await this.buildDetailsQuery()
       .where('pkg.id = :id', { id })
-      .orderBy('packageItem.sortOrder', 'ASC')
+      .orderBy('packageStage.sortOrder', 'ASC')
+      .addOrderBy('packageStage.id', 'ASC')
+      .addOrderBy('packageItem.sortOrder', 'ASC')
       .addOrderBy('packageItem.id', 'ASC')
       .getRawMany<Record<string, unknown>>();
 
@@ -220,6 +288,8 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
       .where('pkg.id IN (:...ids)', { ids })
       .orderBy('pkg.priorityLevel', 'DESC')
       .addOrderBy('pkg.createdAt', 'DESC')
+      .addOrderBy('packageStage.sortOrder', 'ASC')
+      .addOrderBy('packageStage.id', 'ASC')
       .addOrderBy('packageItem.sortOrder', 'ASC')
       .addOrderBy('packageItem.id', 'ASC');
 
@@ -260,6 +330,7 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
       .createQueryBuilder('pkg')
       .innerJoin('facilities', 'packageFacility', 'packageFacility.id = pkg.facilityId')
       .leftJoin('package_items', 'packageItem', 'packageItem.package_id = pkg.id')
+      .leftJoin('package_stages', 'packageStage', 'packageStage.id = packageItem.package_stage_id')
       .leftJoin('facility_services', 'facilityService', 'facilityService.id = packageItem.facility_service_id')
       .leftJoin('services', 'service', 'service.id = facilityService.service_id')
       .leftJoin('service_types', 'serviceType', 'serviceType.id = service.service_type_id')
@@ -282,6 +353,7 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
       .addSelect('packageFacility.ward', 'facilityWard')
       .addSelect('packageFacility.status', 'facilityStatus')
       .addSelect('packageItem.id', 'packageItemId')
+      .addSelect('packageItem.package_stage_id', 'packageStageId')
       .addSelect('packageItem.facility_service_id', 'facilityServiceId')
       .addSelect('packageItem.included_quantity', 'includedQuantity')
       .addSelect('packageItem.is_required', 'isRequired')
@@ -294,6 +366,12 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
           .where('packageFacility.package_item_id = packageItem.id'),
       'facilityIds')
       .addSelect('packageItem.sort_order', 'sortOrder')
+      .addSelect('packageStage.name', 'stageName')
+      .addSelect('packageStage.stage_type', 'stageType')
+      .addSelect('packageStage.week_from', 'stageWeekFrom')
+      .addSelect('packageStage.week_to', 'stageWeekTo')
+      .addSelect('packageStage.goal', 'stageGoal')
+      .addSelect('packageStage.sort_order', 'stageSortOrder')
       .addSelect('facilityService.service_id', 'serviceId')
       .addSelect('facilityService.price', 'facilityServicePrice')
       .addSelect('facilityService.duration_minutes', 'facilityServiceDurationMinutes')
@@ -343,12 +421,14 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
           status: row.facilityStatus as string,
         },
         services: [],
+        stages: [],
       };
 
       if (row.packageItemId) {
-        item.services.push({
+        const serviceItem = {
           id: String(row.packageItemId),
           packageId: id,
+          packageStageId: row.packageStageId ? String(row.packageStageId) : null,
           facilityServiceId: String(row.facilityServiceId),
           facilityId: String(row.facilityId),
           serviceId: String(row.serviceId),
@@ -377,7 +457,34 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
           serviceDefaultDurationMinutes: Number(row.serviceDefaultDurationMinutes),
           serviceRequiresDoctorWarning: row.serviceRequiresDoctorWarning as number,
           serviceStatus: row.serviceStatus as ActiveStatus,
-        });
+        };
+
+        item.services.push(serviceItem);
+
+        if (row.packageStageId) {
+          const stageId = String(row.packageStageId);
+          const existingStage = item.stages?.find(stage => stage.id === stageId);
+          const stage = existingStage ?? {
+            id: stageId,
+            packageId: id,
+            name: String(row.stageName),
+            stageType: String(row.stageType),
+            weekFrom: row.stageWeekFrom === null || row.stageWeekFrom === undefined
+              ? null
+              : Number(row.stageWeekFrom),
+            weekTo: row.stageWeekTo === null || row.stageWeekTo === undefined
+              ? null
+              : Number(row.stageWeekTo),
+            goal: row.stageGoal as string | null,
+            sortOrder: Number(row.stageSortOrder ?? 0),
+            services: [],
+          };
+
+          stage.services.push(serviceItem);
+          if (!existingStage) {
+            item.stages?.push(stage);
+          }
+        }
       }
 
       packages.set(id, item);
@@ -386,6 +493,11 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
     return [...packages.values()].map(item => ({
       ...item,
       services: item.services.sort((a, b) => a.sortOrder - b.sortOrder || Number(a.id) - Number(b.id)),
+      stages: item.stages?.sort((a, b) => a.sortOrder - b.sortOrder || Number(a.id) - Number(b.id))
+        .map(stage => ({
+          ...stage,
+          services: stage.services.sort((a, b) => a.sortOrder - b.sortOrder || Number(a.id) - Number(b.id)),
+        })),
     }));
   }
 

@@ -180,11 +180,13 @@ export class PackageServicesRepository implements IPackageServicesRepository {
     return this.repository
       .createQueryBuilder('packageItem')
       .innerJoin('maternity_packages', 'pkg', 'pkg.id = packageItem.packageId')
+      .leftJoin('package_stages', 'packageStage', 'packageStage.id = packageItem.package_stage_id')
       .innerJoin('facility_services', 'facilityService', 'facilityService.id = packageItem.facilityServiceId')
       .innerJoin('services', 'service', 'service.id = facilityService.service_id')
       .innerJoin('service_types', 'serviceType', 'serviceType.id = service.service_type_id')
       .select('packageItem.id', 'id')
       .addSelect('packageItem.packageId', 'packageId')
+      .addSelect('packageItem.package_stage_id', 'packageStageId')
       .addSelect('packageItem.facilityServiceId', 'facilityServiceId')
       .addSelect('packageItem.includedQuantity', 'includedQuantity')
       .addSelect('packageItem.isRequired', 'isRequired')
@@ -197,6 +199,8 @@ export class PackageServicesRepository implements IPackageServicesRepository {
       .addSelect('pkg.name', 'packageName')
       .addSelect('pkg.price', 'packagePrice')
       .addSelect('pkg.status', 'packageStatus')
+      .addSelect('packageStage.name', 'stageName')
+      .addSelect('packageStage.stage_type', 'stageType')
       .addSelect('service.code', 'serviceCode')
       .addSelect('service.name', 'serviceName')
       .addSelect('service.description', 'serviceDescription')
@@ -218,6 +222,7 @@ export class PackageServicesRepository implements IPackageServicesRepository {
     return {
       id: String(row.id),
       packageId: String(row.packageId),
+      packageStageId: row.packageStageId ? String(row.packageStageId) : null,
       facilityServiceId: String(row.facilityServiceId),
       includedQuantity: Number(row.includedQuantity),
       isRequired: row.isRequired as number,
@@ -230,6 +235,8 @@ export class PackageServicesRepository implements IPackageServicesRepository {
       packageName: row.packageName as string,
       packagePrice: row.packagePrice as string,
       packageStatus: row.packageStatus as string,
+      stageName: row.stageName as string | null,
+      stageType: row.stageType as string | null,
       serviceCode: row.serviceCode as string,
       serviceName: row.serviceName as string,
       serviceDescription: row.serviceDescription as string | null,

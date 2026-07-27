@@ -9,6 +9,7 @@ import { ServiceSaleMode } from '../../../services/dto/requests/create-service.d
 import { ServiceTypeLookupResponseDto } from '../../../service-types/dto/responses/service-type-response.dto';
 import {
   MaternityPackageType,
+  MaternityPackageStageType,
 } from '../requests/create-maternity-package.dto';
 
 export class PackageFacilityResponseDto {
@@ -40,6 +41,9 @@ export class PackageServiceItemResponseDto {
 
   @ApiProperty()
   packageId: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  packageStageId?: string | null;
 
   @ApiProperty()
   facilityServiceId: string;
@@ -108,6 +112,35 @@ export class PackageServiceItemResponseDto {
   serviceStatus: ActiveStatus;
 }
 
+export class PackageStageResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  packageId: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty({ enum: MaternityPackageStageType })
+  stageType: MaternityPackageStageType | string;
+
+  @ApiPropertyOptional({ nullable: true })
+  weekFrom?: number | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  weekTo?: number | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  goal?: string | null;
+
+  @ApiProperty()
+  sortOrder: number;
+
+  @ApiProperty({ type: [PackageServiceItemResponseDto] })
+  services: PackageServiceItemResponseDto[];
+}
+
 export class MaternityPackageResponseDto {
   @ApiProperty()
   id: string;
@@ -150,6 +183,9 @@ export class MaternityPackageResponseDto {
 
   @ApiProperty({ type: [PackageServiceItemResponseDto] })
   services: PackageServiceItemResponseDto[];
+
+  @ApiPropertyOptional({ type: [PackageStageResponseDto] })
+  stages?: PackageStageResponseDto[];
 }
 
 export class MaternityPackagePaginatedResponseDto extends PaginationMetaResponseDto {

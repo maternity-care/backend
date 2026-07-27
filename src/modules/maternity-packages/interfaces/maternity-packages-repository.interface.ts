@@ -5,14 +5,22 @@ import { MaternityPackage } from '../entities/maternity-package.entity';
 import { SearchMaternityPackageDto } from '../dto/requests/search-maternity-package.dto';
 import { MaternityPackageResponseDto } from '../dto/responses/maternity-package-response.dto';
 import { PackageItem } from '../../package-services/entities/package-item.entity';
+import { PackageStage } from '../entities/package-stage.entity';
 
 export const MATERNITY_PACKAGES_REPOSITORY = Symbol('MATERNITY_PACKAGES_REPOSITORY');
+
+export interface PackageStageWithItemsInput {
+  stage: DeepPartial<PackageStage>;
+  items: DeepPartial<PackageItem>[];
+}
 
 export interface IMaternityPackagesRepository {
   create(data: DeepPartial<MaternityPackage>): MaternityPackage;
   save(entity: MaternityPackage): Promise<MaternityPackage>;
   saveWithItems(entity: MaternityPackage, items?: DeepPartial<PackageItem>[]): Promise<MaternityPackage>;
+  saveWithStagesAndItems(entity: MaternityPackage, stages?: PackageStageWithItemsInput[]): Promise<MaternityPackage>;
   replaceItems(packageId: string, items?: DeepPartial<PackageItem>[]): Promise<void>;
+  replaceStagesAndItems(packageId: string, stages?: PackageStageWithItemsInput[]): Promise<void>;
   remove(entity: MaternityPackage): Promise<void>;
   findById(id: string): Promise<MaternityPackage | null>;
   findDetailsById(id: string): Promise<MaternityPackageResponseDto | null>;

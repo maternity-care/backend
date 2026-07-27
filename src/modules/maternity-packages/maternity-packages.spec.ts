@@ -1,9 +1,13 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { MATERNITY_PACKAGE_CONSTANT } from '../../common/constants/maternity-package.constant';
 import { MaternityPackageStatus } from '../../common/constants/status.enum';
-import { CreateMaternityPackageDto } from './dto/requests/create-maternity-package.dto';
+import {
+  CreateMaternityPackageDto,
+  MaternityPackageStageType,
+  MaternityPackageType,
+} from './dto/requests/create-maternity-package.dto';
 import { SearchMaternityPackageDto } from './dto/requests/search-maternity-package.dto';
 import { MaternityPackagesController } from './maternity-packages.controller';
 import { MaternityPackagesService } from './maternity-packages.service';
@@ -88,7 +92,9 @@ describe('MaternityPackagesService business logic', () => {
     findByFacilityAndCode: jest.fn().mockResolvedValue(null),
     findByFacilityAndName: jest.fn().mockResolvedValue(null),
     saveWithItems: jest.fn(async (entity, items = []) => ({ id: entity.id ?? '1', ...entity, services: items })),
+    saveWithStagesAndItems: jest.fn(async (entity, stages = []) => ({ id: entity.id ?? '1', ...entity, stages })),
     replaceItems: jest.fn().mockResolvedValue(undefined),
+    replaceStagesAndItems: jest.fn().mockResolvedValue(undefined),
     findAll: jest.fn().mockResolvedValue([{ ...packageEntity }]),
     findAllPaginated: jest.fn().mockResolvedValue({ items: [{ ...packageEntity }], total: 1 }),
     findAvailableByFacilityId: jest.fn().mockResolvedValue([{
@@ -198,6 +204,86 @@ describe('MaternityPackagesService business logic', () => {
         }),
       ],
     );
+  });
+
+  // Vai tro: tao goi lich trinh gom cac moc tuan thai; moi dich vu trong moc van phai la facilityService cua cung co so.
+  it('creates a schedule package with stages and services in one request', async () => {
+    const { repo, service } = createService();
+
+    await expect(service.create({
+      facilityId: '1',
+      code: 'PKG_SCHEDULE',
+      name: 'Gói thai sản theo lịch trình',
+      price: '3970000.00',
+      status: MaternityPackageStatus.DRAFT,
+      packageType: MaternityPackageType.SCHEDULE,
+      stages: [
+        {
+          name: 'Tuần 12 - 14',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 12,
+          weekTo: 14,
+          goal: 'Siêu âm hình thái, khảo sát dị tật thai',
+          services: [
+            {
+              facilityServiceId: '10',
+              includedQuantity: 1,
+              isRequired: true,
+              isOptional: false,
+            },
+          ],
+        },
+      ],
+    })).resolves.toMatchObject({
+      id: '1',
+      packageType: MaternityPackageType.SCHEDULE,
+      stages: [
+        expect.objectContaining({
+          stage: expect.objectContaining({
+            name: 'Tuần 12 - 14',
+            weekFrom: 12,
+            weekTo: 14,
+          }),
+        }),
+      ],
+    });
+
+    expect(repo.saveWithStagesAndItems).toHaveBeenCalledWith(
+      expect.objectContaining({ facilityId: '1', packageType: MaternityPackageType.SCHEDULE }),
+      [
+        expect.objectContaining({
+          stage: expect.objectContaining({ name: 'Tuần 12 - 14' }),
+          items: [
+            expect.objectContaining({
+              facilityServiceId: '10',
+              includedQuantity: 1,
+            }),
+          ],
+        }),
+      ],
+    );
+  });
+
+  // Vai tro: tranh nhap nham service phang o root khi tao goi theo lich trinh, vi service phai nam trong tung stage.
+  it('rejects schedule package when root services are sent instead of stage services', async () => {
+    const { service } = createService();
+
+    await expect(service.create({
+      facilityId: '1',
+      code: 'PKG_SCHEDULE',
+      name: 'Gói thai sản theo lịch trình',
+      price: '3970000.00',
+      status: MaternityPackageStatus.DRAFT,
+      packageType: MaternityPackageType.SCHEDULE,
+      services: [
+        {
+          facilityServiceId: '10',
+          includedQuantity: 1,
+          isRequired: true,
+          isOptional: false,
+        },
+      ],
+    })).rejects.toBeInstanceOf(BadRequestException);
   });
 
   // Vai tro: bao ve rule khong cho hai goi thai san trung code hoac name.

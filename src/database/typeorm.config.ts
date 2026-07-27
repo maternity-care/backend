@@ -22,6 +22,7 @@ import { Faq } from './entities/faq.entity';
 import { HealthMetric } from './entities/health-metric.entity';
 import { Invoice } from './entities/invoice.entity';
 import { MaternityPackage } from '../modules/maternity-packages/entities/maternity-package.entity';
+import { PackageStage } from '../modules/maternity-packages/entities/package-stage.entity';
 import { MedicalFile } from './entities/medical-file.entity';
 import { MedicalRecord } from '../modules/medical-records/entities/medical-record.entity';
 import { Order } from './entities/order.entity';
@@ -53,6 +54,8 @@ import { UserAuth } from '../modules/auth/entities/user-auth.entity';
 import { Notification } from '../modules/notifications/entities/notification.entity';
 import { UpdateServicePackageDesign1785120000000 } from './migrations/1785120000000-UpdateServicePackageDesign';
 import { UseDynamicServiceTypes1785200000000 } from './migrations/1785200000000-UseDynamicServiceTypes';
+import { MakeFacilityLocationNullable1785300000000 } from './migrations/1785300000000-MakeFacilityLocationNullable';
+import { AddPackageStages1785400000000 } from './migrations/1785400000000-AddPackageStages';
 
 config();
 
@@ -90,6 +93,7 @@ export const typeOrmConfig: DataSourceOptions = {
     Service,
     ServiceType,
     MaternityPackage,
+    PackageStage,
     RoomType,
     UserAuth,
     Appointment,
@@ -117,7 +121,12 @@ export const typeOrmConfig: DataSourceOptions = {
     StaffPermission,
     join(__dirname, 'entities', '*.entity{.ts,.js}'),
   ],
-  migrations: [UpdateServicePackageDesign1785120000000, UseDynamicServiceTypes1785200000000],
+  migrations: [
+    UpdateServicePackageDesign1785120000000,
+    UseDynamicServiceTypes1785200000000,
+    MakeFacilityLocationNullable1785300000000,
+    AddPackageStages1785400000000,
+  ],
   charset: 'utf8mb4_unicode_ci',
 };
 
