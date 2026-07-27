@@ -1,12 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   ActiveStatus,
-  AvailabilityStatus,
   FacilityStatus,
   MaternityPackageStatus,
 } from '../../../../common/constants/status.enum';
 import { PaginationMetaResponseDto } from '../../../../common/dto/pagination-response.dto';
-import { ServiceSaleMode, ServiceType } from '../../../services/dto/requests/create-service.dto';
+import { ServiceSaleMode } from '../../../services/dto/requests/create-service.dto';
+import { ServiceTypeLookupResponseDto } from '../../../service-types/dto/responses/service-type-response.dto';
 import {
   MaternityPackageType,
 } from '../requests/create-maternity-package.dto';
@@ -62,6 +62,9 @@ export class PackageServiceItemResponseDto {
   @ApiProperty()
   allowedFacilityScope: string;
 
+  @ApiPropertyOptional({ type: [String] })
+  facilityIds?: string[];
+
   @ApiProperty()
   sortOrder: number;
 
@@ -71,8 +74,8 @@ export class PackageServiceItemResponseDto {
   @ApiProperty()
   durationMinutes: number;
 
-  @ApiProperty({ enum: AvailabilityStatus })
-  facilityServiceStatus: AvailabilityStatus;
+  @ApiProperty({ enum: ActiveStatus })
+  facilityServiceStatus: ActiveStatus;
 
   @ApiProperty()
   serviceCode: string;
@@ -83,8 +86,11 @@ export class PackageServiceItemResponseDto {
   @ApiPropertyOptional({ nullable: true })
   serviceDescription?: string | null;
 
-  @ApiProperty({ enum: ServiceType })
-  serviceType: ServiceType | string;
+  @ApiProperty()
+  serviceTypeId: string;
+
+  @ApiProperty({ type: ServiceTypeLookupResponseDto })
+  serviceType: ServiceTypeLookupResponseDto;
 
   @ApiProperty({ enum: ServiceSaleMode })
   serviceSaleMode: ServiceSaleMode | string;

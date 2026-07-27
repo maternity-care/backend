@@ -5,6 +5,7 @@ import { PaginationResult } from '../../../common/helpers/pagination';
 import { SearchPackageServiceDto } from '../dto/requests/search-package-service.dto';
 import { PackageServiceResponseDto } from '../dto/responses/package-service-response.dto';
 import { PackageItem } from '../entities/package-item.entity';
+import { PackageServiceFacility } from '../entities/package-service-facility.entity';
 import {
   IPackageServicesRepository,
   PackageServiceWithDetails,
@@ -15,6 +16,8 @@ export class PackageServicesRepository implements IPackageServicesRepository {
   constructor(
     @InjectRepository(PackageItem)
     private readonly repository: Repository<PackageItem>,
+    @InjectRepository(PackageServiceFacility)
+    private readonly packageServiceFacilityRepository: Repository<PackageServiceFacility>,
   ) {}
 
   create(data: DeepPartial<PackageItem>): PackageItem {
@@ -25,12 +28,44 @@ export class PackageServicesRepository implements IPackageServicesRepository {
     return this.repository.save(entity);
   }
 
-  saveWithFacilities(entity: PackageItem, _facilityIds?: string[]): Promise<PackageItem> {
-    return this.repository.save(entity);
+  async saveWithFacilities(entity: PackageItem, facilityIds: string[] = []): Promise<PackageItem> {
+    return this.repository.manager.transaction(async (manager) => {
+      const saved = await manager.save(PackageItem, entity);
+      await manager.delete(PackageServiceFacility, { packageItemId: saved.id });
+      if (facilityIds.length > 0) {
+        await manager.save(
+          PackageServiceFacility,
+          facilityIds.map((facilityId) =>
+            manager.create(PackageServiceFacility, {
+              packageItemId: saved.id,
+              facilityId,
+            }),
+          ),
+        );
+      }
+      return saved;
+    });
   }
 
-  async replaceFacilities(_packageServiceId: string, _facilityIds: string[]): Promise<void> {
-    // Schema hiện tại không có bảng package_service_facilities, nên scope theo facility được biểu diễn qua facilityServiceId.
+  saveManyWithFacilities(entities: PackageItem[]): Promise<PackageItem[]> {
+    return this.repository.save(entities);
+  }
+
+  async replaceFacilities(packageServiceId: string, facilityIds: string[]): Promise<void> {
+    await this.packageServiceFacilityRepository.manager.transaction(async (manager) => {
+      await manager.delete(PackageServiceFacility, { packageItemId: packageServiceId });
+      if (facilityIds.length > 0) {
+        await manager.save(
+          PackageServiceFacility,
+          facilityIds.map((facilityId) =>
+            manager.create(PackageServiceFacility, {
+              packageItemId: packageServiceId,
+              facilityId,
+            }),
+          ),
+        );
+      }
+    });
   }
 
   async remove(entity: PackageItem): Promise<void> {
@@ -58,7 +93,11 @@ export class PackageServicesRepository implements IPackageServicesRepository {
   }
 
   async findFacilityIds(_packageServiceId: string): Promise<string[]> {
-    return [];
+    const rows = await this.packageServiceFacilityRepository.find({
+      where: { packageItemId: _packageServiceId },
+      select: { facilityId: true },
+    });
+    return rows.map((row) => row.facilityId);
   }
 
   async countGeneratedBenefits(packageId: string, facilityServiceId: string): Promise<number> {
@@ -66,10 +105,12 @@ export class PackageServicesRepository implements IPackageServicesRepository {
       const row = await this.repository.manager
         .createQueryBuilder()
         .select('COUNT(*)', 'count')
-        .from('patient_package_benefits', 'benefit')
-        .innerJoin('package_items', 'packageItem', 'packageItem.package_id = benefit.package_id')
-        .where('benefit.package_id = :packageId', { packageId })
+        .from('package_items', 'packageItem')
+        .innerJoin('facility_services', 'facilityService', 'facilityService.id = packageItem.facility_service_id')
+        .innerJoin('patient_package_benefits', 'benefit', 'benefit.service_id = facilityService.service_id')
+        .where('packageItem.package_id = :packageId', { packageId })
         .andWhere('packageItem.facility_service_id = :facilityServiceId', { facilityServiceId })
+        .andWhere('benefit.deleted_at IS NULL')
         .getRawOne<{ count: string }>();
       return Number(row?.count ?? 0);
     } catch (error) {
@@ -114,8 +155,11 @@ export class PackageServicesRepository implements IPackageServicesRepository {
         facilityServiceId: filters.facilityServiceId,
       });
     }
-    if (filters?.serviceType) {
-      query.andWhere('service.service_type = :serviceType', { serviceType: filters.serviceType });
+    if (filters?.facilityId) {
+      query.andWhere('pkg.facilityId = :facilityId', { facilityId: filters.facilityId });
+    }
+    if (filters?.serviceTypeId) {
+      query.andWhere('service.service_type_id = :serviceTypeId', { serviceTypeId: filters.serviceTypeId });
     }
     if (filters?.allowedFacilityScope) {
       query.andWhere('packageItem.allowedFacilityScope = :allowedFacilityScope', {
@@ -138,6 +182,7 @@ export class PackageServicesRepository implements IPackageServicesRepository {
       .innerJoin('maternity_packages', 'pkg', 'pkg.id = packageItem.packageId')
       .innerJoin('facility_services', 'facilityService', 'facilityService.id = packageItem.facilityServiceId')
       .innerJoin('services', 'service', 'service.id = facilityService.service_id')
+      .innerJoin('service_types', 'serviceType', 'serviceType.id = service.service_type_id')
       .select('packageItem.id', 'id')
       .addSelect('packageItem.packageId', 'packageId')
       .addSelect('packageItem.facilityServiceId', 'facilityServiceId')
@@ -155,8 +200,18 @@ export class PackageServicesRepository implements IPackageServicesRepository {
       .addSelect('service.code', 'serviceCode')
       .addSelect('service.name', 'serviceName')
       .addSelect('service.description', 'serviceDescription')
-      .addSelect('service.service_type', 'serviceType')
-      .addSelect('service.base_price', 'serviceBasePrice');
+      .addSelect('service.service_type_id', 'serviceTypeId')
+      .addSelect('serviceType.code', 'serviceTypeCode')
+      .addSelect('serviceType.name', 'serviceTypeName')
+      .addSelect('serviceType.description', 'serviceTypeDescription')
+      .addSelect('serviceType.status', 'serviceTypeStatus')
+      .addSelect('service.base_price', 'serviceBasePrice')
+      .addSelect((subQuery) =>
+        subQuery
+          .select('GROUP_CONCAT(packageFacility.facility_id)')
+          .from('package_service_facilities', 'packageFacility')
+          .where('packageFacility.package_item_id = packageItem.id'),
+      'facilityIds');
   }
 
   private mapRow(row: Record<string, unknown>): PackageServiceResponseDto {
@@ -168,6 +223,7 @@ export class PackageServicesRepository implements IPackageServicesRepository {
       isRequired: row.isRequired as number,
       isOptional: row.isOptional as number,
       allowedFacilityScope: String(row.allowedFacilityScope),
+      sortOrder: Number(row.sortOrder ?? 0),
       createdAt: row.createdAt as Date,
       updatedAt: row.updatedAt as Date,
       packageCode: row.packageCode as string,
@@ -177,9 +233,26 @@ export class PackageServicesRepository implements IPackageServicesRepository {
       serviceCode: row.serviceCode as string,
       serviceName: row.serviceName as string,
       serviceDescription: row.serviceDescription as string | null,
-      serviceType: row.serviceType as string,
+      serviceTypeId: String(row.serviceTypeId),
+      serviceType: {
+        id: String(row.serviceTypeId),
+        code: String(row.serviceTypeCode),
+        name: String(row.serviceTypeName),
+        description: row.serviceTypeDescription as string | null,
+        status: row.serviceTypeStatus as never,
+      },
       serviceBasePrice: row.serviceBasePrice as string,
-      facilityIds: [],
+      facilityIds: this.parseFacilityIds(row.facilityIds),
     };
+  }
+
+  private parseFacilityIds(value: unknown): string[] {
+    if (!value) {
+      return [];
+    }
+    return String(value)
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
   }
 }

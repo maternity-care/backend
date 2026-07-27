@@ -1,9 +1,8 @@
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
-import { AvailabilityStatus } from '../../../../common/constants/status.enum';
+import { ActiveStatus } from '../../../../common/constants/status.enum';
 import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
-import { ServiceType } from '../../../services/dto/requests/create-service.dto';
 
 export class SearchFacilityServiceDto {
   @ApiPropertyOptional({ description: 'Tìm theo code/name/description của service gốc' })
@@ -23,15 +22,16 @@ export class SearchFacilityServiceDto {
   @Matches(POSITIVE_ID_PATTERN)
   serviceId?: string;
 
-  @ApiPropertyOptional({ enum: ServiceType })
+  @ApiPropertyOptional({ description: 'Lọc theo ID trong bảng service_types' })
   @IsOptional()
-  @IsEnum(ServiceType)
-  serviceType?: ServiceType;
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  serviceTypeId?: string;
 
-  @ApiPropertyOptional({ enum: AvailabilityStatus })
+  @ApiPropertyOptional({ enum: ActiveStatus })
   @IsOptional()
-  @IsEnum(AvailabilityStatus)
-  status?: AvailabilityStatus;
+  @IsEnum(ActiveStatus)
+  status?: ActiveStatus;
 
   @ApiPropertyOptional({ minimum: 1 })
   @IsOptional()

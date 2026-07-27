@@ -7,4 +7,13 @@ export const SERVICE_CONSTANT = {
   NOT_FOUND: 'Không tìm thấy dịch vụ',
   CODE_EXISTS: 'Mã dịch vụ đã tồn tại',
   NAME_EXISTS: 'Tên dịch vụ đã tồn tại',
+  TYPE_CREATED: 'Tạo loại dịch vụ thành công',
+  TYPE_UPDATED: 'Cập nhật loại dịch vụ thành công',
+  TYPE_DELETED: 'Xóa loại dịch vụ thành công',
+  TYPE_FOUND: 'Lấy danh sách loại dịch vụ thành công',
+  TYPE_DETAIL_FOUND: 'Lấy chi tiết loại dịch vụ thành công',
+  TYPE_LOOKUP_FOUND: 'Lấy danh sách gợi ý loại dịch vụ thành công',
+  TYPE_NOT_FOUND: 'Không tìm thấy loại dịch vụ',
+  TYPE_ACTIVE_NOT_FOUND: 'Loại dịch vụ không tồn tại hoặc đang ngừng hoạt động',
+  TYPE_NAME_EXISTS: 'Tên loại dịch vụ đã tồn tại',
 };

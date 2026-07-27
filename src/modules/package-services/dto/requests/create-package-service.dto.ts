@@ -13,6 +13,7 @@ import {
   Max,
   Min,
   ValidateIf,
+  ValidateNested,
 } from 'class-validator';
 import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
 
@@ -89,4 +90,18 @@ export class CreatePackageServiceDto extends PackageServiceItemInputDto {
   @IsString()
   @Matches(POSITIVE_ID_PATTERN)
   packageId: string;
+}
+
+export class BulkCreatePackageServicesDto {
+  @ApiProperty({ example: '1' })
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  packageId: string;
+
+  @ApiProperty({ type: [PackageServiceItemInputDto], minItems: 1, maxItems: 100 })
+  @IsArray()
+  @ArrayNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => PackageServiceItemInputDto)
+  services: PackageServiceItemInputDto[];
 }

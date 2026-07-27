@@ -20,6 +20,15 @@ describe('MaternityPackages DTO validation', () => {
     durationDays: '90',
     priorityLevel: '1',
     status: MaternityPackageStatus.DRAFT,
+    services: [
+      {
+        facilityServiceId: '10',
+        includedQuantity: '2',
+        isRequired: 'true',
+        isOptional: 'false',
+        sortOrder: '1',
+      },
+    ],
   };
 
   // Vai tro: dam bao DTO tao package hop le va convert durationDays/priorityLevel ve number.
@@ -76,6 +85,10 @@ describe('MaternityPackagesService business logic', () => {
     findById: jest.fn().mockResolvedValue({ ...packageEntity }),
     findByCode: jest.fn().mockResolvedValue(null),
     findByName: jest.fn().mockResolvedValue(null),
+    findByFacilityAndCode: jest.fn().mockResolvedValue(null),
+    findByFacilityAndName: jest.fn().mockResolvedValue(null),
+    saveWithItems: jest.fn(async (entity, items = []) => ({ id: entity.id ?? '1', ...entity, services: items })),
+    replaceItems: jest.fn().mockResolvedValue(undefined),
     findAll: jest.fn().mockResolvedValue([{ ...packageEntity }]),
     findAllPaginated: jest.fn().mockResolvedValue({ items: [{ ...packageEntity }], total: 1 }),
     findAvailableByFacilityId: jest.fn().mockResolvedValue([{
@@ -102,10 +115,19 @@ describe('MaternityPackagesService business logic', () => {
   const facilitiesService = {
     findById: jest.fn().mockResolvedValue({ id: '1', status: 'active' }),
   };
+  const facilityServicesService = {
+    findDetailsById: jest.fn().mockResolvedValue({
+      id: '10',
+      facilityId: '1',
+      serviceId: '5',
+      status: 'active',
+      service: { id: '5', status: 'active' },
+    }),
+  };
 
   const createService = (repo = createRepo()) => ({
     repo,
-    service: new MaternityPackagesService(repo as never, facilitiesService as never),
+    service: new MaternityPackagesService(repo as never, facilitiesService as never, facilityServicesService as never),
   });
 
   beforeEach(() => jest.clearAllMocks());
@@ -122,19 +144,70 @@ describe('MaternityPackagesService business logic', () => {
       durationDays: 90,
       priorityLevel: 1,
       status: MaternityPackageStatus.DRAFT,
+      services: [
+        {
+          facilityServiceId: '10',
+          includedQuantity: 2,
+          isRequired: true,
+          isOptional: false,
+          sortOrder: 1,
+        },
+      ],
     })).resolves.toMatchObject({ id: '1', code: 'PKG_BASIC' });
-    expect(repo.findByCode).toHaveBeenCalledWith('PKG_BASIC');
-    expect(repo.findByName).toHaveBeenCalledWith('Gói thai sản cơ bản');
+    expect(repo.findByFacilityAndCode).toHaveBeenCalledWith('1', 'PKG_BASIC');
+    expect(repo.findByFacilityAndName).toHaveBeenCalledWith('1', 'Gói thai sản cơ bản');
+  });
+
+  // Vai tro: tao goi va gan luon danh sach dich vu trong mot API; moi facilityService phai thuoc dung facility cua goi.
+  it('creates a package with package services in one request', async () => {
+    const { repo, service } = createService();
+
+    await expect(service.create({
+      facilityId: '1',
+      code: 'PKG_BASIC',
+      name: 'Gói thai sản cơ bản',
+      price: '900000.00',
+      status: MaternityPackageStatus.DRAFT,
+      services: [
+        {
+          facilityServiceId: '10',
+          includedQuantity: 2,
+          isRequired: true,
+          isOptional: false,
+          sortOrder: 1,
+        },
+      ],
+    })).resolves.toMatchObject({
+      id: '1',
+      services: [
+        expect.objectContaining({
+          facilityServiceId: '10',
+          includedQuantity: 2,
+        }),
+      ],
+    });
+
+    expect(facilityServicesService.findDetailsById).toHaveBeenCalledWith('10');
+    expect(repo.saveWithItems).toHaveBeenCalledWith(
+      expect.objectContaining({ facilityId: '1' }),
+      [
+        expect.objectContaining({
+          facilityServiceId: '10',
+          includedQuantity: 2,
+          allowedFacilityScope: 'all',
+        }),
+      ],
+    );
   });
 
   // Vai tro: bao ve rule khong cho hai goi thai san trung code hoac name.
   it('rejects duplicated code or name', async () => {
     const codeContext = createService();
-    codeContext.repo.findByCode.mockResolvedValueOnce(packageEntity);
+    codeContext.repo.findByFacilityAndCode.mockResolvedValueOnce(packageEntity);
     await expect(codeContext.service.create(packageEntity as never)).rejects.toBeInstanceOf(ConflictException);
 
     const nameContext = createService();
-    nameContext.repo.findByName.mockResolvedValueOnce(packageEntity);
+    nameContext.repo.findByFacilityAndName.mockResolvedValueOnce(packageEntity);
     await expect(nameContext.service.create(packageEntity as never)).rejects.toBeInstanceOf(ConflictException);
   });
 
@@ -163,12 +236,12 @@ describe('MaternityPackagesService business logic', () => {
   // Vai tro: chan update package thanh code/name da thuoc ve package khac.
   it('rejects update when changed code or name already exists', async () => {
     const codeContext = createService();
-    codeContext.repo.findByCode.mockResolvedValueOnce(packageEntity);
+    codeContext.repo.findByFacilityAndCode.mockResolvedValueOnce({ ...packageEntity, id: '2' });
     await expect(codeContext.service.update('1', { code: 'PKG_PREMIUM' })).rejects.toBeInstanceOf(ConflictException);
     expect(codeContext.repo.save).not.toHaveBeenCalled();
 
     const nameContext = createService();
-    nameContext.repo.findByName.mockResolvedValueOnce(packageEntity);
+    nameContext.repo.findByFacilityAndName.mockResolvedValueOnce({ ...packageEntity, id: '2' });
     await expect(nameContext.service.update('1', { name: 'Goi thai san nang cao' })).rejects.toBeInstanceOf(ConflictException);
     expect(nameContext.repo.save).not.toHaveBeenCalled();
   });

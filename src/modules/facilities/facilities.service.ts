@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateFacilityDto } from './dto/requests/create-facility.dto';
+import { SearchFacilityAdminOptionsDto } from './dto/requests/search-facility-admin-options.dto';
 import { LookupFacilityDto, SearchFacilityDto } from './dto/requests/search-facility.dto';
 import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
 import { FacilityOperatingHourGroupDto } from './dto/requests/facility-schedule.dto';
@@ -106,6 +107,10 @@ export class FacilitiesService {
 
   async lookup(query?: LookupFacilityDto): Promise<FacilityLookup[]> {
     return this.facilitiesRepository.lookup(query);
+  }
+
+  async findAdminOptions(query?: SearchFacilityAdminOptionsDto) {
+    return this.facilitiesRepository.findAdminOptions(query);
   }
 
   async remove(id: string, reason?: string, deletedBy?: string | null): Promise<SafeRemoveResult> {
@@ -319,7 +324,7 @@ export class FacilitiesService {
     };
   }
 
-  private async generateFacilityCode(province: string): Promise<string> {
+  private async generateFacilityCode(province?: string | null): Promise<string> {
     const prefix = `CS-${this.buildProvinceAbbreviation(province)}`;
     const existingCodes = await this.facilitiesRepository.findCodesByPrefix(prefix);
     const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -331,7 +336,11 @@ export class FacilitiesService {
     return `${prefix}-${String(nextSequence).padStart(2, '0')}`;
   }
 
-  private buildProvinceAbbreviation(province: string): string {
+  private buildProvinceAbbreviation(province?: string | null): string {
+    if (!province || !String(province).trim()) {
+      return 'VN';
+    }
+
     const normalizedProvince = this.normalizeVietnameseText(province)
       .replace(/[^\w\s]/g, ' ')
       .replace(/\b(THANH PHO|TINH|TP)\b/g, ' ')

@@ -74,19 +74,19 @@ export class CreateFacilityDto {
   @MaxLength(255)
   address: string;
 
-  @ApiProperty({ example: 'Ha Noi' })
+  @ApiPropertyOptional({ example: 'Ha Noi', nullable: true })
+  @IsOptional()
   @Transform(({ value }) => trimText(value))
   @IsString()
-  @IsNotEmpty()
   @MaxLength(255)
-  province: string;
+  province?: string | null;
 
-  @ApiProperty({ example: 'Dich Vong Hau' })
+  @ApiPropertyOptional({ example: 'Dich Vong Hau', nullable: true })
+  @IsOptional()
   @Transform(({ value }) => trimText(value))
   @IsString()
-  @IsNotEmpty()
   @MaxLength(255)
-  ward: string;
+  ward?: string | null;
 
   @ApiProperty({ example: '21.0285' })
   @Transform(({ value }) => trimValue(value))

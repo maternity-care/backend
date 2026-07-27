@@ -1,8 +1,8 @@
 import { DeepPartial } from 'typeorm';
-import { Service } from '../entities/service.entity';
+import { ActiveStatus } from '../../../common/constants/status.enum';
 import { PaginationResult } from '../../../common/helpers/pagination';
 import { SearchServiceDto } from '../dto/requests/search-service.dto';
-import { ActiveStatus } from '../../../common/constants/status.enum';
+import { Service } from '../entities/service.entity';
 
 export const SERVICES_REPOSITORY = Symbol('SERVICES_REPOSITORY');
 

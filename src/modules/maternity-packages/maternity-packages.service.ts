@@ -1,8 +1,7 @@
-import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { MATERNITY_PACKAGE_CONSTANT } from '../../common/constants/maternity-package.constant';
 import {
   ActiveStatus,
-  AvailabilityStatus,
   FacilityStatus,
   MaternityPackageStatus,
 } from '../../common/constants/status.enum';
@@ -11,6 +10,7 @@ import { MaternityPackage } from './entities/maternity-package.entity';
 import { FacilitiesService } from '../facilities/facilities.service';
 import {
   CreateMaternityPackageDto,
+  MaternityPackageServiceInputDto,
   MaternityPackageType,
 } from './dto/requests/create-maternity-package.dto';
 import { SearchMaternityPackageDto } from './dto/requests/search-maternity-package.dto';
@@ -21,7 +21,7 @@ import {
   MATERNITY_PACKAGES_REPOSITORY,
 } from './interfaces/maternity-packages-repository.interface';
 import { FacilityServicesService } from '../facility-services/facility-services.service';
-import { PackageServiceItemInputDto } from '../package-services/dto/requests/create-package-service.dto';
+import { PackageServiceFacilityScope } from '../package-services/dto/requests/create-package-service.dto';
 import { PackageItem } from '../package-services/entities/package-item.entity';
 
 @Injectable()
@@ -38,9 +38,12 @@ export class MaternityPackagesService {
   // Tạo "vỏ gói" dịch vụ: code/name/price/duration/status.
   // Các dịch vụ con của gói sẽ được gắn sau bằng module package-services.
   async create(dto: CreateMaternityPackageDto): Promise<MaternityPackageResponseDto> {
-    await this.ensureUniqueCode(dto.code);
-    await this.ensureUniqueName(dto.name);
     await this.ensureActiveFacility(dto.facilityId);
+    await this.ensureUniqueCode(dto.facilityId, dto.code);
+    await this.ensureUniqueName(dto.facilityId, dto.name);
+    if (!dto.services || dto.services.length === 0) {
+      throw new BadRequestException('Tạo gói dịch vụ phải kèm ít nhất một dịch vụ trong gói');
+    }
 
     const entity = this.repository.create({
       ...dto,
@@ -111,16 +114,16 @@ export class MaternityPackagesService {
   async update(id: string, dto: UpdateMaternityPackageDto): Promise<MaternityPackageResponseDto> {
     const entity = await this.findById(id);
 
-    if (dto.code && dto.code !== entity.code) {
-      await this.ensureUniqueCode(dto.code);
-    }
-    if (dto.name && dto.name !== entity.name) {
-      await this.ensureUniqueName(dto.name);
-    }
-
     const nextFacilityId = dto.facilityId ?? entity.facilityId;
     if (dto.facilityId && dto.facilityId !== entity.facilityId) {
       await this.ensureActiveFacility(dto.facilityId);
+    }
+
+    if ((dto.code && dto.code !== entity.code) || nextFacilityId !== entity.facilityId) {
+      await this.ensureUniqueCode(nextFacilityId, dto.code ?? entity.code, entity.id);
+    }
+    if ((dto.name && dto.name !== entity.name) || nextFacilityId !== entity.facilityId) {
+      await this.ensureUniqueName(nextFacilityId, dto.name ?? entity.name, entity.id);
     }
 
     Object.assign(entity, {
@@ -155,15 +158,17 @@ export class MaternityPackagesService {
   }
 
   // Code là định danh ổn định cho quản trị/tích hợp nên không được trùng.
-  private async ensureUniqueCode(code: string): Promise<void> {
-    if (await this.repository.findByCode(code)) {
+  private async ensureUniqueCode(facilityId: string, code: string, currentId?: string): Promise<void> {
+    const duplicated = await this.repository.findByFacilityAndCode(facilityId, code);
+    if (duplicated && duplicated.id !== currentId) {
       throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.CODE_EXISTS);
     }
   }
 
   // Name là tên hiển thị cho người dùng, nên cũng nên chống trùng để tránh nhầm gói.
-  private async ensureUniqueName(name: string): Promise<void> {
-    if (await this.repository.findByName(name)) {
+  private async ensureUniqueName(facilityId: string, name: string, currentId?: string): Promise<void> {
+    const duplicated = await this.repository.findByFacilityAndName(facilityId, name);
+    if (duplicated && duplicated.id !== currentId) {
       throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.NAME_EXISTS);
     }
   }
@@ -195,7 +200,7 @@ export class MaternityPackagesService {
 
   private async buildPackageItems(
     packageFacilityId: string,
-    services?: PackageServiceItemInputDto[],
+    services?: MaternityPackageServiceInputDto[],
   ): Promise<Partial<PackageItem>[]> {
     if (!services || services.length === 0) {
       return [];
@@ -221,7 +226,7 @@ export class MaternityPackagesService {
       if (facilityService.facilityId !== packageFacilityId) {
         throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_NOT_IN_PACKAGE_FACILITY);
       }
-      if (facilityService.status !== AvailabilityStatus.AVAILABLE) {
+      if (facilityService.status !== ActiveStatus.ACTIVE) {
         throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_UNAVAILABLE);
       }
       if (facilityService.service.status !== ActiveStatus.ACTIVE) {
@@ -233,7 +238,7 @@ export class MaternityPackagesService {
         includedQuantity: item.includedQuantity,
         isRequired: item.isRequired,
         isOptional: item.isOptional,
-        allowedFacilityScope: item.allowedFacilityScope,
+        allowedFacilityScope: PackageServiceFacilityScope.ALL,
         sortOrder: item.sortOrder ?? index + 1,
       });
     }

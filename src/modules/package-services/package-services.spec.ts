@@ -63,8 +63,13 @@ describe('PackageServices DTO validation', () => {
 });
 
 describe('PackageServicesService business logic', () => {
-  const pkg = { id: '1', status: MaternityPackageStatus.DRAFT };
-  const serviceEntity = { id: '2', status: ActiveStatus.ACTIVE };
+  const pkg = { id: '1', facilityId: '3', status: MaternityPackageStatus.DRAFT };
+  const facilityServiceEntity = {
+    id: '2',
+    facilityId: '3',
+    status: ActiveStatus.ACTIVE,
+    service: { id: '20', status: ActiveStatus.ACTIVE },
+  };
   const facility = { id: '3', status: FacilityStatus.ACTIVE };
   const entity = {
     id: '10',
@@ -80,6 +85,9 @@ describe('PackageServicesService business logic', () => {
     create: jest.fn((data) => ({ ...data })),
     save: jest.fn(async (data) => ({ id: data.id ?? '10', ...data })),
     saveWithFacilities: jest.fn(async (data) => ({ id: data.id ?? '10', ...data })),
+    saveManyWithFacilities: jest.fn(async (data: any[]) =>
+      data.map((item: any, index: number) => ({ id: String(index + 10), ...item })),
+    ),
     replaceFacilities: jest.fn().mockResolvedValue(undefined),
     remove: jest.fn().mockResolvedValue(undefined),
     findById: jest.fn().mockResolvedValue({ ...entity }),
@@ -92,7 +100,7 @@ describe('PackageServicesService business logic', () => {
     countGeneratedBenefits: jest.fn().mockResolvedValue(0),
   });
   const maternityPackagesService = { findById: jest.fn().mockResolvedValue(pkg) };
-  const servicesService = { findById: jest.fn().mockResolvedValue(serviceEntity) };
+  const facilityServicesService = { findDetailsById: jest.fn().mockResolvedValue(facilityServiceEntity) };
   const facilitiesService = { findById: jest.fn().mockResolvedValue(facility) };
 
   const createService = (repo = createRepo()) => ({
@@ -100,7 +108,7 @@ describe('PackageServicesService business logic', () => {
     service: new PackageServicesService(
       repo as never,
       maternityPackagesService as never,
-      servicesService as never,
+      facilityServicesService as never,
       facilitiesService as never,
     ),
   });
@@ -202,8 +210,26 @@ describe('PackageServicesService business logic', () => {
       }),
     ).rejects.toBeInstanceOf(ConflictException);
 
-    servicesService.findById.mockResolvedValueOnce({
-      ...serviceEntity,
+    facilityServicesService.findDetailsById.mockResolvedValueOnce({
+      ...facilityServiceEntity,
+      service: {
+        ...facilityServiceEntity.service,
+        status: ActiveStatus.INACTIVE,
+      },
+    });
+    await expect(
+      createService().service.create({
+        packageId: '1',
+        facilityServiceId: '2',
+        includedQuantity: 1,
+        isRequired: true,
+        isOptional: false,
+        allowedFacilityScope: PackageServiceFacilityScope.ALL,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    facilityServicesService.findDetailsById.mockResolvedValueOnce({
+      ...facilityServiceEntity,
       status: ActiveStatus.INACTIVE,
     });
     await expect(
@@ -358,17 +384,13 @@ describe('PackageServicesController', () => {
     });
   });
 
-  // Vai tro: kiem tra CRUD package-service tra message/data wrapper nhat quan.
-  it('wraps detail, create, update, and remove responses', async () => {
+  // Vai tro: kiem tra detail/update/remove package-service; route create le da bo de ep workflow tao package kem services.
+  it('wraps detail, update, and remove responses', async () => {
     const service = createServiceMock();
     const controller = new PackageServicesController(service as never);
 
     await expect(controller.findOne('10')).resolves.toMatchObject({
       message: PACKAGE_SERVICE_CONSTANT.DETAIL_FOUND,
-    });
-    await expect(controller.create(entity as never)).resolves.toMatchObject({
-      message: PACKAGE_SERVICE_CONSTANT.CREATED,
-      data: entity,
     });
     await expect(controller.update('10', { includedQuantity: 3 })).resolves.toMatchObject({
       message: PACKAGE_SERVICE_CONSTANT.UPDATED,

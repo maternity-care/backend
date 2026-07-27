@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ServiceTypeLookupResponseDto } from '../../../service-types/dto/responses/service-type-response.dto';
 
 export class PackageServiceResponseDto {
   @ApiProperty()
@@ -21,6 +22,9 @@ export class PackageServiceResponseDto {
 
   @ApiProperty()
   allowedFacilityScope: string;
+
+  @ApiProperty()
+  sortOrder: number;
 
   @ApiProperty()
   createdAt: Date;
@@ -50,7 +54,10 @@ export class PackageServiceResponseDto {
   serviceDescription?: string | null;
 
   @ApiPropertyOptional()
-  serviceType?: string;
+  serviceTypeId?: string;
+
+  @ApiPropertyOptional({ type: ServiceTypeLookupResponseDto })
+  serviceType?: ServiceTypeLookupResponseDto;
 
   @ApiPropertyOptional()
   serviceBasePrice?: string;
