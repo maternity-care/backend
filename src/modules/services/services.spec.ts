@@ -18,6 +18,14 @@ describe('Services DTO validation', () => {
     basePrice: '300000.00',
     requiresDoctorWarning: 'true',
     status: ActiveStatus.ACTIVE,
+    facilityAssignments: [
+      {
+        facilityId: '1',
+        price: '280000.00',
+        durationMinutes: '30',
+        status: ActiveStatus.ACTIVE,
+      },
+    ],
   };
 
   // Vai tro: dam bao DTO tao service hop le va bien doi cac field string sang kieu boolean/number dung.
@@ -27,6 +35,24 @@ describe('Services DTO validation', () => {
     expect(dto.code).toBe('US_2D');
     expect(dto.defaultDurationMinutes).toBe(30);
     expect(dto.requiresDoctorWarning).toBe(true);
+  });
+
+  // Vai tro: dam bao payload tao service co the kem danh sach co so can assign ngay, moi co so co gia/thoi luong rieng.
+  it('accepts facility assignments when creating a service', async () => {
+    const dto = plainToInstance(CreateServiceDto, {
+      ...validPayload,
+      facilityAssignments: [
+        {
+          facilityId: '1',
+          price: '280000.00',
+          durationMinutes: '30',
+          status: ActiveStatus.ACTIVE,
+        },
+      ],
+    });
+
+    expect(await validate(dto)).toHaveLength(0);
+    expect(dto.facilityAssignments?.[0].durationMinutes).toBe(30);
   });
 
   // Vai tro: gom cac input tao service sai de DTO bat loi ma, ten, loai dich vu, thoi luong, gia va status.
@@ -99,7 +125,7 @@ describe('ServicesService business logic', () => {
   beforeEach(() => jest.clearAllMocks());
 
   // Vai tro: dam bao tao dich vu goc phai check trung code va name truoc khi save.
-  it('creates a service after checking unique code and name', async () => {
+  it('rejects creating a service without facility assignments', async () => {
     const { repo, service } = createService();
     await expect(service.create({
       code: 'US_2D',
@@ -109,10 +135,60 @@ describe('ServicesService business logic', () => {
       basePrice: '300000.00',
       requiresDoctorWarning: true,
       status: ActiveStatus.ACTIVE,
-    })).resolves.toMatchObject({ id: '1', requiresDoctorWarning: true });
+    })).rejects.toThrow('Tạo dịch vụ phải kèm ít nhất một cơ sở áp dụng');
     expect(repo.findByCode).toHaveBeenCalledWith('US_2D');
     expect(repo.findByName).toHaveBeenCalledWith('Siêu âm thai 2D');
     expect(serviceTypesService.findActiveById).toHaveBeenCalledWith('1');
+  });
+
+  // Vai tro: tao service goc va gan luon vao facility_services trong cung transaction khi client gui facilityAssignments.
+  it('creates a service with facility assignments', async () => {
+    const { repo } = createService();
+    const manager = {
+      create: jest.fn((_entity, data) => ({ ...data })),
+      save: jest.fn(async (_entity, data) => {
+        if (Array.isArray(data)) {
+          return data.map((item, index) => ({ id: String(index + 10), ...item }));
+        }
+        return { id: '1', ...data };
+      }),
+    };
+    const dataSource = {
+      transaction: jest.fn(async (callback) => callback(manager)),
+    };
+    const facilitiesService = {
+      findById: jest.fn().mockResolvedValue({ id: '1', status: ActiveStatus.ACTIVE }),
+    };
+    const service = new ServicesService(
+      repo as never,
+      serviceTypesService as never,
+      dataSource as never,
+      facilitiesService as never,
+    );
+
+    await expect(service.create({
+      code: 'US_2D',
+      name: 'Siêu âm thai 2D',
+      serviceTypeId: '1',
+      defaultDurationMinutes: 30,
+      basePrice: '300000.00',
+      requiresDoctorWarning: true,
+      status: ActiveStatus.ACTIVE,
+      facilityAssignments: [{ facilityId: '1', status: ActiveStatus.ACTIVE }],
+    })).resolves.toMatchObject({
+      id: '1',
+      facilityServices: [
+        expect.objectContaining({
+          facilityId: '1',
+          serviceId: '1',
+          price: '300000.00',
+          durationMinutes: 30,
+        }),
+      ],
+    });
+
+    expect(facilitiesService.findById).toHaveBeenCalledWith('1');
+    expect(dataSource.transaction).toHaveBeenCalled();
   });
 
   // Vai tro: bao ve rule khong cho 2 dich vu goc trung code hoac trung name.

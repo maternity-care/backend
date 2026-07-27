@@ -384,17 +384,13 @@ describe('PackageServicesController', () => {
     });
   });
 
-  // Vai tro: kiem tra CRUD package-service tra message/data wrapper nhat quan.
-  it('wraps detail, create, update, and remove responses', async () => {
+  // Vai tro: kiem tra detail/update/remove package-service; route create le da bo de ep workflow tao package kem services.
+  it('wraps detail, update, and remove responses', async () => {
     const service = createServiceMock();
     const controller = new PackageServicesController(service as never);
 
     await expect(controller.findOne('10')).resolves.toMatchObject({
       message: PACKAGE_SERVICE_CONSTANT.DETAIL_FOUND,
-    });
-    await expect(controller.create(entity as never)).resolves.toMatchObject({
-      message: PACKAGE_SERVICE_CONSTANT.CREATED,
-      data: entity,
     });
     await expect(controller.update('10', { includedQuantity: 3 })).resolves.toMatchObject({
       message: PACKAGE_SERVICE_CONSTANT.UPDATED,

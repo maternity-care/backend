@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { FacilityOperatingStatus, FacilityStatus } from '../../../../common/constants/status.enum';
+import { AccountStatus, FacilityOperatingStatus, FacilityStatus } from '../../../../common/constants/status.enum';
 import { PaginationMetaResponseDto } from '../../../../common/dto/pagination-response.dto';
 
 export class FacilityOperatingHourResponseDto {
@@ -84,11 +84,11 @@ export class FacilityResponseDto {
   @ApiProperty()
   address: string;
 
-  @ApiProperty()
-  province: string;
+  @ApiPropertyOptional({ nullable: true })
+  province: string | null;
 
-  @ApiProperty()
-  ward: string;
+  @ApiPropertyOptional({ nullable: true })
+  ward: string | null;
 
   @ApiProperty()
   latitude: string;
@@ -140,11 +140,11 @@ export class FacilityLookupResponseDto {
   @ApiProperty()
   address: string;
 
-  @ApiProperty()
-  province: string;
+  @ApiPropertyOptional({ nullable: true })
+  province: string | null;
 
-  @ApiProperty()
-  ward: string;
+  @ApiPropertyOptional({ nullable: true })
+  ward: string | null;
 
   @ApiProperty({ enum: FacilityStatus })
   status: FacilityStatus;
@@ -156,4 +156,56 @@ export class FacilityLookupResponseDto {
 export class FacilityPaginatedResponseDto extends PaginationMetaResponseDto {
   @ApiProperty({ type: [FacilityResponseDto] })
   items: FacilityResponseDto[];
+}
+
+export class FacilityAdminOptionResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  email: string;
+
+  @ApiPropertyOptional()
+  personalEmail?: string | null;
+
+  @ApiProperty()
+  phone: string;
+
+  @ApiProperty()
+  employeeCode: string;
+
+  @ApiProperty({ enum: AccountStatus })
+  status: AccountStatus;
+
+  @ApiPropertyOptional({
+    description: 'Cơ sở đang gắn trực tiếp trên staff.facility_id, nếu có',
+    nullable: true,
+  })
+  homeFacilityId?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  homeFacilityName?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  homeFacilityCode?: string | null;
+
+  @ApiProperty()
+  roleId: string;
+
+  @ApiProperty()
+  roleName: string;
+
+  @ApiProperty({
+    description: 'Số cơ sở đang dùng staff này làm owner/admin phụ trách',
+    example: 0,
+  })
+  ownedFacilityCount: number;
+}
+
+export class FacilityAdminOptionsPaginatedResponseDto extends PaginationMetaResponseDto {
+  @ApiProperty({ type: [FacilityAdminOptionResponseDto] })
+  items: FacilityAdminOptionResponseDto[];
 }

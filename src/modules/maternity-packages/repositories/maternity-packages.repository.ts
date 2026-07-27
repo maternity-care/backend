@@ -101,6 +101,14 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
     return this.repository.findOne({ where: { name } });
   }
 
+  findByFacilityAndCode(facilityId: string, code: string): Promise<MaternityPackage | null> {
+    return this.repository.findOne({ where: { facilityId, code } });
+  }
+
+  findByFacilityAndName(facilityId: string, name: string): Promise<MaternityPackage | null> {
+    return this.repository.findOne({ where: { facilityId, name } });
+  }
+
   // Danh sách không phân trang, trả nested services[].
   async findAll(filters?: SearchMaternityPackageDto): Promise<MaternityPackageResponseDto[]> {
     const ids = await this.findFilteredPackageIds(filters);

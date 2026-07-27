@@ -1,6 +1,9 @@
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayNotEmpty,
+  ArrayUnique,
+  IsBoolean,
   IsArray,
   IsEnum,
   IsInt,
@@ -17,12 +20,54 @@ import {
 import { MaternityPackageStatus } from '../../../../common/constants/status.enum';
 import { normalizeCode, trimText, trimValue } from '../../../../common/helpers/dto-transform.helper';
 import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
-import { PackageServiceItemInputDto } from '../../../package-services/dto/requests/create-package-service.dto';
 import { MONEY_PATTERN } from '../../../services/dto/requests/create-service.dto';
 
 export enum MaternityPackageType {
   QUANTITY = 'quantity',
   SCHEDULE = 'schedule',
+}
+
+function parseBooleanInput(value: unknown): unknown {
+  if (value === true || value === 'true' || value === 1 || value === '1') return true;
+  if (value === false || value === 'false' || value === 0 || value === '0') return false;
+  return value;
+}
+
+export class MaternityPackageServiceInputDto {
+  @ApiProperty({ example: '3', description: 'ID của bảng facility_services, không phải services.id' })
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  facilityServiceId: string;
+
+  @ApiProperty({ example: 2, minimum: 1, maximum: 100 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  includedQuantity: number;
+
+  @ApiProperty({ example: true })
+  @Transform(({ value }) => parseBooleanInput(value))
+  @IsBoolean()
+  isRequired: boolean;
+
+  @ApiProperty({ example: false })
+  @Transform(({ value }) => parseBooleanInput(value))
+  @IsBoolean()
+  isOptional: boolean;
+
+  @ApiProperty({
+    example: 1,
+    minimum: 0,
+    maximum: 1000,
+    description: 'Thứ tự hiển thị dịch vụ trong gói; số nhỏ đứng trước',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  sortOrder?: number;
 }
 
 export class CreateMaternityPackageDto {
@@ -96,12 +141,13 @@ export class CreateMaternityPackageDto {
   status: MaternityPackageStatus;
 
   @ApiPropertyOptional({
-    type: [PackageServiceItemInputDto],
+    type: [MaternityPackageServiceInputDto],
     description: 'Danh sách dịch vụ trong gói; dùng facilityServiceId để giữ đúng giá/thời lượng theo cơ sở',
   })
-  @IsOptional()
   @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique((item: MaternityPackageServiceInputDto) => item.facilityServiceId)
   @ValidateNested({ each: true })
-  @Type(() => PackageServiceItemInputDto)
-  services?: PackageServiceItemInputDto[];
+  @Type(() => MaternityPackageServiceInputDto)
+  services: MaternityPackageServiceInputDto[];
 }

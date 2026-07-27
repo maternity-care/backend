@@ -69,13 +69,13 @@ export class Facility {
   @Column({ name: 'address', type: 'varchar', length: 255 })
   address: string;
 
-  @ApiProperty({ type: String })
-  @Column({ name: 'province', type: 'varchar', length: 255 })
-  province: string;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @Column({ name: 'province', type: 'varchar', length: 255, nullable: true })
+  province: string | null;
 
-  @ApiProperty({ type: String })
-  @Column({ name: 'ward', type: 'varchar', length: 255 })
-  ward: string;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @Column({ name: 'ward', type: 'varchar', length: 255, nullable: true })
+  ward: string | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'latitude', type: 'decimal', precision: 10, scale: 7 })

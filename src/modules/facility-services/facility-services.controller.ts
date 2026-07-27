@@ -1,10 +1,6 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Query } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FACILITY_SERVICE_CONSTANT } from '../../common/constants/facility-service.constant';
-import {
-  BulkCreateFacilityServicesDto,
-  CreateFacilityServiceDto,
-} from './dto/requests/create-facility-service.dto';
 import {
   FacilityServicePaginatedResponseDto,
   FacilityServiceResponseDto,
@@ -13,7 +9,7 @@ import { SearchFacilityServiceDto } from './dto/requests/search-facility-service
 import { UpdateFacilityServiceDto } from './dto/requests/update-facility-service.dto';
 import { FacilityServicesService } from './facility-services.service';
 
-@ApiTags('Management - Facility Services')
+@ApiTags('Management - Facility Service Settings')
 @Controller('management/facility-services')
 export class FacilityServicesController {
   constructor(private readonly facilityServicesService: FacilityServicesService) {}
@@ -41,24 +37,6 @@ export class FacilityServicesController {
   }
 
   // Gán một service gốc cho facility với giá/thời lượng riêng tại facility đó.
-  @Post()
-  @ApiOperation({ summary: 'Assign a service to a facility' })
-  async create(@Body() dto: CreateFacilityServiceDto) {
-    return {
-      message: FACILITY_SERVICE_CONSTANT.CREATED,
-      data: await this.facilityServicesService.create(dto),
-    };
-  }
-
-  @Post('bulk')
-  @ApiOperation({ summary: 'Assign many services to one facility' })
-  async bulkCreate(@Body() dto: BulkCreateFacilityServicesDto) {
-    return {
-      message: FACILITY_SERVICE_CONSTANT.BULK_CREATED,
-      data: await this.facilityServicesService.bulkCreate(dto),
-    };
-  }
-
   // Cập nhật giá, thời lượng hoặc trạng thái available/unavailable của service tại facility.
   @Patch(':id')
   @ApiOperation({ summary: 'Update facility service' })

@@ -1,10 +1,13 @@
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayNotEmpty,
+  ArrayUnique,
   IsBoolean,
   IsEnum,
   IsInt,
   IsNotEmpty,
+  IsArray,
   IsOptional,
   IsString,
   Matches,
@@ -12,6 +15,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
 import { ActiveStatus } from '../../../../common/constants/status.enum';
 import { normalizeCode, trimText, trimValue } from '../../../../common/helpers/dto-transform.helper';
@@ -27,6 +31,45 @@ export enum ServiceSaleMode {
 
 // Giá lưu dạng DECIMAL trong DB nên DTO nhận string để tránh lỗi làm tròn floating point của JS.
 export const MONEY_PATTERN = /^(0|[1-9]\d{0,12})(\.\d{1,2})?$/;
+
+// Payload con dùng khi tạo service gốc và muốn gán luôn service đó vào một hoặc nhiều cơ sở.
+// Không có serviceId ở đây vì serviceId sẽ được sinh sau khi tạo service gốc.
+export class CreateServiceFacilityAssignmentDto {
+  @ApiProperty({ example: '1', description: 'ID cơ sở sẽ cung cấp service vừa tạo' })
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  facilityId: string;
+
+  @ApiPropertyOptional({
+    example: '280000.00',
+    description: 'Giá áp dụng tại cơ sở; bỏ trống thì lấy theo basePrice của service',
+  })
+  @IsOptional()
+  @Transform(({ value }) => trimValue(value))
+  @IsString()
+  @Matches(MONEY_PATTERN, {
+    message: 'price phải là số tiền không âm, tối đa 13 chữ số và 2 số thập phân',
+  })
+  price?: string;
+
+  @ApiPropertyOptional({
+    example: 30,
+    minimum: 5,
+    maximum: 480,
+    description: 'Thời lượng tại cơ sở; bỏ trống thì lấy theo defaultDurationMinutes của service',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(5)
+  @Max(480)
+  durationMinutes?: number;
+
+  @ApiPropertyOptional({ enum: ActiveStatus, example: ActiveStatus.ACTIVE, default: ActiveStatus.ACTIVE })
+  @IsOptional()
+  @IsEnum(ActiveStatus)
+  status?: ActiveStatus;
+}
 
 export class CreateServiceDto {
   @ApiProperty({ example: 'US_2D' })
@@ -91,4 +134,15 @@ export class CreateServiceDto {
   @ApiProperty({ enum: ActiveStatus, example: ActiveStatus.ACTIVE })
   @IsEnum(ActiveStatus)
   status: ActiveStatus;
+
+  @ApiProperty({
+    type: [CreateServiceFacilityAssignmentDto],
+    description: 'Danh sách cơ sở muốn gán service ngay sau khi tạo. API quản trị bắt buộc tạo service kèm assign cơ sở.',
+  })
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique((item: CreateServiceFacilityAssignmentDto) => item.facilityId)
+  @ValidateNested({ each: true })
+  @Type(() => CreateServiceFacilityAssignmentDto)
+  facilityAssignments?: CreateServiceFacilityAssignmentDto[];
 }

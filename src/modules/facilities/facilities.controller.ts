@@ -11,11 +11,13 @@ import {
 } from './dto/requests/facility-closure-day.dto';
 import { LookupFacilityDto, SearchFacilityDto } from './dto/requests/search-facility.dto';
 import {
+  FacilityAdminOptionsPaginatedResponseDto,
   FacilityClosureDayResponseDto,
   FacilityLookupResponseDto,
   FacilityPaginatedResponseDto,
   FacilityResponseDto,
 } from './dto/responds/facilities-respond';
+import { SearchFacilityAdminOptionsDto } from './dto/requests/search-facility-admin-options.dto';
 import { HttpException } from '@nestjs/common';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -110,6 +112,20 @@ export class FacilitiesController {
       return {
         message: RESPONSE_MESSAGES.FACILITIES.LOOKUP_SUCCESS,
         data: await this.facilitiesService.lookup(query),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Get('admin-options')
+  @ApiOperation({ summary: 'List admin accounts for assigning as facility owner/admin' })
+  @ApiResponse({ status: 200, type: FacilityAdminOptionsPaginatedResponseDto })
+  async findAdminOptions(@Query() query: SearchFacilityAdminOptionsDto) {
+    try {
+      return {
+        message: RESPONSE_MESSAGES.FACILITIES.ADMIN_OPTIONS_SUCCESS,
+        data: await this.facilitiesService.findAdminOptions(query),
       };
     } catch (error) {
       this.handleError(error);

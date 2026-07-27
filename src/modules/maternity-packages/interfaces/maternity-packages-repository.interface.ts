@@ -18,6 +18,8 @@ export interface IMaternityPackagesRepository {
   findDetailsById(id: string): Promise<MaternityPackageResponseDto | null>;
   findByCode(code: string): Promise<MaternityPackage | null>;
   findByName(name: string): Promise<MaternityPackage | null>;
+  findByFacilityAndCode(facilityId: string, code: string): Promise<MaternityPackage | null>;
+  findByFacilityAndName(facilityId: string, name: string): Promise<MaternityPackage | null>;
   findAll(filters?: SearchMaternityPackageDto): Promise<MaternityPackageResponseDto[]>;
   findAllPaginated(filters?: SearchMaternityPackageDto): Promise<PaginationResult<MaternityPackageResponseDto>>;
   findAvailableByFacilityId(facilityId: string, filters?: SearchMaternityPackageDto): Promise<MaternityPackageResponseDto[]>;

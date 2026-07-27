@@ -105,10 +105,12 @@ export class PackageServicesRepository implements IPackageServicesRepository {
       const row = await this.repository.manager
         .createQueryBuilder()
         .select('COUNT(*)', 'count')
-        .from('patient_package_benefits', 'benefit')
-        .innerJoin('package_items', 'packageItem', 'packageItem.package_id = benefit.package_id')
-        .where('benefit.package_id = :packageId', { packageId })
+        .from('package_items', 'packageItem')
+        .innerJoin('facility_services', 'facilityService', 'facilityService.id = packageItem.facility_service_id')
+        .innerJoin('patient_package_benefits', 'benefit', 'benefit.service_id = facilityService.service_id')
+        .where('packageItem.package_id = :packageId', { packageId })
         .andWhere('packageItem.facility_service_id = :facilityServiceId', { facilityServiceId })
+        .andWhere('benefit.deleted_at IS NULL')
         .getRawOne<{ count: string }>();
       return Number(row?.count ?? 0);
     } catch (error) {

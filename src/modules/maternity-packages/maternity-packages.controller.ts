@@ -14,7 +14,7 @@ import {
 } from '../../common/helpers/facility-scope.helper';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 
-@ApiTags('Management - Maternity Packages')
+@ApiTags('Management - Maternity Package Catalog')
 @Controller('management/maternity-packages')
 export class MaternityPackagesController {
   constructor(private readonly maternityPackagesService: MaternityPackagesService) {}
@@ -63,7 +63,7 @@ export class MaternityPackagesController {
 
   // Tạo gói dịch vụ. Đây mới là "vỏ gói"; service con sẽ gắn ở package-services.
   @Post()
-  @ApiOperation({ summary: 'Create maternity package' })
+  @ApiOperation({ summary: 'Create maternity package with services' })
   async create(
     @CurrentUser() userOrDto: AuthenticatedUser | CreateMaternityPackageDto | undefined,
     @Body() dtoParam?: CreateMaternityPackageDto,

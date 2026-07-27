@@ -246,13 +246,12 @@ describe('FacilityServicesController', () => {
     });
   });
 
-  // Vai tro: kiem tra CRUD facility-service tra message/data wrapper nhat quan.
-  it('wraps detail, create, update, and remove responses', async () => {
+  // Vai tro: kiem tra detail/update/remove facility-service; route create le da bo de ep workflow tao service kem assign.
+  it('wraps detail, update, and remove responses', async () => {
     const service = createServiceMock();
     const controller = new FacilityServicesController(service as never);
 
     await expect(controller.findOne('10')).resolves.toMatchObject({ message: FACILITY_SERVICE_CONSTANT.DETAIL_FOUND });
-    await expect(controller.create(entity as never)).resolves.toMatchObject({ message: FACILITY_SERVICE_CONSTANT.CREATED, data: entity });
     await expect(controller.update('10', { price: '300000.00' })).resolves.toMatchObject({
       message: FACILITY_SERVICE_CONSTANT.UPDATED,
       data: { price: '300000.00' },
@@ -275,4 +274,3 @@ describe('FacilityServicesController', () => {
     expect(service.findPublicByFacilityId).toHaveBeenCalledWith('1', { serviceTypeId: '1' });
   });
 });
-
