@@ -12,4 +12,5 @@ export interface IDoctorsRepository {
   findByStaffId(staffId: string): Promise<Doctor | null>;
   findByLicenseNo(licenseNo: string): Promise<Doctor | null>;
   findByPersonalEmail(email: string): Promise<Doctor | null>;
+  findByFacilityId(facilityId: string): Promise<Doctor[]>;
 }

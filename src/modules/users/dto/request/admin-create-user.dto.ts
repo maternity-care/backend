@@ -12,7 +12,6 @@ import {
 } from 'class-validator';
 import { UserPermissionOverrideDto } from './user-permission-override.dto';
 import { Type } from 'class-transformer';
-import { RoleEnum } from '../../../../common/constants/role.enum';
 import { FacilityStaffAssignmentDto } from './facility-staff-assignment.dto';
 
 export class AdminCreateUserDto {

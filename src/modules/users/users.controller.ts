@@ -23,6 +23,14 @@ export class UsersController {
     return { message: RESPONSE_MESSAGES.PROFILE_RETRIEVED, data };
   }
 
+  @Get('/pregnancy-profiles')
+  @ApiOperation({ summary: 'Get my pregnancy profiles' })
+  @ApiResponse({ status: 200, type: UserResponseDto })
+  async findMyPregnancyProfiles(@CurrentUser() user: AuthenticatedUser) {
+    const data = await this.usersService.findMyPregnancyProfiles(user.id);
+    return { message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.GET_LIST_SUCCESS, data };
+  }
+
   @Patch('me')
   @ApiOperation({ summary: 'Update my profile' })
   @ApiResponse({ status: 200, type: UserResponseDto })

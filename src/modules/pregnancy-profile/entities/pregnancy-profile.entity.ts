@@ -21,7 +21,10 @@ export class PregnancyProfile {
   id: string;
 
   @ApiProperty({ type: () => User })
-  @ManyToOne(() => User, { onDelete: 'RESTRICT', nullable: false })
+  @ManyToOne(() => User, (user) => user.pregnancyProfiles, {
+    onDelete: 'RESTRICT',
+    nullable: false,
+  })
   @JoinColumn({ name: 'patient_id' })
   user: User;
 

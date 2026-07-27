@@ -35,7 +35,15 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
   async findById(id: string): Promise<PregnancyProfile | null> {
     const profile = await this.repository.findOne({
       where: { id },
-      relations: { user: true },
+      relations: {
+        user: true,
+        medicalRecords: true,
+      },
+      order: {
+        medicalRecords: {
+          createdAt: 'DESC',
+        },
+      },
     });
     if (!profile) {
       throw new NotFoundException(RESPONSE_MESSAGES.PREGNANCY_PROFILES.NOT_FOUND);
