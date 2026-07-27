@@ -3,7 +3,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { ActiveStatus } from '../../common/constants/status.enum';
 import { SERVICE_CONSTANT } from '../../common/constants/service.constant';
-import { CreateServiceDto, ServiceType } from './dto/requests/create-service.dto';
+import { CreateServiceDto } from './dto/requests/create-service.dto';
 import { SearchServiceDto } from './dto/requests/search-service.dto';
 import { ServicesController } from './services.controller';
 import { ServicesService } from './services.service';
@@ -13,7 +13,7 @@ describe('Services DTO validation', () => {
     code: 'US_2D',
     name: 'Siêu âm thai 2D',
     description: 'Dịch vụ siêu âm thai cơ bản',
-    serviceType: ServiceType.ULTRASOUND,
+    serviceTypeId: '1',
     defaultDurationMinutes: '30',
     basePrice: '300000.00',
     requiresDoctorWarning: 'true',
@@ -33,7 +33,7 @@ describe('Services DTO validation', () => {
   it.each([
     [{ ...validPayload, code: 'bad code' }, 'code'],
     [{ ...validPayload, name: 'A' }, 'name'],
-    [{ ...validPayload, serviceType: 'invalid' }, 'serviceType'],
+    [{ ...validPayload, serviceTypeId: '0' }, 'serviceTypeId'],
     [{ ...validPayload, defaultDurationMinutes: 3 }, 'defaultDurationMinutes'],
     [{ ...validPayload, basePrice: '-1' }, 'basePrice'],
     [{ ...validPayload, status: 'deleted' }, 'status'],
@@ -45,13 +45,13 @@ describe('Services DTO validation', () => {
   // Vai tro: dam bao query search service chan enum sai va tham so phan trang ngoai gioi han.
   it('validates search pagination and enum filters', async () => {
     const dto = plainToInstance(SearchServiceDto, {
-      serviceType: 'invalid',
+      serviceTypeId: '0',
       status: 'deleted',
       page: '0',
       limit: '101',
     });
     expect((await validate(dto)).map(error => error.property)).toEqual(
-      expect.arrayContaining(['serviceType', 'status', 'page', 'limit']),
+      expect.arrayContaining(['serviceTypeId', 'status', 'page', 'limit']),
     );
   });
 });
@@ -61,7 +61,8 @@ describe('ServicesService business logic', () => {
     id: '1',
     code: 'US_2D',
     name: 'Siêu âm thai 2D',
-    serviceType: ServiceType.ULTRASOUND,
+    serviceTypeId: '1',
+    serviceType: { id: '1', code: 'ULTRASOUND', name: 'Siêu âm', status: ActiveStatus.ACTIVE },
     defaultDurationMinutes: 30,
     basePrice: '300000.00',
     requiresDoctorWarning: 1,
@@ -81,10 +82,21 @@ describe('ServicesService business logic', () => {
     updateStatus: jest.fn(async (entity, status) => ({ ...entity, status })),
   });
 
+  const serviceTypesService = {
+    findActiveById: jest.fn().mockResolvedValue({
+      id: '1',
+      code: 'ULTRASOUND',
+      name: 'Siêu âm',
+      status: ActiveStatus.ACTIVE,
+    }),
+  };
+
   const createService = (repo = createRepo()) => ({
     repo,
-    service: new ServicesService(repo as never),
+    service: new ServicesService(repo as never, serviceTypesService as never),
   });
+
+  beforeEach(() => jest.clearAllMocks());
 
   // Vai tro: dam bao tao dich vu goc phai check trung code va name truoc khi save.
   it('creates a service after checking unique code and name', async () => {
@@ -92,7 +104,7 @@ describe('ServicesService business logic', () => {
     await expect(service.create({
       code: 'US_2D',
       name: 'Siêu âm thai 2D',
-      serviceType: ServiceType.ULTRASOUND,
+      serviceTypeId: '1',
       defaultDurationMinutes: 30,
       basePrice: '300000.00',
       requiresDoctorWarning: true,
@@ -100,6 +112,7 @@ describe('ServicesService business logic', () => {
     })).resolves.toMatchObject({ id: '1', requiresDoctorWarning: true });
     expect(repo.findByCode).toHaveBeenCalledWith('US_2D');
     expect(repo.findByName).toHaveBeenCalledWith('Siêu âm thai 2D');
+    expect(serviceTypesService.findActiveById).toHaveBeenCalledWith('1');
   });
 
   // Vai tro: bao ve rule khong cho 2 dich vu goc trung code hoac trung name.
@@ -125,12 +138,12 @@ describe('ServicesService business logic', () => {
   // Vai tro: kiem tra service tra dung danh sach thuong va danh sach phan trang tu repository.
   it('returns plain and paginated service lists through repository', async () => {
     const { repo, service } = createService();
-    await expect(service.findAll({ serviceType: ServiceType.ULTRASOUND })).resolves.toEqual([{ ...serviceEntity }]);
+    await expect(service.findAll({ serviceTypeId: '1' })).resolves.toEqual([{ ...serviceEntity }]);
     await expect(service.findAllPaginated({ page: 1, limit: 20 })).resolves.toEqual({
       items: [{ ...serviceEntity }],
       total: 1,
     });
-    expect(repo.findAll).toHaveBeenCalledWith({ serviceType: ServiceType.ULTRASOUND });
+    expect(repo.findAll).toHaveBeenCalledWith({ serviceTypeId: '1' });
     expect(repo.findAllPaginated).toHaveBeenCalledWith({ page: 1, limit: 20 });
   });
 
@@ -193,7 +206,8 @@ describe('ServicesController', () => {
     id: '1',
     code: 'US_2D',
     name: 'Sieu am thai 2D',
-    serviceType: ServiceType.ULTRASOUND,
+    serviceTypeId: '1',
+    serviceType: { id: '1', code: 'ULTRASOUND', name: 'Siêu âm', status: ActiveStatus.ACTIVE },
     defaultDurationMinutes: 30,
     basePrice: '300000.00',
     requiresDoctorWarning: 1,

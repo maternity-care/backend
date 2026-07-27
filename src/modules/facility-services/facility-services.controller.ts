@@ -1,7 +1,10 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FACILITY_SERVICE_CONSTANT } from '../../common/constants/facility-service.constant';
-import { CreateFacilityServiceDto } from './dto/requests/create-facility-service.dto';
+import {
+  BulkCreateFacilityServicesDto,
+  CreateFacilityServiceDto,
+} from './dto/requests/create-facility-service.dto';
 import {
   FacilityServicePaginatedResponseDto,
   FacilityServiceResponseDto,
@@ -44,6 +47,15 @@ export class FacilityServicesController {
     return {
       message: FACILITY_SERVICE_CONSTANT.CREATED,
       data: await this.facilityServicesService.create(dto),
+    };
+  }
+
+  @Post('bulk')
+  @ApiOperation({ summary: 'Assign many services to one facility' })
+  async bulkCreate(@Body() dto: BulkCreateFacilityServicesDto) {
+    return {
+      message: FACILITY_SERVICE_CONSTANT.BULK_CREATED,
+      data: await this.facilityServicesService.bulkCreate(dto),
     };
   }
 

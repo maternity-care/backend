@@ -2,7 +2,6 @@ import { ConflictException, Inject, Injectable, NotFoundException, Optional } fr
 import { MATERNITY_PACKAGE_CONSTANT } from '../../common/constants/maternity-package.constant';
 import {
   ActiveStatus,
-  AvailabilityStatus,
   FacilityStatus,
   MaternityPackageStatus,
 } from '../../common/constants/status.enum';
@@ -221,7 +220,7 @@ export class MaternityPackagesService {
       if (facilityService.facilityId !== packageFacilityId) {
         throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_NOT_IN_PACKAGE_FACILITY);
       }
-      if (facilityService.status !== AvailabilityStatus.AVAILABLE) {
+      if (facilityService.status !== ActiveStatus.ACTIVE) {
         throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_UNAVAILABLE);
       }
       if (facilityService.service.status !== ActiveStatus.ACTIVE) {

@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
 import {
   ActiveStatus,
-  AvailabilityStatus,
   FacilityStatus,
 } from '../../../common/constants/status.enum';
 import { FacilityServiceResponseDto } from '../dto/responses/facility-service-response.dto';
@@ -32,6 +31,10 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
     return this.repository.save(entity);
   }
 
+  saveMany(entities: FacilityService[]): Promise<FacilityService[]> {
+    return this.repository.save(entities);
+  }
+
   // Xóa cứng mapping khi chưa có dữ liệu phụ thuộc.
   async remove(entity: FacilityService): Promise<void> {
     await this.repository.remove(entity);
@@ -55,7 +58,7 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
     return this.repository.findOne({ where: { facilityId, serviceId } });
   }
 
-  // Danh sách management: filter theo facility/service/status/serviceType/search.
+  // Danh sách management: filter theo facility/service/status/serviceTypeId/search.
   async findAll(filters?: SearchFacilityServiceDto): Promise<FacilityServiceWithDetails[]> {
     const rows = await this.buildListQuery(filters).getRawMany<Record<string, unknown>>();
     return rows.map(row => this.mapRowToResponse(row));
@@ -76,13 +79,13 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
   ): Promise<FacilityServiceWithDetails[]> {
     const query = this.buildDetailsQuery()
       .where('facilityService.facilityId = :facilityId', { facilityId })
-      .andWhere('facilityService.status = :available', { available: AvailabilityStatus.AVAILABLE })
+      .andWhere('facilityService.status = :facilityServiceActive', { facilityServiceActive: ActiveStatus.ACTIVE })
       .andWhere('service.status = :active', { active: ActiveStatus.ACTIVE })
       .andWhere('facility.status = :facilityActive', { facilityActive: FacilityStatus.ACTIVE })
       .orderBy('service.name', 'ASC');
 
-    if (filters?.serviceType) {
-      query.andWhere('service.service_type = :serviceType', { serviceType: filters.serviceType });
+    if (filters?.serviceTypeId) {
+      query.andWhere('service.service_type_id = :serviceTypeId', { serviceTypeId: filters.serviceTypeId });
     }
     if (filters?.search) {
       query.andWhere(
@@ -117,7 +120,7 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
   }
 
   // Chuyển mapping sang unavailable thay vì xóa cứng khi đã có lịch sử sử dụng.
-  updateStatus(entity: FacilityService, status: AvailabilityStatus): Promise<FacilityService> {
+  updateStatus(entity: FacilityService, status: ActiveStatus): Promise<FacilityService> {
     entity.status = status;
     return this.repository.save(entity);
   }
@@ -134,8 +137,8 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
     if (filters?.status) {
       query.andWhere('facilityService.status = :status', { status: filters.status });
     }
-    if (filters?.serviceType) {
-      query.andWhere('service.service_type = :serviceType', { serviceType: filters.serviceType });
+    if (filters?.serviceTypeId) {
+      query.andWhere('service.service_type_id = :serviceTypeId', { serviceTypeId: filters.serviceTypeId });
     }
     if (filters?.search) {
       query.andWhere(
@@ -151,6 +154,7 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
     return this.repository
       .createQueryBuilder('facilityService')
       .innerJoin('services', 'service', 'service.id = facilityService.serviceId')
+      .innerJoin('service_types', 'serviceType', 'serviceType.id = service.service_type_id')
       .innerJoin('facilities', 'facility', 'facility.id = facilityService.facilityId')
       .select('facilityService.id', 'id')
       .addSelect('facilityService.facilityId', 'facilityId')
@@ -169,7 +173,11 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
       .addSelect('service.code', 'serviceCode')
       .addSelect('service.name', 'serviceName')
       .addSelect('service.description', 'serviceDescription')
-      .addSelect('service.service_type', 'serviceType')
+      .addSelect('service.service_type_id', 'serviceTypeId')
+      .addSelect('serviceType.code', 'serviceTypeCode')
+      .addSelect('serviceType.name', 'serviceTypeName')
+      .addSelect('serviceType.description', 'serviceTypeDescription')
+      .addSelect('serviceType.status', 'serviceTypeStatus')
       .addSelect('service.sale_mode', 'serviceSaleMode')
       .addSelect('service.base_price', 'serviceBasePrice')
       .addSelect('service.default_duration_minutes', 'serviceDefaultDurationMinutes')
@@ -250,7 +258,7 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
       serviceId: String(row.serviceId),
       price: String(row.price),
       durationMinutes: Number(row.durationMinutes),
-      status: row.status as AvailabilityStatus,
+      status: row.status as ActiveStatus,
       createdAt: row.createdAt as Date,
       updatedAt: row.updatedAt as Date,
       facility: {
@@ -267,7 +275,14 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
         code: String(row.serviceCode),
         name: String(row.serviceName),
         description: row.serviceDescription as string | null,
-        serviceType: row.serviceType as string,
+        serviceTypeId: String(row.serviceTypeId),
+        serviceType: {
+          id: String(row.serviceTypeId),
+          code: String(row.serviceTypeCode),
+          name: String(row.serviceTypeName),
+          description: row.serviceTypeDescription as string | null,
+          status: row.serviceTypeStatus as ActiveStatus,
+        },
         saleMode: row.serviceSaleMode as never,
         basePrice: String(row.serviceBasePrice),
         defaultDurationMinutes: Number(row.serviceDefaultDurationMinutes),

@@ -3,12 +3,10 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import {
   ActiveStatus,
-  AvailabilityStatus,
   FacilityStatus,
 } from '../../common/constants/status.enum';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { FACILITY_SERVICE_CONSTANT } from '../../common/constants/facility-service.constant';
-import { ServiceType } from '../services/dto/requests/create-service.dto';
 import { CreateFacilityServiceDto } from './dto/requests/create-facility-service.dto';
 import { SearchFacilityServiceDto } from './dto/requests/search-facility-service.dto';
 import { FacilityServicesController } from './facility-services.controller';
@@ -21,7 +19,7 @@ describe('FacilityServices DTO validation', () => {
     serviceId: '2',
     price: '280000.00',
     durationMinutes: '30',
-    status: AvailabilityStatus.AVAILABLE,
+    status: ActiveStatus.ACTIVE,
   };
 
   // Vai tro: dam bao DTO tao facility-service hop le va convert durationMinutes ve number.
@@ -37,7 +35,7 @@ describe('FacilityServices DTO validation', () => {
     [{ ...validPayload, serviceId: '-1' }, 'serviceId'],
     [{ ...validPayload, price: '-1000' }, 'price'],
     [{ ...validPayload, durationMinutes: 3 }, 'durationMinutes'],
-    [{ ...validPayload, status: 'active' }, 'status'],
+    [{ ...validPayload, status: 'available' }, 'status'],
   ])('rejects invalid create input', async (payload, property) => {
     const errors = await validate(plainToInstance(CreateFacilityServiceDto, payload));
     expect(errors.some(error => error.property === property)).toBe(true);
@@ -47,27 +45,32 @@ describe('FacilityServices DTO validation', () => {
   it('validates search filters and pagination', async () => {
     const dto = plainToInstance(SearchFacilityServiceDto, {
       facilityId: '0',
-      serviceType: 'invalid',
-      status: 'active',
+      serviceTypeId: '0',
+      status: 'available',
       page: '0',
       limit: '101',
     });
     expect((await validate(dto)).map(error => error.property)).toEqual(
-      expect.arrayContaining(['facilityId', 'serviceType', 'status', 'page', 'limit']),
+      expect.arrayContaining(['facilityId', 'serviceTypeId', 'status', 'page', 'limit']),
     );
   });
 });
 
 describe('FacilityServicesService business logic', () => {
   const facility = { id: '1', status: FacilityStatus.ACTIVE };
-  const service = { id: '2', status: ActiveStatus.ACTIVE, serviceType: ServiceType.ULTRASOUND };
+  const service = {
+    id: '2',
+    status: ActiveStatus.ACTIVE,
+    serviceTypeId: '1',
+    serviceType: { id: '1', code: 'ULTRASOUND', name: 'Siêu âm', status: ActiveStatus.ACTIVE },
+  };
   const entity = {
     id: '10',
     facilityId: '1',
     serviceId: '2',
     price: '280000.00',
     durationMinutes: 30,
-    status: AvailabilityStatus.AVAILABLE,
+    status: ActiveStatus.ACTIVE,
   };
 
   const createRepo = () => ({
@@ -115,11 +118,11 @@ describe('FacilityServicesService business logic', () => {
       items: [{ ...entity }],
       total: 1,
     });
-    await expect(facilityServicesService.findPublicByFacilityId('1', { status: AvailabilityStatus.AVAILABLE })).resolves.toEqual([
+    await expect(facilityServicesService.findPublicByFacilityId('1', { status: ActiveStatus.ACTIVE })).resolves.toEqual([
       expect.objectContaining({ id: '10', serviceName: expect.any(String) }),
     ]);
     await expect(facilityServicesService.findDetailsById('10')).resolves.toEqual({ ...entity });
-    expect(repo.findPublicByFacilityId).toHaveBeenCalledWith('1', { status: AvailabilityStatus.AVAILABLE });
+    expect(repo.findPublicByFacilityId).toHaveBeenCalledWith('1', { status: ActiveStatus.ACTIVE });
   });
 
   // Vai tro: dam bao API public khong hien dich vu cua facility da inactive.
@@ -202,7 +205,7 @@ describe('FacilityServicesService business logic', () => {
     });
     expect(softContext.repo.updateStatus).toHaveBeenCalledWith(
       expect.objectContaining({ id: '10' }),
-      AvailabilityStatus.UNAVAILABLE,
+      ActiveStatus.INACTIVE,
     );
   });
 });
@@ -214,11 +217,12 @@ describe('FacilityServicesController', () => {
     serviceId: '2',
     price: '280000.00',
     durationMinutes: 30,
-    status: AvailabilityStatus.AVAILABLE,
+    status: ActiveStatus.ACTIVE,
   };
 
   const createServiceMock = () => ({
     create: jest.fn().mockResolvedValue(entity),
+    bulkCreate: jest.fn().mockResolvedValue([entity]),
     findAll: jest.fn().mockResolvedValue([entity]),
     findAllPaginated: jest.fn().mockResolvedValue({ items: [entity], total: 1, page: 1, limit: 20 }),
     findDetailsById: jest.fn().mockResolvedValue({ ...entity, serviceName: 'Sieu am' }),
@@ -264,10 +268,11 @@ describe('FacilityServicesController', () => {
     const service = createServiceMock();
     const controller = new PublicFacilityServicesController(service as never);
 
-    await expect(controller.findServicesByFacility('1', { serviceType: ServiceType.ULTRASOUND } as never)).resolves.toEqual({
+    await expect(controller.findServicesByFacility('1', { serviceTypeId: '1' } as never)).resolves.toEqual({
       message: RESPONSE_MESSAGES.SUCCESS,
       data: [entity],
     });
-    expect(service.findPublicByFacilityId).toHaveBeenCalledWith('1', { serviceType: ServiceType.ULTRASOUND });
+    expect(service.findPublicByFacilityId).toHaveBeenCalledWith('1', { serviceTypeId: '1' });
   });
 });
+

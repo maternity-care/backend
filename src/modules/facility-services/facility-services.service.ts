@@ -1,7 +1,6 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   ActiveStatus,
-  AvailabilityStatus,
   FacilityStatus,
 } from '../../common/constants/status.enum';
 import { FACILITY_SERVICE_CONSTANT } from '../../common/constants/facility-service.constant';
@@ -9,7 +8,10 @@ import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.int
 import { ServicesService } from '../services/services.service';
 import { FacilityService } from './entities/facility-service.entity';
 import { FacilitiesService } from '../facilities/facilities.service';
-import { CreateFacilityServiceDto } from './dto/requests/create-facility-service.dto';
+import {
+  BulkCreateFacilityServicesDto,
+  CreateFacilityServiceDto,
+} from './dto/requests/create-facility-service.dto';
 import { SearchFacilityServiceDto } from './dto/requests/search-facility-service.dto';
 import { UpdateFacilityServiceDto } from './dto/requests/update-facility-service.dto';
 import {
@@ -42,6 +44,50 @@ export class FacilityServicesService {
       durationMinutes: saved.durationMinutes,
       status: saved.status,
     };
+  }
+
+  async bulkCreate(dto: BulkCreateFacilityServicesDto) {
+    const facility = await this.facilitiesService.findById(dto.facilityId);
+    if (facility.status !== FacilityStatus.ACTIVE) {
+      throw new ConflictException(FACILITY_SERVICE_CONSTANT.FACILITY_INACTIVE);
+    }
+
+    const duplicatedInDb: FacilityService[] = [];
+    const entities: FacilityService[] = [];
+
+    for (const item of dto.services) {
+      const service = await this.servicesService.findById(item.serviceId);
+      if (service.status !== ActiveStatus.ACTIVE) {
+        throw new ConflictException(FACILITY_SERVICE_CONSTANT.SERVICE_INACTIVE);
+      }
+
+      const duplicated = await this.repository.findByFacilityAndService(dto.facilityId, item.serviceId);
+      if (duplicated) {
+        duplicatedInDb.push(duplicated);
+        continue;
+      }
+
+      entities.push(this.repository.create({
+        facilityId: dto.facilityId,
+        serviceId: item.serviceId,
+        price: item.price ?? service.basePrice,
+        durationMinutes: item.durationMinutes ?? service.defaultDurationMinutes,
+        status: item.status ?? ActiveStatus.ACTIVE,
+      }));
+    }
+
+    if (duplicatedInDb.length > 0) {
+      throw new ConflictException({
+        message: FACILITY_SERVICE_CONSTANT.BULK_ALREADY_EXISTS,
+        data: {
+          duplicatedField: 'serviceId',
+          duplicatedData: duplicatedInDb,
+        },
+      });
+    }
+
+    const saved = await this.repository.saveMany(entities);
+    return Promise.all(saved.map((item) => this.findDetailsById(item.id)));
   }
 
   // Lấy danh sách mapping facility-service cho màn hình quản trị.
@@ -123,7 +169,7 @@ export class FacilityServicesService {
       return { action: 'hard_deleted', affectedCount: 0 };
     }
 
-    await this.repository.updateStatus(entity, AvailabilityStatus.UNAVAILABLE);
+    await this.repository.updateStatus(entity, ActiveStatus.INACTIVE);
     return { action: 'soft_deleted', affectedCount: dependencyCount };
   }
 

@@ -7,10 +7,12 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { PackageServiceFacilityScope } from '../dto/requests/create-package-service.dto';
+import { PackageServiceFacility } from './package-service-facility.entity';
 
 @Entity('package_items')
 export class PackageItem {
@@ -64,6 +66,9 @@ export class PackageItem {
   @ApiProperty({ type: Number })
   @Column({ name: 'sort_order', type: 'int', default: 0 })
   sortOrder: number;
+
+  @OneToMany(() => PackageServiceFacility, (facility) => facility.packageItem)
+  facilities: PackageServiceFacility[];
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })

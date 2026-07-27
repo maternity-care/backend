@@ -15,16 +15,7 @@ import {
 } from 'class-validator';
 import { ActiveStatus } from '../../../../common/constants/status.enum';
 import { normalizeCode, trimText, trimValue } from '../../../../common/helpers/dto-transform.helper';
-
-// Các nhóm dịch vụ phổ biến trong vận hành phòng khám/sản khoa.
-export enum ServiceType {
-  CONSULTATION = 'consultation',
-  ULTRASOUND = 'ultrasound',
-  LAB_TEST = 'lab_test',
-  SCREENING = 'screening',
-  PROCEDURE = 'procedure',
-  OTHER = 'other',
-}
+import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
 
 // Quy định service có được bán lẻ hay chỉ được dùng bên trong gói.
 // Field này giúp FE/booking không hiển thị nhầm service "chỉ trong gói" ở màn mua dịch vụ lẻ.
@@ -61,9 +52,10 @@ export class CreateServiceDto {
   @MaxLength(2000)
   description?: string;
 
-  @ApiProperty({ enum: ServiceType, example: ServiceType.ULTRASOUND })
-  @IsEnum(ServiceType)
-  serviceType: ServiceType;
+  @ApiProperty({ example: '1', description: 'ID của bảng service_types' })
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  serviceTypeId: string;
 
   @ApiPropertyOptional({
     enum: ServiceSaleMode,

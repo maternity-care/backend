@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, In, Repository, SelectQueryBuilder } from 'typeorm';
 import {
   ActiveStatus,
-  AvailabilityStatus,
   MaternityPackageStatus,
 } from '../../../common/constants/status.enum';
 import { PaginationResult } from '../../../common/helpers/pagination';
@@ -187,9 +186,10 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
       .innerJoin('package_items', 'packageItem', 'packageItem.package_id = pkg.id')
       .innerJoin('facility_services', 'facilityService', 'facilityService.id = packageItem.facility_service_id')
       .innerJoin('services', 'service', 'service.id = facilityService.service_id')
+      .innerJoin('service_types', 'serviceType', 'serviceType.id = service.service_type_id')
       .andWhere('pkg.facilityId = :facilityId', { facilityId })
       .andWhere('facilityService.facility_id = :facilityId', { facilityId })
-      .andWhere('facilityService.status = :available', { available: AvailabilityStatus.AVAILABLE })
+      .andWhere('facilityService.status = :facilityServiceActive', { facilityServiceActive: ActiveStatus.ACTIVE })
       .andWhere('service.status = :active', { active: ActiveStatus.ACTIVE })
       .select('pkg.id', 'id')
       .groupBy('pkg.id')
@@ -240,6 +240,10 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
       query.andWhere('pkg.status = :status', { status: filters.status });
     }
 
+    if (filters?.facilityId) {
+      query.andWhere('pkg.facilityId = :facilityId', { facilityId: filters.facilityId });
+    }
+
     return query;
   }
 
@@ -250,6 +254,7 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
       .leftJoin('package_items', 'packageItem', 'packageItem.package_id = pkg.id')
       .leftJoin('facility_services', 'facilityService', 'facilityService.id = packageItem.facility_service_id')
       .leftJoin('services', 'service', 'service.id = facilityService.service_id')
+      .leftJoin('service_types', 'serviceType', 'serviceType.id = service.service_type_id')
       .select('pkg.id', 'id')
       .addSelect('pkg.facilityId', 'facilityId')
       .addSelect('pkg.code', 'code')
@@ -274,6 +279,12 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
       .addSelect('packageItem.is_required', 'isRequired')
       .addSelect('packageItem.is_optional', 'isOptional')
       .addSelect('packageItem.allowed_facility_scope', 'allowedFacilityScope')
+      .addSelect((subQuery) =>
+        subQuery
+          .select('GROUP_CONCAT(packageFacility.facility_id)')
+          .from('package_service_facilities', 'packageFacility')
+          .where('packageFacility.package_item_id = packageItem.id'),
+      'facilityIds')
       .addSelect('packageItem.sort_order', 'sortOrder')
       .addSelect('facilityService.service_id', 'serviceId')
       .addSelect('facilityService.price', 'facilityServicePrice')
@@ -282,7 +293,11 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
       .addSelect('service.code', 'serviceCode')
       .addSelect('service.name', 'serviceName')
       .addSelect('service.description', 'serviceDescription')
-      .addSelect('service.service_type', 'serviceType')
+      .addSelect('service.service_type_id', 'serviceTypeId')
+      .addSelect('serviceType.code', 'serviceTypeCode')
+      .addSelect('serviceType.name', 'serviceTypeName')
+      .addSelect('serviceType.description', 'serviceTypeDescription')
+      .addSelect('serviceType.status', 'serviceTypeStatus')
       .addSelect('service.sale_mode', 'serviceSaleMode')
       .addSelect('service.base_price', 'serviceBasePrice')
       .addSelect('service.default_duration_minutes', 'serviceDefaultDurationMinutes')
@@ -333,14 +348,22 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
           isRequired: row.isRequired as number,
           isOptional: row.isOptional as number,
           allowedFacilityScope: String(row.allowedFacilityScope ?? PackageServiceFacilityScope.ALL),
+          facilityIds: this.parseFacilityIds(row.facilityIds),
           sortOrder: Number(row.sortOrder ?? 0),
           price: String(row.facilityServicePrice),
           durationMinutes: Number(row.facilityServiceDurationMinutes),
-          facilityServiceStatus: row.facilityServiceStatus as AvailabilityStatus,
+          facilityServiceStatus: row.facilityServiceStatus as ActiveStatus,
           serviceCode: String(row.serviceCode),
           serviceName: String(row.serviceName),
           serviceDescription: row.serviceDescription as string | null,
-          serviceType: String(row.serviceType),
+          serviceTypeId: String(row.serviceTypeId),
+          serviceType: {
+            id: String(row.serviceTypeId),
+            code: String(row.serviceTypeCode),
+            name: String(row.serviceTypeName),
+            description: row.serviceTypeDescription as string | null,
+            status: row.serviceTypeStatus as ActiveStatus,
+          },
           serviceSaleMode: String(row.serviceSaleMode),
           serviceBasePrice: String(row.serviceBasePrice),
           serviceDefaultDurationMinutes: Number(row.serviceDefaultDurationMinutes),
@@ -377,5 +400,15 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
       }
       throw error;
     }
+  }
+
+  private parseFacilityIds(value: unknown): string[] {
+    if (!value) {
+      return [];
+    }
+    return String(value)
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
   }
 }

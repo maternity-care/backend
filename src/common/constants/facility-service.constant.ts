@@ -6,6 +6,8 @@ export const FACILITY_SERVICE_CONSTANT = {
   DETAIL_FOUND: 'Lấy chi tiết dịch vụ tại cơ sở thành công',
   NOT_FOUND: 'Không tìm thấy dịch vụ tại cơ sở',
   ALREADY_EXISTS: 'Cơ sở này đã có dịch vụ đó',
+  BULK_CREATED: 'Gán nhiều dịch vụ cho cơ sở thành công',
+  BULK_ALREADY_EXISTS: 'Một hoặc nhiều dịch vụ đã được gán cho cơ sở này',
   FACILITY_INACTIVE: 'Cơ sở không hoạt động',
   SERVICE_INACTIVE: 'Dịch vụ gốc không hoạt động',
 };

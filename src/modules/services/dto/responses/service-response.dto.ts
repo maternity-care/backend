@@ -1,7 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ActiveStatus, AvailabilityStatus } from '../../../../common/constants/status.enum';
+import { ActiveStatus } from '../../../../common/constants/status.enum';
 import { PaginationMetaResponseDto } from '../../../../common/dto/pagination-response.dto';
-import { ServiceSaleMode, ServiceType } from '../requests/create-service.dto';
+import { ServiceTypeLookupResponseDto } from '../../../service-types/dto/responses/service-type-response.dto';
+import { ServiceSaleMode } from '../requests/create-service.dto';
 
 export class ServiceFacilityAssignmentResponseDto {
   @ApiProperty()
@@ -22,8 +23,8 @@ export class ServiceFacilityAssignmentResponseDto {
   @ApiProperty()
   durationMinutes: number;
 
-  @ApiProperty({ enum: AvailabilityStatus })
-  status: AvailabilityStatus;
+  @ApiProperty({ enum: ActiveStatus })
+  status: ActiveStatus;
 }
 
 export class ServiceResponseDto {
@@ -39,8 +40,11 @@ export class ServiceResponseDto {
   @ApiPropertyOptional({ nullable: true })
   description?: string | null;
 
-  @ApiProperty({ enum: ServiceType })
-  serviceType: ServiceType | string;
+  @ApiProperty()
+  serviceTypeId: string;
+
+  @ApiProperty({ type: ServiceTypeLookupResponseDto })
+  serviceType: ServiceTypeLookupResponseDto;
 
   @ApiProperty({ enum: ServiceSaleMode })
   saleMode: ServiceSaleMode;

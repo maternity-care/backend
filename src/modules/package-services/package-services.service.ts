@@ -1,9 +1,15 @@
 import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { ActiveStatus, MaternityPackageStatus } from '../../common/constants/status.enum';
 import { PACKAGE_SERVICE_CONSTANT } from '../../common/constants/package-service.constant';
+import { MATERNITY_PACKAGE_CONSTANT } from '../../common/constants/maternity-package.constant';
 import { MaternityPackagesService } from '../maternity-packages/maternity-packages.service';
-import { ServicesService } from '../services/services.service';
-import { CreatePackageServiceDto, PackageServiceFacilityScope } from './dto/requests/create-package-service.dto';
+import { FacilityServicesService } from '../facility-services/facility-services.service';
+import {
+  BulkCreatePackageServicesDto,
+  CreatePackageServiceDto,
+  PackageServiceFacilityScope,
+  PackageServiceItemInputDto,
+} from './dto/requests/create-package-service.dto';
 import { SearchPackageServiceDto } from './dto/requests/search-package-service.dto';
 import { UpdatePackageServiceDto } from './dto/requests/update-package-service.dto';
 import { PackageItem } from './entities/package-item.entity';
@@ -18,18 +24,17 @@ export class PackageServicesService {
     @Inject(PACKAGE_SERVICES_REPOSITORY)
     private readonly repository: IPackageServicesRepository,
     private readonly maternityPackagesService: MaternityPackagesService,
-    @Optional()
-    private readonly servicesService?: ServicesService,
+    private readonly facilityServicesService: FacilityServicesService,
     @Optional()
     private readonly facilitiesService?: { findById(id: string): Promise<{ status?: string }> },
   ) {}
 
   async create(dto: CreatePackageServiceDto): Promise<PackageItem> {
-    await this.validatePackage(dto.packageId);
-    await this.validateServiceReference(dto.facilityServiceId);
+    const pkg = await this.validatePackage(dto.packageId);
+    await this.validateServiceReference(dto.facilityServiceId, pkg.facilityId);
     await this.ensureUniquePair(dto.packageId, dto.facilityServiceId);
 
-    const facilityIds = await this.resolveFacilityIds(dto);
+    const facilityIds = await this.resolveFacilityIds(dto, pkg.facilityId);
     const entity = this.repository.create({
       ...dto,
       isRequired: dto.isRequired ? 1 : 0,
@@ -38,6 +43,39 @@ export class PackageServicesService {
     });
 
     return this.repository.saveWithFacilities(entity, facilityIds);
+  }
+
+  async bulkCreate(dto: BulkCreatePackageServicesDto) {
+    const pkg = await this.validatePackage(dto.packageId);
+    this.ensureNoDuplicatedFacilityServiceInPayload(dto.services);
+
+    const entities: PackageItem[] = [];
+    const facilityIdsByFacilityServiceId = new Map<string, string[]>();
+    for (const [index, item] of dto.services.entries()) {
+      await this.validateServiceReference(item.facilityServiceId, pkg.facilityId);
+      await this.ensureUniquePair(dto.packageId, item.facilityServiceId);
+      const facilityIds = await this.resolveFacilityIds(item, pkg.facilityId);
+      facilityIdsByFacilityServiceId.set(item.facilityServiceId, facilityIds);
+
+      entities.push(this.repository.create({
+        ...item,
+        packageId: dto.packageId,
+        isRequired: item.isRequired ? 1 : 0,
+        isOptional: item.isOptional ? 1 : 0,
+        sortOrder: item.sortOrder ?? index + 1,
+      }));
+    }
+
+    const saved = await this.repository.saveManyWithFacilities(entities);
+    await Promise.all(
+      saved.map((item) =>
+        this.repository.replaceFacilities(
+          item.id,
+          facilityIdsByFacilityServiceId.get(item.facilityServiceId) ?? [],
+        ),
+      ),
+    );
+    return Promise.all(saved.map((item) => this.findDetailsById(item.id)));
   }
 
   async findAll(filters?: SearchPackageServiceDto) {
@@ -82,8 +120,8 @@ export class PackageServicesService {
     const nextFacilityServiceId = dto.facilityServiceId ?? entity.facilityServiceId;
 
     if (dto.packageId || dto.facilityServiceId) {
-      await this.validatePackage(nextPackageId);
-      await this.validateServiceReference(nextFacilityServiceId);
+      const pkg = await this.validatePackage(nextPackageId);
+      await this.validateServiceReference(nextFacilityServiceId, pkg.facilityId);
       await this.ensureUniquePair(nextPackageId, nextFacilityServiceId, entity.id);
     }
 
@@ -95,7 +133,8 @@ export class PackageServicesService {
       ...(dto.isOptional === undefined ? {} : { isOptional: dto.isOptional ? 1 : 0 }),
     });
 
-    const facilityIds = await this.resolveFacilityIds(entity as never, entity.id);
+    const pkg = await this.validatePackage(nextPackageId);
+    const facilityIds = await this.resolveFacilityIds(entity as never, pkg.facilityId, entity.id);
     return this.repository.saveWithFacilities(entity, facilityIds);
   }
 
@@ -113,19 +152,24 @@ export class PackageServicesService {
     await this.repository.remove(entity);
   }
 
-  private async validatePackage(packageId: string): Promise<void> {
+  private async validatePackage(packageId: string) {
     const pkg = await this.maternityPackagesService.findById(packageId);
     if (pkg.status === MaternityPackageStatus.INACTIVE) {
       throw new ConflictException(PACKAGE_SERVICE_CONSTANT.PACKAGE_INACTIVE);
     }
+    return pkg;
   }
 
-  private async validateServiceReference(facilityServiceId: string): Promise<void> {
-    if (this.servicesService && typeof this.servicesService.findById === 'function') {
-      const service = await this.servicesService.findById(facilityServiceId);
-      if (service.status !== ActiveStatus.ACTIVE) {
-        throw new ConflictException(PACKAGE_SERVICE_CONSTANT.SERVICE_INACTIVE);
-      }
+  private async validateServiceReference(facilityServiceId: string, packageFacilityId: string): Promise<void> {
+    const facilityService = await this.facilityServicesService.findDetailsById(facilityServiceId);
+    if (facilityService.facilityId !== packageFacilityId) {
+      throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_NOT_IN_PACKAGE_FACILITY);
+    }
+    if (facilityService.status !== ActiveStatus.ACTIVE) {
+      throw new ConflictException(PACKAGE_SERVICE_CONSTANT.FACILITY_SERVICE_INACTIVE);
+    }
+    if (facilityService.service.status !== ActiveStatus.ACTIVE) {
+      throw new ConflictException(PACKAGE_SERVICE_CONSTANT.SERVICE_INACTIVE);
     }
   }
 
@@ -142,6 +186,7 @@ export class PackageServicesService {
 
   private async resolveFacilityIds(
     dto: Partial<CreatePackageServiceDto>,
+    packageFacilityId: string,
     packageServiceId?: string,
   ): Promise<string[]> {
     if (dto.allowedFacilityScope !== PackageServiceFacilityScope.SELECTED) {
@@ -149,7 +194,7 @@ export class PackageServicesService {
     }
 
     if (dto.facilityIds && dto.facilityIds.length > 0) {
-      await this.validateSelectedFacilities(dto.facilityIds);
+      await this.validateSelectedFacilities(dto.facilityIds, packageFacilityId);
       return dto.facilityIds;
     }
 
@@ -160,7 +205,11 @@ export class PackageServicesService {
     throw new ConflictException(PACKAGE_SERVICE_CONSTANT.SELECTED_FACILITIES_REQUIRED);
   }
 
-  private async validateSelectedFacilities(facilityIds: string[]): Promise<void> {
+  private async validateSelectedFacilities(facilityIds: string[], packageFacilityId: string): Promise<void> {
+    if (facilityIds.some((facilityId) => facilityId !== packageFacilityId)) {
+      throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_NOT_IN_PACKAGE_FACILITY);
+    }
+
     if (!this.facilitiesService) {
       return;
     }
@@ -176,6 +225,18 @@ export class PackageServicesService {
   private ensureRowsFound(rows?: unknown[] | null): void {
     if (!rows || rows.length === 0) {
       throw new NotFoundException(PACKAGE_SERVICE_CONSTANT.NOT_FOUND);
+    }
+  }
+
+  private ensureNoDuplicatedFacilityServiceInPayload(
+    services: PackageServiceItemInputDto[],
+  ): void {
+    const ids = new Set<string>();
+    for (const item of services) {
+      if (ids.has(item.facilityServiceId)) {
+        throw new ConflictException(PACKAGE_SERVICE_CONSTANT.BULK_DUPLICATED_IN_PAYLOAD);
+      }
+      ids.add(item.facilityServiceId);
     }
   }
 }

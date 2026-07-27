@@ -6,10 +6,13 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { ServiceType } from '../../service-types/entities/service-type.entity';
 
 @Entity('services')
 export class Service {
@@ -32,9 +35,17 @@ export class Service {
   @Column({ name: 'description', type: 'text' })
   description: string;
 
+  @ApiProperty({ type: () => ServiceType })
+  @ManyToOne(() => ServiceType, (serviceType) => serviceType.services, {
+    onDelete: 'RESTRICT',
+    nullable: false,
+  })
+  @JoinColumn({ name: 'service_type_id' })
+  serviceType: ServiceType;
+
   @ApiProperty({ type: String })
-  @Column({ name: 'service_type', type: 'varchar', length: 255 })
-  serviceType: string;
+  @Column({ name: 'service_type_id', type: 'bigint' })
+  serviceTypeId: string;
 
   @ApiProperty({ enum: ServiceSaleMode, enumName: 'ServiceSaleMode' })
   @Column({

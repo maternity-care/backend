@@ -1,7 +1,7 @@
 import { PackageItem } from './../../package-services/entities/package-item.entity';
 import { Service } from './../../services/entities/service.entity';
 import { Facility } from './../../facilities/entities/facility.entity';
-import { ActiveStatus, AvailabilityStatus } from './../../../common/constants/status.enum';
+import { ActiveStatus } from './../../../common/constants/status.enum';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -52,7 +52,7 @@ export class FacilityService {
 
   @ApiProperty({ enum: ActiveStatus, enumName: 'ActiveStatus' })
   @Column({ name: 'status', type: 'enum', enum: ActiveStatus })
-  status: ActiveStatus | AvailabilityStatus;
+  status: ActiveStatus;
 
   @ApiProperty({ type: PackageItem, isArray: true })
   @OneToMany(() => PackageItem, (packageItem) => packageItem.facilityService)
