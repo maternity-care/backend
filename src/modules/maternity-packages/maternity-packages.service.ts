@@ -6,28 +6,30 @@ import {
   MaternityPackageStatus,
 } from '../../common/constants/status.enum';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
-import { MaternityPackage } from './entities/maternity-package.entity';
 import { FacilitiesService } from '../facilities/facilities.service';
+import { FacilityServicesService } from '../facility-services/facility-services.service';
+import { PackageServiceFacilityScope } from '../package-services/dto/requests/create-package-service.dto';
+import { PackageItem } from '../package-services/entities/package-item.entity';
 import {
   CreateMaternityPackageDto,
+  MaternityPackageStageInputDto,
+  MaternityPackageStageType,
   MaternityPackageServiceInputDto,
   MaternityPackageType,
 } from './dto/requests/create-maternity-package.dto';
 import { SearchMaternityPackageDto } from './dto/requests/search-maternity-package.dto';
 import { UpdateMaternityPackageDto } from './dto/requests/update-maternity-package.dto';
 import { MaternityPackageResponseDto } from './dto/responses/maternity-package-response.dto';
+import { MaternityPackage } from './entities/maternity-package.entity';
 import {
   IMaternityPackagesRepository,
   MATERNITY_PACKAGES_REPOSITORY,
+  PackageStageWithItemsInput,
 } from './interfaces/maternity-packages-repository.interface';
-import { FacilityServicesService } from '../facility-services/facility-services.service';
-import { PackageServiceFacilityScope } from '../package-services/dto/requests/create-package-service.dto';
-import { PackageItem } from '../package-services/entities/package-item.entity';
 
 @Injectable()
 export class MaternityPackagesService {
   constructor(
-    // Inject qua token để service phụ thuộc vào abstraction, không phụ thuộc trực tiếp TypeORM class.
     @Inject(MATERNITY_PACKAGES_REPOSITORY)
     private readonly repository: IMaternityPackagesRepository,
     private readonly facilitiesService: FacilitiesService,
@@ -35,45 +37,49 @@ export class MaternityPackagesService {
     private readonly facilityServicesService?: FacilityServicesService,
   ) {}
 
-  // Tạo "vỏ gói" dịch vụ: code/name/price/duration/status.
-  // Các dịch vụ con của gói sẽ được gắn sau bằng module package-services.
+  // Tạo gói thai sản và gắn luôn dịch vụ trong một API.
+  // packageType=quantity dùng services[] ở root; packageType=schedule dùng stages[].services[].
   async create(dto: CreateMaternityPackageDto): Promise<MaternityPackageResponseDto> {
     await this.ensureActiveFacility(dto.facilityId);
     await this.ensureUniqueCode(dto.facilityId, dto.code);
     await this.ensureUniqueName(dto.facilityId, dto.name);
-    if (!dto.services || dto.services.length === 0) {
-      throw new BadRequestException('Tạo gói dịch vụ phải kèm ít nhất một dịch vụ trong gói');
-    }
 
+    const packageType = dto.packageType ?? MaternityPackageType.QUANTITY;
+    this.ensureValidPackageStructure(packageType, dto);
+
+    const { services: _ignoredServices, stages: _ignoredStages, ...packagePayload } = dto;
     const entity = this.repository.create({
-      ...dto,
+      ...packagePayload,
       description: dto.description ?? '',
       priorityLevel: dto.priorityLevel ?? 0,
-      packageType: dto.packageType ?? MaternityPackageType.QUANTITY,
+      packageType,
     });
 
-    const packageItems = await this.buildPackageItems(dto.facilityId, dto.services);
-    const saved = typeof this.repository.saveWithItems === 'function'
-      ? await this.repository.saveWithItems(entity, packageItems)
-      : await this.repository.save(entity);
+    const saved = packageType === MaternityPackageType.SCHEDULE
+      ? await this.repository.saveWithStagesAndItems(
+        entity,
+        await this.buildPackageStages(dto.facilityId, dto.stages),
+      )
+      : await this.repository.saveWithItems(
+        entity,
+        await this.buildPackageItems(dto.facilityId, dto.services),
+      );
+
     return this.findDetailsOrEntity(saved);
   }
 
-  // Lấy danh sách gói cho management/public tùy controller gọi filter status thế nào.
   async findAll(filters?: SearchMaternityPackageDto): Promise<MaternityPackageResponseDto[]> {
     const packages = await this.repository.findAll(filters);
     this.ensurePackagesFound(packages);
     return packages;
   }
 
-  // Lấy danh sách gói có phân trang.
   async findAllPaginated(filters?: SearchMaternityPackageDto) {
     const result = await this.repository.findAllPaginated(filters);
     this.ensurePackagesFound(result.items);
     return result;
   }
 
-  // Lấy chi tiết gói theo id.
   async findAvailableByFacilityId(
     facilityId: string,
     filters?: SearchMaternityPackageDto,
@@ -110,11 +116,11 @@ export class MaternityPackagesService {
     return entity;
   }
 
-  // Cập nhật thông tin gói; nếu đổi code/name thì kiểm tra trùng lại.
   async update(id: string, dto: UpdateMaternityPackageDto): Promise<MaternityPackageResponseDto> {
     const entity = await this.findById(id);
-
     const nextFacilityId = dto.facilityId ?? entity.facilityId;
+    const nextPackageType = dto.packageType ?? entity.packageType;
+
     if (dto.facilityId && dto.facilityId !== entity.facilityId) {
       await this.ensureActiveFacility(dto.facilityId);
     }
@@ -126,24 +132,41 @@ export class MaternityPackagesService {
       await this.ensureUniqueName(nextFacilityId, dto.name ?? entity.name, entity.id);
     }
 
+    const {
+      services: _ignoredServices,
+      stages: _ignoredStages,
+      ...packagePayload
+    } = dto;
     Object.assign(entity, {
-      ...dto,
+      ...packagePayload,
       description: dto.description ?? entity.description,
-      packageType: dto.packageType ?? entity.packageType,
+      packageType: nextPackageType,
     });
 
     const saved = await this.repository.save(entity);
-    if (dto.services) {
-      const packageItems = await this.buildPackageItems(nextFacilityId, dto.services);
-      if (typeof this.repository.replaceItems === 'function') {
-        await this.repository.replaceItems(saved.id, packageItems);
+    if (dto.services !== undefined || dto.stages !== undefined || dto.packageType !== undefined) {
+      this.ensureValidPackageStructure(nextPackageType, {
+        ...dto,
+        services: dto.services,
+        stages: dto.stages,
+      });
+
+      if (nextPackageType === MaternityPackageType.SCHEDULE) {
+        await this.repository.replaceStagesAndItems(
+          saved.id,
+          await this.buildPackageStages(nextFacilityId, dto.stages),
+        );
+      } else {
+        await this.repository.replaceItems(
+          saved.id,
+          await this.buildPackageItems(nextFacilityId, dto.services),
+        );
       }
     }
 
     return this.findDetailsOrEntity(saved);
   }
 
-  // Xóa an toàn: gói chưa được dùng thì hard delete; đã có service con/người mua thì chuyển inactive.
   async remove(id: string): Promise<SafeRemoveResult> {
     const entity = await this.findById(id);
     const dependencyCount = await this.repository.countDependencies(entity.id);
@@ -157,7 +180,44 @@ export class MaternityPackagesService {
     return { action: 'soft_deleted', affectedCount: dependencyCount };
   }
 
-  // Code là định danh ổn định cho quản trị/tích hợp nên không được trùng.
+  private ensureValidPackageStructure(
+    packageType: MaternityPackageType | string,
+    dto: Pick<CreateMaternityPackageDto, 'services' | 'stages'>,
+  ): void {
+    if (packageType === MaternityPackageType.SCHEDULE) {
+      if (dto.services && dto.services.length > 0) {
+        throw new BadRequestException(MATERNITY_PACKAGE_CONSTANT.SCHEDULE_ROOT_SERVICES_INVALID);
+      }
+      if (!dto.stages || dto.stages.length === 0) {
+        throw new BadRequestException(MATERNITY_PACKAGE_CONSTANT.SCHEDULE_STAGES_REQUIRED);
+      }
+      for (const stage of dto.stages) {
+        this.ensureValidStage(stage);
+      }
+      return;
+    }
+
+    if (!dto.services || dto.services.length === 0) {
+      throw new BadRequestException(MATERNITY_PACKAGE_CONSTANT.QUANTITY_SERVICES_REQUIRED);
+    }
+  }
+
+  private ensureValidStage(stage: MaternityPackageStageInputDto): void {
+    if (!stage.services || stage.services.length === 0) {
+      throw new BadRequestException(MATERNITY_PACKAGE_CONSTANT.STAGE_SERVICES_REQUIRED);
+    }
+
+    const stageType = stage.stageType ?? MaternityPackageStageType.PREGNANCY_WEEK;
+    if (stageType === MaternityPackageStageType.PREGNANCY_WEEK) {
+      if (!stage.weekFrom || !stage.weekTo) {
+        throw new BadRequestException(MATERNITY_PACKAGE_CONSTANT.STAGE_WEEK_REQUIRED);
+      }
+      if (stage.weekFrom > stage.weekTo) {
+        throw new BadRequestException(MATERNITY_PACKAGE_CONSTANT.STAGE_WEEK_RANGE_INVALID);
+      }
+    }
+  }
+
   private async ensureUniqueCode(facilityId: string, code: string, currentId?: string): Promise<void> {
     const duplicated = await this.repository.findByFacilityAndCode(facilityId, code);
     if (duplicated && duplicated.id !== currentId) {
@@ -165,7 +225,6 @@ export class MaternityPackagesService {
     }
   }
 
-  // Name là tên hiển thị cho người dùng, nên cũng nên chống trùng để tránh nhầm gói.
   private async ensureUniqueName(facilityId: string, name: string, currentId?: string): Promise<void> {
     const duplicated = await this.repository.findByFacilityAndName(facilityId, name);
     if (duplicated && duplicated.id !== currentId) {
@@ -186,9 +245,7 @@ export class MaternityPackagesService {
     }
   }
 
-  private async findDetailsOrEntity(
-    entity: MaternityPackage,
-  ): Promise<MaternityPackageResponseDto> {
+  private async findDetailsOrEntity(entity: MaternityPackage): Promise<MaternityPackageResponseDto> {
     if (typeof this.repository.findDetailsById === 'function') {
       const details = await this.repository.findDetailsById(entity.id);
       if (details) {
@@ -196,6 +253,31 @@ export class MaternityPackagesService {
       }
     }
     return entity as unknown as MaternityPackageResponseDto;
+  }
+
+  private async buildPackageStages(
+    packageFacilityId: string,
+    stages?: MaternityPackageStageInputDto[],
+  ): Promise<PackageStageWithItemsInput[]> {
+    if (!stages || stages.length === 0) {
+      return [];
+    }
+
+    const result: PackageStageWithItemsInput[] = [];
+    for (const [index, stage] of stages.entries()) {
+      result.push({
+        stage: {
+          name: stage.name,
+          stageType: stage.stageType ?? MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: stage.weekFrom ?? null,
+          weekTo: stage.weekTo ?? null,
+          goal: stage.goal ?? null,
+          sortOrder: stage.sortOrder ?? index + 1,
+        },
+        items: await this.buildPackageItems(packageFacilityId, stage.services),
+      });
+    }
+    return result;
   }
 
   private async buildPackageItems(
@@ -210,15 +292,7 @@ export class MaternityPackagesService {
       throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_INVALID);
     }
 
-    const duplicatedFacilityServiceId = services.find((service, index) =>
-      services.some((item, itemIndex) =>
-        itemIndex !== index && item.facilityServiceId === service.facilityServiceId,
-      ),
-    );
-
-    if (duplicatedFacilityServiceId) {
-      throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.PACKAGE_ITEM_DUPLICATED);
-    }
+    this.ensureNoDuplicatedFacilityServiceInSameGroup(services);
 
     const items: Partial<PackageItem>[] = [];
     for (const [index, item] of services.entries()) {
@@ -244,5 +318,17 @@ export class MaternityPackagesService {
     }
 
     return items;
+  }
+
+  private ensureNoDuplicatedFacilityServiceInSameGroup(
+    services: MaternityPackageServiceInputDto[],
+  ): void {
+    const ids = new Set<string>();
+    for (const service of services) {
+      if (ids.has(service.facilityServiceId)) {
+        throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.PACKAGE_ITEM_DUPLICATED);
+      }
+      ids.add(service.facilityServiceId);
+    }
   }
 }

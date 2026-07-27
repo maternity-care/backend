@@ -1,4 +1,5 @@
 import { FacilityService } from './../../facility-services/entities/facility-service.entity';
+import { PackageStage } from './../../maternity-packages/entities/package-stage.entity';
 import { MaternityPackage } from './../../maternity-packages/entities/maternity-package.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
@@ -41,6 +42,17 @@ export class PackageItem {
   })
   @JoinColumn({ name: 'facility_service_id' })
   facilityService: FacilityService;
+
+  @ApiProperty({ type: String, nullable: true, required: false })
+  @Column({ name: 'package_stage_id', type: 'bigint', nullable: true })
+  packageStageId: string | null;
+
+  @ManyToOne(() => PackageStage, (stage) => stage.items, {
+    nullable: true,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'package_stage_id' })
+  stage: PackageStage | null;
 
   @ApiProperty({ type: Number })
   @Column({ name: 'included_quantity', type: 'int' })

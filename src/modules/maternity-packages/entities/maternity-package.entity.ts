@@ -3,6 +3,7 @@ import { Facility } from './../../facilities/entities/facility.entity';
 import { MaternityPackageStatus } from './../../../common/constants/status.enum';
 import { ApiProperty } from '@nestjs/swagger';
 import { MaternityPackageType } from '../dto/requests/create-maternity-package.dto';
+import { PackageStage } from './package-stage.entity';
 import {
   Column,
   CreateDateColumn,
@@ -70,6 +71,11 @@ export class MaternityPackage {
     onDelete: 'CASCADE',
   })
   packageItems: PackageItem[];
+
+  @OneToMany(() => PackageStage, (stage) => stage.package, {
+    onDelete: 'CASCADE',
+  })
+  stages: PackageStage[];
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })

@@ -3,8 +3,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   ArrayNotEmpty,
   ArrayUnique,
-  IsBoolean,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsNotEmpty,
@@ -25,6 +25,12 @@ import { MONEY_PATTERN } from '../../../services/dto/requests/create-service.dto
 export enum MaternityPackageType {
   QUANTITY = 'quantity',
   SCHEDULE = 'schedule',
+}
+
+export enum MaternityPackageStageType {
+  PREGNANCY_WEEK = 'pregnancy_week',
+  POSTPARTUM = 'postpartum',
+  CUSTOM = 'custom',
 }
 
 function parseBooleanInput(value: unknown): unknown {
@@ -56,11 +62,11 @@ export class MaternityPackageServiceInputDto {
   @IsBoolean()
   isOptional: boolean;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 1,
     minimum: 0,
     maximum: 1000,
-    description: 'Thứ tự hiển thị dịch vụ trong gói; số nhỏ đứng trước',
+    description: 'Thứ tự hiển thị dịch vụ trong cùng một gói/stage; số nhỏ đứng trước',
   })
   @IsOptional()
   @Type(() => Number)
@@ -68,6 +74,74 @@ export class MaternityPackageServiceInputDto {
   @Min(0)
   @Max(1000)
   sortOrder?: number;
+}
+
+export class MaternityPackageStageInputDto {
+  @ApiProperty({ example: 'Tuần 12 - 14' })
+  @Transform(({ value }) => trimText(value))
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(2)
+  @MaxLength(255)
+  name: string;
+
+  @ApiPropertyOptional({
+    enum: MaternityPackageStageType,
+    example: MaternityPackageStageType.PREGNANCY_WEEK,
+    default: MaternityPackageStageType.PREGNANCY_WEEK,
+  })
+  @IsOptional()
+  @IsEnum(MaternityPackageStageType)
+  stageType?: MaternityPackageStageType;
+
+  @ApiPropertyOptional({ example: 12, minimum: 1, maximum: 45, nullable: true })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(45)
+  weekFrom?: number | null;
+
+  @ApiPropertyOptional({ example: 14, minimum: 1, maximum: 45, nullable: true })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(45)
+  weekTo?: number | null;
+
+  @ApiPropertyOptional({
+    example: 'Siêu âm hình thái, khảo sát dị tật thai',
+    nullable: true,
+  })
+  @IsOptional()
+  @Transform(({ value }) => trimText(value))
+  @IsString()
+  @MaxLength(3000)
+  goal?: string | null;
+
+  @ApiPropertyOptional({
+    example: 1,
+    minimum: 0,
+    maximum: 1000,
+    description: 'Thứ tự hiển thị mốc/lộ trình trong gói; số nhỏ đứng trước',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  sortOrder?: number;
+
+  @ApiProperty({
+    type: [MaternityPackageServiceInputDto],
+    description: 'Danh sách dịch vụ thuộc mốc/lộ trình này; phải là facilityServiceId của cùng cơ sở với gói',
+  })
+  @IsArray()
+  @ArrayNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => MaternityPackageServiceInputDto)
+  services: MaternityPackageServiceInputDto[];
 }
 
 export class CreateMaternityPackageDto {
@@ -142,12 +216,24 @@ export class CreateMaternityPackageDto {
 
   @ApiPropertyOptional({
     type: [MaternityPackageServiceInputDto],
-    description: 'Danh sách dịch vụ trong gói; dùng facilityServiceId để giữ đúng giá/thời lượng theo cơ sở',
+    description: 'Dùng cho packageType = quantity. Danh sách dịch vụ trong gói; dùng facilityServiceId để giữ đúng giá/thời lượng theo cơ sở',
   })
+  @IsOptional()
   @IsArray()
   @ArrayNotEmpty()
   @ArrayUnique((item: MaternityPackageServiceInputDto) => item.facilityServiceId)
   @ValidateNested({ each: true })
   @Type(() => MaternityPackageServiceInputDto)
-  services: MaternityPackageServiceInputDto[];
+  services?: MaternityPackageServiceInputDto[];
+
+  @ApiPropertyOptional({
+    type: [MaternityPackageStageInputDto],
+    description: 'Dùng cho packageType = schedule. Mỗi stage là một mốc tuần thai/sau sinh/custom và chứa danh sách dịch vụ riêng.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => MaternityPackageStageInputDto)
+  stages?: MaternityPackageStageInputDto[];
 }

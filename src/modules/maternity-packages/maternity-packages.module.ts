@@ -10,10 +10,11 @@ import { PublicFacilityMaternityPackagesController } from './public-facility-mat
 import { PublicMaternityPackagesController } from './public-maternity-packages.controller';
 import { PackageItem } from '../package-services/entities/package-item.entity';
 import { FacilityServicesModule } from '../facility-services/facility-services.module';
+import { PackageStage } from './entities/package-stage.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([MaternityPackage, PackageItem]),
+    TypeOrmModule.forFeature([MaternityPackage, PackageStage, PackageItem]),
     FacilitiesModule,
     FacilityServicesModule,
   ],
