@@ -121,6 +121,10 @@ export class UsersService implements IUsersService, IAdminManageService {
     return this.usersRepository.findByEmailWithPassword(email);
   }
 
+  async findMyPregnancyProfiles(id: string) {
+    return this.usersRepository.findMyPregnancyProfiles(id);
+  }
+
   async update(id: string, dto: UpdateUserDto): Promise<User> {
     const user = await this.findById(id);
 

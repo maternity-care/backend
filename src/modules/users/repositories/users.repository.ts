@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { RESPONSE_MESSAGES } from './../../../common/constants/response-message.constant';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
@@ -41,6 +42,14 @@ export class UsersRepository implements IUsersRepository {
     });
   }
 
+  findByPhone(phone: string): Promise<User | null> {
+    return this.repository.findOne({ where: { phone } });
+  }
+
+  findByCccd(cccd: string): Promise<User | null> {
+    return this.repository.findOne({ where: { cccd } });
+  }
+
   findByEmailWithPassword(email: string): Promise<User | null> {
     return this.repository
       .createQueryBuilder('user')
@@ -51,6 +60,19 @@ export class UsersRepository implements IUsersRepository {
       .leftJoinAndSelect('permissionOverride.permission', 'overridePermission')
       .where('user.email = :email', { email })
       .getOne();
+  }
+
+  async findMyPregnancyProfiles(id: string): Promise<User> {
+    const user = await this.repository.findOne({
+      where: { id },
+      relations: {
+        pregnancyProfiles: true,
+      },
+    });
+    if (!user) {
+      throw new NotFoundException(RESPONSE_MESSAGES.NOT_FOUND_CURRENT_USER);
+    }
+    return user;
   }
 
   async updateStatus(id: string, status: AccountStatus): Promise<void> {

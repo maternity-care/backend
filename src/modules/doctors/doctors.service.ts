@@ -31,6 +31,10 @@ export class DoctorsService {
     return this.repository.findAll();
   }
 
+  async findByFacilityId(facilityId: string): Promise<Doctor[]> {
+    return this.repository.findByFacilityId(facilityId);
+  }
+
   async findById(id: string): Promise<Doctor> {
     const doctor = await this.repository.findById(id);
     if (!doctor) {

@@ -1,15 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { RoleResponseDto } from '../../../roles/dto/response/role-response.dto';
-import { PermissionResponseDto } from '../../../permissions/dto/response/permission-response.dto';
 import { AccountStatus } from '../../../../common/constants/status.enum';
-
-export class UserPermissionOverrideResponseDto {
-  @ApiProperty({ type: PermissionResponseDto })
-  permission: PermissionResponseDto;
-
-  @ApiProperty({ enum: ['allow', 'deny'] })
-  effect: 'allow' | 'deny';
-}
 
 export class UserResponseDto {
   @ApiProperty()
@@ -21,11 +11,32 @@ export class UserResponseDto {
   @ApiProperty()
   email: string;
 
+  @ApiProperty()
+  phone: string;
+
+  @ApiProperty({ nullable: true })
+  cccd: string | null;
+
+  @ApiProperty({ nullable: true })
+  dateOfBirth: string | null;
+
+  @ApiProperty({ nullable: true })
+  address: string | null;
+
+  @ApiProperty({ nullable: true })
+  province: string | null;
+
+  @ApiProperty({ nullable: true })
+  ward: string | null;
+
+  @ApiProperty({ nullable: true })
+  emergencyContactName: string | null;
+
+  @ApiProperty({ nullable: true })
+  emergencyContactPhone: string | null;
+
   @ApiProperty({ enum: AccountStatus })
   status: AccountStatus;
-
-  @ApiProperty({ type: [RoleResponseDto] })
-  roles: RoleResponseDto[];
 
   @ApiProperty()
   createdAt: Date;

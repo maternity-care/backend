@@ -16,7 +16,7 @@ import { PregnancyProfileResponseDto } from './dto/response/pregnancy-profile-re
 export class PregnancyProfileController {
   constructor(private readonly pregnancyProfileService: PregnancyProfileService) {}
 
-  @Get()
+  @Get('/me')
   @ApiOperation({ summary: 'Get my pregnancy profiles' })
   @ApiResponse({ status: 200, type: [PregnancyProfileResponseDto] })
   async findMine(@CurrentUser() user: AuthenticatedUser) {

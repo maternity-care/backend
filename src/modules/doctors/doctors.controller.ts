@@ -39,4 +39,16 @@ export class DoctorsController {
       data: plainToInstance(DoctorResponseDto, doctor),
     };
   }
+
+  @Get()
+  @Roles(RoleEnum.DOCTOR)
+  @ApiOperation({ summary: 'Get all doctors' })
+  @ApiResponse({ status: 200, type: [DoctorResponseDto] })
+  async findAll() {
+    const doctors = await this.doctorsService.findAll();
+    return {
+      message: 'Thành công',
+      data: doctors.map((doctor) => plainToInstance(DoctorResponseDto, doctor)),
+    };
+  }
 }
