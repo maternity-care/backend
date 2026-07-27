@@ -1,7 +1,10 @@
 import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { MATERNITY_PACKAGE_CONSTANT } from '../../common/constants/maternity-package.constant';
-import { CreateMaternityPackageDto } from './dto/requests/create-maternity-package.dto';
+import {
+  CreateQuantityMaternityPackageDto,
+  CreateScheduleMaternityPackageDto,
+} from './dto/requests/create-maternity-package.dto';
 import { SearchMaternityPackageDto } from './dto/requests/search-maternity-package.dto';
 import { UpdateMaternityPackageDto } from './dto/requests/update-maternity-package.dto';
 import { MaternityPackagesService } from './maternity-packages.service';
@@ -61,15 +64,15 @@ export class MaternityPackagesController {
     };
   }
 
-  // Tạo gói dịch vụ. Đây mới là "vỏ gói"; service con sẽ gắn ở package-services.
-  @Post()
-  @ApiOperation({ summary: 'Create maternity package with services' })
-  async create(
-    @CurrentUser() userOrDto: AuthenticatedUser | CreateMaternityPackageDto | undefined,
-    @Body() dtoParam?: CreateMaternityPackageDto,
+  // Tao goi theo so luot: body chi dung services[], khong dung stages[].
+  @Post('quantity')
+  @ApiOperation({ summary: 'Create quantity-based maternity package' })
+  async createQuantity(
+    @CurrentUser() userOrDto: AuthenticatedUser | CreateQuantityMaternityPackageDto | undefined,
+    @Body() dtoParam?: CreateQuantityMaternityPackageDto,
   ) {
     const user = dtoParam ? userOrDto as AuthenticatedUser | undefined : undefined;
-    const dto = dtoParam ?? userOrDto as CreateMaternityPackageDto;
+    const dto = dtoParam ?? userOrDto as CreateQuantityMaternityPackageDto;
 
     if (user && isSuperAdmin(user)) {
       throw new ForbiddenException(RESPONSE_MESSAGES.FACILITY_ASSIGNMENT_INVALID);
@@ -82,7 +85,32 @@ export class MaternityPackagesController {
 
     return {
       message: MATERNITY_PACKAGE_CONSTANT.CREATED,
-      data: await this.maternityPackagesService.create(dto),
+      data: await this.maternityPackagesService.createQuantity(dto),
+    };
+  }
+
+  // Tao goi theo tuan tu/lich trinh: body chi dung stages[], khong dung services[] o root.
+  @Post('schedule')
+  @ApiOperation({ summary: 'Create schedule-based maternity package' })
+  async createSchedule(
+    @CurrentUser() userOrDto: AuthenticatedUser | CreateScheduleMaternityPackageDto | undefined,
+    @Body() dtoParam?: CreateScheduleMaternityPackageDto,
+  ) {
+    const user = dtoParam ? userOrDto as AuthenticatedUser | undefined : undefined;
+    const dto = dtoParam ?? userOrDto as CreateScheduleMaternityPackageDto;
+
+    if (user && isSuperAdmin(user)) {
+      throw new ForbiddenException(RESPONSE_MESSAGES.FACILITY_ASSIGNMENT_INVALID);
+    }
+
+    const activeFacilityId = getActiveFacilityId(user);
+    if (activeFacilityId) {
+      dto.facilityId = activeFacilityId;
+    }
+
+    return {
+      message: MATERNITY_PACKAGE_CONSTANT.CREATED,
+      data: await this.maternityPackagesService.createSchedule(dto),
     };
   }
 

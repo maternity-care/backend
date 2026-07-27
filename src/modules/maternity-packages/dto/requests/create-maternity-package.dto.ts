@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import {
   ArrayNotEmpty,
   ArrayUnique,
@@ -236,4 +236,39 @@ export class CreateMaternityPackageDto {
   @ValidateNested({ each: true })
   @Type(() => MaternityPackageStageInputDto)
   stages?: MaternityPackageStageInputDto[];
+}
+
+// DTO rieng cho API tao goi theo so luot.
+// FE chi gui services[] o root, BE se tu gan packageType = quantity.
+export class CreateQuantityMaternityPackageDto extends OmitType(CreateMaternityPackageDto, [
+  'packageType',
+  'stages',
+] as const) {
+  @ApiProperty({
+    type: [MaternityPackageServiceInputDto],
+    description: 'Danh sach dich vu trong goi theo so luot; dung facilityServiceId cua co so dang tao goi',
+  })
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique((item: MaternityPackageServiceInputDto) => item.facilityServiceId)
+  @ValidateNested({ each: true })
+  @Type(() => MaternityPackageServiceInputDto)
+  services: MaternityPackageServiceInputDto[];
+}
+
+// DTO rieng cho API tao goi theo lich trinh/tuan tu.
+// FE chi gui stages[], moi stage se chua danh sach services[] rieng.
+export class CreateScheduleMaternityPackageDto extends OmitType(CreateMaternityPackageDto, [
+  'packageType',
+  'services',
+] as const) {
+  @ApiProperty({
+    type: [MaternityPackageStageInputDto],
+    description: 'Danh sach moc/lộ trinh cua goi; moi stage chua services[] rieng',
+  })
+  @IsArray()
+  @ArrayNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => MaternityPackageStageInputDto)
+  stages: MaternityPackageStageInputDto[];
 }

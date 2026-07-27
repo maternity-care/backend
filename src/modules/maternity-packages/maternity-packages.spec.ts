@@ -5,6 +5,8 @@ import { MATERNITY_PACKAGE_CONSTANT } from '../../common/constants/maternity-pac
 import { MaternityPackageStatus } from '../../common/constants/status.enum';
 import {
   CreateMaternityPackageDto,
+  CreateQuantityMaternityPackageDto,
+  CreateScheduleMaternityPackageDto,
   MaternityPackageStageType,
   MaternityPackageType,
 } from './dto/requests/create-maternity-package.dto';
@@ -41,6 +43,30 @@ describe('MaternityPackages DTO validation', () => {
     expect(await validate(dto)).toHaveLength(0);
     expect(dto.durationDays).toBe(90);
     expect(dto.priorityLevel).toBe(1);
+  });
+
+  // Vai tro: dam bao API tao goi theo so luot chi can services[] va khong bat FE gui packageType.
+  it('accepts quantity create payload without packageType', async () => {
+    const dto = plainToInstance(CreateQuantityMaternityPackageDto, validPayload);
+    expect(await validate(dto)).toHaveLength(0);
+  });
+
+  // Vai tro: dam bao API tao goi theo lich trinh chi can stages[] va khong bat FE gui services[] o root.
+  it('accepts schedule create payload without packageType', async () => {
+    const dto = plainToInstance(CreateScheduleMaternityPackageDto, {
+      ...validPayload,
+      services: undefined,
+      stages: [
+        {
+          name: 'Tuan 12 - 14',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 12,
+          weekTo: 14,
+          services: validPayload.services,
+        },
+      ],
+    });
+    expect(await validate(dto)).toHaveLength(0);
   });
 
   // Vai tro: gom cac input tao package sai de DTO bat loi code, name, price, duration, priority va status.
@@ -284,6 +310,89 @@ describe('MaternityPackagesService business logic', () => {
         },
       ],
     })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  // Vai tro: tranh nhap nham stages khi tao goi theo so luot, vi goi quantity chi dung services[] o root.
+  it('rejects quantity package when stages are sent instead of root services', async () => {
+    const { service } = createService();
+
+    await expect(service.create({
+      facilityId: '1',
+      code: 'PKG_QUANTITY',
+      name: 'Goi thai san theo so luot',
+      price: '900000.00',
+      status: MaternityPackageStatus.DRAFT,
+      packageType: MaternityPackageType.QUANTITY,
+      stages: [
+        {
+          name: 'Tuan 12 - 14',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 12,
+          weekTo: 14,
+          services: [
+            {
+              facilityServiceId: '10',
+              includedQuantity: 1,
+              isRequired: true,
+              isOptional: false,
+            },
+          ],
+        },
+      ],
+    })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  // Vai tro: dam bao hai API create rieng tu gan dung packageType truoc khi save.
+  it('creates quantity and schedule packages through dedicated methods', async () => {
+    const quantityContext = createService();
+    await quantityContext.service.createQuantity({
+      facilityId: '1',
+      code: 'PKG_QUANTITY',
+      name: 'Goi thai san theo so luot',
+      price: '900000.00',
+      status: MaternityPackageStatus.DRAFT,
+      services: [
+        {
+          facilityServiceId: '10',
+          includedQuantity: 2,
+          isRequired: true,
+          isOptional: false,
+        },
+      ],
+    });
+    expect(quantityContext.repo.saveWithItems).toHaveBeenCalledWith(
+      expect.objectContaining({ packageType: MaternityPackageType.QUANTITY }),
+      expect.any(Array),
+    );
+
+    const scheduleContext = createService();
+    await scheduleContext.service.createSchedule({
+      facilityId: '1',
+      code: 'PKG_SCHEDULE',
+      name: 'Goi thai san theo lich trinh',
+      price: '3970000.00',
+      status: MaternityPackageStatus.DRAFT,
+      stages: [
+        {
+          name: 'Tuan 12 - 14',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 12,
+          weekTo: 14,
+          services: [
+            {
+              facilityServiceId: '10',
+              includedQuantity: 1,
+              isRequired: true,
+              isOptional: false,
+            },
+          ],
+        },
+      ],
+    });
+    expect(scheduleContext.repo.saveWithStagesAndItems).toHaveBeenCalledWith(
+      expect.objectContaining({ packageType: MaternityPackageType.SCHEDULE }),
+      expect.any(Array),
+    );
   });
 
   // Vai tro: bao ve rule khong cho hai goi thai san trung code hoac name.
@@ -547,6 +656,8 @@ describe('MaternityPackagesController', () => {
 
   const createServiceMock = () => ({
     create: jest.fn().mockResolvedValue(packageEntity),
+    createQuantity: jest.fn().mockResolvedValue({ ...packageEntity, packageType: MaternityPackageType.QUANTITY }),
+    createSchedule: jest.fn().mockResolvedValue({ ...packageEntity, packageType: MaternityPackageType.SCHEDULE }),
     findAll: jest.fn().mockResolvedValue([packageEntity]),
     findAllPaginated: jest.fn().mockResolvedValue({ items: [packageEntity], total: 1 }),
     findById: jest.fn().mockResolvedValue(packageEntity),
@@ -576,7 +687,14 @@ describe('MaternityPackagesController', () => {
     const controller = new MaternityPackagesController(service as never);
 
     await expect(controller.findOne('1')).resolves.toMatchObject({ message: MATERNITY_PACKAGE_CONSTANT.DETAIL_FOUND });
-    await expect(controller.create(packageEntity as never)).resolves.toMatchObject({ message: MATERNITY_PACKAGE_CONSTANT.CREATED });
+    await expect(controller.createQuantity(packageEntity as never)).resolves.toMatchObject({
+      message: MATERNITY_PACKAGE_CONSTANT.CREATED,
+      data: { packageType: MaternityPackageType.QUANTITY },
+    });
+    await expect(controller.createSchedule(packageEntity as never)).resolves.toMatchObject({
+      message: MATERNITY_PACKAGE_CONSTANT.CREATED,
+      data: { packageType: MaternityPackageType.SCHEDULE },
+    });
     await expect(controller.update('1', { price: '850000.00' })).resolves.toMatchObject({
       message: MATERNITY_PACKAGE_CONSTANT.UPDATED,
       data: { price: '850000.00' },

@@ -12,6 +12,8 @@ import { PackageServiceFacilityScope } from '../package-services/dto/requests/cr
 import { PackageItem } from '../package-services/entities/package-item.entity';
 import {
   CreateMaternityPackageDto,
+  CreateQuantityMaternityPackageDto,
+  CreateScheduleMaternityPackageDto,
   MaternityPackageStageInputDto,
   MaternityPackageStageType,
   MaternityPackageServiceInputDto,
@@ -66,6 +68,22 @@ export class MaternityPackagesService {
       );
 
     return this.findDetailsOrEntity(saved);
+  }
+
+  // Tao goi theo so luot: FE khong can gui packageType, BE tu gan packageType = quantity.
+  async createQuantity(dto: CreateQuantityMaternityPackageDto): Promise<MaternityPackageResponseDto> {
+    return this.create({
+      ...dto,
+      packageType: MaternityPackageType.QUANTITY,
+    });
+  }
+
+  // Tao goi theo lich trinh/tuan tu: FE khong can gui packageType, BE tu gan packageType = schedule.
+  async createSchedule(dto: CreateScheduleMaternityPackageDto): Promise<MaternityPackageResponseDto> {
+    return this.create({
+      ...dto,
+      packageType: MaternityPackageType.SCHEDULE,
+    });
   }
 
   async findAll(filters?: SearchMaternityPackageDto): Promise<MaternityPackageResponseDto[]> {
@@ -195,6 +213,10 @@ export class MaternityPackagesService {
         this.ensureValidStage(stage);
       }
       return;
+    }
+
+    if (dto.stages && dto.stages.length > 0) {
+      throw new BadRequestException(MATERNITY_PACKAGE_CONSTANT.QUANTITY_STAGES_INVALID);
     }
 
     if (!dto.services || dto.services.length === 0) {

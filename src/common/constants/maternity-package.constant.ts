@@ -13,6 +13,8 @@ export const MATERNITY_PACKAGE_CONSTANT = {
     'Dịch vụ trong gói phải thuộc cùng cơ sở với gói',
   PACKAGE_ITEM_DUPLICATED: 'Gói không được chứa trùng một dịch vụ tại cơ sở trong cùng một nhóm',
   QUANTITY_SERVICES_REQUIRED: 'Gói theo số lượt phải có danh sách dịch vụ ở services',
+  QUANTITY_STAGES_INVALID:
+    'Gói theo số lượt không nhập stages, hãy nhập danh sách dịch vụ ở services',
   SCHEDULE_STAGES_REQUIRED: 'Gói theo lịch trình phải có danh sách mốc/lộ trình ở stages',
   SCHEDULE_ROOT_SERVICES_INVALID:
     'Gói theo lịch trình không nhập services ở root, hãy nhập dịch vụ trong từng stage',
