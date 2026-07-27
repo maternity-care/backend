@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { FacilityOperatingStatus, FacilityStatus } from '../../../../common/constants/status.enum';
+import { PaginationMetaResponseDto } from '../../../../common/dto/pagination-response.dto';
 
 export class FacilityOperatingHourResponseDto {
   @ApiProperty()
@@ -150,4 +151,9 @@ export class FacilityLookupResponseDto {
 
   @ApiPropertyOptional()
   ownerName?: string;
+}
+
+export class FacilityPaginatedResponseDto extends PaginationMetaResponseDto {
+  @ApiProperty({ type: [FacilityResponseDto] })
+  items: FacilityResponseDto[];
 }

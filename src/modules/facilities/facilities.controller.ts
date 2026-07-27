@@ -10,7 +10,12 @@ import {
   UpdateFacilityClosureDayDto,
 } from './dto/requests/facility-closure-day.dto';
 import { LookupFacilityDto, SearchFacilityDto } from './dto/requests/search-facility.dto';
-import { FacilityClosureDayResponseDto, FacilityLookupResponseDto, FacilityResponseDto } from './dto/responds/facilities-respond';
+import {
+  FacilityClosureDayResponseDto,
+  FacilityLookupResponseDto,
+  FacilityPaginatedResponseDto,
+  FacilityResponseDto,
+} from './dto/responds/facilities-respond';
 import { HttpException } from '@nestjs/common';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -34,7 +39,7 @@ export class FacilitiesController {
 
   @Get()
   @ApiOperation({ summary: 'List facilities' })
-  @ApiResponse({ status: 200, description: 'Facilities found', type: [FacilityResponseDto] })
+  @ApiResponse({ status: 200, description: 'Facilities found', type: FacilityPaginatedResponseDto })
   async findAll(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: SearchFacilityDto,
@@ -43,11 +48,17 @@ export class FacilitiesController {
       const activeFacilityId = getActiveFacilityId(user);
       if (activeFacilityId) {
         const facility = await this.facilitiesService.findDetailsById(activeFacilityId);
+        const page = Math.max(1, Number(query?.page) || 1);
+        const limit = Math.max(1, Number(query?.limit) || 20);
         return {
           message: RESPONSE_MESSAGES.FACILITIES.GET_LIST_SUCCESS,
-          data: query?.page
-            ? { items: [facility], total: 1, page: Number(query.page), limit: 1 }
-            : [facility],
+          data: {
+            items: [facility],
+            total: 1,
+            page,
+            limit,
+            totalPages: 1,
+          },
         };
       }
 
@@ -60,7 +71,7 @@ export class FacilitiesController {
         };
       }
 
-      const facilities = await this.facilitiesService.findAll(query);
+      const facilities = await this.facilitiesService.findAllPaginated(query);
       return {
         message: RESPONSE_MESSAGES.FACILITIES.GET_LIST_SUCCESS,
         data: facilities,

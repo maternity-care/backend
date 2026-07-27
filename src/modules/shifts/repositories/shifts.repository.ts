@@ -14,6 +14,7 @@ import {
   DisruptionStatus,
   DoctorShiftStatus,
 } from '../../../common/constants/status.enum';
+import { addDays, isOvernightRange, shiftIntervalsOverlap } from '../helpers/shifts.helper';
 
 @Injectable()
 export class ShiftsRepository implements IShiftsRepository {
@@ -93,6 +94,8 @@ export class ShiftsRepository implements IShiftsRepository {
     // tìm kiếm các ca làm việc của bác sĩ dựa trên các điều kiện được cung cấp trong input.
 
     const staffId = input.staffId ?? input.doctorId;
+    const fromDate = addDays(input.shiftDate, -1);
+    const toDate = addDays(input.shiftDate, 1);
     const baseQuery = (statuses: string[]) => {
       // baseQuery chứa điều kiện chung cho cả conflict theo bác sĩ và conflict theo phòng.
       // statuses giúp tùy biến trạng thái nào được tính là conflict trong từng loại query.
@@ -104,11 +107,9 @@ export class ShiftsRepository implements IShiftsRepository {
         .createQueryBuilder('doctor_shifts')
         // Alias 'doctor_shifts' là tên tạm trong query builder.
         // Nó không phải biến entity; đặt giống tên bảng để đọc SQL dễ hơn.
-        .where('doctor_shifts.shiftDate = :shiftDate', { shiftDate: input.shiftDate })
+        .where('doctor_shifts.shiftDate BETWEEN :fromDate AND :toDate', { fromDate, toDate })
         .andWhere('doctor_shifts.deletedAt IS NULL')
         // Hai dòng dưới là điều kiện kiểm tra giao nhau giữa 2 khoảng giờ.
-        .andWhere('doctor_shifts.startTime < :endTime', { endTime: input.endTime })
-        .andWhere('doctor_shifts.endTime > :startTime', { startTime: input.startTime })
         // IN (:...statuses): là một điều kiện trong truy vấn SQL,
         // được sử dụng để kiểm tra xem giá trị của một cột có nằm trong một tập hợp các giá trị hay không.
         .andWhere('doctor_shifts.status IN (:...statuses)', { statuses });
@@ -136,7 +137,10 @@ export class ShiftsRepository implements IShiftsRepository {
       doctorQuery.getMany(),
       roomQuery ? roomQuery.getMany() : Promise.resolve([]),
     ]);
-    return { doctorConflicts, roomConflicts };
+    return {
+      doctorConflicts: this.filterOverlappingShifts(input, doctorConflicts),
+      roomConflicts: this.filterOverlappingShifts(input, roomConflicts),
+    };
   }
 
   findWeekly(
@@ -177,24 +181,31 @@ export class ShiftsRepository implements IShiftsRepository {
     return query.getRawMany<ShiftWithDetails>();
   }
 
-  findDoctorShiftsForDate(
+  async findDoctorShiftsForDate(
     facilityId: string,
     doctorId: string,
     date: string,
   ): Promise<DoctorShift[]> {
     // Lấy các ca có thể nhận lịch hẹn của một bác sĩ trong một ngày.
     // Chỉ lấy available/full vì cancelled/off không dùng để sinh slot đặt lịch.
-    return this.repository
+    const previousDate = addDays(date, -1);
+    const shifts = await this.repository
       .createQueryBuilder('shift')
       .where('shift.facilityId = :facilityId', { facilityId })
       .andWhere('shift.deletedAt IS NULL')
       .andWhere('shift.staffId IN (SELECT doctor.staff_id FROM doctors doctor WHERE doctor.id = :doctorId)', { doctorId })
-      .andWhere('shift.shiftDate = :date', { date })
+      .andWhere('shift.shiftDate BETWEEN :previousDate AND :date', { previousDate, date })
       .andWhere('shift.status IN (:...statuses)', {
         statuses: [DoctorShiftStatus.AVAILABLE, DoctorShiftStatus.FULL],
       })
-      .orderBy('shift.startTime', 'ASC')
+      .orderBy('shift.shiftDate', 'ASC')
+      .addOrderBy('shift.startTime', 'ASC')
       .getMany();
+
+    return shifts.filter(shift =>
+      this.toDateOnly(shift.shiftDate) === date
+      || (this.toDateOnly(shift.shiftDate) === previousDate && isOvernightRange(shift.startTime, shift.endTime)),
+    );
   }
 
   findDoctorAppointmentsForDate(
@@ -211,6 +222,7 @@ export class ShiftsRepository implements IShiftsRepository {
       AppointmentStatus.CHECKED_IN,
       AppointmentStatus.IN_PROGRESS,
     ];
+    const nextDate = addDays(date, 1);
 
     return this.repository.manager
       .createQueryBuilder()
@@ -226,15 +238,17 @@ export class ShiftsRepository implements IShiftsRepository {
       .where('staff.facility_id = :facilityId', { facilityId })
       .andWhere('doctor.id = :doctorId', { doctorId })
       // DATE(...) giúp so sánh phần ngày của scheduled_start với date dạng YYYY-MM-DD.
-      .andWhere('DATE(appointment.scheduled_start) = :date', { date })
+      .andWhere('DATE(appointment.scheduled_start) BETWEEN :date AND :nextDate', { date, nextDate })
       .andWhere('appointment.status IN (:...activeStatuses)', { activeStatuses })
       .orderBy('appointment.scheduled_start', 'ASC')
       .getRawMany<DoctorAppointmentBlock>();
   }
 
-  findAppointmentsForShift(shift: DoctorShift, activeOnly = false): Promise<DoctorAppointmentBlock[]> {
+  async findAppointmentsForShift(shift: DoctorShift, activeOnly = false): Promise<DoctorAppointmentBlock[]> {
     // Tìm appointment nằm trong khoảng giờ của một ca trực cụ thể.
     // Dùng khi xóa/hủy ca để biết appointment nào bị ảnh hưởng.
+    const shiftDate = this.toDateOnly(shift.shiftDate);
+    const nextDate = addDays(shiftDate, 1);
     const query = this.repository.manager
       .createQueryBuilder()
       .select('appointment.id', 'id')
@@ -247,10 +261,9 @@ export class ShiftsRepository implements IShiftsRepository {
       .innerJoin('staffs', 'staff', 'staff.id = appointment.doctor_id')
       .where('staff.facility_id = :facilityId', { facilityId: shift.facilityId })
       .andWhere('appointment.doctor_id = :staffId', { staffId: shift.staffId })
-      .andWhere('DATE(appointment.scheduled_start) = :shiftDate', { shiftDate: shift.shiftDate })
+      .andWhere('DATE(appointment.scheduled_start) BETWEEN :shiftDate AND :nextDate', { shiftDate, nextDate })
       // Hai dòng TIME(...) dưới kiểm tra appointment có giao với giờ của ca không.
-      .andWhere('TIME(appointment.scheduled_start) < :endTime', { endTime: shift.endTime })
-      .andWhere('TIME(appointment.scheduled_end) > :startTime', { startTime: shift.startTime });
+      ;
 
     if (activeOnly) {
       // activeOnly = true nghĩa là chỉ lấy các appointment còn cần xử lý khi ca bị hủy.
@@ -265,7 +278,17 @@ export class ShiftsRepository implements IShiftsRepository {
       });
     }
 
-    return query.orderBy('appointment.scheduled_start', 'ASC').getRawMany<DoctorAppointmentBlock>();
+    const appointments = await query.orderBy('appointment.scheduled_start', 'ASC').getRawMany<DoctorAppointmentBlock>();
+    return appointments.filter(appointment =>
+      shiftIntervalsOverlap(
+        shiftDate,
+        shift.startTime,
+        shift.endTime,
+        this.toDateOnly(appointment.scheduledStart),
+        this.dateTimeToTime(appointment.scheduledStart),
+        this.dateTimeToTime(appointment.scheduledEnd),
+      ),
+    );
   }
 
   async cancelShiftWithDisruption(
@@ -289,6 +312,7 @@ export class ShiftsRepository implements IShiftsRepository {
         deletedReason: reason ?? null,
       });
 
+      //log 2
       // Ghi audit log để sau này biết ai hủy, hủy từ trạng thái nào sang trạng thái nào, lý do gì.
       await manager.createQueryBuilder().insert().into('shift_change_logs').values({
         shift_id: shift.id,
@@ -438,6 +462,33 @@ export class ShiftsRepository implements IShiftsRepository {
     if (filters?.dateFrom) query.andWhere('shift.shiftDate >= :dateFrom', { dateFrom: filters.dateFrom });
     if (filters?.dateTo) query.andWhere('shift.shiftDate <= :dateTo', { dateTo: filters.dateTo });
     return query;
+  }
+
+  private filterOverlappingShifts(input: ShiftConflictInput, shifts: DoctorShift[]): DoctorShift[] {
+    return (shifts ?? []).filter(shift => {
+      if (!shift.shiftDate || !shift.startTime || !shift.endTime) return true;
+      return shiftIntervalsOverlap(
+        input.shiftDate,
+        input.startTime,
+        input.endTime,
+        this.toDateOnly(shift.shiftDate),
+        shift.startTime,
+        shift.endTime,
+      );
+    });
+  }
+
+  private toDateOnly(value: string | Date): string {
+    if (value instanceof Date) return value.toISOString().slice(0, 10);
+    return String(value).slice(0, 10);
+  }
+
+  private dateTimeToTime(value: Date | string): string {
+    const date = value instanceof Date ? value : new Date(value);
+    const hour = date.getHours().toString().padStart(2, '0');
+    const minute = date.getMinutes().toString().padStart(2, '0');
+    const second = date.getSeconds().toString().padStart(2, '0');
+    return `${hour}:${minute}:${second}`;
   }
 
   private buildDetailsQuery(): SelectQueryBuilder<DoctorShift> {

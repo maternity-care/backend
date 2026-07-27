@@ -35,6 +35,8 @@ const createFacility = (overrides: Partial<Facility> = {}): Facility => ({
   deletedAt: null,
   deletedBy: null,
   deleteReason: null,
+  facilityServices: [],
+  appointments: [],
   ...overrides,
 });
 
@@ -705,16 +707,17 @@ describe('RoomsController', () => {
   // Vai tro: dam bao user bi scope facility khong the tu query room cua facility khac.
   it('overrides facilityId with active facility when listing rooms', async () => {
     const service = createService();
-    service.findAll.mockResolvedValue([room]);
+    const paged = { items: [room], total: 1, page: 1, limit: 20, totalPages: 1 };
+    service.findAllPaginated.mockResolvedValue(paged);
     const query = { facilityId: 'fac-2' } as any;
     const controller = new RoomsController(service as any);
 
     await expect(controller.findAll(facilityAdmin, query)).resolves.toEqual({
       message: ROOM_CONSTANT.ROOM_FOUND,
-      data: [room],
+      data: paged,
     });
     expect(query.facilityId).toBe('fac-1');
-    expect(service.findAll).toHaveBeenCalledWith(query);
+    expect(service.findAllPaginated).toHaveBeenCalledWith(query);
   });
 
   // Vai tro: kiem tra controller room chon ham phan trang khi query co page.
@@ -799,17 +802,18 @@ describe('RoomsController', () => {
     });
   });
 
-  // Vai tro: controller list room-type dung service thuong khi khong co page.
+  // Vai tro: controller list room-type luon tra response phan trang.
   it('returns room type list', async () => {
     const service = createService();
-    service.findAllRoomTypes.mockResolvedValue([roomType]);
+    const paged = { items: [roomType], total: 1, page: 1, limit: 20, totalPages: 1 };
+    service.findAllRoomTypesPaginated.mockResolvedValue(paged);
     const controller = new RoomsController(service as any);
 
     await expect(controller.findAllRoomTypes({ search: 'consult' } as any)).resolves.toEqual({
       message: RESPONSE_MESSAGES.ROOM_TYPES.GET_LIST_SUCCESS,
-      data: [roomType],
+      data: paged,
     });
-    expect(service.findAllRoomTypes).toHaveBeenCalledWith({ search: 'consult' });
+    expect(service.findAllRoomTypesPaginated).toHaveBeenCalledWith({ search: 'consult' });
   });
 
   // Vai tro: controller list room-type dung service phan trang khi query co page.
@@ -887,7 +891,7 @@ describe('RoomsController', () => {
   // Vai tro: chuan hoa loi bat ngo o RoomsController thanh 500 thay vi leak loi raw.
   it('converts unknown controller errors to internal server error', async () => {
     const service = createService();
-    service.findAll.mockRejectedValue(new Error('unexpected'));
+    service.findAllPaginated.mockRejectedValue(new Error('unexpected'));
     const controller = new RoomsController(service as any);
 
     await expect(controller.findAll(superAdmin, {} as any)).rejects.toBeInstanceOf(InternalServerErrorException);

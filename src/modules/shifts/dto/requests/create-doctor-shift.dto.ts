@@ -1,9 +1,8 @@
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsEnum, IsIn, IsInt, IsOptional, IsString, Matches, Max, Min, ValidateIf } from 'class-validator';
+import { IsDateString, IsEnum, IsIn, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 import { DoctorShiftStatus } from '../../../../common/constants/status.enum';
 import { RESPONSE_MESSAGES } from '../../../../common/constants/response-message.constant';
-import { IsLaterThan } from '../../../../common/helpers/dto-validation.helper';
 import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
 //shiftTime định dạng: HH:mm hoặc HH:mm:ss
 // ([01]\d|2[0-3]):[0-5]\d: kiểm tra giờ (00-23) và phút (00-59)

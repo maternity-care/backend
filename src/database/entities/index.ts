@@ -1,3 +1,5 @@
+import { Role } from 'src/modules/roles/entities/role.entity';
+
 export { Doctor } from '../../modules/doctors/entities/doctor.entity';
 export { Staff } from '../../modules/staffs/entities/staff.entity';
 export { Facility } from '../../modules/facilities/entities/facility.entity';
