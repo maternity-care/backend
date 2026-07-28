@@ -19,9 +19,7 @@ export function getActiveFacilityId(user?: AuthenticatedUser): string | null {
  * Returns the selected facility for operational staff.
  * Super admins are intentionally unscoped and therefore receive null.
  */
-export function requireActiveFacilityId(
-  user?: AuthenticatedUser,
-): string | null {
+export function requireActiveFacilityId(user?: AuthenticatedUser): string | null {
   if (isSuperAdmin(user)) {
     return null;
   }
@@ -40,7 +38,6 @@ export function requireActiveFacilityId(
 
   return String(facilityId);
 }
-
 
 // Asserts that the user has access to the specified facility.
 export function assertFacilityAccess(
