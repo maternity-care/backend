@@ -41,8 +41,21 @@ export class DoctorsRepository implements IDoctorsRepository {
     });
   }
 
-  findByStaffId(staffId: string): Promise<Doctor | null> {
-    return this.repository.findOne({ where: { staffId } });
+  async findByStaffId(staffId: string): Promise<Doctor | null> {
+    const doctor = await this.repository.findOne({
+      where: { staffId },
+      relations: { staff: true },
+    });
+    if (!doctor) {
+      return null;
+    }
+    return {
+      ...doctor,
+      staff: {
+        ...doctor.staff,
+        password: '',
+      },
+    };
   }
 
   findByLicenseNo(licenseNo: string): Promise<Doctor | null> {

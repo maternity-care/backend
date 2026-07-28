@@ -3,7 +3,7 @@ import { User } from './../../users/entities/user.entity';
 import { RESPONSE_MESSAGES } from './../../../common/constants/response-message.constant';
 import { NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DeepPartial, FindOptionsWhere, Repository } from 'typeorm';
+import { DeepPartial, FindOptionsWhere, Like, Repository } from 'typeorm';
 import { PregnancyProfile } from '../entities/pregnancy-profile.entity';
 import { IPregnancyProfileRepository } from '../interfaces/pregnancy-profile-repository.interface';
 import { SearchProfileQueryDto } from '../dto/request/search-pregnancy-profiles.dto';
@@ -37,7 +37,9 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
       where: { id },
       relations: {
         user: true,
-        medicalRecords: true,
+        medicalRecords: {
+          files: true,
+        },
       },
       order: {
         medicalRecords: {
@@ -73,7 +75,7 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
   async findByPatientId(patientId: string): Promise<PregnancyProfile[]> {
     const profile = await this.repository.find({
       where: { patientId },
-      relations: { user: true, medicalRecords: true },
+      relations: { user: true, medicalRecords: { files: true } },
       order: { id: 'DESC' },
     });
     if (!profile) {
@@ -142,7 +144,7 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
     const where: FindOptionsWhere<PregnancyProfile> = {};
 
     if (query?.code) {
-      where.code = query.code;
+      where.code = Like(`%${query.code}%`);
     }
 
     if (query?.status) {
@@ -152,19 +154,19 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
     const userWhere: FindOptionsWhere<User> = {};
 
     if (query?.name) {
-      userWhere.name = query.name;
+      userWhere.name = Like(`%${query.name}%`);
     }
 
     if (query?.phone) {
-      userWhere.phone = query.phone;
+      userWhere.phone = Like(`%${query.phone}%`);
     }
 
     if (query?.email) {
-      userWhere.email = query.email;
+      userWhere.email = Like(`%${query.email}%`);
     }
 
     const [data, total] = await this.repository.findAndCount({
-      relations: { user: true, medicalRecords: true },
+      relations: { user: true, medicalRecords: { files: true } },
       where: {
         ...where,
         user: {
