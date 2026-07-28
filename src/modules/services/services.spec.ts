@@ -10,7 +10,6 @@ import { ServicesService } from './services.service';
 
 describe('Services DTO validation', () => {
   const validPayload = {
-    code: 'US_2D',
     name: 'Siêu âm thai 2D',
     description: 'Dịch vụ siêu âm thai cơ bản',
     serviceTypeId: '1',
@@ -32,7 +31,6 @@ describe('Services DTO validation', () => {
   it('accepts a valid create payload and transforms primitive values', async () => {
     const dto = plainToInstance(CreateServiceDto, validPayload);
     expect(await validate(dto)).toHaveLength(0);
-    expect(dto.code).toBe('US_2D');
     expect(dto.defaultDurationMinutes).toBe(30);
     expect(dto.requiresDoctorWarning).toBe(true);
   });
@@ -57,7 +55,6 @@ describe('Services DTO validation', () => {
 
   // Vai tro: gom cac input tao service sai de DTO bat loi ma, ten, loai dich vu, thoi luong, gia va status.
   it.each([
-    [{ ...validPayload, code: 'bad code' }, 'code'],
     [{ ...validPayload, name: 'A' }, 'name'],
     [{ ...validPayload, serviceTypeId: '0' }, 'serviceTypeId'],
     [{ ...validPayload, defaultDurationMinutes: 3 }, 'defaultDurationMinutes'],
@@ -101,6 +98,7 @@ describe('ServicesService business logic', () => {
     remove: jest.fn().mockResolvedValue(undefined),
     findById: jest.fn().mockResolvedValue({ ...serviceEntity }),
     findByCode: jest.fn().mockResolvedValue(null),
+    findCodesByPrefix: jest.fn().mockResolvedValue([]),
     findByName: jest.fn().mockResolvedValue(null),
     findAll: jest.fn().mockResolvedValue([{ ...serviceEntity }]),
     findAllPaginated: jest.fn().mockResolvedValue({ items: [{ ...serviceEntity }], total: 1 }),
@@ -128,7 +126,6 @@ describe('ServicesService business logic', () => {
   it('creates a base service without facility assignments', async () => {
     const { repo, service } = createService();
     await expect(service.create({
-      code: 'US_2D',
       name: 'Siêu âm thai 2D',
       serviceTypeId: '1',
       defaultDurationMinutes: 30,
@@ -137,11 +134,10 @@ describe('ServicesService business logic', () => {
       status: ActiveStatus.ACTIVE,
     })).resolves.toMatchObject({
       id: '1',
-      code: 'US_2D',
       facilityAssignments: undefined,
       saleMode: 'both',
     });
-    expect(repo.findByCode).toHaveBeenCalledWith('US_2D');
+    expect(repo.findCodesByPrefix).toHaveBeenCalled();
     expect(repo.findByName).toHaveBeenCalledWith('Siêu âm thai 2D');
     expect(serviceTypesService.findActiveById).toHaveBeenCalledWith('1');
     expect(repo.save).toHaveBeenCalled();
@@ -173,7 +169,6 @@ describe('ServicesService business logic', () => {
     );
 
     await expect(service.create({
-      code: 'US_2D',
       name: 'Siêu âm thai 2D',
       serviceTypeId: '1',
       defaultDurationMinutes: 30,
@@ -197,15 +192,27 @@ describe('ServicesService business logic', () => {
     expect(dataSource.transaction).toHaveBeenCalled();
   });
 
-  // Vai tro: bao ve rule khong cho 2 dich vu goc trung code hoac trung name.
-  it('rejects duplicated code or name', async () => {
-    const codeContext = createService();
-    codeContext.repo.findByCode.mockResolvedValueOnce(serviceEntity);
-    await expect(codeContext.service.create(serviceEntity as never)).rejects.toBeInstanceOf(ConflictException);
-
+  // Vai tro: bao ve rule khong cho 2 dich vu goc trung name.
+  it('rejects duplicated name', async () => {
     const nameContext = createService();
     nameContext.repo.findByName.mockResolvedValueOnce(serviceEntity);
     await expect(nameContext.service.create(serviceEntity as never)).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  // Vai tro: dam bao code duoc BE tu sinh va tu tang hau to khi prefix da ton tai.
+  it('auto-generates the next service code from name', async () => {
+    const { repo, service } = createService();
+    repo.findCodesByPrefix.mockResolvedValueOnce(['SIEU_AM_THAI_2D', 'SIEU_AM_THAI_2D_02']);
+
+    await expect(service.create({
+      name: 'Sieu am thai 2D',
+      serviceTypeId: '1',
+      defaultDurationMinutes: 30,
+      basePrice: '300000.00',
+      status: ActiveStatus.ACTIVE,
+    })).resolves.toMatchObject({
+      code: 'SIEU_AM_THAI_2D_03',
+    });
   });
 
   // Vai tro: dam bao update service convert flag requiresDoctorWarning ve dang DB dang dung la 0/1.
@@ -229,13 +236,8 @@ describe('ServicesService business logic', () => {
     expect(repo.findAllPaginated).toHaveBeenCalledWith({ page: 1, limit: 20 });
   });
 
-  // Vai tro: dam bao update code/name moi se check duplicate truoc khi save.
-  it('checks duplicated code and name when update changes those fields', async () => {
-    const duplicateCodeContext = createService();
-    duplicateCodeContext.repo.findByCode.mockResolvedValueOnce(serviceEntity);
-    await expect(duplicateCodeContext.service.update('1', { code: 'US_3D' })).rejects.toBeInstanceOf(ConflictException);
-    expect(duplicateCodeContext.repo.save).not.toHaveBeenCalled();
-
+  // Vai tro: dam bao update name moi se check duplicate truoc khi save.
+  it('checks duplicated name when update changes that field', async () => {
     const duplicateNameContext = createService();
     duplicateNameContext.repo.findByName.mockResolvedValueOnce(serviceEntity);
     await expect(duplicateNameContext.service.update('1', { name: 'Sieu am thai 3D' })).rejects.toBeInstanceOf(ConflictException);
