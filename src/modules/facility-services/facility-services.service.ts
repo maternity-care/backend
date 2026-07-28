@@ -52,18 +52,57 @@ export class FacilityServicesService {
       throw new ConflictException(FACILITY_SERVICE_CONSTANT.FACILITY_INACTIVE);
     }
 
-    const duplicatedInDb: FacilityService[] = [];
+    const issues: Array<{
+      index: number;
+      serviceId: string;
+      reason: string;
+      duplicatedData?: FacilityService;
+    }> = [];
     const entities: FacilityService[] = [];
+    const seenServiceIds = new Set<string>();
 
-    for (const item of dto.services) {
-      const service = await this.servicesService.findById(item.serviceId);
+    for (const [index, item] of dto.services.entries()) {
+      if (seenServiceIds.has(item.serviceId)) {
+        issues.push({
+          index,
+          serviceId: item.serviceId,
+          reason: 'Dịch vụ bị trùng trong payload',
+        });
+        continue;
+      }
+      seenServiceIds.add(item.serviceId);
+
+      let service;
+      try {
+        service = await this.servicesService.findById(item.serviceId);
+      } catch (error) {
+        issues.push({
+          index,
+          serviceId: item.serviceId,
+          reason: error instanceof NotFoundException
+            ? 'Dịch vụ gốc không tồn tại'
+            : 'Không thể kiểm tra dịch vụ gốc',
+        });
+        continue;
+      }
+
       if (service.status !== ActiveStatus.ACTIVE) {
-        throw new ConflictException(FACILITY_SERVICE_CONSTANT.SERVICE_INACTIVE);
+        issues.push({
+          index,
+          serviceId: item.serviceId,
+          reason: FACILITY_SERVICE_CONSTANT.SERVICE_INACTIVE,
+        });
+        continue;
       }
 
       const duplicated = await this.repository.findByFacilityAndService(dto.facilityId, item.serviceId);
       if (duplicated) {
-        duplicatedInDb.push(duplicated);
+        issues.push({
+          index,
+          serviceId: item.serviceId,
+          reason: 'Dịch vụ này đã có trong cơ sở',
+          duplicatedData: duplicated,
+        });
         continue;
       }
 
@@ -76,12 +115,15 @@ export class FacilityServicesService {
       }));
     }
 
-    if (duplicatedInDb.length > 0) {
+    if (issues.length > 0) {
       throw new ConflictException({
         message: FACILITY_SERVICE_CONSTANT.BULK_ALREADY_EXISTS,
         data: {
-          duplicatedField: 'serviceId',
-          duplicatedData: duplicatedInDb,
+          facilityId: dto.facilityId,
+          totalItems: dto.services.length,
+          validItems: entities.length,
+          invalidItems: issues.length,
+          items: issues,
         },
       });
     }

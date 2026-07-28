@@ -125,7 +125,7 @@ describe('ServicesService business logic', () => {
   beforeEach(() => jest.clearAllMocks());
 
   // Vai tro: dam bao tao dich vu goc phai check trung code va name truoc khi save.
-  it('rejects creating a service without facility assignments', async () => {
+  it('creates a base service without facility assignments', async () => {
     const { repo, service } = createService();
     await expect(service.create({
       code: 'US_2D',
@@ -135,10 +135,16 @@ describe('ServicesService business logic', () => {
       basePrice: '300000.00',
       requiresDoctorWarning: true,
       status: ActiveStatus.ACTIVE,
-    })).rejects.toThrow('Tạo dịch vụ phải kèm ít nhất một cơ sở áp dụng');
+    })).resolves.toMatchObject({
+      id: '1',
+      code: 'US_2D',
+      facilityAssignments: undefined,
+      saleMode: 'both',
+    });
     expect(repo.findByCode).toHaveBeenCalledWith('US_2D');
     expect(repo.findByName).toHaveBeenCalledWith('Siêu âm thai 2D');
     expect(serviceTypesService.findActiveById).toHaveBeenCalledWith('1');
+    expect(repo.save).toHaveBeenCalled();
   });
 
   // Vai tro: tao service goc va gan luon vao facility_services trong cung transaction khi client gui facilityAssignments.
