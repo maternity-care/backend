@@ -18,7 +18,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { MaternityPackageStatus } from '../../../../common/constants/status.enum';
-import { normalizeCode, trimText, trimValue } from '../../../../common/helpers/dto-transform.helper';
+import { trimText, trimValue } from '../../../../common/helpers/dto-transform.helper';
 import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
 import { MONEY_PATTERN } from '../../../services/dto/requests/create-service.dto';
 
@@ -149,14 +149,6 @@ export class CreateMaternityPackageDto {
   @IsString()
   @Matches(POSITIVE_ID_PATTERN)
   facilityId: string;
-
-  @ApiProperty({ example: 'PKG_BASIC' })
-  @Transform(({ value }) => normalizeCode(value))
-  @IsString()
-  @Matches(/^[A-Z0-9_-]{2,50}$/, {
-    message: 'code chỉ gồm chữ in hoa, số, dấu gạch ngang hoặc gạch dưới (2-50 ký tự)',
-  })
-  code: string;
 
   @ApiProperty({ example: 'Gói thai sản cơ bản' })
   @Transform(({ value }) => trimText(value))

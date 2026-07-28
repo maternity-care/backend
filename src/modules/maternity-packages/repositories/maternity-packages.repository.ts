@@ -173,6 +173,20 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
     return this.repository.findOne({ where: { facilityId, code } });
   }
 
+  async findCodesByFacilityAndPrefix(facilityId: string, prefix: string): Promise<string[]> {
+    const rows = await this.repository
+      .createQueryBuilder('pkg')
+      .select('pkg.code', 'code')
+      .where('pkg.facilityId = :facilityId', { facilityId })
+      .andWhere('(pkg.code = :prefix OR pkg.code LIKE :pattern)', {
+        prefix,
+        pattern: `${prefix}_%`,
+      })
+      .getRawMany<{ code: string }>();
+
+    return rows.map((row) => row.code);
+  }
+
   findByFacilityAndName(facilityId: string, name: string): Promise<MaternityPackage | null> {
     return this.repository.findOne({ where: { facilityId, name } });
   }

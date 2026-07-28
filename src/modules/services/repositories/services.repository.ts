@@ -38,6 +38,19 @@ export class ServicesRepository implements IServicesRepository {
     return this.repository.findOne({ where: { code } });
   }
 
+  async findCodesByPrefix(prefix: string): Promise<string[]> {
+    const rows = await this.repository
+      .createQueryBuilder('service')
+      .select('service.code', 'code')
+      .where('service.code = :prefix OR service.code LIKE :pattern', {
+        prefix,
+        pattern: `${prefix}_%`,
+      })
+      .getRawMany<{ code: string }>();
+
+    return rows.map((row) => row.code);
+  }
+
   findByName(name: string): Promise<Service | null> {
     return this.repository.findOne({ where: { name } });
   }

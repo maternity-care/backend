@@ -6,6 +6,10 @@ import {
   MaternityPackageStatus,
 } from '../../common/constants/status.enum';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
+import {
+  buildCodePrefixFromName,
+  buildNextCodeFromExisting,
+} from '../../common/helpers/code-generator.helper';
 import { FacilitiesService } from '../facilities/facilities.service';
 import { FacilityServicesService } from '../facility-services/facility-services.service';
 import { PackageServiceFacilityScope } from '../package-services/dto/requests/create-package-service.dto';
@@ -43,8 +47,8 @@ export class MaternityPackagesService {
   // packageType=quantity dùng services[] ở root; packageType=schedule dùng stages[].services[].
   async create(dto: CreateMaternityPackageDto): Promise<MaternityPackageResponseDto> {
     await this.ensureActiveFacility(dto.facilityId);
-    await this.ensureUniqueCode(dto.facilityId, dto.code);
     await this.ensureUniqueName(dto.facilityId, dto.name);
+    const code = await this.generateCode(dto.facilityId, dto.name);
 
     const packageType = dto.packageType ?? MaternityPackageType.QUANTITY;
     this.ensureValidPackageStructure(packageType, dto);
@@ -52,6 +56,7 @@ export class MaternityPackagesService {
     const { services: _ignoredServices, stages: _ignoredStages, ...packagePayload } = dto;
     const entity = this.repository.create({
       ...packagePayload,
+      code,
       description: dto.description ?? '',
       priorityLevel: dto.priorityLevel ?? 0,
       packageType,
@@ -143,9 +148,6 @@ export class MaternityPackagesService {
       await this.ensureActiveFacility(dto.facilityId);
     }
 
-    if ((dto.code && dto.code !== entity.code) || nextFacilityId !== entity.facilityId) {
-      await this.ensureUniqueCode(nextFacilityId, dto.code ?? entity.code, entity.id);
-    }
     if ((dto.name && dto.name !== entity.name) || nextFacilityId !== entity.facilityId) {
       await this.ensureUniqueName(nextFacilityId, dto.name ?? entity.name, entity.id);
     }
@@ -240,11 +242,10 @@ export class MaternityPackagesService {
     }
   }
 
-  private async ensureUniqueCode(facilityId: string, code: string, currentId?: string): Promise<void> {
-    const duplicated = await this.repository.findByFacilityAndCode(facilityId, code);
-    if (duplicated && duplicated.id !== currentId) {
-      throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.CODE_EXISTS);
-    }
+  private async generateCode(facilityId: string, name: string): Promise<string> {
+    const prefix = buildCodePrefixFromName(name, 'PACKAGE');
+    const existingCodes = await this.repository.findCodesByFacilityAndPrefix(facilityId, prefix);
+    return buildNextCodeFromExisting(prefix, existingCodes);
   }
 
   private async ensureUniqueName(facilityId: string, name: string, currentId?: string): Promise<void> {

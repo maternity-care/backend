@@ -12,6 +12,7 @@ export interface IServicesRepository {
   remove(service: Service): Promise<void>;
   findById(id: string): Promise<Service | null>;
   findByCode(code: string): Promise<Service | null>;
+  findCodesByPrefix(prefix: string): Promise<string[]>;
   findByName(name: string): Promise<Service | null>;
   findAll(filters?: SearchServiceDto): Promise<Service[]>;
   findAllPaginated(filters?: SearchServiceDto): Promise<PaginationResult<Service>>;

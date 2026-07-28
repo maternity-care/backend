@@ -27,6 +27,7 @@ export interface IMaternityPackagesRepository {
   findByCode(code: string): Promise<MaternityPackage | null>;
   findByName(name: string): Promise<MaternityPackage | null>;
   findByFacilityAndCode(facilityId: string, code: string): Promise<MaternityPackage | null>;
+  findCodesByFacilityAndPrefix(facilityId: string, prefix: string): Promise<string[]>;
   findByFacilityAndName(facilityId: string, name: string): Promise<MaternityPackage | null>;
   findAll(filters?: SearchMaternityPackageDto): Promise<MaternityPackageResponseDto[]>;
   findAllPaginated(filters?: SearchMaternityPackageDto): Promise<PaginationResult<MaternityPackageResponseDto>>;
