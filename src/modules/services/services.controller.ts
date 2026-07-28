@@ -33,7 +33,7 @@ export class ServicesController {
 
   // Tạo dịch vụ gốc với giá tham khảo và thời lượng mặc định.
   @Post()
-  @ApiOperation({ summary: 'Create service and assign to facilities' })
+  @ApiOperation({ summary: 'Create service with optional facility assignments' })
   async create(@Body() dto: CreateServiceDto) {
     return {
       message: SERVICE_CONSTANT.CREATED,

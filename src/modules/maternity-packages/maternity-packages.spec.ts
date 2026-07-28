@@ -342,6 +342,28 @@ describe('MaternityPackagesService business logic', () => {
     })).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  // Vai tro: goi thai san cua mot co so chi duoc chon facilityServiceId da duoc assign vao co so do.
+  it('rejects package service when the service has not been assigned to the facility', async () => {
+    facilityServicesService.findDetailsById.mockRejectedValueOnce(new NotFoundException('Facility service not found'));
+    const { service } = createService();
+
+    await expect(service.createQuantity({
+      facilityId: '1',
+      code: 'PKG_QUANTITY',
+      name: 'Goi thai san theo so luot',
+      price: '900000.00',
+      status: MaternityPackageStatus.DRAFT,
+      services: [
+        {
+          facilityServiceId: '999',
+          includedQuantity: 1,
+          isRequired: true,
+          isOptional: false,
+        },
+      ],
+    })).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   // Vai tro: dam bao hai API create rieng tu gan dung packageType truoc khi save.
   it('creates quantity and schedule packages through dedicated methods', async () => {
     const quantityContext = createService();

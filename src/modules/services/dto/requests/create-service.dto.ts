@@ -135,10 +135,11 @@ export class CreateServiceDto {
   @IsEnum(ActiveStatus)
   status: ActiveStatus;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: [CreateServiceFacilityAssignmentDto],
-    description: 'Danh sách cơ sở muốn gán service ngay sau khi tạo. API quản trị bắt buộc tạo service kèm assign cơ sở.',
+    description: 'Danh sách cơ sở muốn gán service ngay sau khi tạo. Bỏ trống nếu chỉ muốn tạo dịch vụ gốc, chưa assign cơ sở.',
   })
+  @IsOptional()
   @IsArray()
   @ArrayNotEmpty()
   @ArrayUnique((item: CreateServiceFacilityAssignmentDto) => item.facilityId)

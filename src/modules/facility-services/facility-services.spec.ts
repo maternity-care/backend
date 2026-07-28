@@ -7,7 +7,10 @@ import {
 } from '../../common/constants/status.enum';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { FACILITY_SERVICE_CONSTANT } from '../../common/constants/facility-service.constant';
-import { CreateFacilityServiceDto } from './dto/requests/create-facility-service.dto';
+import {
+  BulkCreateFacilityServicesDto,
+  CreateFacilityServiceDto,
+} from './dto/requests/create-facility-service.dto';
 import { SearchFacilityServiceDto } from './dto/requests/search-facility-service.dto';
 import { FacilityServicesController } from './facility-services.controller';
 import { FacilityServicesService } from './facility-services.service';
@@ -27,6 +30,24 @@ describe('FacilityServices DTO validation', () => {
     const dto = plainToInstance(CreateFacilityServiceDto, validPayload);
     expect(await validate(dto)).toHaveLength(0);
     expect(dto.durationMinutes).toBe(30);
+  });
+
+  // Vai tro: dam bao payload gan hang loat service vao mot co so hop le va convert duration cua tung item.
+  it('accepts a valid bulk create payload', async () => {
+    const dto = plainToInstance(BulkCreateFacilityServicesDto, {
+      facilityId: '1',
+      services: [
+        {
+          serviceId: '2',
+          price: '280000.00',
+          durationMinutes: '30',
+          status: ActiveStatus.ACTIVE,
+        },
+      ],
+    });
+
+    expect(await validate(dto)).toHaveLength(0);
+    expect(dto.services[0].durationMinutes).toBe(30);
   });
 
   // Vai tro: gom cac input sai khi gan dich vu vao co so de bat loi id, gia, thoi luong va status.
@@ -63,6 +84,8 @@ describe('FacilityServicesService business logic', () => {
     status: ActiveStatus.ACTIVE,
     serviceTypeId: '1',
     serviceType: { id: '1', code: 'ULTRASOUND', name: 'Siêu âm', status: ActiveStatus.ACTIVE },
+    basePrice: '300000.00',
+    defaultDurationMinutes: 30,
   };
   const entity = {
     id: '10',
@@ -76,6 +99,8 @@ describe('FacilityServicesService business logic', () => {
   const createRepo = () => ({
     create: jest.fn(data => ({ ...data })),
     save: jest.fn(async data => ({ id: data.id ?? '10', ...data })),
+    saveMany: jest.fn(async (data: Array<Record<string, unknown>>) =>
+      data.map((item, index) => ({ id: String(index + 20), ...item }))),
     remove: jest.fn().mockResolvedValue(undefined),
     findById: jest.fn().mockResolvedValue({ ...entity }),
     findByFacilityAndService: jest.fn().mockResolvedValue(null),
@@ -107,6 +132,69 @@ describe('FacilityServicesService business logic', () => {
     expect(facilitiesService.findById).toHaveBeenCalledWith('1');
     expect(servicesService.findById).toHaveBeenCalledWith('2');
     expect(repo.findByFacilityAndService).toHaveBeenCalledWith('1', '2');
+  });
+
+  // Vai tro: gan hang loat service vao co so va tu lay gia/thoi luong mac dinh neu item khong gui.
+  it('bulk creates facility services when all items are valid', async () => {
+    const { repo, service: facilityServicesService } = createService();
+    repo.saveMany = jest.fn(async (data: Array<Record<string, unknown>>) =>
+      data.map((item, index) => ({ id: String(index + 20), ...item })));
+    repo.findDetailsById = jest.fn(async id => ({ ...entity, id }));
+
+    await expect(facilityServicesService.bulkCreate({
+      facilityId: '1',
+      services: [
+        {
+          serviceId: '2',
+          status: ActiveStatus.ACTIVE,
+        },
+      ],
+    })).resolves.toEqual([
+      expect.objectContaining({ id: '20' }),
+    ]);
+
+    expect(repo.saveMany).toHaveBeenCalledWith([
+      expect.objectContaining({
+        facilityId: '1',
+        serviceId: '2',
+        price: '300000.00',
+        durationMinutes: 30,
+      }),
+    ]);
+  });
+
+  // Vai tro: neu bulk co item bi conflict thi tra danh sach loi theo tung dong, khong save nua.
+  it('rejects bulk create with detailed item issues', async () => {
+    const { repo, service: facilityServicesService } = createService();
+    repo.saveMany = jest.fn();
+    repo.findByFacilityAndService.mockImplementation(async (_facilityId, serviceId) =>
+      serviceId === '2' ? entity : null,
+    );
+    servicesService.findById
+      .mockResolvedValueOnce({ ...service, id: '2' })
+      .mockResolvedValueOnce({ ...service, id: '3', status: ActiveStatus.INACTIVE });
+
+    await expect(facilityServicesService.bulkCreate({
+      facilityId: '1',
+      services: [
+        { serviceId: '2' },
+        { serviceId: '3' },
+        { serviceId: '2' },
+      ],
+    })).rejects.toMatchObject({
+      response: {
+        data: {
+          facilityId: '1',
+          invalidItems: 3,
+          items: [
+            expect.objectContaining({ index: 0, serviceId: '2' }),
+            expect.objectContaining({ index: 1, serviceId: '3' }),
+            expect.objectContaining({ index: 2, serviceId: '2' }),
+          ],
+        },
+      },
+    });
+    expect(repo.saveMany).not.toHaveBeenCalled();
   });
 
   // Vai tro: kiem tra cac duong doc du lieu facility-service deu lay qua repository dung ham.
@@ -252,6 +340,14 @@ describe('FacilityServicesController', () => {
     const controller = new FacilityServicesController(service as never);
 
     await expect(controller.findOne('10')).resolves.toMatchObject({ message: FACILITY_SERVICE_CONSTANT.DETAIL_FOUND });
+    await expect(controller.create(entity as never)).resolves.toMatchObject({
+      message: FACILITY_SERVICE_CONSTANT.CREATED,
+      data: { id: '10' },
+    });
+    await expect(controller.bulkCreate({ facilityId: '1', services: [{ serviceId: '2' }] } as never)).resolves.toMatchObject({
+      message: FACILITY_SERVICE_CONSTANT.BULK_CREATED,
+      data: [entity],
+    });
     await expect(controller.update('10', { price: '300000.00' })).resolves.toMatchObject({
       message: FACILITY_SERVICE_CONSTANT.UPDATED,
       data: { price: '300000.00' },

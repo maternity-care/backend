@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import {
   ActiveStatus,
@@ -48,7 +48,8 @@ export class ServicesService {
     };
 
     if (!dto.facilityAssignments || dto.facilityAssignments.length === 0) {
-      throw new BadRequestException('Tạo dịch vụ phải kèm ít nhất một cơ sở áp dụng');
+      const entity = this.repository.create(serviceData);
+      return this.repository.save(entity);
     }
 
     const assignments = await this.validateFacilityAssignments(dto.facilityAssignments);
