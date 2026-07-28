@@ -57,26 +57,26 @@ export class RoomsController {
     }
   }
 
-  @Get('lookup')
-  @ApiOperation({ summary: 'Lookup rooms for select/autocomplete' })
-  @ApiResponse({ status: 200, type: [RoomLookupResponseDto] })
-  async lookup(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query() query: LookupRoomsDto,
-  ) {
-    try {
-      const activeFacilityId = getActiveFacilityId(user);
-      if (activeFacilityId) {
-        query.facilityId = activeFacilityId;
-      }
-      return {
-        message: RESPONSE_MESSAGES.ROOMS.LOOKUP_SUCCESS,
-        data: await this.roomsService.lookup(query),
-      };
-    } catch (error) {
-      this.handleError(error);
-    }
-  }
+  // @Get('lookup')
+  // @ApiOperation({ summary: 'Lookup rooms for select/autocomplete' })
+  // @ApiResponse({ status: 200, type: [RoomLookupResponseDto] })
+  // async lookup(
+  //   @CurrentUser() user: AuthenticatedUser,
+  //   @Query() query: LookupRoomsDto,
+  // ) {
+  //   try {
+  //     const activeFacilityId = getActiveFacilityId(user);
+  //     if (activeFacilityId) {
+  //       query.facilityId = activeFacilityId;
+  //     }
+  //     return {
+  //       message: RESPONSE_MESSAGES.ROOMS.LOOKUP_SUCCESS,
+  //       data: await this.roomsService.lookup(query),
+  //     };
+  //   } catch (error) {
+  //     this.handleError(error);
+  //   }
+  // }
 
   @Get('room-types/lookup')
   @ApiOperation({ summary: 'Lookup room types for room form select/autocomplete' })
@@ -241,45 +241,45 @@ export class RoomsController {
     }
   }
 
-  @Post('bulk-create/preview')
-  @ApiOperation({ summary: 'Preview bulk create rooms before saving' })
-  async previewBulkCreate(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: BulkCreateRoomsPreviewDto,
-  ) {
-    try {
-      const activeFacilityId = getActiveFacilityId(user);
-      if (activeFacilityId) {
-        dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
-      }
-      return {
-        message: RESPONSE_MESSAGES.ROOMS.BULK_PREVIEW_SUCCESS,
-        data: await this.roomsService.previewBulkCreate(dto),
-      };
-    } catch (error) {
-      this.handleError(error);
-    }
-  }
+  // @Post('bulk-create/preview')
+  // @ApiOperation({ summary: 'Preview bulk create rooms before saving' })
+  // async previewBulkCreate(
+  //   @CurrentUser() user: AuthenticatedUser,
+  //   @Body() dto: BulkCreateRoomsPreviewDto,
+  // ) {
+  //   try {
+  //     const activeFacilityId = getActiveFacilityId(user);
+  //     if (activeFacilityId) {
+  //       dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
+  //     }
+  //     return {
+  //       message: RESPONSE_MESSAGES.ROOMS.BULK_PREVIEW_SUCCESS,
+  //       data: await this.roomsService.previewBulkCreate(dto),
+  //     };
+  //   } catch (error) {
+  //     this.handleError(error);
+  //   }
+  // }
 
-  @Post('bulk-create/confirm')
-  @ApiOperation({ summary: 'Confirm and save valid rooms from bulk-create preview' })
-  async confirmBulkCreate(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: BulkCreateRoomsPreviewDto,
-  ) {
-    try {
-      const activeFacilityId = getActiveFacilityId(user);
-      if (activeFacilityId) {
-        dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
-      }
-      return {
-        message: RESPONSE_MESSAGES.ROOMS.BULK_CONFIRM_SUCCESS,
-        data: await this.roomsService.confirmBulkCreate(dto),
-      };
-    } catch (error) {
-      this.handleError(error);
-    }
-  }
+  // @Post('bulk-create/confirm')
+  // @ApiOperation({ summary: 'Confirm and save valid rooms from bulk-create preview' })
+  // async confirmBulkCreate(
+  //   @CurrentUser() user: AuthenticatedUser,
+  //   @Body() dto: BulkCreateRoomsPreviewDto,
+  // ) {
+  //   try {
+  //     const activeFacilityId = getActiveFacilityId(user);
+  //     if (activeFacilityId) {
+  //       dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
+  //     }
+  //     return {
+  //       message: RESPONSE_MESSAGES.ROOMS.BULK_CONFIRM_SUCCESS,
+  //       data: await this.roomsService.confirmBulkCreate(dto),
+  //     };
+  //   } catch (error) {
+  //     this.handleError(error);
+  //   }
+  // }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update room' })

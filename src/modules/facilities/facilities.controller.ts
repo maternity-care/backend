@@ -83,40 +83,40 @@ export class FacilitiesController {
     }
   }
 
-  @Get('lookup')
-  @ApiOperation({ summary: 'Lookup facilities for select/autocomplete' })
-  @ApiResponse({ status: 200, type: [FacilityLookupResponseDto] })
-  async lookup(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query() query: LookupFacilityDto,
-  ) {
-    try {
-      const activeFacilityId = getActiveFacilityId(user);
-      if (activeFacilityId) {
-        const facility = await this.facilitiesService.findDetailsById(activeFacilityId);
-        return {
-          message: RESPONSE_MESSAGES.FACILITIES.LOOKUP_SUCCESS,
-          data: [{
-            id: facility.id,
-            name: facility.name,
-            code: facility.code,
-            address: facility.address,
-            province: facility.province,
-            ward: facility.ward,
-            status: facility.status,
-            ownerName: facility.ownerName,
-          }],
-        };
-      }
+  // @Get('lookup')
+  // @ApiOperation({ summary: 'Lookup facilities for select/autocomplete' })
+  // @ApiResponse({ status: 200, type: [FacilityLookupResponseDto] })
+  // async lookup(
+  //   @CurrentUser() user: AuthenticatedUser,
+  //   @Query() query: LookupFacilityDto,
+  // ) {
+  //   try {
+  //     const activeFacilityId = getActiveFacilityId(user);
+  //     if (activeFacilityId) {
+  //       const facility = await this.facilitiesService.findDetailsById(activeFacilityId);
+  //       return {
+  //         message: RESPONSE_MESSAGES.FACILITIES.LOOKUP_SUCCESS,
+  //         data: [{
+  //           id: facility.id,
+  //           name: facility.name,
+  //           code: facility.code,
+  //           address: facility.address,
+  //           province: facility.province,
+  //           ward: facility.ward,
+  //           status: facility.status,
+  //           ownerName: facility.ownerName,
+  //         }],
+  //       };
+  //     }
 
-      return {
-        message: RESPONSE_MESSAGES.FACILITIES.LOOKUP_SUCCESS,
-        data: await this.facilitiesService.lookup(query),
-      };
-    } catch (error) {
-      this.handleError(error);
-    }
-  }
+  //     return {
+  //       message: RESPONSE_MESSAGES.FACILITIES.LOOKUP_SUCCESS,
+  //       data: await this.facilitiesService.lookup(query),
+  //     };
+  //   } catch (error) {
+  //     this.handleError(error);
+  //   }
+  // }
 
   @Get('admin-options')
   @ApiOperation({ summary: 'List admin accounts for assigning as facility owner/admin' })
