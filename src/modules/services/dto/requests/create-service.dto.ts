@@ -18,7 +18,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { ActiveStatus } from '../../../../common/constants/status.enum';
-import { normalizeCode, trimText, trimValue } from '../../../../common/helpers/dto-transform.helper';
+import { trimText, trimValue } from '../../../../common/helpers/dto-transform.helper';
 import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
 
 // Quy định service có được bán lẻ hay chỉ được dùng bên trong gói.
@@ -72,14 +72,6 @@ export class CreateServiceFacilityAssignmentDto {
 }
 
 export class CreateServiceDto {
-  @ApiProperty({ example: 'US_2D' })
-  @Transform(({ value }) => normalizeCode(value))
-  @IsString()
-  @Matches(/^[A-Z0-9_-]{2,50}$/, {
-    message: 'code chỉ gồm chữ in hoa, số, dấu gạch ngang hoặc gạch dưới (2-50 ký tự)',
-  })
-  code: string;
-
   @ApiProperty({ example: 'Siêu âm thai 2D' })
   @Transform(({ value }) => trimText(value))
   @IsString()
@@ -135,10 +127,11 @@ export class CreateServiceDto {
   @IsEnum(ActiveStatus)
   status: ActiveStatus;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: [CreateServiceFacilityAssignmentDto],
-    description: 'Danh sách cơ sở muốn gán service ngay sau khi tạo. API quản trị bắt buộc tạo service kèm assign cơ sở.',
+    description: 'Danh sách cơ sở muốn gán service ngay sau khi tạo. Bỏ trống nếu chỉ muốn tạo dịch vụ gốc, chưa assign cơ sở.',
   })
+  @IsOptional()
   @IsArray()
   @ArrayNotEmpty()
   @ArrayUnique((item: CreateServiceFacilityAssignmentDto) => item.facilityId)

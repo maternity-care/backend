@@ -1,10 +1,14 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import {
   ActiveStatus,
   FacilityStatus,
 } from '../../common/constants/status.enum';
 import { SERVICE_CONSTANT } from '../../common/constants/service.constant';
+import {
+  buildCodePrefixFromName,
+  buildNextCodeFromExisting,
+} from '../../common/helpers/code-generator.helper';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
 import { FacilitiesService } from '../facilities/facilities.service';
 import { FacilityService } from '../facility-services/entities/facility-service.entity';
@@ -35,12 +39,13 @@ export class ServicesService {
   ) {}
 
   async create(dto: CreateServiceDto): Promise<Service> {
-    await this.ensureUniqueCode(dto.code);
     await this.ensureUniqueName(dto.name);
     await this.serviceTypesService.findActiveById(dto.serviceTypeId);
+    const code = await this.generateCode(dto.name);
 
     const serviceData = {
       ...dto,
+      code,
       facilityAssignments: undefined,
       saleMode: dto.saleMode ?? ServiceSaleMode.BOTH,
       description: dto.description ?? '',
@@ -48,7 +53,8 @@ export class ServicesService {
     };
 
     if (!dto.facilityAssignments || dto.facilityAssignments.length === 0) {
-      throw new BadRequestException('Tạo dịch vụ phải kèm ít nhất một cơ sở áp dụng');
+      const entity = this.repository.create(serviceData);
+      return this.repository.save(entity);
     }
 
     const assignments = await this.validateFacilityAssignments(dto.facilityAssignments);
@@ -112,9 +118,6 @@ export class ServicesService {
   async update(id: string, dto: UpdateServiceDto): Promise<Service> {
     const service = await this.findById(id);
 
-    if (dto.code && dto.code !== service.code) {
-      await this.ensureUniqueCode(dto.code);
-    }
     if (dto.name && dto.name !== service.name) {
       await this.ensureUniqueName(dto.name);
     }
@@ -145,10 +148,10 @@ export class ServicesService {
     return { action: 'soft_deleted', affectedCount: dependencyCount };
   }
 
-  private async ensureUniqueCode(code: string): Promise<void> {
-    if (await this.repository.findByCode(code)) {
-      throw new ConflictException(SERVICE_CONSTANT.CODE_EXISTS);
-    }
+  private async generateCode(name: string): Promise<string> {
+    const prefix = buildCodePrefixFromName(name, 'SERVICE');
+    const existingCodes = await this.repository.findCodesByPrefix(prefix);
+    return buildNextCodeFromExisting(prefix, existingCodes);
   }
 
   private async ensureUniqueName(name: string): Promise<void> {
