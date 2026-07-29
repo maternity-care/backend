@@ -137,9 +137,13 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
     });
   }
 
-  // Hard delete gói; chỉ dùng khi chưa phát sinh package_items/patient_packages.
+  // Hard delete package catalog data only when there is no purchased package history.
   async remove(entity: MaternityPackage): Promise<void> {
-    await this.repository.remove(entity);
+    await this.repository.manager.transaction(async (manager) => {
+      await manager.delete(PackageItem, { packageId: entity.id });
+      await manager.delete(PackageStage, { packageId: entity.id });
+      await manager.remove(MaternityPackage, entity);
+    });
   }
 
   // Tìm gói theo id.
@@ -243,11 +247,11 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
     };
   }
 
-  // Đếm dữ liệu phụ thuộc để quyết định hard delete hay chuyển inactive.
+  // Only generated business records block hard delete. Package items/stages are package configuration
+  // and are removed together with the package when it has not been purchased yet.
   async countDependencies(packageId: string): Promise<number> {
-    const packageItemCount = await this.countRowsIfTableExists('package_items', 'package_id', packageId);
     const patientPackageCount = await this.countRowsIfTableExists('patient_packages', 'package_id', packageId);
-    return packageItemCount + patientPackageCount;
+    return patientPackageCount;
   }
 
   // Chuyển trạng thái gói, dùng khi delete an toàn với gói đã có lịch sử.

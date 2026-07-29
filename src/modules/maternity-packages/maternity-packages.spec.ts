@@ -11,10 +11,14 @@ import {
   MaternityPackageType,
 } from './dto/requests/create-maternity-package.dto';
 import { SearchMaternityPackageDto } from './dto/requests/search-maternity-package.dto';
+import { MaternityPackage } from './entities/maternity-package.entity';
+import { PackageStage } from './entities/package-stage.entity';
 import { MaternityPackagesController } from './maternity-packages.controller';
 import { MaternityPackagesService } from './maternity-packages.service';
 import { PublicFacilityMaternityPackagesController } from './public-facility-maternity-packages.controller';
 import { PublicMaternityPackagesController } from './public-maternity-packages.controller';
+import { PackageItem } from '../package-services/entities/package-item.entity';
+import { MaternityPackagesRepository } from './repositories/maternity-packages.repository';
 
 describe('MaternityPackages DTO validation', () => {
   const validPayload = {
@@ -567,6 +571,66 @@ describe('MaternityPackagesService business logic', () => {
       expect.objectContaining({ id: '1' }),
       MaternityPackageStatus.INACTIVE,
     );
+  });
+});
+
+describe('MaternityPackagesRepository remove rules', () => {
+  const createQueryBuilderMock = (count = '0') => {
+    const queryBuilder = {
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      getRawOne: jest.fn().mockResolvedValue({ count }),
+    };
+
+    return queryBuilder;
+  };
+
+  const createRepository = () => {
+    const transactionManager = {
+      delete: jest.fn().mockResolvedValue(undefined),
+      remove: jest.fn().mockResolvedValue(undefined),
+    };
+    const manager = {
+      createQueryBuilder: jest.fn(),
+      transaction: jest.fn(async (callback) => callback(transactionManager)),
+    };
+    const repository = {
+      manager,
+    };
+
+    return {
+      repository,
+      transactionManager,
+      maternityPackagesRepository: new MaternityPackagesRepository(
+        repository as never,
+        {} as never,
+        {} as never,
+      ),
+    };
+  };
+
+  it('counts only purchased package history as delete dependency', async () => {
+    const { repository, maternityPackagesRepository } = createRepository();
+    const queryBuilder = createQueryBuilderMock('3');
+    repository.manager.createQueryBuilder.mockReturnValue(queryBuilder);
+
+    await expect(maternityPackagesRepository.countDependencies('1')).resolves.toBe(3);
+    expect(repository.manager.createQueryBuilder).toHaveBeenCalledTimes(1);
+    expect(queryBuilder.from).toHaveBeenCalledWith('patient_packages', 'patient_packages');
+    expect(queryBuilder.from).not.toHaveBeenCalledWith('package_items', 'package_items');
+  });
+
+  it('hard deletes package configuration before removing the package', async () => {
+    const { repository, transactionManager, maternityPackagesRepository } = createRepository();
+    const entity = { id: '1' } as MaternityPackage;
+
+    await maternityPackagesRepository.remove(entity);
+
+    expect(repository.manager.transaction).toHaveBeenCalled();
+    expect(transactionManager.delete).toHaveBeenNthCalledWith(1, PackageItem, { packageId: '1' });
+    expect(transactionManager.delete).toHaveBeenNthCalledWith(2, PackageStage, { packageId: '1' });
+    expect(transactionManager.remove).toHaveBeenCalledWith(MaternityPackage, entity);
   });
 });
 
