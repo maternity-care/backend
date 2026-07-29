@@ -43,6 +43,10 @@ export class User {
   @Column({ name: 'address', type: 'varchar', length: 255, nullable: true })
   address: string | null;
 
+  @ApiProperty({ type: Number })
+  @Column({ name: 'priority_level', type: 'int', nullable: true, default: 0 })
+  priorityLevel: number | null;
+
   @ApiProperty({ type: String })
   @Column({ name: 'province', type: 'varchar', length: 255, nullable: true })
   province: string | null;

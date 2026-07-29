@@ -1,3 +1,4 @@
+import { MedicalFile } from './../../../database/entities/medical-file.entity';
 import { DeepPartial } from 'typeorm';
 import { PaginationResult } from '../../../common/helpers/pagination';
 import { Appointment } from '../../../database/entities/appointment.entity';
@@ -16,4 +17,5 @@ export interface IMedicalRecordRepository {
   findAll(filters?: SearchMedicalRecordDto): Promise<MedicalRecord[]>;
   findAllPaginated(filters?: SearchMedicalRecordDto): Promise<PaginationResult<MedicalRecord>>;
   countFiles(recordId: string): Promise<number>;
+  createMedicalFiles(data: DeepPartial<MedicalFile>[]): Promise<MedicalFile[]>;
 }

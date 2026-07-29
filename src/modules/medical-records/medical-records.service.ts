@@ -32,13 +32,21 @@ export class MedicalRecordsService implements IMedicalRecordService {
 
     const record = this.repository.create({
       ...dto,
-      diagnosis: dto.diagnosis ?? null,
-      recommendation: dto.recommendation ?? null,
+      diagnosis: dto?.diagnosis ?? null,
+      recommendation: dto?.recommendation ?? null,
       nextAppointmentSuggestedAt: dto.nextAppointmentSuggestedAt
         ? new Date(dto.nextAppointmentSuggestedAt)
         : null,
     });
     const saved = await this.repository.save(record);
+    const medicalFiles = dto?.files
+      ? dto.files?.map((file) => ({ ...file, medicalRecordId: saved.id }))
+      : [];
+    await this.repository.createMedicalFiles(medicalFiles);
+    // TODO: đặt lịch và thông báo cho bệnh nhân
+    if (dto?.nextAppointmentSuggestedAt) {
+      // TODO: tạo lịch hẹn
+    }
     return this.findById(saved.id);
   }
 
