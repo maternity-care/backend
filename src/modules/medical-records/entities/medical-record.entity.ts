@@ -11,7 +11,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Appointment } from '../../../database/entities/appointment.entity';
+import { Appointment } from '../../appointments/entities/appointment.entity';
 import { MedicalFile } from '../../../database/entities/medical-file.entity';
 
 @Entity('medical_records')

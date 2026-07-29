@@ -1,10 +1,11 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { AppointmentsService } from './appointments.service';
-import { CreateAppointmentDto } from './dto/create-appointment.dto';
+import { CreateAppointmentDto } from './dto/requests/create-appointment.dto';
 
 @ApiTags('Appointments')
 @ApiBearerAuth()
@@ -18,7 +19,7 @@ export class AppointmentsController {
   async create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateAppointmentDto) {
     const data = await this.appointmentsService.createForPatient(user.id, dto);
     return {
-      message: 'Đặt lịch thành công.',
+      message: RESPONSE_MESSAGES.APPOINTMENTS.CREATED,
       data,
     };
   }

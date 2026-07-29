@@ -4,6 +4,11 @@ import { Type } from 'class-transformer';
 import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class SearchProfileQueryDto {
+  @ApiPropertyOptional({ description: 'Lọc theo user/patient id' })
+  @IsString()
+  @IsOptional()
+  patientId?: string;
+
   @ApiPropertyOptional({ description: 'Tìm kiếm theo tên' })
   @IsString()
   @IsOptional()

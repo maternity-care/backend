@@ -143,6 +143,10 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
         : 10;
     const where: FindOptionsWhere<PregnancyProfile> = {};
 
+    if (query?.patientId) {
+      where.patientId = query.patientId;
+    }
+
     if (query?.code) {
       where.code = Like(`%${query.code}%`);
     }

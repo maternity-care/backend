@@ -18,7 +18,7 @@ export { PatientPackageBenefit } from './patient-package-benefit.entity';
 export { PregnancyProfile } from '../../modules/pregnancy-profile/entities/pregnancy-profile.entity';
 export { PregnancyHistoryEvent } from './pregnancy-history-event.entity';
 export { HealthMetric } from './health-metric.entity';
-export { Appointment } from './appointment.entity';
+export { Appointment } from '../../modules/appointments/entities/appointment.entity';
 export { AppointmentStatusLog } from './appointment-status-log.entity';
 export { AppointmentReminder } from './appointment-reminder.entity';
 export { Order } from './order.entity';

@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
@@ -17,7 +18,7 @@ export class SchedulesController {
   @ApiOperation({ summary: 'Get my schedules' })
   async findMine(@CurrentUser() user: AuthenticatedUser) {
     return {
-      message: 'Lấy lịch cá nhân thành công.',
+      message: RESPONSE_MESSAGES.SCHEDULES.GET_LIST_SUCCESS,
       data: await this.schedulesService.findMine(user.id),
     };
   }
@@ -26,7 +27,7 @@ export class SchedulesController {
   @ApiOperation({ summary: 'Create my schedule' })
   async createMine(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateUserScheduleDto) {
     return {
-      message: 'Tạo lịch cá nhân thành công.',
+      message: RESPONSE_MESSAGES.SCHEDULES.CREATED,
       data: await this.schedulesService.createMine(user.id, dto),
     };
   }
@@ -35,7 +36,7 @@ export class SchedulesController {
   @ApiOperation({ summary: 'Delete my manual schedule' })
   async removeMine(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return {
-      message: 'Xóa lịch cá nhân thành công.',
+      message: RESPONSE_MESSAGES.SCHEDULES.DELETED,
       data: await this.schedulesService.removeMine(user.id, id),
     };
   }
