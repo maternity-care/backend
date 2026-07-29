@@ -28,6 +28,7 @@ import { DoctorsModule } from './modules/doctors/doctors.module';
 import { MedicalRecordsModule } from './modules/medical-records/medical-records.module';
 import { ChatbotModule } from './modules/chatbot/chatbot.module';
 import { AppointmentsModule } from './modules/appointments/appointments.module';
+import { SchedulesModule } from './modules/schedules/schedules.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -71,6 +72,7 @@ import { AppointmentsModule } from './modules/appointments/appointments.module';
     DoctorsModule,
     MedicalRecordsModule,
     ChatbotModule,
+    SchedulesModule,
     AppointmentsModule,
   ],
 })

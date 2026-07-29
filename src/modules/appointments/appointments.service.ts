@@ -9,6 +9,7 @@ import { Appointment } from '../../database/entities/appointment.entity';
 import { ActiveStatus, AppointmentStatus, DoctorShiftStatus } from '../../common/constants/status.enum';
 import { FacilityService } from '../facility-services/entities/facility-service.entity';
 import { DoctorShift } from '../shifts/entities/shift.entity';
+import { SchedulesService } from '../schedules/schedules.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 
 const ACTIVE_APPOINTMENT_STATUSES = [
@@ -49,6 +50,7 @@ function overlaps(startA: string, endA: string, startB: string | Date, endB: str
 export class AppointmentsService {
   constructor(
     private readonly dataSource: DataSource,
+    private readonly schedulesService: SchedulesService,
   ) {}
 
   async createForPatient(patientId: string, dto: CreateAppointmentDto) {
@@ -142,7 +144,48 @@ export class AppointmentsService {
         createdBy: patientId,
       });
 
-      return manager.getRepository(Appointment).save(appointment);
+      const savedAppointment = await manager.getRepository(Appointment).save(appointment);
+      const appointmentScheduleDetails = await manager
+        .createQueryBuilder()
+        .select('service.name', 'serviceName')
+        .addSelect('facility.name', 'facilityName')
+        .addSelect('facility.address', 'facilityAddress')
+        .addSelect('doctorInfo.title', 'doctorTitle')
+        .addSelect('staff.name', 'staffName')
+        .from('appointments', 'appointment')
+        .leftJoin('services', 'service', 'service.id = appointment.service_id')
+        .leftJoin('facilities', 'facility', 'facility.id = appointment.facility_id')
+        .leftJoin('staffs', 'staff', 'staff.id = appointment.doctor_id')
+        .leftJoin('doctors', 'doctorInfo', 'doctorInfo.staff_id = staff.id')
+        .where('appointment.id = :appointmentId', { appointmentId: savedAppointment.id })
+        .getRawOne<{
+          serviceName?: string;
+          facilityName?: string;
+          facilityAddress?: string;
+          doctorTitle?: string;
+          staffName?: string;
+        }>();
+
+      await this.schedulesService.createForAppointment(manager, {
+        userId: patientId,
+        appointmentId: savedAppointment.id,
+        title: appointmentScheduleDetails?.serviceName
+          ? `Khám: ${appointmentScheduleDetails.serviceName}`
+          : 'Lịch khám',
+        date: dto.date,
+        time: startTime,
+        location:
+          appointmentScheduleDetails?.facilityName ??
+          appointmentScheduleDetails?.facilityAddress ??
+          null,
+        doctor: [appointmentScheduleDetails?.doctorTitle, appointmentScheduleDetails?.staffName]
+          .filter(Boolean)
+          .join(' ') || null,
+        note: 'Lịch được tạo tự động sau khi đặt lịch khám.',
+        type: 'checkup',
+      });
+
+      return savedAppointment;
     });
   }
 }

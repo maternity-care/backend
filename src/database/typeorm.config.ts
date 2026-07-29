@@ -51,6 +51,7 @@ import { StaffPasswordResetToken } from '../modules/auth/entities/staff-password
 import { StaffRefreshToken } from '../modules/auth/entities/staff-refresh-token.entity';
 import { User } from '../modules/users/entities/user.entity';
 import { UserAuth } from '../modules/auth/entities/user-auth.entity';
+import { UserSchedule } from '../modules/schedules/entities/user-schedule.entity';
 import { Notification } from '../modules/notifications/entities/notification.entity';
 import { UpdateServicePackageDesign1785120000000 } from './migrations/1785120000000-UpdateServicePackageDesign';
 import { UseDynamicServiceTypes1785200000000 } from './migrations/1785200000000-UseDynamicServiceTypes';
@@ -60,6 +61,8 @@ import { AddChatbotPersistence1785500000000 } from './migrations/1785500000000-A
 import { AddChatbotGuestAndUploadRateLimit1785600000000 } from './migrations/1785600000000-AddChatbotGuestAndUploadRateLimit';
 import { UseAppointmentTimestamps1785700000000 } from './migrations/1785700000000-UseAppointmentTimestamps';
 import { MakeAppointmentPregnancyProfileNullable1785800000000 } from './migrations/1785800000000-MakeAppointmentPregnancyProfileNullable';
+import { AddUserSchedules1785900000000 } from './migrations/1785900000000-AddUserSchedules';
+import { BackfillAppointmentSchedules1786000000000 } from './migrations/1786000000000-BackfillAppointmentSchedules';
 
 config();
 
@@ -81,6 +84,7 @@ export const typeOrmConfig: DataSourceOptions = {
     RefreshToken,
     Setting,
     Staff,
+    UserSchedule,
     StaffRefreshToken,
     StaffPasswordResetToken,
     Facility,
@@ -134,6 +138,8 @@ export const typeOrmConfig: DataSourceOptions = {
     AddChatbotGuestAndUploadRateLimit1785600000000,
     UseAppointmentTimestamps1785700000000,
     MakeAppointmentPregnancyProfileNullable1785800000000,
+    AddUserSchedules1785900000000,
+    BackfillAppointmentSchedules1786000000000,
   ],
   charset: 'utf8mb4_unicode_ci',
 };
