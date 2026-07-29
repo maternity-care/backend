@@ -17,16 +17,16 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CreateUserDto } from './dto/request/create-user.dto';
 import { SearchUserDto } from './dto/request/search-user.dto';
-import { UpdateUserDto } from './dto/request/update-user.dto';
+import { UpdatePregnantUserDto } from './dto/request/update-pregnant-user.dto';
 import { UserStatusEnum } from './users.enum';
 import { UsersService } from './users.service';
+import { CreateUserDto } from './dto/request/create-user.dto';
 
 @ApiTags('Management - Users')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-@Roles(RoleEnum.SUPER_ADMIN)
+@Roles(RoleEnum.SUPER_ADMIN, RoleEnum.ADMIN)
 @Controller('management/users')
 export class ManagementSystemUsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -54,7 +54,7 @@ export class ManagementSystemUsersController {
 
   @Patch(':id')
   @Permissions(PermissionEnum.USER_UPDATE)
-  async update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
+  async update(@Param('id') id: string, @Body() dto: UpdatePregnantUserDto) {
     const data = await this.usersService.update(id, dto);
     return { data, success: true, message: 'Cập nhật người dùng thành công.' };
   }

@@ -3,13 +3,14 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import {
   ActiveStatus,
-  AvailabilityStatus,
   FacilityStatus,
 } from '../../common/constants/status.enum';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { FACILITY_SERVICE_CONSTANT } from '../../common/constants/facility-service.constant';
-import { ServiceType } from '../services/dto/requests/create-service.dto';
-import { CreateFacilityServiceDto } from './dto/requests/create-facility-service.dto';
+import {
+  BulkCreateFacilityServicesDto,
+  CreateFacilityServiceDto,
+} from './dto/requests/create-facility-service.dto';
 import { SearchFacilityServiceDto } from './dto/requests/search-facility-service.dto';
 import { FacilityServicesController } from './facility-services.controller';
 import { FacilityServicesService } from './facility-services.service';
@@ -21,7 +22,7 @@ describe('FacilityServices DTO validation', () => {
     serviceId: '2',
     price: '280000.00',
     durationMinutes: '30',
-    status: AvailabilityStatus.AVAILABLE,
+    status: ActiveStatus.ACTIVE,
   };
 
   // Vai tro: dam bao DTO tao facility-service hop le va convert durationMinutes ve number.
@@ -31,13 +32,31 @@ describe('FacilityServices DTO validation', () => {
     expect(dto.durationMinutes).toBe(30);
   });
 
+  // Vai tro: dam bao payload gan hang loat service vao mot co so hop le va convert duration cua tung item.
+  it('accepts a valid bulk create payload', async () => {
+    const dto = plainToInstance(BulkCreateFacilityServicesDto, {
+      facilityId: '1',
+      services: [
+        {
+          serviceId: '2',
+          price: '280000.00',
+          durationMinutes: '30',
+          status: ActiveStatus.ACTIVE,
+        },
+      ],
+    });
+
+    expect(await validate(dto)).toHaveLength(0);
+    expect(dto.services[0].durationMinutes).toBe(30);
+  });
+
   // Vai tro: gom cac input sai khi gan dich vu vao co so de bat loi id, gia, thoi luong va status.
   it.each([
     [{ ...validPayload, facilityId: '0' }, 'facilityId'],
     [{ ...validPayload, serviceId: '-1' }, 'serviceId'],
     [{ ...validPayload, price: '-1000' }, 'price'],
     [{ ...validPayload, durationMinutes: 3 }, 'durationMinutes'],
-    [{ ...validPayload, status: 'active' }, 'status'],
+    [{ ...validPayload, status: 'available' }, 'status'],
   ])('rejects invalid create input', async (payload, property) => {
     const errors = await validate(plainToInstance(CreateFacilityServiceDto, payload));
     expect(errors.some(error => error.property === property)).toBe(true);
@@ -47,32 +66,41 @@ describe('FacilityServices DTO validation', () => {
   it('validates search filters and pagination', async () => {
     const dto = plainToInstance(SearchFacilityServiceDto, {
       facilityId: '0',
-      serviceType: 'invalid',
-      status: 'active',
+      serviceTypeId: '0',
+      status: 'available',
       page: '0',
       limit: '101',
     });
     expect((await validate(dto)).map(error => error.property)).toEqual(
-      expect.arrayContaining(['facilityId', 'serviceType', 'status', 'page', 'limit']),
+      expect.arrayContaining(['facilityId', 'serviceTypeId', 'status', 'page', 'limit']),
     );
   });
 });
 
 describe('FacilityServicesService business logic', () => {
   const facility = { id: '1', status: FacilityStatus.ACTIVE };
-  const service = { id: '2', status: ActiveStatus.ACTIVE, serviceType: ServiceType.ULTRASOUND };
+  const service = {
+    id: '2',
+    status: ActiveStatus.ACTIVE,
+    serviceTypeId: '1',
+    serviceType: { id: '1', code: 'ULTRASOUND', name: 'Siêu âm', status: ActiveStatus.ACTIVE },
+    basePrice: '300000.00',
+    defaultDurationMinutes: 30,
+  };
   const entity = {
     id: '10',
     facilityId: '1',
     serviceId: '2',
     price: '280000.00',
     durationMinutes: 30,
-    status: AvailabilityStatus.AVAILABLE,
+    status: ActiveStatus.ACTIVE,
   };
 
   const createRepo = () => ({
     create: jest.fn(data => ({ ...data })),
     save: jest.fn(async data => ({ id: data.id ?? '10', ...data })),
+    saveMany: jest.fn(async (data: Array<Record<string, unknown>>) =>
+      data.map((item, index) => ({ id: String(index + 20), ...item }))),
     remove: jest.fn().mockResolvedValue(undefined),
     findById: jest.fn().mockResolvedValue({ ...entity }),
     findByFacilityAndService: jest.fn().mockResolvedValue(null),
@@ -106,6 +134,69 @@ describe('FacilityServicesService business logic', () => {
     expect(repo.findByFacilityAndService).toHaveBeenCalledWith('1', '2');
   });
 
+  // Vai tro: gan hang loat service vao co so va tu lay gia/thoi luong mac dinh neu item khong gui.
+  it('bulk creates facility services when all items are valid', async () => {
+    const { repo, service: facilityServicesService } = createService();
+    repo.saveMany = jest.fn(async (data: Array<Record<string, unknown>>) =>
+      data.map((item, index) => ({ id: String(index + 20), ...item })));
+    repo.findDetailsById = jest.fn(async id => ({ ...entity, id }));
+
+    await expect(facilityServicesService.bulkCreate({
+      facilityId: '1',
+      services: [
+        {
+          serviceId: '2',
+          status: ActiveStatus.ACTIVE,
+        },
+      ],
+    })).resolves.toEqual([
+      expect.objectContaining({ id: '20' }),
+    ]);
+
+    expect(repo.saveMany).toHaveBeenCalledWith([
+      expect.objectContaining({
+        facilityId: '1',
+        serviceId: '2',
+        price: '300000.00',
+        durationMinutes: 30,
+      }),
+    ]);
+  });
+
+  // Vai tro: neu bulk co item bi conflict thi tra danh sach loi theo tung dong, khong save nua.
+  it('rejects bulk create with detailed item issues', async () => {
+    const { repo, service: facilityServicesService } = createService();
+    repo.saveMany = jest.fn();
+    repo.findByFacilityAndService.mockImplementation(async (_facilityId, serviceId) =>
+      serviceId === '2' ? entity : null,
+    );
+    servicesService.findById
+      .mockResolvedValueOnce({ ...service, id: '2' })
+      .mockResolvedValueOnce({ ...service, id: '3', status: ActiveStatus.INACTIVE });
+
+    await expect(facilityServicesService.bulkCreate({
+      facilityId: '1',
+      services: [
+        { serviceId: '2' },
+        { serviceId: '3' },
+        { serviceId: '2' },
+      ],
+    })).rejects.toMatchObject({
+      response: {
+        data: {
+          facilityId: '1',
+          invalidItems: 3,
+          items: [
+            expect.objectContaining({ index: 0, serviceId: '2' }),
+            expect.objectContaining({ index: 1, serviceId: '3' }),
+            expect.objectContaining({ index: 2, serviceId: '2' }),
+          ],
+        },
+      },
+    });
+    expect(repo.saveMany).not.toHaveBeenCalled();
+  });
+
   // Vai tro: kiem tra cac duong doc du lieu facility-service deu lay qua repository dung ham.
   it('returns list, paginated list, public list, and details through repository', async () => {
     const { repo, service: facilityServicesService } = createService();
@@ -115,11 +206,11 @@ describe('FacilityServicesService business logic', () => {
       items: [{ ...entity }],
       total: 1,
     });
-    await expect(facilityServicesService.findPublicByFacilityId('1', { status: AvailabilityStatus.AVAILABLE })).resolves.toEqual([
+    await expect(facilityServicesService.findPublicByFacilityId('1', { status: ActiveStatus.ACTIVE })).resolves.toEqual([
       expect.objectContaining({ id: '10', serviceName: expect.any(String) }),
     ]);
     await expect(facilityServicesService.findDetailsById('10')).resolves.toEqual({ ...entity });
-    expect(repo.findPublicByFacilityId).toHaveBeenCalledWith('1', { status: AvailabilityStatus.AVAILABLE });
+    expect(repo.findPublicByFacilityId).toHaveBeenCalledWith('1', { status: ActiveStatus.ACTIVE });
   });
 
   // Vai tro: dam bao API public khong hien dich vu cua facility da inactive.
@@ -202,7 +293,7 @@ describe('FacilityServicesService business logic', () => {
     });
     expect(softContext.repo.updateStatus).toHaveBeenCalledWith(
       expect.objectContaining({ id: '10' }),
-      AvailabilityStatus.UNAVAILABLE,
+      ActiveStatus.INACTIVE,
     );
   });
 });
@@ -214,11 +305,12 @@ describe('FacilityServicesController', () => {
     serviceId: '2',
     price: '280000.00',
     durationMinutes: 30,
-    status: AvailabilityStatus.AVAILABLE,
+    status: ActiveStatus.ACTIVE,
   };
 
   const createServiceMock = () => ({
     create: jest.fn().mockResolvedValue(entity),
+    bulkCreate: jest.fn().mockResolvedValue([entity]),
     findAll: jest.fn().mockResolvedValue([entity]),
     findAllPaginated: jest.fn().mockResolvedValue({ items: [entity], total: 1, page: 1, limit: 20 }),
     findDetailsById: jest.fn().mockResolvedValue({ ...entity, serviceName: 'Sieu am' }),
@@ -242,13 +334,20 @@ describe('FacilityServicesController', () => {
     });
   });
 
-  // Vai tro: kiem tra CRUD facility-service tra message/data wrapper nhat quan.
-  it('wraps detail, create, update, and remove responses', async () => {
+  // Vai tro: kiem tra detail/update/remove facility-service; route create le da bo de ep workflow tao service kem assign.
+  it('wraps detail, update, and remove responses', async () => {
     const service = createServiceMock();
     const controller = new FacilityServicesController(service as never);
 
     await expect(controller.findOne('10')).resolves.toMatchObject({ message: FACILITY_SERVICE_CONSTANT.DETAIL_FOUND });
-    await expect(controller.create(entity as never)).resolves.toMatchObject({ message: FACILITY_SERVICE_CONSTANT.CREATED, data: entity });
+    await expect(controller.create(entity as never)).resolves.toMatchObject({
+      message: FACILITY_SERVICE_CONSTANT.CREATED,
+      data: { id: '10' },
+    });
+    await expect(controller.bulkCreate({ facilityId: '1', services: [{ serviceId: '2' }] } as never)).resolves.toMatchObject({
+      message: FACILITY_SERVICE_CONSTANT.BULK_CREATED,
+      data: [entity],
+    });
     await expect(controller.update('10', { price: '300000.00' })).resolves.toMatchObject({
       message: FACILITY_SERVICE_CONSTANT.UPDATED,
       data: { price: '300000.00' },
@@ -264,10 +363,10 @@ describe('FacilityServicesController', () => {
     const service = createServiceMock();
     const controller = new PublicFacilityServicesController(service as never);
 
-    await expect(controller.findServicesByFacility('1', { serviceType: ServiceType.ULTRASOUND } as never)).resolves.toEqual({
+    await expect(controller.findServicesByFacility('1', { serviceTypeId: '1' } as never)).resolves.toEqual({
       message: RESPONSE_MESSAGES.SUCCESS,
       data: [entity],
     });
-    expect(service.findPublicByFacilityId).toHaveBeenCalledWith('1', { serviceType: ServiceType.ULTRASOUND });
+    expect(service.findPublicByFacilityId).toHaveBeenCalledWith('1', { serviceTypeId: '1' });
   });
 });

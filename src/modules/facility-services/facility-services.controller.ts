@@ -1,13 +1,19 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FACILITY_SERVICE_CONSTANT } from '../../common/constants/facility-service.constant';
-import { CreateFacilityServiceDto } from './dto/requests/create-facility-service.dto';
-import { FacilityServiceResponseDto } from './dto/responses/facility-service-response.dto';
+import {
+  FacilityServicePaginatedResponseDto,
+  FacilityServiceResponseDto,
+} from './dto/responses/facility-service-response.dto';
 import { SearchFacilityServiceDto } from './dto/requests/search-facility-service.dto';
 import { UpdateFacilityServiceDto } from './dto/requests/update-facility-service.dto';
 import { FacilityServicesService } from './facility-services.service';
+import {
+  BulkCreateFacilityServicesDto,
+  CreateFacilityServiceDto,
+} from './dto/requests/create-facility-service.dto';
 
-@ApiTags('Management - Facility Services')
+@ApiTags('Management - Facility Service Settings')
 @Controller('management/facility-services')
 export class FacilityServicesController {
   constructor(private readonly facilityServicesService: FacilityServicesService) {}
@@ -15,7 +21,7 @@ export class FacilityServicesController {
   // Lấy danh sách dịch vụ theo từng facility; dùng cho màn hình quản trị giá/thời lượng.
   @Get()
   @ApiOperation({ summary: 'List facility services' })
-  @ApiResponse({ status: 200, type: [FacilityServiceResponseDto] })
+  @ApiResponse({ status: 200, type: FacilityServicePaginatedResponseDto })
   async findAll(@Query() query: SearchFacilityServiceDto) {
     const data = query.page
       ? await this.facilityServicesService.findAllPaginated(query)
@@ -35,6 +41,7 @@ export class FacilityServicesController {
   }
 
   // Gán một service gốc cho facility với giá/thời lượng riêng tại facility đó.
+  // Cập nhật giá, thời lượng hoặc trạng thái available/unavailable của service tại facility.
   @Post()
   @ApiOperation({ summary: 'Assign a service to a facility' })
   async create(@Body() dto: CreateFacilityServiceDto) {
@@ -44,7 +51,15 @@ export class FacilityServicesController {
     };
   }
 
-  // Cập nhật giá, thời lượng hoặc trạng thái available/unavailable của service tại facility.
+  @Post('bulk')
+  @ApiOperation({ summary: 'Bulk assign services to a facility' })
+  async bulkCreate(@Body() dto: BulkCreateFacilityServicesDto) {
+    return {
+      message: FACILITY_SERVICE_CONSTANT.BULK_CREATED,
+      data: await this.facilityServicesService.bulkCreate(dto),
+    };
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Update facility service' })
   async update(@Param('id') id: string, @Body() dto: UpdateFacilityServiceDto) {

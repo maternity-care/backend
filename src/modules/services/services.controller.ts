@@ -6,7 +6,7 @@ import { SearchServiceDto } from './dto/requests/search-service.dto';
 import { UpdateServiceDto } from './dto/requests/update-service.dto';
 import { ServicesService } from './services.service';
 
-@ApiTags('Management - Services')
+@ApiTags('Management - Service Catalog')
 @Controller('management/services')
 export class ServicesController {
   constructor(private readonly servicesService: ServicesService) {}
@@ -33,7 +33,7 @@ export class ServicesController {
 
   // Tạo dịch vụ gốc với giá tham khảo và thời lượng mặc định.
   @Post()
-  @ApiOperation({ summary: 'Create service' })
+  @ApiOperation({ summary: 'Create service with optional facility assignments' })
   async create(@Body() dto: CreateServiceDto) {
     return {
       message: SERVICE_CONSTANT.CREATED,

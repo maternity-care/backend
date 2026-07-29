@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateFacilityDto } from './dto/requests/create-facility.dto';
+import { SearchFacilityAdminOptionsDto } from './dto/requests/search-facility-admin-options.dto';
 import { LookupFacilityDto, SearchFacilityDto } from './dto/requests/search-facility.dto';
 import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
 import { FacilityOperatingHourGroupDto } from './dto/requests/facility-schedule.dto';
@@ -22,6 +23,7 @@ import {
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
 import { ActiveStatus, FacilityOperatingStatus, FacilityStatus } from '../../common/constants/status.enum';
+import { addDays, isOvernightRange } from '../shifts/helpers/shifts.helper';
 
 @Injectable()
 export class FacilitiesService {
@@ -105,6 +107,10 @@ export class FacilitiesService {
 
   async lookup(query?: LookupFacilityDto): Promise<FacilityLookup[]> {
     return this.facilitiesRepository.lookup(query);
+  }
+
+  async findAdminOptions(query?: SearchFacilityAdminOptionsDto) {
+    return this.facilitiesRepository.findAdminOptions(query);
   }
 
   async remove(id: string, reason?: string, deletedBy?: string | null): Promise<SafeRemoveResult> {
@@ -318,7 +324,7 @@ export class FacilitiesService {
     };
   }
 
-  private async generateFacilityCode(province: string): Promise<string> {
+  private async generateFacilityCode(province?: string | null): Promise<string> {
     const prefix = `CS-${this.buildProvinceAbbreviation(province)}`;
     const existingCodes = await this.facilitiesRepository.findCodesByPrefix(prefix);
     const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -330,7 +336,11 @@ export class FacilitiesService {
     return `${prefix}-${String(nextSequence).padStart(2, '0')}`;
   }
 
-  private buildProvinceAbbreviation(province: string): string {
+  private buildProvinceAbbreviation(province?: string | null): string {
+    if (!province || !String(province).trim()) {
+      return 'VN';
+    }
+
     const normalizedProvince = this.normalizeVietnameseText(province)
       .replace(/[^\w\s]/g, ' ')
       .replace(/\b(THANH PHO|TINH|TP)\b/g, ' ')
@@ -396,11 +406,10 @@ export class FacilitiesService {
   }
 
   private async buildOperatingHoursFromGroupedInput(
-    facility: Pick<Facility, 'id'>,
+    _facility: Pick<Facility, 'id'>,
     dto: UpdateFacilityOperatingHoursDto,
   ) {
-    const currentHours = await this.getOperatingHoursOrDefault(facility);
-    return this.buildOperatingHoursFromGroupedSchedules(dto.schedules, currentHours);
+    return this.buildOperatingHoursFromGroupedSchedules(dto.schedules);
   }
 
   private buildDefaultOperatingHours() {
@@ -505,6 +514,38 @@ export class FacilitiesService {
       const normalizedEnd = this.normalizeTime(shift.endTime);
       const normalizedOpen = this.normalizeTime(String(operatingHour.openTime));
       const normalizedClose = this.normalizeTime(String(operatingHour.closeTime));
+
+      if (isOvernightRange(normalizedStart, normalizedEnd)) {
+        const nextDate = addDays(this.formatDateOnly(shift.shiftDate), 1);
+        const nextDayOfWeek = this.getDayOfWeekFromDate(nextDate);
+        const nextOperatingHour = operatingHoursByDay.get(nextDayOfWeek);
+
+        if (normalizedStart < normalizedOpen || normalizedClose < '23:59:00') {
+          impactedShifts.push(this.toImpactedShiftData(
+            shift,
+            `Ca dem can ngay bat dau mo den 23:59, hien tai ${normalizedOpen} - ${normalizedClose}`,
+          ));
+          continue;
+        }
+
+        if (!nextOperatingHour || nextOperatingHour.isClosed || !nextOperatingHour.openTime || !nextOperatingHour.closeTime) {
+          impactedShifts.push(this.toImpactedShiftData(
+            shift,
+            'Ca dem ket thuc vao ngay ke tiep nhung ngay ke tiep dang dong cua',
+          ));
+          continue;
+        }
+
+        const nextOpen = this.normalizeTime(String(nextOperatingHour.openTime));
+        const nextClose = this.normalizeTime(String(nextOperatingHour.closeTime));
+        if (nextOpen > '00:00:00' || normalizedEnd > nextClose) {
+          impactedShifts.push(this.toImpactedShiftData(
+            shift,
+            `Ca dem can ngay ke tiep mo tu 00:00 den sau ${normalizedEnd}, hien tai ${nextOpen} - ${nextClose}`,
+          ));
+        }
+        continue;
+      }
 
       if (normalizedStart < normalizedOpen) {
         impactedShifts.push(this.toImpactedShiftData(

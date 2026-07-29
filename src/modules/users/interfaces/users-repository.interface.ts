@@ -12,7 +12,10 @@ export interface IUsersRepository {
   findAll(): Promise<User[]>;
   findById(id: string): Promise<User | null>;
   findByEmail(email: string): Promise<User | null>;
+  findByPhone(phone: string): Promise<User | null>;
+  findByCccd(cccd: string): Promise<User | null>;
   findByEmailWithPassword(email: string): Promise<User | null>;
+  findMyPregnancyProfiles(id: string): Promise<User>;
   updateStatus(id: string, status: AccountStatus): Promise<void>;
   checkPhoneExists(phone: string): Promise<boolean>;
   searchUsers(query: SearchUserDto): Promise<SearchUserResponseDto>;

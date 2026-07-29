@@ -1,5 +1,5 @@
 import { CurrentUser } from './../../common/decorators/current-user.decorator';
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { plainToInstance } from 'class-transformer';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -14,6 +14,7 @@ import { DoctorResponseDto } from './dto/response/doctor-response.dto';
 import { DoctorsService } from './doctors.service';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { AdminCreateUserDto } from '../users/dto/request/admin-create-user.dto';
+import { SearchDoctorDto } from './dto/requests/search-doctor.dto';
 
 @ApiTags('Management - Doctors')
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
@@ -26,8 +27,20 @@ export class ManagementDoctorsController {
   @Permissions(PermissionEnum.DOCTOR_VIEW)
   @ApiOperation({ summary: 'List doctors' })
   @ApiResponse({ status: 200, type: [DoctorResponseDto] })
-  async findAll() {
-    const doctors = await this.doctorsService.findAll();
+  async findAll(@Query() query: SearchDoctorDto) {
+    const doctors = await this.doctorsService.findAll(query);
+    return {
+      message: 'Thành công',
+      data: doctors.map((doctor) => plainToInstance(DoctorResponseDto, doctor)),
+    };
+  }
+
+  @Get('/facility/:id')
+  @Permissions(PermissionEnum.DOCTOR_VIEW)
+  @ApiOperation({ summary: 'List doctors by facility' })
+  @ApiResponse({ status: 200, type: [DoctorResponseDto] })
+  async findByFacilityId(@Param('id') id: string) {
+    const doctors = await this.doctorsService.findByFacilityId(id);
     return {
       message: 'Thành công',
       data: doctors.map((doctor) => plainToInstance(DoctorResponseDto, doctor)),

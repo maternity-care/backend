@@ -1,5 +1,6 @@
 export const PACKAGE_SERVICE_CONSTANT = {
   CREATED: 'Thêm dịch vụ vào gói thành công',
+  BULK_CREATED: 'Thêm nhiều dịch vụ vào gói thành công',
   UPDATED: 'Cập nhật dịch vụ trong gói thành công',
   DELETED: 'Xóa dịch vụ khỏi gói thành công',
   FOUND: 'Lấy danh sách dịch vụ trong gói thành công',
@@ -8,6 +9,8 @@ export const PACKAGE_SERVICE_CONSTANT = {
   ALREADY_EXISTS: 'Gói này đã có dịch vụ đó',
   PACKAGE_INACTIVE: 'Gói dịch vụ không hoạt động',
   SERVICE_INACTIVE: 'Dịch vụ gốc không hoạt động',
+  FACILITY_SERVICE_INACTIVE: 'Dịch vụ tại cơ sở đang ngừng cung cấp',
+  BULK_DUPLICATED_IN_PAYLOAD: 'Danh sách thêm vào gói có dịch vụ tại cơ sở bị trùng',
   SELECTED_FACILITIES_REQUIRED: 'facilityIds là bắt buộc khi allowedFacilityScope = selected',
   CANNOT_DELETE_USED_PACKAGE_SERVICE: 'Dịch vụ trong gói đã phát sinh quyền lợi cho bệnh nhân, không thể xóa cứng',
 };

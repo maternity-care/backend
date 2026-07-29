@@ -22,7 +22,7 @@ import { CreateDoctorShiftDto } from './dto/requests/create-doctor-shift.dto';
 import { DoctorAvailabilityQueryDto } from './dto/requests/doctor-availability.dto';
 import { SearchDoctorShiftDto, WeeklyDoctorShiftDto } from './dto/requests/search-doctor-shift.dto';
 import { UpdateDoctorShiftDto } from './dto/requests/update-doctor-shift.dto';
-import { DoctorShiftResponseDto } from './dto/responses/doctor-shift-response.dto';
+import { DoctorShiftPaginatedResponseDto, DoctorShiftResponseDto } from './dto/responses/doctor-shift-response.dto';
 import {
   AutoGenerateConfirmApiResponse,
   AutoGeneratePreviewApiResponse,
@@ -40,15 +40,13 @@ export class ShiftsController {
 
   @Get()
   @ApiOperation({ summary: 'List shifts' })
-  @ApiResponse({ status: 200, type: [DoctorShiftResponseDto] })
+  @ApiResponse({ status: 200, type: DoctorShiftPaginatedResponseDto })
   async findAll(
     @CurrentUser() user: AuthenticatedUser,
    @Query() query: SearchDoctorShiftDto) {
     const activeFacilityId = getActiveFacilityId(user);
     if (activeFacilityId) query.facilityId = activeFacilityId;
-    const data = query.page
-      ? await this.service.findAllPaginated(query)
-      : await this.service.findAll(query);
+    const data = await this.service.findAllPaginated(query);
     return { message: RESPONSE_MESSAGES.SHIFTS.FOUND, data };
   }
 

@@ -7,11 +7,13 @@ import {
   IsBoolean,
   IsEnum,
   IsInt,
+  IsOptional,
   IsString,
   Matches,
   Max,
   Min,
   ValidateIf,
+  ValidateNested,
 } from 'class-validator';
 import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
 
@@ -26,16 +28,11 @@ function parseBooleanInput(value: unknown): unknown {
   return value;
 }
 
-export class CreatePackageServiceDto {
-  @ApiProperty({ example: '1' })
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
-  packageId: string;
-
+export class PackageServiceItemInputDto {
   @ApiProperty({ example: '3' })
   @IsString()
   @Matches(POSITIVE_ID_PATTERN)
-  serviceId: string;
+  facilityServiceId: string;
 
   @ApiProperty({ example: 2, minimum: 1, maximum: 100 })
   @Type(() => Number)
@@ -55,15 +52,29 @@ export class CreatePackageServiceDto {
   isOptional: boolean;
 
   @ApiProperty({ enum: PackageServiceFacilityScope, example: PackageServiceFacilityScope.ALL })
+  @IsOptional()
   @IsEnum(PackageServiceFacilityScope)
-  allowedFacilityScope: PackageServiceFacilityScope;
+  allowedFacilityScope: PackageServiceFacilityScope = PackageServiceFacilityScope.ALL;
+
+  @ApiPropertyOptional({
+    example: 1,
+    minimum: 0,
+    maximum: 1000,
+    description: 'Thứ tự hiển thị dịch vụ trong gói; số nhỏ đứng trước',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  sortOrder?: number;
 
   @ApiPropertyOptional({
     example: ['1', '2'],
     description: 'Bắt buộc khi allowedFacilityScope = selected',
   })
   @ValidateIf(
-    (dto: CreatePackageServiceDto) =>
+    (dto: PackageServiceItemInputDto) =>
       dto.allowedFacilityScope === PackageServiceFacilityScope.SELECTED,
   )
   @IsArray()
@@ -72,4 +83,25 @@ export class CreatePackageServiceDto {
   @IsString({ each: true })
   @Matches(POSITIVE_ID_PATTERN, { each: true })
   facilityIds?: string[];
+}
+
+export class CreatePackageServiceDto extends PackageServiceItemInputDto {
+  @ApiProperty({ example: '1' })
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  packageId: string;
+}
+
+export class BulkCreatePackageServicesDto {
+  @ApiProperty({ example: '1' })
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  packageId: string;
+
+  @ApiProperty({ type: [PackageServiceItemInputDto], minItems: 1, maxItems: 100 })
+  @IsArray()
+  @ArrayNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => PackageServiceItemInputDto)
+  services: PackageServiceItemInputDto[];
 }

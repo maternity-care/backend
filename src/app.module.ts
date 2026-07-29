@@ -18,8 +18,10 @@ import { StaffsModule } from './modules/staffs/staffs.module';
 import { MapsModule } from './modules/maps/maps.module';
 import { ShiftsModule } from './modules/shifts/shifts.module';
 import { ServicesModule } from './modules/services/services.module';
+import { ServiceTypesModule } from './modules/service-types/service-types.module';
 import { FacilityServicesModule } from './modules/facility-services/facility-services.module';
 import { MaternityPackagesModule } from './modules/maternity-packages/maternity-packages.module';
+import { PackageServicesModule } from './modules/package-services/package-services.module';
 import { PregnancyProfileModule } from './modules/pregnancy-profile/pregnancy-profile.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { DoctorsModule } from './modules/doctors/doctors.module';
@@ -57,9 +59,11 @@ import { MedicalRecordsModule } from './modules/medical-records/medical-records.
     RoomsModule,
     MapsModule,
     ShiftsModule,
+    ServiceTypesModule,
     ServicesModule,
     FacilityServicesModule,
     MaternityPackagesModule,
+    PackageServicesModule,
     PregnancyProfileModule,
     NotificationsModule,
     DoctorsModule,

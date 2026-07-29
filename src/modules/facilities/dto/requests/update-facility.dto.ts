@@ -60,21 +60,19 @@ export class UpdateFacilityDto {
   @MaxLength(255)
   address?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @Transform(({ value }) => trimText(value))
   @IsString()
-  @IsNotEmpty()
   @MaxLength(255)
-  province?: string;
+  province?: string | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @Transform(({ value }) => trimText(value))
   @IsString()
-  @IsNotEmpty()
   @MaxLength(255)
-  ward?: string;
+  ward?: string | null;
 
   @ApiPropertyOptional()
   @ValidateIf((dto: UpdateFacilityDto) => dto.latitude !== undefined || dto.longitude !== undefined)

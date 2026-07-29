@@ -1,3 +1,4 @@
+import { PregnancyProfile } from './../../pregnancy-profile/entities/pregnancy-profile.entity';
 import { PatientPackageBenefit } from './../../../database/entities/patient-package-benefit.entity';
 import { Notification } from './../../notifications/entities/notification.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -67,6 +68,9 @@ export class User {
 
   @OneToMany(() => PatientPackageBenefit, (packageBenefits) => packageBenefits.userId)
   packageBenefits: PatientPackageBenefit[];
+
+  @OneToMany(() => PregnancyProfile, (pregnancyProfile) => pregnancyProfile.user)
+  pregnancyProfiles: PregnancyProfile[];
 
   @ApiPropertyOptional({ type: Object, nullable: true, required: false })
   @Column({ name: 'metadata', type: 'json', nullable: true })

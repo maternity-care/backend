@@ -1,7 +1,6 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   ActiveStatus,
-  AvailabilityStatus,
   FacilityStatus,
 } from '../../common/constants/status.enum';
 import { FACILITY_SERVICE_CONSTANT } from '../../common/constants/facility-service.constant';
@@ -9,7 +8,10 @@ import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.int
 import { ServicesService } from '../services/services.service';
 import { FacilityService } from './entities/facility-service.entity';
 import { FacilitiesService } from '../facilities/facilities.service';
-import { CreateFacilityServiceDto } from './dto/requests/create-facility-service.dto';
+import {
+  BulkCreateFacilityServicesDto,
+  CreateFacilityServiceDto,
+} from './dto/requests/create-facility-service.dto';
 import { SearchFacilityServiceDto } from './dto/requests/search-facility-service.dto';
 import { UpdateFacilityServiceDto } from './dto/requests/update-facility-service.dto';
 import {
@@ -28,14 +30,106 @@ export class FacilityServicesService {
   ) {}
 
   // Gán một service gốc cho một facility, đồng thời set giá/thời lượng thực tế tại facility đó.
-  async create(dto: CreateFacilityServiceDto): Promise<FacilityService> {
+  async create(dto: CreateFacilityServiceDto) {
     await this.validateFacilityAndService(dto.facilityId, dto.serviceId);
 
     if (await this.repository.findByFacilityAndService(dto.facilityId, dto.serviceId)) {
       throw new ConflictException(FACILITY_SERVICE_CONSTANT.ALREADY_EXISTS);
     }
 
-    return this.repository.save(this.repository.create(dto));
+    const saved = await this.repository.save(this.repository.create(dto));
+    return {
+      ...(await this.findDetailsById(saved.id)),
+      price: saved.price,
+      durationMinutes: saved.durationMinutes,
+      status: saved.status,
+    };
+  }
+
+  async bulkCreate(dto: BulkCreateFacilityServicesDto) {
+    const facility = await this.facilitiesService.findById(dto.facilityId);
+    if (facility.status !== FacilityStatus.ACTIVE) {
+      throw new ConflictException(FACILITY_SERVICE_CONSTANT.FACILITY_INACTIVE);
+    }
+
+    const issues: Array<{
+      index: number;
+      serviceId: string;
+      reason: string;
+      duplicatedData?: FacilityService;
+    }> = [];
+    const entities: FacilityService[] = [];
+    const seenServiceIds = new Set<string>();
+
+    for (const [index, item] of dto.services.entries()) {
+      if (seenServiceIds.has(item.serviceId)) {
+        issues.push({
+          index,
+          serviceId: item.serviceId,
+          reason: 'Dịch vụ bị trùng trong payload',
+        });
+        continue;
+      }
+      seenServiceIds.add(item.serviceId);
+
+      let service;
+      try {
+        service = await this.servicesService.findById(item.serviceId);
+      } catch (error) {
+        issues.push({
+          index,
+          serviceId: item.serviceId,
+          reason: error instanceof NotFoundException
+            ? 'Dịch vụ gốc không tồn tại'
+            : 'Không thể kiểm tra dịch vụ gốc',
+        });
+        continue;
+      }
+
+      if (service.status !== ActiveStatus.ACTIVE) {
+        issues.push({
+          index,
+          serviceId: item.serviceId,
+          reason: FACILITY_SERVICE_CONSTANT.SERVICE_INACTIVE,
+        });
+        continue;
+      }
+
+      const duplicated = await this.repository.findByFacilityAndService(dto.facilityId, item.serviceId);
+      if (duplicated) {
+        issues.push({
+          index,
+          serviceId: item.serviceId,
+          reason: 'Dịch vụ này đã có trong cơ sở',
+          duplicatedData: duplicated,
+        });
+        continue;
+      }
+
+      entities.push(this.repository.create({
+        facilityId: dto.facilityId,
+        serviceId: item.serviceId,
+        price: item.price ?? service.basePrice,
+        durationMinutes: item.durationMinutes ?? service.defaultDurationMinutes,
+        status: item.status ?? ActiveStatus.ACTIVE,
+      }));
+    }
+
+    if (issues.length > 0) {
+      throw new ConflictException({
+        message: FACILITY_SERVICE_CONSTANT.BULK_ALREADY_EXISTS,
+        data: {
+          facilityId: dto.facilityId,
+          totalItems: dto.services.length,
+          validItems: entities.length,
+          invalidItems: issues.length,
+          items: issues,
+        },
+      });
+    }
+
+    const saved = await this.repository.saveMany(entities);
+    return Promise.all(saved.map((item) => this.findDetailsById(item.id)));
   }
 
   // Lấy danh sách mapping facility-service cho màn hình quản trị.
@@ -54,7 +148,11 @@ export class FacilityServicesService {
     if (facility.status !== FacilityStatus.ACTIVE) {
       throw new ConflictException(FACILITY_SERVICE_CONSTANT.FACILITY_INACTIVE);
     }
-    return this.repository.findPublicByFacilityId(facilityId, filters);
+    const services = await this.repository.findPublicByFacilityId(facilityId, filters);
+    if (services.length === 0) {
+      throw new NotFoundException(FACILITY_SERVICE_CONSTANT.NOT_FOUND);
+    }
+    return services;
   }
 
   // Tìm một mapping theo id, dùng cho detail/update/delete.
@@ -76,7 +174,7 @@ export class FacilityServicesService {
   }
 
   // Cập nhật giá/thời lượng/trạng thái hoặc chuyển sang facility/service khác nếu cần.
-  async update(id: string, dto: UpdateFacilityServiceDto): Promise<FacilityService> {
+  async update(id: string, dto: UpdateFacilityServiceDto) {
     const entity = await this.findById(id);
     const nextFacilityId = dto.facilityId ?? entity.facilityId;
     const nextServiceId = dto.serviceId ?? entity.serviceId;
@@ -90,21 +188,43 @@ export class FacilityServicesService {
     }
 
     Object.assign(entity, dto);
-    return this.repository.save(entity);
+    const saved = await this.repository.save(entity);
+    return {
+      ...(await this.findDetailsById(saved.id)),
+      price: saved.price,
+      durationMinutes: saved.durationMinutes,
+      status: saved.status,
+    };
   }
 
   // Xóa an toàn: chưa có lịch sử thì hard delete, đã có appointment/extra-service thì chuyển unavailable.
   async remove(id: string): Promise<SafeRemoveResult> {
     const entity = await this.findById(id);
-    const dependencyCount = await this.repository.countDependencies(entity.facilityId, entity.serviceId);
+    const dependencyCount = await this.repository.countDependencies(
+      entity.facilityId,
+      entity.serviceId,
+      entity.id,
+    );
 
     if (dependencyCount === 0) {
       await this.repository.remove(entity);
       return { action: 'hard_deleted', affectedCount: 0 };
     }
 
-    await this.repository.updateStatus(entity, AvailabilityStatus.UNAVAILABLE);
+    await this.repository.updateStatus(entity, ActiveStatus.INACTIVE);
     return { action: 'soft_deleted', affectedCount: dependencyCount };
+  }
+
+  // Unassign theo cặp facilityId + serviceId để FE không bắt buộc phải biết id của bảng facility_services.
+  async removeByFacilityAndService(
+    facilityId: string,
+    serviceId: string,
+  ): Promise<SafeRemoveResult> {
+    const entity = await this.repository.findByFacilityAndService(facilityId, serviceId);
+    if (!entity) {
+      throw new NotFoundException(FACILITY_SERVICE_CONSTANT.NOT_FOUND);
+    }
+    return this.remove(entity.id);
   }
 
   // Validation chung: facility phải active và service gốc phải active trước khi public/cung cấp tại cơ sở.

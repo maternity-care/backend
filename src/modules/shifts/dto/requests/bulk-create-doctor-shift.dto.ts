@@ -17,7 +17,6 @@ import {
 } from 'class-validator';
 import { DoctorShiftStatus } from '../../../../common/constants/status.enum';
 import { RESPONSE_MESSAGES } from '../../../../common/constants/response-message.constant';
-import { IsLaterThan } from '../../../../common/helpers/dto-validation.helper';
 import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
 import { SHIFT_TIME_PATTERN } from './create-doctor-shift.dto';
 
@@ -104,7 +103,6 @@ export class BulkCreateDoctorShiftDto {
   @ApiPropertyOptional({ example: '12:00', description: 'Bắt buộc nếu không gửi slotId' })
   @ValidateIf((dto: BulkCreateDoctorShiftDto) => !dto.slotId)
   @Matches(SHIFT_TIME_PATTERN)
-  @IsLaterThan('startTime', { message: RESPONSE_MESSAGES.SHIFTS.END_TIME_AFTER_START_TIME })
   endTime?: string;
 
   @ApiPropertyOptional({ minimum: 1, maximum: 100 })

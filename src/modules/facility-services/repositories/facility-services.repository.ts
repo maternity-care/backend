@@ -2,12 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
 import {
-  AvailabilityStatus,
   ActiveStatus,
   FacilityStatus,
 } from '../../../common/constants/status.enum';
-import { FacilityService } from '../entities/facility-service.entity';
+import { FacilityServiceResponseDto } from '../dto/responses/facility-service-response.dto';
 import { SearchFacilityServiceDto } from '../dto/requests/search-facility-service.dto';
+import { FacilityService } from '../entities/facility-service.entity';
 import {
   FacilityServiceWithDetails,
   IFacilityServicesRepository,
@@ -31,22 +31,26 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
     return this.repository.save(entity);
   }
 
-  // Xóa cứng mapping khi chưa có appointment/extra-service phụ thuộc.
+  saveMany(entities: FacilityService[]): Promise<FacilityService[]> {
+    return this.repository.save(entities);
+  }
+
+  // Xóa cứng mapping khi chưa có dữ liệu phụ thuộc.
   async remove(entity: FacilityService): Promise<void> {
     await this.repository.remove(entity);
   }
 
-  // Tìm mapping theo id.
+  // Tìm mapping theo id, dùng cho update/delete.
   findById(id: string): Promise<FacilityService | null> {
     return this.repository.findOne({ where: { id } });
   }
 
+  // Detail trả nested object để FE không phải tự join facility/service.
   async findDetailsById(id: string): Promise<FacilityServiceWithDetails | null> {
-    return (
-      (await this.buildDetailsQuery()
-        .where('facilityService.id = :id', { id })
-        .getRawOne<FacilityServiceWithDetails>()) ?? null
-    );
+    const row = await this.buildDetailsQuery()
+      .where('facilityService.id = :id', { id })
+      .getRawOne<Record<string, unknown>>();
+    return row ? this.mapRowToResponse(row) : null;
   }
 
   // Kiểm tra một facility đã được gán service này chưa để chống trùng unique pair.
@@ -54,9 +58,10 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
     return this.repository.findOne({ where: { facilityId, serviceId } });
   }
 
-  // Danh sách management: filter theo facility/service/status/serviceType/search.
-  findAll(filters?: SearchFacilityServiceDto): Promise<FacilityServiceWithDetails[]> {
-    return this.buildListQuery(filters).getRawMany<FacilityServiceWithDetails>();
+  // Danh sách management: filter theo facility/service/status/serviceTypeId/search.
+  async findAll(filters?: SearchFacilityServiceDto): Promise<FacilityServiceWithDetails[]> {
+    const rows = await this.buildListQuery(filters).getRawMany<Record<string, unknown>>();
+    return rows.map(row => this.mapRowToResponse(row));
   }
 
   // Danh sách management có phân trang.
@@ -74,13 +79,13 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
   ): Promise<FacilityServiceWithDetails[]> {
     const query = this.buildDetailsQuery()
       .where('facilityService.facilityId = :facilityId', { facilityId })
-      .andWhere('facilityService.status = :available', { available: AvailabilityStatus.AVAILABLE })
+      .andWhere('facilityService.status = :facilityServiceActive', { facilityServiceActive: ActiveStatus.ACTIVE })
       .andWhere('service.status = :active', { active: ActiveStatus.ACTIVE })
       .andWhere('facility.status = :facilityActive', { facilityActive: FacilityStatus.ACTIVE })
       .orderBy('service.name', 'ASC');
 
-    if (filters?.serviceType) {
-      query.andWhere('service.service_type = :serviceType', { serviceType: filters.serviceType });
+    if (filters?.serviceTypeId) {
+      query.andWhere('service.service_type_id = :serviceTypeId', { serviceTypeId: filters.serviceTypeId });
     }
     if (filters?.search) {
       query.andWhere(
@@ -89,49 +94,42 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
       );
     }
 
-    return query.getRawMany<FacilityServiceWithDetails>();
+    const rows = await query.getRawMany<Record<string, unknown>>();
+    return rows.map(row => this.mapRowToResponse(row));
   }
 
   // Đếm dữ liệu đã phát sinh từ cặp facility-service để quyết định hard delete hay unavailable.
-  async countDependencies(facilityId: string, serviceId: string): Promise<number> {
+  async countDependencies(
+    facilityId: string,
+    serviceId: string,
+    facilityServiceId?: string,
+  ): Promise<number> {
     const tables = [
       { table: 'appointments', facilityColumn: 'facility_id', serviceColumn: 'service_id' },
-      {
-        table: 'patient_extra_services',
-        facilityColumn: 'facility_id',
-        serviceColumn: 'service_id',
-      },
+      { table: 'patient_extra_services', facilityColumn: 'facility_id', serviceColumn: 'service_id' },
+      { table: 'package_items', facilityColumn: null, serviceColumn: 'facility_service_id' },
     ];
 
     const rows = await Promise.all(
-      tables.map((item) =>
-        this.repository.manager
-          .createQueryBuilder()
-          .select('COUNT(*)', 'count')
-          .from(item.table, item.table)
-          .where(`${item.table}.${item.facilityColumn} = :facilityId`, { facilityId })
-          .andWhere(`${item.table}.${item.serviceColumn} = :serviceId`, { serviceId })
-          .getRawOne<{ count: string }>(),
-      ),
+      tables.map((item) => item.facilityColumn
+        ? this.countRowsIfTableExists(item.table, item.facilityColumn, item.serviceColumn, facilityId, serviceId)
+        : this.countRowsByFacilityServiceIdIfTableExists(item.table, item.serviceColumn, facilityServiceId ?? '0')),
     );
 
-    return rows.reduce((total, row) => total + Number(row?.count ?? 0), 0);
+    return rows.reduce((total, count) => total + count, 0);
   }
 
   // Chuyển mapping sang unavailable thay vì xóa cứng khi đã có lịch sử sử dụng.
-  updateStatus(entity: FacilityService, status: AvailabilityStatus): Promise<FacilityService> {
+  updateStatus(entity: FacilityService, status: ActiveStatus): Promise<FacilityService> {
     entity.status = status;
     return this.repository.save(entity);
   }
 
-  // Query chung cho findAll và findAllPaginated.
   private buildListQuery(filters?: SearchFacilityServiceDto): SelectQueryBuilder<FacilityService> {
     const query = this.buildDetailsQuery().orderBy('facilityService.createdAt', 'DESC');
 
     if (filters?.facilityId) {
-      query.andWhere('facilityService.facilityId = :facilityId', {
-        facilityId: filters.facilityId,
-      });
+      query.andWhere('facilityService.facilityId = :facilityId', { facilityId: filters.facilityId });
     }
     if (filters?.serviceId) {
       query.andWhere('facilityService.serviceId = :serviceId', { serviceId: filters.serviceId });
@@ -139,8 +137,8 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
     if (filters?.status) {
       query.andWhere('facilityService.status = :status', { status: filters.status });
     }
-    if (filters?.serviceType) {
-      query.andWhere('service.service_type = :serviceType', { serviceType: filters.serviceType });
+    if (filters?.serviceTypeId) {
+      query.andWhere('service.service_type_id = :serviceTypeId', { serviceTypeId: filters.serviceTypeId });
     }
     if (filters?.search) {
       query.andWhere(
@@ -156,6 +154,7 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
     return this.repository
       .createQueryBuilder('facilityService')
       .innerJoin('services', 'service', 'service.id = facilityService.serviceId')
+      .innerJoin('service_types', 'serviceType', 'serviceType.id = service.service_type_id')
       .innerJoin('facilities', 'facility', 'facility.id = facilityService.facilityId')
       .select('facilityService.id', 'id')
       .addSelect('facilityService.facilityId', 'facilityId')
@@ -169,13 +168,21 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
       .addSelect('facility.name', 'facilityName')
       .addSelect('facility.address', 'facilityAddress')
       .addSelect('facility.province', 'facilityProvince')
+      .addSelect('facility.ward', 'facilityWard')
+      .addSelect('facility.status', 'facilityStatus')
       .addSelect('service.code', 'serviceCode')
       .addSelect('service.name', 'serviceName')
       .addSelect('service.description', 'serviceDescription')
-      .addSelect('service.service_type', 'serviceType')
+      .addSelect('service.service_type_id', 'serviceTypeId')
+      .addSelect('serviceType.code', 'serviceTypeCode')
+      .addSelect('serviceType.name', 'serviceTypeName')
+      .addSelect('serviceType.description', 'serviceTypeDescription')
+      .addSelect('serviceType.status', 'serviceTypeStatus')
+      .addSelect('service.sale_mode', 'serviceSaleMode')
       .addSelect('service.base_price', 'serviceBasePrice')
       .addSelect('service.default_duration_minutes', 'serviceDefaultDurationMinutes')
-      .addSelect('service.requires_doctor_warning', 'serviceRequiresDoctorWarning');
+      .addSelect('service.requires_doctor_warning', 'serviceRequiresDoctorWarning')
+      .addSelect('service.status', 'serviceStatus');
   }
 
   private async paginateRaw<T>(
@@ -185,17 +192,103 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
     const page = Math.max(1, Number(options?.page) || 1);
     const limit = Math.max(1, Number(options?.limit) || 20);
     const total = await query.clone().getCount();
-    const items = await query
+    const rows = await query
       .offset((page - 1) * limit)
       .limit(limit)
-      .getRawMany<T>();
+      .getRawMany<Record<string, unknown>>();
 
     return {
-      items,
+      items: rows.map(row => this.mapRowToResponse(row)) as T[],
       total,
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  private async countRowsIfTableExists(
+    table: string,
+    facilityColumn: string,
+    serviceColumn: string,
+    facilityId: string,
+    serviceId: string,
+  ): Promise<number> {
+    try {
+      const row = await this.repository.manager
+        .createQueryBuilder()
+        .select('COUNT(*)', 'count')
+        .from(table, table)
+        .where(`${table}.${facilityColumn} = :facilityId`, { facilityId })
+        .andWhere(`${table}.${serviceColumn} = :serviceId`, { serviceId })
+        .getRawOne<{ count: string }>();
+      return Number(row?.count ?? 0);
+    } catch (error) {
+      if ((error as { code?: string; errno?: number }).code === 'ER_NO_SUCH_TABLE' || (error as { errno?: number }).errno === 1146) {
+        return 0;
+      }
+      throw error;
+    }
+  }
+
+  private async countRowsByFacilityServiceIdIfTableExists(
+    table: string,
+    column: string,
+    facilityServiceId: string,
+  ): Promise<number> {
+    try {
+      const row = await this.repository.manager
+        .createQueryBuilder()
+        .select('COUNT(*)', 'count')
+        .from(table, table)
+        .where(`${table}.${column} = :facilityServiceId`, { facilityServiceId })
+        .getRawOne<{ count: string }>();
+      return Number(row?.count ?? 0);
+    } catch (error) {
+      if ((error as { code?: string; errno?: number }).code === 'ER_NO_SUCH_TABLE' || (error as { errno?: number }).errno === 1146) {
+        return 0;
+      }
+      throw error;
+    }
+  }
+
+  private mapRowToResponse(row: Record<string, unknown>): FacilityServiceResponseDto {
+    return {
+      id: String(row.id),
+      facilityId: String(row.facilityId),
+      serviceId: String(row.serviceId),
+      price: String(row.price),
+      durationMinutes: Number(row.durationMinutes),
+      status: row.status as ActiveStatus,
+      createdAt: row.createdAt as Date,
+      updatedAt: row.updatedAt as Date,
+      facility: {
+        id: String(row.facilityId),
+        code: String(row.facilityCode),
+        name: String(row.facilityName),
+        address: row.facilityAddress as string,
+        province: row.facilityProvince as string,
+        ward: row.facilityWard as string,
+        status: row.facilityStatus as string,
+      },
+      service: {
+        id: String(row.serviceId),
+        code: String(row.serviceCode),
+        name: String(row.serviceName),
+        description: row.serviceDescription as string | null,
+        serviceTypeId: String(row.serviceTypeId),
+        serviceType: {
+          id: String(row.serviceTypeId),
+          code: String(row.serviceTypeCode),
+          name: String(row.serviceTypeName),
+          description: row.serviceTypeDescription as string | null,
+          status: row.serviceTypeStatus as ActiveStatus,
+        },
+        saleMode: row.serviceSaleMode as never,
+        basePrice: String(row.serviceBasePrice),
+        defaultDurationMinutes: Number(row.serviceDefaultDurationMinutes),
+        requiresDoctorWarning: row.serviceRequiresDoctorWarning as number,
+        status: row.serviceStatus as ActiveStatus,
+      },
     };
   }
 }

@@ -1,8 +1,8 @@
 import { DeepPartial } from 'typeorm';
-import { Service } from '../entities/service.entity';
+import { ActiveStatus } from '../../../common/constants/status.enum';
 import { PaginationResult } from '../../../common/helpers/pagination';
 import { SearchServiceDto } from '../dto/requests/search-service.dto';
-import { ActiveStatus } from '../../../common/constants/status.enum';
+import { Service } from '../entities/service.entity';
 
 export const SERVICES_REPOSITORY = Symbol('SERVICES_REPOSITORY');
 
@@ -12,6 +12,7 @@ export interface IServicesRepository {
   remove(service: Service): Promise<void>;
   findById(id: string): Promise<Service | null>;
   findByCode(code: string): Promise<Service | null>;
+  findCodesByPrefix(prefix: string): Promise<string[]>;
   findByName(name: string): Promise<Service | null>;
   findAll(filters?: SearchServiceDto): Promise<Service[]>;
   findAllPaginated(filters?: SearchServiceDto): Promise<PaginationResult<Service>>;

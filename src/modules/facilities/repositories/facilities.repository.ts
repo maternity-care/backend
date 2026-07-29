@@ -5,13 +5,16 @@ import { Facility } from '../entities/facility.entity';
 import { FacilityClosureDay } from '../entities/facility-closure-day.entity';
 import { FacilityDayOfWeek, FacilityOperatingHour } from '../entities/facility-operating-hour.entity';
 import { AccountStatus, DoctorShiftStatus, FacilityStatus } from '../../../common/constants/status.enum';
+import { RoleEnum } from '../../../common/constants/role.enum';
 import {
+  FacilityAdminOption,
   FacilityShiftScheduleViolation,
   FacilityLookup,
   FacilityWithDetails,
   IFacilitiesRepository,
 } from '../interfaces/facility-repository.interface';
 import { SearchFacilityClosureDayDto } from '../dto/requests/facility-closure-day.dto';
+import { SearchFacilityAdminOptionsDto } from '../dto/requests/search-facility-admin-options.dto';
 import { LookupFacilityDto, SearchFacilityDto } from '../dto/requests/search-facility.dto';
 import { PaginationResult } from '../../../common/helpers/pagination';
 import { RESPONSE_MESSAGES } from '../../../common/constants/response-message.constant';
@@ -67,7 +70,9 @@ export class FacilitiesRepository implements IFacilitiesRepository {
     return this.repository.manager
       .createQueryBuilder()
       .select('shift.id', 'id')
-      .addSelect('shift.shift_date', 'shiftDate')
+      // DATE column khi đi qua MySQL driver đôi lúc bị ép thành Date object rồi lệch ngày khi toISOString().
+      // Format thẳng ở DB để validate operating-hours luôn dùng đúng ngày YYYY-MM-DD như dữ liệu trong MySQL.
+      .addSelect("DATE_FORMAT(shift.shift_date, '%Y-%m-%d')", 'shiftDate')
       .addSelect('shift.start_time', 'startTime')
       .addSelect('shift.end_time', 'endTime')
       .addSelect('shift.status', 'status')
@@ -221,11 +226,93 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       .createQueryBuilder()
       .select('COUNT(*)', 'count')
       .from('staffs', 'staff')
+      .innerJoin('staff_roles', 'staffRole', 'staffRole.staff_id = staff.id')
+      .innerJoin('roles', 'role', 'role.id = staffRole.role_id')
       .where('staff.id = :ownerId', { ownerId })
       .andWhere('staff.status = :status', { status: AccountStatus.ACTIVE })
+      .andWhere('role.name = :roleName', { roleName: RoleEnum.ADMIN })
       .getRawOne<{ count: string }>();
 
     return Number(count?.count ?? 0) > 0;
+  }
+
+  async findAdminOptions(filters?: SearchFacilityAdminOptionsDto): Promise<PaginationResult<FacilityAdminOption>> {
+    const page = Math.max(1, Number(filters?.page) || 1);
+    const limit = Math.max(1, Number(filters?.limit) || 20);
+    const status = filters?.status ?? AccountStatus.ACTIVE;
+
+    const query = this.repository.manager
+      .createQueryBuilder()
+      .from('staffs', 'staff')
+      .innerJoin('staff_roles', 'staffRole', 'staffRole.staff_id = staff.id')
+      .innerJoin('roles', 'role', 'role.id = staffRole.role_id')
+      .leftJoin('facilities', 'homeFacility', 'homeFacility.id = staff.facility_id AND homeFacility.deleted_at IS NULL')
+      .where('role.name = :roleName', { roleName: RoleEnum.ADMIN })
+      .andWhere('staff.status = :status', { status })
+      .select('staff.id', 'id')
+      .addSelect('staff.name', 'name')
+      .addSelect('staff.email', 'email')
+      .addSelect('staff.personal_email', 'personalEmail')
+      .addSelect('staff.phone', 'phone')
+      .addSelect('staff.employee_code', 'employeeCode')
+      .addSelect('staff.status', 'status')
+      .addSelect('staff.facility_id', 'homeFacilityId')
+      .addSelect('homeFacility.name', 'homeFacilityName')
+      .addSelect('homeFacility.code', 'homeFacilityCode')
+      .addSelect('role.id', 'roleId')
+      .addSelect('role.name', 'roleName')
+      .addSelect((subQuery) => (
+        subQuery
+          .select('COUNT(1)')
+          .from('facilities', 'ownedFacility')
+          .where('ownedFacility.owner_id = staff.id')
+          .andWhere('ownedFacility.deleted_at IS NULL')
+      ), 'ownedFacilityCount');
+
+    if (filters?.search) {
+      query.andWhere(
+        [
+          'LOWER(staff.name) LIKE LOWER(:search)',
+          'LOWER(staff.email) LIKE LOWER(:search)',
+          'LOWER(staff.personal_email) LIKE LOWER(:search)',
+          'LOWER(staff.phone) LIKE LOWER(:search)',
+          'LOWER(staff.employee_code) LIKE LOWER(:search)',
+        ].join(' OR '),
+        { search: `%${filters.search}%` },
+      );
+    }
+
+    if (filters?.availableOnly === 'true') {
+      query.andWhere(`
+        NOT EXISTS (
+          SELECT 1
+          FROM facilities ownedFacility
+          WHERE ownedFacility.owner_id = staff.id
+            AND ownedFacility.deleted_at IS NULL
+        )
+      `);
+    }
+
+    const totalRow = await query.clone()
+      .select('COUNT(DISTINCT staff.id)', 'count')
+      .getRawOne<{ count: string }>();
+    const items = await query
+      .orderBy('staff.name', 'ASC')
+      .addOrderBy('staff.employee_code', 'ASC')
+      .offset((page - 1) * limit)
+      .limit(limit)
+      .getRawMany<FacilityAdminOption & { ownedFacilityCount: string }>();
+
+    return {
+      items: items.map(item => ({
+        ...item,
+        ownedFacilityCount: Number(item.ownedFacilityCount ?? 0),
+      })),
+      total: Number(totalRow?.count ?? 0),
+      page,
+      limit,
+      totalPages: Math.ceil(Number(totalRow?.count ?? 0) / limit),
+    };
   }
 
   lookup(filters?: LookupFacilityDto): Promise<FacilityLookup[]> {
@@ -248,7 +335,11 @@ export class FacilitiesRepository implements IFacilitiesRepository {
   }
 
   async remove(facility: Facility): Promise<void> {
-    await this.repository.remove(facility);
+    await this.repository.manager.transaction(async manager => {
+      await manager.delete(FacilityOperatingHour, { facilityId: facility.id });
+      await manager.delete(FacilityClosureDay, { facilityId: facility.id });
+      await manager.remove(Facility, facility);
+    });
   }
 
   async countDependencies(facilityId: string): Promise<number> {
@@ -261,14 +352,11 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       { table: 'facility_services', column: 'facility_id' },
     ];
 
-    const rows = await Promise.all(tables.map(item => this.repository.manager
-      .createQueryBuilder()
-      .select('COUNT(*)', 'count')
-      .from(item.table, item.table)
-      .where(`${item.table}.${item.column} = :facilityId`, { facilityId })
-      .getRawOne<{ count: string }>()));
+    const rows = await Promise.all(tables.map(item =>
+      this.countRowsIfTableExists(item.table, item.column, facilityId),
+    ));
 
-    return rows.reduce((total, row) => total + Number(row?.count ?? 0), 0);
+    return rows.reduce((total, count) => total + count, 0);
   }
 
   async softDelete(facility: Facility, reason?: string, deletedBy?: string | null): Promise<Facility> {
@@ -365,5 +453,24 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  private async countRowsIfTableExists(table: string, column: string, facilityId: string): Promise<number> {
+    try {
+      const row = await this.repository.manager
+        .createQueryBuilder()
+        .select('COUNT(*)', 'count')
+        .from(table, table)
+        .where(`${table}.${column} = :facilityId`, { facilityId })
+        .getRawOne<{ count: string }>();
+
+      return Number(row?.count ?? 0);
+    } catch (error) {
+      const driverError = error as { code?: string; errno?: number };
+      if (driverError.code === 'ER_NO_SUCH_TABLE' || driverError.errno === 1146) {
+        return 0;
+      }
+      throw error;
+    }
   }
 }

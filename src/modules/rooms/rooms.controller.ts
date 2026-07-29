@@ -9,8 +9,10 @@ import { RoomResponseDto } from './dto/responds/room-response.dto';
 import { RoomsWithFacilityResponseDto } from './dto/responds/rooms-with-facility-response.dto';
 import {
   RoomLookupResponseDto,
+  RoomPaginatedResponseDto,
   RoomTypeResponseDto,
   RoomTypeLookupResponseDto,
+  RoomTypePaginatedResponseDto,
   RoomWithDetailsResponseDto,
 } from './dto/responses/room-with-details-response.dto';
 import { LookupRoomsDto, LookupRoomTypesDto, SearchRoomsDto, SearchRoomTypesDto } from './dto/requests/search-rooms.dto';
@@ -36,7 +38,7 @@ export class RoomsController {
 
   @Get()
   @ApiOperation({ summary: 'List rooms' })
-  @ApiResponse({ status: 200, description: 'Rooms found', type: [RoomWithDetailsResponseDto] })
+  @ApiResponse({ status: 200, description: 'Rooms found', type: RoomPaginatedResponseDto })
   async findAll(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: SearchRoomsDto,
@@ -46,44 +48,35 @@ export class RoomsController {
       if (activeFacilityId) {
         query.facilityId = activeFacilityId;
       }
-      if (query?.page) {
-        const paged = await this.roomsService.findAllPaginated(query);
-        return {
-          message: RESPONSE_MESSAGES.ROOMS.GET_LIST_SUCCESS,
-          data: paged,
-        };
-      }
-
-      const rooms = await this.roomsService.findAll(query);
       return {
         message: RESPONSE_MESSAGES.ROOMS.GET_LIST_SUCCESS,
-        data: rooms,
+        data: await this.roomsService.findAllPaginated(query),
       };
     } catch (error) {
       this.handleError(error);
     }
   }
 
-  @Get('lookup')
-  @ApiOperation({ summary: 'Lookup rooms for select/autocomplete' })
-  @ApiResponse({ status: 200, type: [RoomLookupResponseDto] })
-  async lookup(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query() query: LookupRoomsDto,
-  ) {
-    try {
-      const activeFacilityId = getActiveFacilityId(user);
-      if (activeFacilityId) {
-        query.facilityId = activeFacilityId;
-      }
-      return {
-        message: RESPONSE_MESSAGES.ROOMS.LOOKUP_SUCCESS,
-        data: await this.roomsService.lookup(query),
-      };
-    } catch (error) {
-      this.handleError(error);
-    }
-  }
+  // @Get('lookup')
+  // @ApiOperation({ summary: 'Lookup rooms for select/autocomplete' })
+  // @ApiResponse({ status: 200, type: [RoomLookupResponseDto] })
+  // async lookup(
+  //   @CurrentUser() user: AuthenticatedUser,
+  //   @Query() query: LookupRoomsDto,
+  // ) {
+  //   try {
+  //     const activeFacilityId = getActiveFacilityId(user);
+  //     if (activeFacilityId) {
+  //       query.facilityId = activeFacilityId;
+  //     }
+  //     return {
+  //       message: RESPONSE_MESSAGES.ROOMS.LOOKUP_SUCCESS,
+  //       data: await this.roomsService.lookup(query),
+  //     };
+  //   } catch (error) {
+  //     this.handleError(error);
+  //   }
+  // }
 
   @Get('room-types/lookup')
   @ApiOperation({ summary: 'Lookup room types for room form select/autocomplete' })
@@ -101,19 +94,12 @@ export class RoomsController {
 
   @Get('room-types')
   @ApiOperation({ summary: 'List room types' })
-  @ApiResponse({ status: 200, type: [RoomTypeResponseDto] })
+  @ApiResponse({ status: 200, type: RoomTypePaginatedResponseDto })
   async findAllRoomTypes(@Query() query: SearchRoomTypesDto) {
     try {
-      if (query?.page) {
-        return {
-          message: RESPONSE_MESSAGES.ROOM_TYPES.GET_LIST_SUCCESS,
-          data: await this.roomsService.findAllRoomTypesPaginated(query),
-        };
-      }
-
       return {
         message: RESPONSE_MESSAGES.ROOM_TYPES.GET_LIST_SUCCESS,
-        data: await this.roomsService.findAllRoomTypes(query),
+        data: await this.roomsService.findAllRoomTypesPaginated(query),
       };
     } catch (error) {
       this.handleError(error);
@@ -255,45 +241,45 @@ export class RoomsController {
     }
   }
 
-  @Post('bulk-create/preview')
-  @ApiOperation({ summary: 'Preview bulk create rooms before saving' })
-  async previewBulkCreate(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: BulkCreateRoomsPreviewDto,
-  ) {
-    try {
-      const activeFacilityId = getActiveFacilityId(user);
-      if (activeFacilityId) {
-        dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
-      }
-      return {
-        message: RESPONSE_MESSAGES.ROOMS.BULK_PREVIEW_SUCCESS,
-        data: await this.roomsService.previewBulkCreate(dto),
-      };
-    } catch (error) {
-      this.handleError(error);
-    }
-  }
+  // @Post('bulk-create/preview')
+  // @ApiOperation({ summary: 'Preview bulk create rooms before saving' })
+  // async previewBulkCreate(
+  //   @CurrentUser() user: AuthenticatedUser,
+  //   @Body() dto: BulkCreateRoomsPreviewDto,
+  // ) {
+  //   try {
+  //     const activeFacilityId = getActiveFacilityId(user);
+  //     if (activeFacilityId) {
+  //       dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
+  //     }
+  //     return {
+  //       message: RESPONSE_MESSAGES.ROOMS.BULK_PREVIEW_SUCCESS,
+  //       data: await this.roomsService.previewBulkCreate(dto),
+  //     };
+  //   } catch (error) {
+  //     this.handleError(error);
+  //   }
+  // }
 
-  @Post('bulk-create/confirm')
-  @ApiOperation({ summary: 'Confirm and save valid rooms from bulk-create preview' })
-  async confirmBulkCreate(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: BulkCreateRoomsPreviewDto,
-  ) {
-    try {
-      const activeFacilityId = getActiveFacilityId(user);
-      if (activeFacilityId) {
-        dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
-      }
-      return {
-        message: RESPONSE_MESSAGES.ROOMS.BULK_CONFIRM_SUCCESS,
-        data: await this.roomsService.confirmBulkCreate(dto),
-      };
-    } catch (error) {
-      this.handleError(error);
-    }
-  }
+  // @Post('bulk-create/confirm')
+  // @ApiOperation({ summary: 'Confirm and save valid rooms from bulk-create preview' })
+  // async confirmBulkCreate(
+  //   @CurrentUser() user: AuthenticatedUser,
+  //   @Body() dto: BulkCreateRoomsPreviewDto,
+  // ) {
+  //   try {
+  //     const activeFacilityId = getActiveFacilityId(user);
+  //     if (activeFacilityId) {
+  //       dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
+  //     }
+  //     return {
+  //       message: RESPONSE_MESSAGES.ROOMS.BULK_CONFIRM_SUCCESS,
+  //       data: await this.roomsService.confirmBulkCreate(dto),
+  //     };
+  //   } catch (error) {
+  //     this.handleError(error);
+  //   }
+  // }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update room' })

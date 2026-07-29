@@ -1,14 +1,18 @@
 import { FacilityService } from './../../facility-services/entities/facility-service.entity';
 import { ActiveStatus } from './../../../common/constants/status.enum';
 import { ApiProperty } from '@nestjs/swagger';
+import { ServiceSaleMode } from '../dto/requests/create-service.dto';
 import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { ServiceType } from '../../service-types/entities/service-type.entity';
 
 @Entity('services')
 export class Service {
@@ -24,16 +28,33 @@ export class Service {
   @Column({ name: 'name', type: 'varchar', length: 255 })
   name: string;
 
-  @OneToMany(() => FacilityService, (facilityService) => facilityService.serviceId)
+  @OneToMany(() => FacilityService, (facilityService) => facilityService.service)
   facilityServices: FacilityService[];
 
   @ApiProperty({ type: String })
   @Column({ name: 'description', type: 'text' })
   description: string;
 
+  @ApiProperty({ type: () => ServiceType })
+  @ManyToOne(() => ServiceType, (serviceType) => serviceType.services, {
+    onDelete: 'RESTRICT',
+    nullable: false,
+  })
+  @JoinColumn({ name: 'service_type_id' })
+  serviceType: ServiceType;
+
   @ApiProperty({ type: String })
-  @Column({ name: 'service_type', type: 'varchar', length: 255 })
-  serviceType: string;
+  @Column({ name: 'service_type_id', type: 'bigint' })
+  serviceTypeId: string;
+
+  @ApiProperty({ enum: ServiceSaleMode, enumName: 'ServiceSaleMode' })
+  @Column({
+    name: 'sale_mode',
+    type: 'enum',
+    enum: ServiceSaleMode,
+    default: ServiceSaleMode.BOTH,
+  })
+  saleMode: ServiceSaleMode;
 
   @ApiProperty({ type: Number })
   @Column({ name: 'default_duration_minutes', type: 'int' })

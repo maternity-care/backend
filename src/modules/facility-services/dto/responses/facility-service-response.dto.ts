@@ -1,5 +1,69 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { AvailabilityStatus } from '../../../../common/constants/status.enum';
+import {
+  ActiveStatus,
+  FacilityStatus,
+} from '../../../../common/constants/status.enum';
+import { PaginationMetaResponseDto } from '../../../../common/dto/pagination-response.dto';
+import { ServiceTypeLookupResponseDto } from '../../../service-types/dto/responses/service-type-response.dto';
+import { ServiceSaleMode } from '../../../services/dto/requests/create-service.dto';
+
+export class FacilityServiceFacilityResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  code: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiPropertyOptional()
+  address?: string;
+
+  @ApiPropertyOptional()
+  province?: string;
+
+  @ApiPropertyOptional()
+  ward?: string;
+
+  @ApiPropertyOptional({ enum: FacilityStatus })
+  status?: FacilityStatus | string;
+}
+
+export class FacilityServiceBaseServiceResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  code: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  description?: string | null;
+
+  @ApiProperty()
+  serviceTypeId: string;
+
+  @ApiProperty({ type: ServiceTypeLookupResponseDto })
+  serviceType: ServiceTypeLookupResponseDto;
+
+  @ApiProperty({ enum: ServiceSaleMode })
+  saleMode: ServiceSaleMode;
+
+  @ApiProperty()
+  basePrice: string;
+
+  @ApiProperty()
+  defaultDurationMinutes: number;
+
+  @ApiProperty()
+  requiresDoctorWarning: boolean | number;
+
+  @ApiProperty({ enum: ActiveStatus })
+  status: ActiveStatus;
+}
 
 export class FacilityServiceResponseDto {
   @ApiProperty()
@@ -17,8 +81,8 @@ export class FacilityServiceResponseDto {
   @ApiProperty()
   durationMinutes: number;
 
-  @ApiProperty({ enum: AvailabilityStatus })
-  status: AvailabilityStatus;
+  @ApiProperty({ enum: ActiveStatus })
+  status: ActiveStatus;
 
   @ApiProperty()
   createdAt: Date;
@@ -26,39 +90,14 @@ export class FacilityServiceResponseDto {
   @ApiProperty()
   updatedAt: Date;
 
-  @ApiPropertyOptional()
-  facilityCode?: string;
+  @ApiProperty({ type: FacilityServiceFacilityResponseDto })
+  facility: FacilityServiceFacilityResponseDto;
 
-  @ApiPropertyOptional()
-  facilityName?: string;
+  @ApiProperty({ type: FacilityServiceBaseServiceResponseDto })
+  service: FacilityServiceBaseServiceResponseDto;
+}
 
-  @ApiPropertyOptional()
-  facilityAddress?: string;
-
-  @ApiPropertyOptional()
-  facilityProvince?: string;
-
-  @ApiPropertyOptional()
-  facilityDistrict?: string;
-
-  @ApiPropertyOptional()
-  serviceCode?: string;
-
-  @ApiPropertyOptional()
-  serviceName?: string;
-
-  @ApiPropertyOptional({ nullable: true })
-  serviceDescription?: string | null;
-
-  @ApiPropertyOptional()
-  serviceType?: string;
-
-  @ApiPropertyOptional()
-  serviceBasePrice?: string;
-
-  @ApiPropertyOptional()
-  serviceDefaultDurationMinutes?: number;
-
-  @ApiPropertyOptional()
-  serviceRequiresDoctorWarning?: number;
+export class FacilityServicePaginatedResponseDto extends PaginationMetaResponseDto {
+  @ApiProperty({ type: [FacilityServiceResponseDto] })
+  items: FacilityServiceResponseDto[];
 }

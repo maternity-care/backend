@@ -1,24 +1,43 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { MATERNITY_PACKAGE_CONSTANT } from '../../common/constants/maternity-package.constant';
 import { MaternityPackageStatus } from '../../common/constants/status.enum';
-import { CreateMaternityPackageDto } from './dto/requests/create-maternity-package.dto';
+import {
+  CreateMaternityPackageDto,
+  CreateQuantityMaternityPackageDto,
+  CreateScheduleMaternityPackageDto,
+  MaternityPackageStageType,
+  MaternityPackageType,
+} from './dto/requests/create-maternity-package.dto';
 import { SearchMaternityPackageDto } from './dto/requests/search-maternity-package.dto';
+import { MaternityPackage } from './entities/maternity-package.entity';
+import { PackageStage } from './entities/package-stage.entity';
 import { MaternityPackagesController } from './maternity-packages.controller';
 import { MaternityPackagesService } from './maternity-packages.service';
 import { PublicFacilityMaternityPackagesController } from './public-facility-maternity-packages.controller';
 import { PublicMaternityPackagesController } from './public-maternity-packages.controller';
+import { PackageItem } from '../package-services/entities/package-item.entity';
+import { MaternityPackagesRepository } from './repositories/maternity-packages.repository';
 
 describe('MaternityPackages DTO validation', () => {
   const validPayload = {
-    code: 'PKG_BASIC',
+    facilityId: '1',
     name: 'Gói thai sản cơ bản',
     description: 'Gói theo dõi thai kỳ cơ bản',
     price: '900000.00',
     durationDays: '90',
     priorityLevel: '1',
     status: MaternityPackageStatus.DRAFT,
+    services: [
+      {
+        facilityServiceId: '10',
+        includedQuantity: '2',
+        isRequired: 'true',
+        isOptional: 'false',
+        sortOrder: '1',
+      },
+    ],
   };
 
   // Vai tro: dam bao DTO tao package hop le va convert durationDays/priorityLevel ve number.
@@ -29,9 +48,32 @@ describe('MaternityPackages DTO validation', () => {
     expect(dto.priorityLevel).toBe(1);
   });
 
+  // Vai tro: dam bao API tao goi theo so luot chi can services[] va khong bat FE gui packageType.
+  it('accepts quantity create payload without packageType', async () => {
+    const dto = plainToInstance(CreateQuantityMaternityPackageDto, validPayload);
+    expect(await validate(dto)).toHaveLength(0);
+  });
+
+  // Vai tro: dam bao API tao goi theo lich trinh chi can stages[] va khong bat FE gui services[] o root.
+  it('accepts schedule create payload without packageType', async () => {
+    const dto = plainToInstance(CreateScheduleMaternityPackageDto, {
+      ...validPayload,
+      services: undefined,
+      stages: [
+        {
+          name: 'Tuan 12 - 14',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 12,
+          weekTo: 14,
+          services: validPayload.services,
+        },
+      ],
+    });
+    expect(await validate(dto)).toHaveLength(0);
+  });
+
   // Vai tro: gom cac input tao package sai de DTO bat loi code, name, price, duration, priority va status.
   it.each([
-    [{ ...validPayload, code: 'bad code' }, 'code'],
     [{ ...validPayload, name: 'A' }, 'name'],
     [{ ...validPayload, price: '-1' }, 'price'],
     [{ ...validPayload, durationDays: 0 }, 'durationDays'],
@@ -58,6 +100,7 @@ describe('MaternityPackages DTO validation', () => {
 describe('MaternityPackagesService business logic', () => {
   const packageEntity = {
     id: '1',
+    facilityId: '1',
     code: 'PKG_BASIC',
     name: 'Gói thai sản cơ bản',
     description: 'Gói theo dõi thai kỳ cơ bản',
@@ -74,6 +117,13 @@ describe('MaternityPackagesService business logic', () => {
     findById: jest.fn().mockResolvedValue({ ...packageEntity }),
     findByCode: jest.fn().mockResolvedValue(null),
     findByName: jest.fn().mockResolvedValue(null),
+    findByFacilityAndCode: jest.fn().mockResolvedValue(null),
+    findCodesByFacilityAndPrefix: jest.fn().mockResolvedValue([]),
+    findByFacilityAndName: jest.fn().mockResolvedValue(null),
+    saveWithItems: jest.fn(async (entity, items = []) => ({ id: entity.id ?? '1', ...entity, services: items })),
+    saveWithStagesAndItems: jest.fn(async (entity, stages = []) => ({ id: entity.id ?? '1', ...entity, stages })),
+    replaceItems: jest.fn().mockResolvedValue(undefined),
+    replaceStagesAndItems: jest.fn().mockResolvedValue(undefined),
     findAll: jest.fn().mockResolvedValue([{ ...packageEntity }]),
     findAllPaginated: jest.fn().mockResolvedValue({ items: [{ ...packageEntity }], total: 1 }),
     findAvailableByFacilityId: jest.fn().mockResolvedValue([{
@@ -100,39 +150,296 @@ describe('MaternityPackagesService business logic', () => {
   const facilitiesService = {
     findById: jest.fn().mockResolvedValue({ id: '1', status: 'active' }),
   };
+  const facilityServicesService = {
+    findDetailsById: jest.fn().mockResolvedValue({
+      id: '10',
+      facilityId: '1',
+      serviceId: '5',
+      status: 'active',
+      service: { id: '5', status: 'active' },
+    }),
+  };
 
   const createService = (repo = createRepo()) => ({
     repo,
-    service: new MaternityPackagesService(repo as never, facilitiesService as never),
+    service: new MaternityPackagesService(repo as never, facilitiesService as never, facilityServicesService as never),
   });
 
   beforeEach(() => jest.clearAllMocks());
 
-  // Vai tro: dam bao tao goi thai san phai check unique code/name truoc khi save.
-  it('creates a package after checking unique code and name', async () => {
+  // Vai tro: tao goi thai san phai check unique name va tu sinh code truoc khi save.
+  it('creates a package after checking unique name and generating code', async () => {
     const { repo, service } = createService();
     await expect(service.create({
-      code: 'PKG_BASIC',
+      facilityId: '1',
       name: 'Gói thai sản cơ bản',
       description: 'Gói theo dõi thai kỳ cơ bản',
       price: '900000.00',
       durationDays: 90,
       priorityLevel: 1,
       status: MaternityPackageStatus.DRAFT,
-    })).resolves.toMatchObject({ id: '1', code: 'PKG_BASIC' });
-    expect(repo.findByCode).toHaveBeenCalledWith('PKG_BASIC');
-    expect(repo.findByName).toHaveBeenCalledWith('Gói thai sản cơ bản');
+      services: [
+        {
+          facilityServiceId: '10',
+          includedQuantity: 2,
+          isRequired: true,
+          isOptional: false,
+          sortOrder: 1,
+        },
+      ],
+    })).resolves.toMatchObject({ id: '1', code: expect.any(String) });
+    expect(repo.findCodesByFacilityAndPrefix).toHaveBeenCalled();
+    expect(repo.findByFacilityAndName).toHaveBeenCalledWith('1', 'Gói thai sản cơ bản');
   });
 
-  // Vai tro: bao ve rule khong cho hai goi thai san trung code hoac name.
-  it('rejects duplicated code or name', async () => {
-    const codeContext = createService();
-    codeContext.repo.findByCode.mockResolvedValueOnce(packageEntity);
-    await expect(codeContext.service.create(packageEntity as never)).rejects.toBeInstanceOf(ConflictException);
+  // Vai tro: tao goi va gan luon danh sach dich vu trong mot API; moi facilityService phai thuoc dung facility cua goi.
+  it('creates a package with package services in one request', async () => {
+    const { repo, service } = createService();
 
+    await expect(service.create({
+      facilityId: '1',
+      name: 'Gói thai sản cơ bản',
+      price: '900000.00',
+      status: MaternityPackageStatus.DRAFT,
+      services: [
+        {
+          facilityServiceId: '10',
+          includedQuantity: 2,
+          isRequired: true,
+          isOptional: false,
+          sortOrder: 1,
+        },
+      ],
+    })).resolves.toMatchObject({
+      id: '1',
+      services: [
+        expect.objectContaining({
+          facilityServiceId: '10',
+          includedQuantity: 2,
+        }),
+      ],
+    });
+
+    expect(facilityServicesService.findDetailsById).toHaveBeenCalledWith('10');
+    expect(repo.saveWithItems).toHaveBeenCalledWith(
+      expect.objectContaining({ facilityId: '1' }),
+      [
+        expect.objectContaining({
+          facilityServiceId: '10',
+          includedQuantity: 2,
+          allowedFacilityScope: 'all',
+        }),
+      ],
+    );
+  });
+
+  // Vai tro: tao goi lich trinh gom cac moc tuan thai; moi dich vu trong moc van phai la facilityService cua cung co so.
+  it('creates a schedule package with stages and services in one request', async () => {
+    const { repo, service } = createService();
+
+    await expect(service.create({
+      facilityId: '1',
+      name: 'Gói thai sản theo lịch trình',
+      price: '3970000.00',
+      status: MaternityPackageStatus.DRAFT,
+      packageType: MaternityPackageType.SCHEDULE,
+      stages: [
+        {
+          name: 'Tuần 12 - 14',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 12,
+          weekTo: 14,
+          goal: 'Siêu âm hình thái, khảo sát dị tật thai',
+          services: [
+            {
+              facilityServiceId: '10',
+              includedQuantity: 1,
+              isRequired: true,
+              isOptional: false,
+            },
+          ],
+        },
+      ],
+    })).resolves.toMatchObject({
+      id: '1',
+      packageType: MaternityPackageType.SCHEDULE,
+      stages: [
+        expect.objectContaining({
+          stage: expect.objectContaining({
+            name: 'Tuần 12 - 14',
+            weekFrom: 12,
+            weekTo: 14,
+          }),
+        }),
+      ],
+    });
+
+    expect(repo.saveWithStagesAndItems).toHaveBeenCalledWith(
+      expect.objectContaining({ facilityId: '1', packageType: MaternityPackageType.SCHEDULE }),
+      [
+        expect.objectContaining({
+          stage: expect.objectContaining({ name: 'Tuần 12 - 14' }),
+          items: [
+            expect.objectContaining({
+              facilityServiceId: '10',
+              includedQuantity: 1,
+            }),
+          ],
+        }),
+      ],
+    );
+  });
+
+  // Vai tro: tranh nhap nham service phang o root khi tao goi theo lich trinh, vi service phai nam trong tung stage.
+  it('rejects schedule package when root services are sent instead of stage services', async () => {
+    const { service } = createService();
+
+    await expect(service.create({
+      facilityId: '1',
+      name: 'Gói thai sản theo lịch trình',
+      price: '3970000.00',
+      status: MaternityPackageStatus.DRAFT,
+      packageType: MaternityPackageType.SCHEDULE,
+      services: [
+        {
+          facilityServiceId: '10',
+          includedQuantity: 1,
+          isRequired: true,
+          isOptional: false,
+        },
+      ],
+    })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  // Vai tro: tranh nhap nham stages khi tao goi theo so luot, vi goi quantity chi dung services[] o root.
+  it('rejects quantity package when stages are sent instead of root services', async () => {
+    const { service } = createService();
+
+    await expect(service.create({
+      facilityId: '1',
+      name: 'Goi thai san theo so luot',
+      price: '900000.00',
+      status: MaternityPackageStatus.DRAFT,
+      packageType: MaternityPackageType.QUANTITY,
+      stages: [
+        {
+          name: 'Tuan 12 - 14',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 12,
+          weekTo: 14,
+          services: [
+            {
+              facilityServiceId: '10',
+              includedQuantity: 1,
+              isRequired: true,
+              isOptional: false,
+            },
+          ],
+        },
+      ],
+    })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  // Vai tro: goi thai san cua mot co so chi duoc chon facilityServiceId da duoc assign vao co so do.
+  it('rejects package service when the service has not been assigned to the facility', async () => {
+    facilityServicesService.findDetailsById.mockRejectedValueOnce(new NotFoundException('Facility service not found'));
+    const { service } = createService();
+
+    await expect(service.createQuantity({
+      facilityId: '1',
+      name: 'Goi thai san theo so luot',
+      price: '900000.00',
+      status: MaternityPackageStatus.DRAFT,
+      services: [
+        {
+          facilityServiceId: '999',
+          includedQuantity: 1,
+          isRequired: true,
+          isOptional: false,
+        },
+      ],
+    })).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  // Vai tro: dam bao hai API create rieng tu gan dung packageType truoc khi save.
+  it('creates quantity and schedule packages through dedicated methods', async () => {
+    const quantityContext = createService();
+    await quantityContext.service.createQuantity({
+      facilityId: '1',
+      name: 'Goi thai san theo so luot',
+      price: '900000.00',
+      status: MaternityPackageStatus.DRAFT,
+      services: [
+        {
+          facilityServiceId: '10',
+          includedQuantity: 2,
+          isRequired: true,
+          isOptional: false,
+        },
+      ],
+    });
+    expect(quantityContext.repo.saveWithItems).toHaveBeenCalledWith(
+      expect.objectContaining({ packageType: MaternityPackageType.QUANTITY }),
+      expect.any(Array),
+    );
+
+    const scheduleContext = createService();
+    await scheduleContext.service.createSchedule({
+      facilityId: '1',
+      name: 'Goi thai san theo lich trinh',
+      price: '3970000.00',
+      status: MaternityPackageStatus.DRAFT,
+      stages: [
+        {
+          name: 'Tuan 12 - 14',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 12,
+          weekTo: 14,
+          services: [
+            {
+              facilityServiceId: '10',
+              includedQuantity: 1,
+              isRequired: true,
+              isOptional: false,
+            },
+          ],
+        },
+      ],
+    });
+    expect(scheduleContext.repo.saveWithStagesAndItems).toHaveBeenCalledWith(
+      expect.objectContaining({ packageType: MaternityPackageType.SCHEDULE }),
+      expect.any(Array),
+    );
+  });
+
+  // Vai tro: bao ve rule khong cho hai goi thai san trung name trong cung co so.
+  it('rejects duplicated name', async () => {
     const nameContext = createService();
-    nameContext.repo.findByName.mockResolvedValueOnce(packageEntity);
+    nameContext.repo.findByFacilityAndName.mockResolvedValueOnce(packageEntity);
     await expect(nameContext.service.create(packageEntity as never)).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  // Vai tro: dam bao code goi thai san duoc BE tu sinh theo name va tang hau to khi trung trong cung co so.
+  it('auto-generates the next maternity package code by facility and name', async () => {
+    const { repo, service } = createService();
+    repo.findCodesByFacilityAndPrefix.mockResolvedValueOnce(['GOI_THAI_SAN_CO_BAN', 'GOI_THAI_SAN_CO_BAN_02']);
+
+    await expect(service.createQuantity({
+      facilityId: '1',
+      name: 'Goi thai san co ban',
+      price: '900000.00',
+      status: MaternityPackageStatus.DRAFT,
+      services: [
+        {
+          facilityServiceId: '10',
+          includedQuantity: 1,
+          isRequired: true,
+          isOptional: false,
+        },
+      ],
+    })).resolves.toMatchObject({
+      code: 'GOI_THAI_SAN_CO_BAN_03',
+    });
   });
 
   // Vai tro: dam bao update package binh thuong save duoc va duplicate chi can check khi doi code/name.
@@ -157,15 +464,10 @@ describe('MaternityPackagesService business logic', () => {
     expect(repo.findAllPaginated).toHaveBeenCalledWith({ page: 1, limit: 20 });
   });
 
-  // Vai tro: chan update package thanh code/name da thuoc ve package khac.
-  it('rejects update when changed code or name already exists', async () => {
-    const codeContext = createService();
-    codeContext.repo.findByCode.mockResolvedValueOnce(packageEntity);
-    await expect(codeContext.service.update('1', { code: 'PKG_PREMIUM' })).rejects.toBeInstanceOf(ConflictException);
-    expect(codeContext.repo.save).not.toHaveBeenCalled();
-
+  // Vai tro: chan update package thanh name da thuoc ve package khac.
+  it('rejects update when changed name already exists', async () => {
     const nameContext = createService();
-    nameContext.repo.findByName.mockResolvedValueOnce(packageEntity);
+    nameContext.repo.findByFacilityAndName.mockResolvedValueOnce({ ...packageEntity, id: '2' });
     await expect(nameContext.service.update('1', { name: 'Goi thai san nang cao' })).rejects.toBeInstanceOf(ConflictException);
     expect(nameContext.repo.save).not.toHaveBeenCalled();
   });
@@ -272,6 +574,66 @@ describe('MaternityPackagesService business logic', () => {
   });
 });
 
+describe('MaternityPackagesRepository remove rules', () => {
+  const createQueryBuilderMock = (count = '0') => {
+    const queryBuilder = {
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      getRawOne: jest.fn().mockResolvedValue({ count }),
+    };
+
+    return queryBuilder;
+  };
+
+  const createRepository = () => {
+    const transactionManager = {
+      delete: jest.fn().mockResolvedValue(undefined),
+      remove: jest.fn().mockResolvedValue(undefined),
+    };
+    const manager = {
+      createQueryBuilder: jest.fn(),
+      transaction: jest.fn(async (callback) => callback(transactionManager)),
+    };
+    const repository = {
+      manager,
+    };
+
+    return {
+      repository,
+      transactionManager,
+      maternityPackagesRepository: new MaternityPackagesRepository(
+        repository as never,
+        {} as never,
+        {} as never,
+      ),
+    };
+  };
+
+  it('counts only purchased package history as delete dependency', async () => {
+    const { repository, maternityPackagesRepository } = createRepository();
+    const queryBuilder = createQueryBuilderMock('3');
+    repository.manager.createQueryBuilder.mockReturnValue(queryBuilder);
+
+    await expect(maternityPackagesRepository.countDependencies('1')).resolves.toBe(3);
+    expect(repository.manager.createQueryBuilder).toHaveBeenCalledTimes(1);
+    expect(queryBuilder.from).toHaveBeenCalledWith('patient_packages', 'patient_packages');
+    expect(queryBuilder.from).not.toHaveBeenCalledWith('package_items', 'package_items');
+  });
+
+  it('hard deletes package configuration before removing the package', async () => {
+    const { repository, transactionManager, maternityPackagesRepository } = createRepository();
+    const entity = { id: '1' } as MaternityPackage;
+
+    await maternityPackagesRepository.remove(entity);
+
+    expect(repository.manager.transaction).toHaveBeenCalled();
+    expect(transactionManager.delete).toHaveBeenNthCalledWith(1, PackageItem, { packageId: '1' });
+    expect(transactionManager.delete).toHaveBeenNthCalledWith(2, PackageStage, { packageId: '1' });
+    expect(transactionManager.remove).toHaveBeenCalledWith(MaternityPackage, entity);
+  });
+});
+
 describe('PublicMaternityPackagesController', () => {
   const activePackage = {
     id: '1',
@@ -303,7 +665,7 @@ describe('PublicMaternityPackagesController', () => {
   // Vai tro: dam bao public detail tra package khi package dang active.
   it('returns active package detail', async () => {
     const service = {
-      findById: jest.fn().mockResolvedValue(activePackage),
+      findDetailsById: jest.fn().mockResolvedValue(activePackage),
     };
     const controller = new PublicMaternityPackagesController(service as never);
 
@@ -316,7 +678,7 @@ describe('PublicMaternityPackagesController', () => {
   // Vai tro: dam bao public detail khong tra success cho package draft/inactive.
   it('throws not found instead of returning success with null when package is not active', async () => {
     const service = {
-      findById: jest.fn().mockResolvedValue({
+      findDetailsById: jest.fn().mockResolvedValue({
         id: '1',
         status: MaternityPackageStatus.DRAFT,
       }),
@@ -385,9 +747,12 @@ describe('MaternityPackagesController', () => {
 
   const createServiceMock = () => ({
     create: jest.fn().mockResolvedValue(packageEntity),
+    createQuantity: jest.fn().mockResolvedValue({ ...packageEntity, packageType: MaternityPackageType.QUANTITY }),
+    createSchedule: jest.fn().mockResolvedValue({ ...packageEntity, packageType: MaternityPackageType.SCHEDULE }),
     findAll: jest.fn().mockResolvedValue([packageEntity]),
     findAllPaginated: jest.fn().mockResolvedValue({ items: [packageEntity], total: 1 }),
     findById: jest.fn().mockResolvedValue(packageEntity),
+    findDetailsById: jest.fn().mockResolvedValue(packageEntity),
     update: jest.fn().mockResolvedValue({ ...packageEntity, price: '850000.00' }),
     remove: jest.fn().mockResolvedValue({ action: 'hard_deleted', affectedCount: 0 }),
   });
@@ -413,7 +778,14 @@ describe('MaternityPackagesController', () => {
     const controller = new MaternityPackagesController(service as never);
 
     await expect(controller.findOne('1')).resolves.toMatchObject({ message: MATERNITY_PACKAGE_CONSTANT.DETAIL_FOUND });
-    await expect(controller.create(packageEntity as never)).resolves.toMatchObject({ message: MATERNITY_PACKAGE_CONSTANT.CREATED });
+    await expect(controller.createQuantity(packageEntity as never)).resolves.toMatchObject({
+      message: MATERNITY_PACKAGE_CONSTANT.CREATED,
+      data: { packageType: MaternityPackageType.QUANTITY },
+    });
+    await expect(controller.createSchedule(packageEntity as never)).resolves.toMatchObject({
+      message: MATERNITY_PACKAGE_CONSTANT.CREATED,
+      data: { packageType: MaternityPackageType.SCHEDULE },
+    });
     await expect(controller.update('1', { price: '850000.00' })).resolves.toMatchObject({
       message: MATERNITY_PACKAGE_CONSTANT.UPDATED,
       data: { price: '850000.00' },

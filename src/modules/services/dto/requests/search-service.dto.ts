@@ -1,19 +1,28 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 import { ActiveStatus } from '../../../../common/constants/status.enum';
-import { ServiceType } from './create-service.dto';
+import { trimText } from '../../../../common/helpers/dto-transform.helper';
+import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
+import { ServiceSaleMode } from './create-service.dto';
 
 export class SearchServiceDto {
-  @ApiPropertyOptional({ description: 'Tìm theo code, name hoặc description' })
+  @ApiPropertyOptional({ description: 'Tim theo id, code hoac name' })
   @IsOptional()
+  @Transform(({ value }) => trimText(value))
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ enum: ServiceType })
+  @ApiPropertyOptional({ description: 'Lọc theo ID trong bảng service_types' })
   @IsOptional()
-  @IsEnum(ServiceType)
-  serviceType?: ServiceType;
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  serviceTypeId?: string;
+
+  @ApiPropertyOptional({ enum: ServiceSaleMode })
+  @IsOptional()
+  @IsEnum(ServiceSaleMode)
+  saleMode?: ServiceSaleMode;
 
   @ApiPropertyOptional({ enum: ActiveStatus })
   @IsOptional()

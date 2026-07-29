@@ -1,8 +1,10 @@
+import { ActiveStatus } from './../../../common/constants/status.enum';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository } from 'typeorm';
 import { Doctor } from '../entities/doctor.entity';
 import { IDoctorsRepository } from '../interfaces/doctors-repository.interface';
+import { SearchDoctorDto } from '../dto/requests/search-doctor.dto';
 
 @Injectable()
 export class DoctorsRepository implements IDoctorsRepository {
@@ -23,12 +25,51 @@ export class DoctorsRepository implements IDoctorsRepository {
     return this.repository.findOne({ where: { id } });
   }
 
-  findAll(): Promise<Doctor[]> {
-    return this.repository.find({ relations: { staff: true }, order: { createdAt: 'DESC' } });
+  findAll(filters?: SearchDoctorDto): Promise<Doctor[]> {
+    const query = this.repository
+      .createQueryBuilder('doctor')
+      .leftJoinAndSelect('doctor.staff', 'staff')
+      .orderBy('doctor.createdAt', 'DESC');
+
+    if (filters?.search) {
+      query.andWhere(
+        `(${[
+          'CAST(doctor.id AS CHAR) LIKE :search',
+          'LOWER(staff.employeeCode) LIKE LOWER(:search)',
+          'LOWER(staff.name) LIKE LOWER(:search)',
+        ].join(' OR ')})`,
+        { search: `%${filters.search}%` },
+      );
+    }
+
+    return query.getMany();
   }
 
-  findByStaffId(staffId: string): Promise<Doctor | null> {
-    return this.repository.findOne({ where: { staffId } });
+  findByFacilityId(facilityId: string): Promise<Doctor[]> {
+    return this.repository.find({
+      relations: { staff: true },
+      where: {
+        status: ActiveStatus.ACTIVE,
+        staff: { facilityId: facilityId },
+      },
+    });
+  }
+
+  async findByStaffId(staffId: string): Promise<Doctor | null> {
+    const doctor = await this.repository.findOne({
+      where: { staffId },
+      relations: { staff: true },
+    });
+    if (!doctor) {
+      return null;
+    }
+    return {
+      ...doctor,
+      staff: {
+        ...doctor.staff,
+        password: '',
+      },
+    };
   }
 
   findByLicenseNo(licenseNo: string): Promise<Doctor | null> {

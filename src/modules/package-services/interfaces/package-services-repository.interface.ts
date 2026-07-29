@@ -11,14 +11,16 @@ export interface IPackageServicesRepository {
   create(data: DeepPartial<PackageItem>): PackageItem;
   save(entity: PackageItem): Promise<PackageItem>;
   saveWithFacilities(entity: PackageItem, facilityIds?: string[]): Promise<PackageItem>;
+  saveManyWithFacilities(entities: PackageItem[]): Promise<PackageItem[]>;
   replaceFacilities(packageServiceId: string, facilityIds: string[]): Promise<void>;
   remove(entity: PackageItem): Promise<void>;
   findById(id: string): Promise<PackageItem | null>;
   findDetailsById(id: string): Promise<PackageServiceWithDetails | null>;
-  findByPackageAndService(packageId: string, serviceId: string): Promise<PackageItem | null>;
+  findByPackageAndService(packageId: string, facilityServiceId: string): Promise<PackageItem | null>;
   findAll(filters?: SearchPackageServiceDto): Promise<PackageServiceWithDetails[]>;
+  findDetailsByPackageId?(packageId: string): Promise<PackageServiceWithDetails[]>;
   findFacilityIds(packageServiceId: string): Promise<string[]>;
-  countGeneratedBenefits(packageId: string, serviceId: string): Promise<number>;
+  countGeneratedBenefits(packageId: string, facilityServiceId: string): Promise<number>;
   findAllPaginated(
     filters?: SearchPackageServiceDto,
   ): Promise<{ items: PackageServiceWithDetails[]; total: number }>;

@@ -13,6 +13,7 @@ import { UsersService } from '../users/users.service';
 import { AdminCreateUserDto } from '../users/dto/request/admin-create-user.dto';
 import { User } from '../users/entities/user.entity';
 import { USERS_SERVICE } from '../users/interfaces/users-service.interface';
+import { SearchDoctorDto } from './dto/requests/search-doctor.dto';
 
 @Injectable()
 export class DoctorsService {
@@ -27,8 +28,12 @@ export class DoctorsService {
     return this.usersService.createUser(dto, actor);
   }
 
-  async findAll(): Promise<Doctor[]> {
-    return this.repository.findAll();
+  async findAll(filters?: SearchDoctorDto): Promise<Doctor[]> {
+    return this.repository.findAll(filters);
+  }
+
+  async findByFacilityId(facilityId: string): Promise<Doctor[]> {
+    return this.repository.findByFacilityId(facilityId);
   }
 
   async findById(id: string): Promise<Doctor> {

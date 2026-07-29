@@ -22,11 +22,13 @@ import { Faq } from './entities/faq.entity';
 import { HealthMetric } from './entities/health-metric.entity';
 import { Invoice } from './entities/invoice.entity';
 import { MaternityPackage } from '../modules/maternity-packages/entities/maternity-package.entity';
+import { PackageStage } from '../modules/maternity-packages/entities/package-stage.entity';
 import { MedicalFile } from './entities/medical-file.entity';
 import { MedicalRecord } from '../modules/medical-records/entities/medical-record.entity';
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { PackageItem } from '../modules/package-services/entities/package-item.entity';
+import { PackageServiceFacility } from '../modules/package-services/entities/package-service-facility.entity';
 import { PasswordResetToken } from '../modules/auth/entities/password-reset-token.entity';
 import { PatientPackageBenefit } from './entities/patient-package-benefit.entity';
 import { Payment } from './entities/payment.entity';
@@ -39,6 +41,7 @@ import { RolePermission } from './entities/role-permission.entity';
 import { Room } from '../modules/rooms/entities/room.entity';
 import { RoomType } from './entities/room-type.entity';
 import { Service } from '../modules/services/entities/service.entity';
+import { ServiceType } from '../modules/service-types/entities/service-type.entity';
 import { Setting } from '../modules/settings/entities/setting.entity';
 import { Shift } from '../modules/shifts/entities/shift.entity';
 import { ShiftDisruption } from '../modules/shifts/entities/shift-disruption.entity';
@@ -49,6 +52,10 @@ import { StaffRefreshToken } from '../modules/auth/entities/staff-refresh-token.
 import { User } from '../modules/users/entities/user.entity';
 import { UserAuth } from '../modules/auth/entities/user-auth.entity';
 import { Notification } from '../modules/notifications/entities/notification.entity';
+import { UpdateServicePackageDesign1785120000000 } from './migrations/1785120000000-UpdateServicePackageDesign';
+import { UseDynamicServiceTypes1785200000000 } from './migrations/1785200000000-UseDynamicServiceTypes';
+import { MakeFacilityLocationNullable1785300000000 } from './migrations/1785300000000-MakeFacilityLocationNullable';
+import { AddPackageStages1785400000000 } from './migrations/1785400000000-AddPackageStages';
 
 config();
 
@@ -84,7 +91,9 @@ export const typeOrmConfig: DataSourceOptions = {
     AppointmentDisruptionItem,
     Notification,
     Service,
+    ServiceType,
     MaternityPackage,
+    PackageStage,
     RoomType,
     UserAuth,
     Appointment,
@@ -102,6 +111,7 @@ export const typeOrmConfig: DataSourceOptions = {
     Order,
     OrderItem,
     PackageItem,
+    PackageServiceFacility,
     PatientPackageBenefit,
     Payment,
     PregnancyHistoryEvent,
@@ -111,7 +121,12 @@ export const typeOrmConfig: DataSourceOptions = {
     StaffPermission,
     join(__dirname, 'entities', '*.entity{.ts,.js}'),
   ],
-  migrations: [],
+  migrations: [
+    UpdateServicePackageDesign1785120000000,
+    UseDynamicServiceTypes1785200000000,
+    MakeFacilityLocationNullable1785300000000,
+    AddPackageStages1785400000000,
+  ],
   charset: 'utf8mb4_unicode_ci',
 };
 

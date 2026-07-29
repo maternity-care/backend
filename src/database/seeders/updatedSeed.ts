@@ -1,1310 +1,1101 @@
-/**
- * Seed data cho NestJS + TypeORM + MariaDB.
- *
- * - Bao phủ 51 bảng trong ERD, mỗi bảng 5 bản ghi.
- * - Dùng ID cố định 900xxx và ON DUPLICATE KEY UPDATE nên có thể chạy lại.
- * - Mật khẩu mặc định lấy từ SEED_PASSWORD, fallback: Password@123.
- * - Hãy đối chiếu các chuỗi status/type với enum thực tế trước khi chạy lần đầu.
- */
-import 'reflect-metadata';
-import * as bcrypt from 'bcrypt';
-import { DataSource, QueryRunner, Table } from 'typeorm';
+import { Room } from './../../modules/rooms/entities/room.entity';
+import { RoomType } from './../entities/room-type.entity';
+import { Facility } from './../../modules/facilities/entities/facility.entity';
+import { Article } from './../entities/article.entity';
+import { EMAIL_DOMAIN } from './../../modules/users/users.enum';
+import {
+  AccountStatus,
+  ActiveStatus,
+  ArticleStatus,
+  FaqStatusEnum,
+} from './../../common/constants/status.enum';
+import { Staff } from './../../modules/staffs/entities/staff.entity';
+import { RoleEnum } from './../../common/constants/role.enum';
+import { Permission } from './../../modules/permissions/entities/permission.entity';
+import { PermissionEnum } from './../../common/constants/permission.enum';
+import { Role } from './../../modules/roles/entities/role.entity';
 import dataSource from '../typeorm.config';
+import { Doctor, Faq, RolePermission } from '../entities';
+import * as bcrypt from 'bcrypt';
+import { Not, In } from 'typeorm';
 
-type SeedValue = string | number | boolean | Date | null | Record<string, unknown>;
-type SeedRow = Record<string, SeedValue>;
+// khởi tạo global repository
+const roleRepository = dataSource.getRepository(Role);
+const permissionRepository = dataSource.getRepository(Permission);
+const rolePermissionRepository = dataSource.getRepository(RolePermission);
+const staffRepository = dataSource.getRepository(Staff);
+const doctorRepository = dataSource.getRepository(Doctor);
+const faqRepository = dataSource.getRepository(Faq);
+const articleRepository = dataSource.getRepository(Article);
+const facilityRepository = dataSource.getRepository(Facility);
+const roomTypeRepository = dataSource.getRepository(RoomType);
+const roomRepository = dataSource.getRepository(Room);
 
-interface TableSeed {
-  /** Tên đầu tiên là tên theo ERD; các tên sau là alias tương thích. */
-  names: string[];
-  rows: SeedRow[];
+//---------------------------------
+
+// Hàm insert data cho các bảng
+async function insertPermission() {
+  const data = Object.values(PermissionEnum).map((permission) => {
+    return {
+      name: permission,
+      guardName: 'api',
+    };
+  });
+
+  await permissionRepository.save(data);
 }
 
-const SEED_PASSWORD = process.env.SEED_PASSWORD ?? 'Password@123';
-const SEED_COUNT = 5;
-
-function quoteIdentifier(identifier: string): string {
-  return `\`${identifier.replace(/`/g, '``')}\``;
+async function insertRoles() {
+  const roles = Object.values(RoleEnum).map((role) => {
+    return {
+      name: role,
+      guardName: 'api',
+    };
+  });
+  await roleRepository.save(roles);
 }
 
-async function resolveTable(queryRunner: QueryRunner, candidates: string[]): Promise<Table> {
-  for (const candidate of candidates) {
-    const table = await queryRunner.getTable(candidate);
-    if (table) return table;
-  }
-  throw new Error(`Không tìm thấy bảng: ${candidates.join(' hoặc ')}`);
+async function insertRolePermission() {
+  const roles = await roleRepository.find();
+  const permissions = await permissionRepository.find();
+  const rolePermissionMap: Record<RoleEnum, PermissionEnum[]> = {
+    [RoleEnum.SUPER_ADMIN]: Object.values(PermissionEnum),
+    [RoleEnum.ADMIN]: Object.values(PermissionEnum),
+    [RoleEnum.DOCTOR]: [
+      PermissionEnum.MEMBER_VIEW,
+      PermissionEnum.MEMBER_MEDICAL_VIEW,
+      PermissionEnum.PREGNANCY_VIEW,
+      PermissionEnum.PREGNANCY_UPDATE,
+      PermissionEnum.HEALTH_METRIC_VIEW,
+      PermissionEnum.HEALTH_METRIC_CREATE,
+      PermissionEnum.HEALTH_METRIC_UPDATE,
+      PermissionEnum.APPOINTMENT_VIEW,
+      PermissionEnum.APPOINTMENT_UPDATE,
+      PermissionEnum.MEDICAL_RECORD_VIEW,
+      PermissionEnum.MEDICAL_RECORD_CREATE,
+      PermissionEnum.MEDICAL_RECORD_UPDATE,
+      PermissionEnum.MEDICAL_RECORD_SENSITIVE_VIEW,
+      PermissionEnum.REMINDER_VIEW,
+      PermissionEnum.CHECKLIST_VIEW,
+      PermissionEnum.CONSULTATION_VIEW,
+      PermissionEnum.CONSULTATION_REPLY,
+    ],
+    [RoleEnum.NURSE]: [
+      PermissionEnum.MEMBER_VIEW,
+      PermissionEnum.PREGNANCY_VIEW,
+      PermissionEnum.HEALTH_METRIC_VIEW,
+      PermissionEnum.HEALTH_METRIC_CREATE,
+      PermissionEnum.HEALTH_METRIC_UPDATE,
+      PermissionEnum.APPOINTMENT_VIEW,
+      PermissionEnum.APPOINTMENT_UPDATE,
+      PermissionEnum.REMINDER_VIEW,
+      PermissionEnum.REMINDER_CREATE,
+      PermissionEnum.REMINDER_UPDATE,
+      PermissionEnum.CHECKLIST_VIEW,
+      PermissionEnum.CHECKLIST_UPDATE,
+      PermissionEnum.CONSULTATION_VIEW,
+      PermissionEnum.CONSULTATION_REPLY,
+    ],
+    [RoleEnum.STAFF]: [
+      PermissionEnum.MEMBER_VIEW,
+      PermissionEnum.APPOINTMENT_VIEW,
+      PermissionEnum.APPOINTMENT_CREATE,
+      PermissionEnum.APPOINTMENT_UPDATE,
+      PermissionEnum.APPOINTMENT_CANCEL,
+      PermissionEnum.CONSULTATION_VIEW,
+      PermissionEnum.CONSULTATION_REPLY,
+      PermissionEnum.CONSULTATION_CLOSE,
+      PermissionEnum.SERVICE_PACKAGE_VIEW,
+      PermissionEnum.PAYMENT_VIEW,
+      PermissionEnum.ARTICLE_VIEW,
+    ],
+    [RoleEnum.MEMBER]: [
+      PermissionEnum.PREGNANCY_VIEW,
+      PermissionEnum.PREGNANCY_CREATE,
+      PermissionEnum.PREGNANCY_UPDATE,
+      PermissionEnum.PREGNANCY_SHARE,
+      PermissionEnum.HEALTH_METRIC_VIEW,
+      PermissionEnum.HEALTH_METRIC_CREATE,
+      PermissionEnum.APPOINTMENT_VIEW,
+      PermissionEnum.APPOINTMENT_CREATE,
+      PermissionEnum.APPOINTMENT_CANCEL,
+      PermissionEnum.MEDICAL_RECORD_VIEW,
+      PermissionEnum.REMINDER_VIEW,
+      PermissionEnum.REMINDER_CREATE,
+      PermissionEnum.REMINDER_UPDATE,
+      PermissionEnum.CHECKLIST_VIEW,
+      PermissionEnum.CHECKLIST_UPDATE,
+      PermissionEnum.CONSULTATION_VIEW,
+      PermissionEnum.CONSULTATION_CREATE,
+      PermissionEnum.ARTICLE_VIEW,
+      PermissionEnum.SERVICE_PACKAGE_VIEW,
+      PermissionEnum.PAYMENT_VIEW,
+    ],
+    [RoleEnum.PARTNER]: [
+      PermissionEnum.PREGNANCY_VIEW,
+      PermissionEnum.HEALTH_METRIC_VIEW,
+      PermissionEnum.APPOINTMENT_VIEW,
+      PermissionEnum.MEDICAL_RECORD_VIEW,
+      PermissionEnum.REMINDER_VIEW,
+      PermissionEnum.CHECKLIST_VIEW,
+      PermissionEnum.ARTICLE_VIEW,
+    ],
+  };
+  const data = roles
+    .map((role) => {
+      const roleId = role.id;
+      const permissionNames = rolePermissionMap[role.name as RoleEnum];
+      const rolePermissions = permissionNames.map((permissionName) => {
+        return {
+          roleId,
+          permissionId: permissions.find((permission) => permission.name === permissionName)?.id,
+        };
+      });
+      return rolePermissions;
+    })
+    .flat();
+
+  await rolePermissionRepository.save(data);
 }
 
-function normalizeValue(value: SeedValue): SeedValue | string {
-  if (value instanceof Date) return value;
-  if (value && typeof value === 'object') return JSON.stringify(value);
-  return value;
-}
+async function insertStaffs() {
+  const dbRoles = await roleRepository.find();
+  const hashPassword = await bcrypt.hash('Password@123', 10);
 
-async function upsertRows(queryRunner: QueryRunner, spec: TableSeed): Promise<void> {
-  const table = await resolveTable(queryRunner, spec.names);
-  const actualColumns = new Set(table.columns.map((column) => column.name));
+  const getPositionCodePrefix = (role: RoleEnum) => {
+    if (role === RoleEnum.SUPER_ADMIN) return 'SA';
+    if (role === RoleEnum.ADMIN) return 'AD';
+    if (role === RoleEnum.DOCTOR) return 'DR';
+    if (role === RoleEnum.NURSE) return 'NU';
+    return 'ST';
+  };
 
-  for (const originalRow of spec.rows) {
-    const row = Object.fromEntries(
-      Object.entries(originalRow)
-        .filter(([column]) => actualColumns.has(column))
-        .map(([column, value]) => [column, normalizeValue(value)]),
+  const generateStaffEmployeeCode = async () => {
+    const year = new Date().getFullYear().toString().slice(-2); // Lấy 2 chữ số cuối của năm hiện tại
+    const result = await staffRepository.query(
+      `
+  SELECT COALESCE(
+    MAX(
+      CAST(
+        RIGHT(employee_code, 4)
+        AS UNSIGNED
+      )
+    ),
+    0
+  ) AS max_number
+  FROM staffs
+  WHERE employee_code LIKE ?
+  `,
+      [`__${year}%`],
     );
-    const columns = Object.keys(row);
-    if (!columns.includes('id')) {
-      throw new Error(`Seed của bảng ${table.name} thiếu cột id`);
+
+    // tạo string nextNumber với 4 chữ số, ví dụ: 0001, 0002, 0003, ...
+    const nextNumber = (Number(result[0].max_number) + 1).toString().padStart(4, '0');
+    return `${year}${nextNumber}`;
+  };
+
+  const buildEmailPrefixFromName = (name: string) => {
+    const normalized = name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z\s]/g, ' ')
+      .trim()
+      .toLowerCase();
+
+    const parts = normalized.split(/\s+/).filter(Boolean);
+    if (parts.length === 0) {
+      throw new Error('Tên người dùng không hợp lệ. Tên phải chứa ít nhất một ký tự chữ cái.');
     }
 
-    const columnSql = columns.map(quoteIdentifier).join(', ');
-    const placeholders = columns.map(() => '?').join(', ');
-    const updateColumns = columns.filter((column) => column !== 'id');
-    const updateSql = updateColumns
-      .map((column) => `${quoteIdentifier(column)} = VALUES(${quoteIdentifier(column)})`)
-      .join(', ');
+    const lastPart = parts[parts.length - 1];
+    const prefixParts = parts.slice(0, -1);
+    const initials = prefixParts.map((part) => part[0]).join('');
 
-    await queryRunner.query(
-      `INSERT INTO ${quoteIdentifier(table.name)} (${columnSql})
-       VALUES (${placeholders})
-       ON DUPLICATE KEY UPDATE ${updateSql}`,
-      columns.map((column) => row[column]),
+    return `${lastPart}${initials}`.replace(/[^a-z0-9]/g, '');
+  };
+
+  const companyEmail = async (name: string) => {
+    const basePrefix = buildEmailPrefixFromName(name);
+
+    const result = await staffRepository.query(
+      `
+      SELECT COALESCE(
+        MAX(
+          CAST(
+            REPLACE(
+              SUBSTRING_INDEX(email, '@', 1),
+              ?,
+              ''
+            ) AS UNSIGNED
+          )
+        ),
+        0
+      ) AS max_number
+      FROM staffs
+      WHERE email REGEXP ?
+      `,
+      [basePrefix, `^${basePrefix}[0-9]+@${EMAIL_DOMAIN.replace(/\./g, '\\.')}$`],
     );
-  }
 
-  const ids = spec.rows.map((row) => row.id);
-  const result: Array<{ total: string | number }> = await queryRunner.query(
-    `SELECT COUNT(*) AS total
-       FROM ${quoteIdentifier(table.name)}
-      WHERE id IN (${ids.map(() => '?').join(', ')})`,
-    ids,
+    const nextNumber = Number(result[0].max_number) + 1;
+
+    return `${basePrefix}${nextNumber}@${EMAIL_DOMAIN}`;
+  };
+
+  const names = [
+    'Nguyễn Minh Anh',
+    'Trần Quốc Bảo',
+    'Lê Hoàng Nam',
+    'Phạm Thu Trang',
+    'Hoàng Ngọc Mai',
+    'Vũ Đức Anh',
+    'Đặng Hải Yến',
+    'Bùi Quang Huy',
+    'Đỗ Khánh Linh',
+    'Hồ Tuấn Kiệt',
+    'Nguyễn Thị Lan Anh',
+    'Trần Văn Minh',
+    'Lê Phương Thảo',
+    'Phạm Đức Long',
+    'Hoàng Thanh Hương',
+    'Vũ Minh Quân',
+    'Đặng Ngọc Hà',
+    'Bùi Thành Công',
+    'Đỗ Mai Phương',
+    'Hồ Quốc Khánh',
+    'Nguyễn Nhật Linh',
+    'Trần Anh Tuấn',
+    'Lê Thu Huyền',
+    'Phạm Minh Đức',
+    'Hoàng Bảo Ngọc',
+    'Vũ Quang Vinh',
+    'Đặng Thùy Dương',
+    'Bùi Gia Hưng',
+    'Đỗ Ngọc Anh',
+    'Hồ Đức Thành',
+    'Nguyễn Quốc Việt',
+    'Trần Minh Châu',
+    'Lê Anh Khoa',
+    'Phạm Ngọc Trâm',
+    'Hoàng Tuấn Anh',
+    'Vũ Thu Hà',
+    'Đặng Minh Hiếu',
+    'Bùi Thanh Tâm',
+    'Đỗ Hải Đăng',
+    'Hồ Phương Linh',
+    'Nguyễn Đức Mạnh',
+    'Trần Khánh Vy',
+    'Lê Quốc Trung',
+    'Phạm Thanh Nhàn',
+    'Hoàng Minh Tú',
+    'Vũ Ngọc Diệp',
+    'Đặng Quang Dũng',
+    'Bùi Thị Hạnh',
+    'Đỗ Minh Hoàng',
+    'Hồ Anh Thư',
+    'Nguyễn Thành Đạt',
+    'Trần Ngọc Ánh',
+    'Lê Minh Nhật',
+    'Phạm Thu Uyên',
+    'Hoàng Quốc Huy',
+    'Vũ Kim Ngân',
+    'Đặng Đức Thắng',
+    'Bùi Minh Trang',
+    'Đỗ Thành Nam',
+    'Hồ Ngọc Mai',
+    'Nguyễn Quang Anh',
+    'Trần Thu Giang',
+    'Lê Đức Duy',
+    'Phạm Khánh Hòa',
+    'Hoàng Minh Phúc',
+    'Vũ Hải Anh',
+    'Đặng Tuấn Vũ',
+    'Bùi Ngọc Linh',
+    'Đỗ Quốc Cường',
+    'Hồ Thanh Nga',
+    'Nguyễn Tiến Dũng',
+    'Trần Mai Anh',
+    'Lê Hoàng Sơn',
+    'Phạm Ngọc Hân',
+    'Hoàng Đức Tài',
+    'Vũ Phương Anh',
+    'Đặng Minh Khang',
+    'Bùi Thùy Linh',
+    'Đỗ Anh Dũng',
+    'Hồ Minh Nguyệt',
+    'Nguyễn Thanh Bình',
+    'Trần Bảo Châu',
+    'Lê Quang Khải',
+    'Phạm Minh Hằng',
+    'Hoàng Gia Bảo',
+    'Vũ Thanh Thủy',
+    'Đặng Quốc Đạt',
+    'Bùi Ngọc Minh',
+    'Đỗ Thu Trang',
+    'Hồ Anh Quân',
+    'Nguyễn Trọng Nghĩa',
+    'Trần Khánh An',
+    'Lê Đức Phương',
+    'Phạm Hải Yến',
+    'Hoàng Minh Thành',
+    'Vũ Ngọc Huyền',
+    'Đặng Thành Trung',
+    'Bùi Mai Linh',
+    'Đỗ Quang Hưng',
+    'Hồ Thanh Trúc',
+    'Nguyễn Đức Khôi',
+    'Trần Phương Mai',
+    'Lê Thành Công',
+    'Phạm Ngọc Quỳnh',
+    'Hoàng Quốc Thịnh',
+    'Vũ Thanh Mai',
+    'Đặng Anh Khoa',
+    'Bùi Minh Ngọc',
+    'Đỗ Tuấn Thành',
+    'Hồ Thu Phương',
+  ];
+
+  const addresses = [
+    'Cầu Giấy, Hà Nội',
+    'Đống Đa, Hà Nội',
+    'Ba Đình, Hà Nội',
+    'Hai Bà Trưng, Hà Nội',
+    'Hoàn Kiếm, Hà Nội',
+    'Thanh Xuân, Hà Nội',
+    'Hoàng Mai, Hà Nội',
+    'Long Biên, Hà Nội',
+    'Nam Từ Liêm, Hà Nội',
+    'Bắc Từ Liêm, Hà Nội',
+    'Hà Đông, Hà Nội',
+    'Tây Hồ, Hà Nội',
+    'Gia Lâm, Hà Nội',
+    'Đông Anh, Hà Nội',
+    'Thanh Trì, Hà Nội',
+    'Hoài Đức, Hà Nội',
+    'Đan Phượng, Hà Nội',
+    'Thạch Thất, Hà Nội',
+    'Quốc Oai, Hà Nội',
+    'Chương Mỹ, Hà Nội',
+    'Sóc Sơn, Hà Nội',
+    'Mê Linh, Hà Nội',
+  ];
+
+  const roleQuantities: Array<{
+    role: RoleEnum;
+    quantity: number;
+  }> = [
+    { role: RoleEnum.SUPER_ADMIN, quantity: 5 },
+    { role: RoleEnum.ADMIN, quantity: 5 },
+    { role: RoleEnum.DOCTOR, quantity: 20 },
+    { role: RoleEnum.NURSE, quantity: 20 },
+    { role: RoleEnum.STAFF, quantity: 20 },
+    { role: RoleEnum.MEMBER, quantity: 20 },
+    { role: RoleEnum.PARTNER, quantity: 20 },
+  ];
+
+  const removeVietnameseTones = (value: string): string => {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D');
+  };
+
+  const generateEmail = (name: string, index: number): string => {
+    const nameParts = removeVietnameseTones(name).toLowerCase().trim().split(/\s+/);
+
+    const lastName = nameParts[nameParts.length - 1];
+    const initials = nameParts
+      .slice(0, -1)
+      .map((part) => part.charAt(0))
+      .join('');
+
+    return `${lastName}${initials}${String(index + 1).padStart(3, '0')}@gmail.com`;
+  };
+
+  const roles = roleQuantities.flatMap(({ role, quantity }) =>
+    Array<RoleEnum>(quantity).fill(role),
   );
-  if (Number(result[0]?.total ?? 0) < SEED_COUNT) {
-    throw new Error(`Bảng ${table.name} chưa có đủ ${SEED_COUNT} seed records`);
+
+  const baseData = names.map((name, index) => ({
+    name,
+    personalEmail: generateEmail(name, index),
+    // Tạo các số điện thoại mẫu từ 0985000001 đến 0985000110
+    phoneNumber: `0985${String(index + 1).padStart(5, '0')}`,
+    address: addresses[index % addresses.length],
+    role: dbRoles.filter((role) => role.name === roles[index]) || [dbRoles[dbRoles.length - 1]],
+  }));
+
+  for (const staff of baseData) {
+    const email = await companyEmail(staff.name);
+    const employeeCode = `${getPositionCodePrefix(staff.role[0].name as RoleEnum)}${await generateStaffEmployeeCode()}`;
+    const data = {
+      name: staff.name,
+      personalEmail: staff.personalEmail,
+      employeeCode: employeeCode,
+      email: email,
+      phone: staff.phoneNumber,
+      password: hashPassword,
+      address: staff.address,
+      status: AccountStatus.ACTIVE,
+      permission: [],
+      roles: staff.role,
+    };
+    await staffRepository.save(data);
   }
-  console.log(`Seeded ${table.name}: ${SEED_COUNT} records`);
 }
 
-async function buildSeedData(passwordHash: string): Promise<TableSeed[]> {
-  const now = new Date('2026-07-24T08:00:00.000Z');
-  return [
+async function insertDoctor() {
+  const staffs = await staffRepository.find({
+    relations: { roles: true },
+    where: { roles: { name: RoleEnum.DOCTOR } },
+  });
+
+  const titleList = [
+    { title: 'Bác sĩ', year: 5 },
+    { title: 'Bác sĩ Chuyên khoa I', year: 8 },
+    { title: 'Bác sĩ Chuyên khoa II', year: 10 },
+    { title: 'Thạc sĩ, Bác sĩ', year: 15 },
+    { title: 'Tiến sĩ, Bác sĩ', year: 20 },
+    { title: 'Phó giáo sư, Tiến sĩ, Bác sĩ', year: 25 },
+    { title: 'Giáo sư, Tiến sĩ, Bác sĩ', year: 30 },
+  ];
+
+  const doctors = staffs.map((staff, index) => {
+    const title = titleList[index % titleList.length];
+    const yearEx = Math.floor(Math.random() * 5) + title.year;
+    return {
+      staffId: staff.id,
+      licenseNo: `CCHN-OBGYN-2601${index + 10}`,
+      title: title.title,
+      specialty: 'Sản phụ khoa',
+      yearsOfExperience: yearEx,
+      bio: `${title.title} ${staff.name} có ${yearEx} kinh nghiệm trong lĩnh vực sản phụ khoa, tận tâm tư vấn, thăm khám và đồng hành cùng mẹ bầu trong suốt thai kỳ, hướng đến sự an toàn và chăm sóc phù hợp cho mẹ và bé.`,
+      status: ActiveStatus.ACTIVE,
+      createdAt: new Date(new Date().getTime() - 5 * 365 * 24 * 60 * 60 * 1000),
+      updatedAt: new Date(new Date().getTime() - 5 * 365 * 24 * 60 * 60 * 1000),
+    };
+  });
+
+  await doctorRepository.save(doctors);
+}
+
+async function insertFaqs() {
+  const faqData = [
     {
-      names: ['staffs'],
-      rows: [
-        {
-          id: 900011,
-          name: 'Nguyễn An',
-          personal_email: 'staffs.0101@example.com',
-          employee_code: 'STAF-0101',
-          facility_id: 900091,
-          email: 'staffs.0101@example.com',
-          phone: '0900100001',
-          password: passwordHash,
-          address: 'Hà Nội',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900012,
-          name: 'Trần Bình',
-          personal_email: 'staffs.0102@example.com',
-          employee_code: 'STAF-0102',
-          facility_id: 900092,
-          email: 'staffs.0102@example.com',
-          phone: '0900100002',
-          password: passwordHash,
-          address: 'Hà Nội',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900013,
-          name: 'Lê Chi',
-          personal_email: 'staffs.0103@example.com',
-          employee_code: 'STAF-0103',
-          facility_id: 900093,
-          email: 'staffs.0103@example.com',
-          phone: '0900100003',
-          password: passwordHash,
-          address: 'Hà Nội',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900014,
-          name: 'Phạm Dũng',
-          personal_email: 'staffs.0104@example.com',
-          employee_code: 'STAF-0104',
-          facility_id: 900094,
-          email: 'staffs.0104@example.com',
-          phone: '0900100004',
-          password: passwordHash,
-          address: 'Hà Nội',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900015,
-          name: 'Hoàng Giang',
-          personal_email: 'staffs.0105@example.com',
-          employee_code: 'STAF-0105',
-          facility_id: 900095,
-          email: 'staffs.0105@example.com',
-          phone: '0900100005',
-          password: passwordHash,
-          address: 'Hà Nội',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-      ],
+      question: 'Làm thế nào để đăng ký tài khoản trên hệ thống?',
+      answer:
+        'Bạn chọn mục Đăng ký, nhập đầy đủ thông tin cá nhân, số điện thoại, email và mật khẩu, sau đó thực hiện xác minh theo hướng dẫn của hệ thống.',
+      category: 'account',
     },
     {
-      names: ['roles'],
-      rows: [
-        {
-          id: 900021,
-          name: 'super_admin',
-          guard_name: 'api',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-        },
-        {
-          id: 900022,
-          name: 'admin',
-          guard_name: 'api',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-        },
-        {
-          id: 900023,
-          name: 'doctor',
-          guard_name: 'api',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-        },
-        {
-          id: 900024,
-          name: 'staff',
-          guard_name: 'api',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-        },
-        {
-          id: 900025,
-          name: 'nurse',
-          guard_name: 'api',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-        },
-      ],
+      question: 'Tôi quên mật khẩu thì phải làm thế nào?',
+      answer:
+        'Bạn chọn Quên mật khẩu tại trang đăng nhập, nhập email đã đăng ký và làm theo hướng dẫn được gửi đến email để thiết lập mật khẩu mới.',
+      category: 'account',
     },
     {
-      names: ['permissions'],
-      rows: [
-        {
-          id: 900031,
-          name: 'user.view',
-          guard_name: 'api',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-        },
-        {
-          id: 900032,
-          name: 'facility.view',
-          guard_name: 'api',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-        },
-        {
-          id: 900033,
-          name: 'appointment.view',
-          guard_name: 'api',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-        },
-        {
-          id: 900034,
-          name: 'medical_record.view',
-          guard_name: 'api',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-        },
-        {
-          id: 900035,
-          name: 'report.view',
-          guard_name: 'api',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-        },
-      ],
+      question: 'Tôi có thể cập nhật thông tin cá nhân không?',
+      answer:
+        'Bạn có thể cập nhật các thông tin được phép tại mục Hồ sơ cá nhân. Một số thông tin quan trọng có thể yêu cầu xác minh hoặc hỗ trợ từ nhân viên.',
+      category: 'account',
     },
     {
-      names: ['staff_roles'],
-      rows: [
-        { id: 900041, staff_id: 900011, role_id: 900021, created_at: now, updated_at: now },
-        { id: 900042, staff_id: 900012, role_id: 900022, created_at: now, updated_at: now },
-        { id: 900043, staff_id: 900013, role_id: 900023, created_at: now, updated_at: now },
-        { id: 900044, staff_id: 900014, role_id: 900024, created_at: now, updated_at: now },
-        { id: 900045, staff_id: 900015, role_id: 900025, created_at: now, updated_at: now },
-      ],
+      question: 'Hồ sơ thai sản dùng để làm gì?',
+      answer:
+        'Hồ sơ thai sản lưu trữ thông tin thai kỳ, lịch sử khám, kết quả kiểm tra và các dữ liệu liên quan, giúp người dùng và bác sĩ theo dõi thai kỳ thuận tiện hơn.',
+      category: 'pregnancy_profile',
     },
     {
-      names: ['password_reset_tokens'],
-      rows: [
-        {
-          id: 900051,
-          user_id: 900081,
-          token_hash: 'seed-token-hash-password_reset_tokens-1',
-          expires_at: '2026-08-11 09:00:00',
-          used_at: null,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900052,
-          user_id: 900082,
-          token_hash: 'seed-token-hash-password_reset_tokens-2',
-          expires_at: '2026-08-12 10:00:00',
-          used_at: null,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900053,
-          user_id: 900083,
-          token_hash: 'seed-token-hash-password_reset_tokens-3',
-          expires_at: '2026-08-13 11:00:00',
-          used_at: null,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900054,
-          user_id: 900084,
-          token_hash: 'seed-token-hash-password_reset_tokens-4',
-          expires_at: '2026-08-14 12:00:00',
-          used_at: null,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900055,
-          user_id: 900085,
-          token_hash: 'seed-token-hash-password_reset_tokens-5',
-          expires_at: '2026-08-15 13:00:00',
-          used_at: null,
-          created_at: now,
-          updated_at: now,
-        },
-      ],
+      question: 'Tôi có thể tạo nhiều hồ sơ thai sản không?',
+      answer:
+        'Bạn có thể tạo hồ sơ cho các thai kỳ khác nhau. Tuy nhiên, thông thường tại một thời điểm chỉ nên có một hồ sơ thai kỳ đang hoạt động.',
+      category: 'pregnancy_profile',
     },
     {
-      names: ['refresh_tokens'],
-      rows: [
-        {
-          id: 900061,
-          user_id: 900081,
-          token_hash: 'seed-token-hash-refresh_tokens-1',
-          expires_at: '2026-08-11 09:00:00',
-          revoked_at: null,
-          replaced_by_token_hash: 'replacedByTokenHash mẫu 1',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900062,
-          user_id: 900082,
-          token_hash: 'seed-token-hash-refresh_tokens-2',
-          expires_at: '2026-08-12 10:00:00',
-          revoked_at: null,
-          replaced_by_token_hash: 'replacedByTokenHash mẫu 2',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900063,
-          user_id: 900083,
-          token_hash: 'seed-token-hash-refresh_tokens-3',
-          expires_at: '2026-08-13 11:00:00',
-          revoked_at: null,
-          replaced_by_token_hash: 'replacedByTokenHash mẫu 3',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900064,
-          user_id: 900084,
-          token_hash: 'seed-token-hash-refresh_tokens-4',
-          expires_at: '2026-08-14 12:00:00',
-          revoked_at: null,
-          replaced_by_token_hash: 'replacedByTokenHash mẫu 4',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900065,
-          user_id: 900085,
-          token_hash: 'seed-token-hash-refresh_tokens-5',
-          expires_at: '2026-08-15 13:00:00',
-          revoked_at: null,
-          replaced_by_token_hash: 'replacedByTokenHash mẫu 5',
-          created_at: now,
-          updated_at: now,
-        },
-      ],
+      question: 'Làm thế nào để đặt lịch khám?',
+      answer:
+        'Bạn chọn cơ sở, dịch vụ, bác sĩ và khung giờ còn trống, sau đó kiểm tra thông tin và xác nhận lịch hẹn.',
+      category: 'appointment',
     },
     {
-      names: ['role_permissions'],
-      rows: [
-        { id: 900071, role_id: 900021, permission_id: 900031, created_at: now, updated_at: now },
-        { id: 900072, role_id: 900022, permission_id: 900032, created_at: now, updated_at: now },
-        { id: 900073, role_id: 900023, permission_id: 900033, created_at: now, updated_at: now },
-        { id: 900074, role_id: 900024, permission_id: 900034, created_at: now, updated_at: now },
-        { id: 900075, role_id: 900025, permission_id: 900035, created_at: now, updated_at: now },
-      ],
+      question: 'Tôi có thể thay đổi lịch hẹn đã đặt không?',
+      answer:
+        'Bạn có thể yêu cầu đổi lịch nếu lịch hẹn đáp ứng chính sách thay đổi của cơ sở. Khung giờ mới phải còn khả dụng tại thời điểm xác nhận.',
+      category: 'appointment',
     },
     {
-      names: ['facilities'],
-      rows: [
-        {
-          id: 900091,
-          name: 'Phòng khám Thai sản Mẫu 1',
-          code: 'FACI-0901',
-          owner_id: 900011,
-          phone: '0900900001',
-          email: 'facilities.0901@example.com',
-          open_time: '08:00:00',
-          close_time: '17:00:00',
-          working_days: '1,2,3,4,5,6',
-          address: 'Số 10, đường Mẫu, Hà Nội',
-          province: 'Hà Nội',
-          ward: 'Phường mẫu 1',
-          latitude: '21.015000',
-          longitude: '105.811900',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-          deleted_by: null,
-          delete_reason: null,
-        },
-        {
-          id: 900092,
-          name: 'Phòng khám Thai sản Mẫu 2',
-          code: 'FACI-0902',
-          owner_id: 900012,
-          phone: '0900900002',
-          email: 'facilities.0902@example.com',
-          open_time: '09:00:00',
-          close_time: '18:00:00',
-          working_days: '1,2,3,4,5,6',
-          address: 'Số 20, đường Mẫu, Hà Nội',
-          province: 'Hà Nội',
-          ward: 'Phường mẫu 2',
-          latitude: '21.025000',
-          longitude: '105.821900',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-          deleted_by: null,
-          delete_reason: null,
-        },
-        {
-          id: 900093,
-          name: 'Phòng khám Thai sản Mẫu 3',
-          code: 'FACI-0903',
-          owner_id: 900013,
-          phone: '0900900003',
-          email: 'facilities.0903@example.com',
-          open_time: '10:00:00',
-          close_time: '19:00:00',
-          working_days: '1,2,3,4,5,6',
-          address: 'Số 30, đường Mẫu, Hà Nội',
-          province: 'Hà Nội',
-          ward: 'Phường mẫu 3',
-          latitude: '21.035000',
-          longitude: '105.831900',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-          deleted_by: null,
-          delete_reason: null,
-        },
-        {
-          id: 900094,
-          name: 'Phòng khám Thai sản Mẫu 4',
-          code: 'FACI-0904',
-          owner_id: 900014,
-          phone: '0900900004',
-          email: 'facilities.0904@example.com',
-          open_time: '11:00:00',
-          close_time: '20:00:00',
-          working_days: '1,2,3,4,5,6',
-          address: 'Số 40, đường Mẫu, Hà Nội',
-          province: 'Hà Nội',
-          ward: 'Phường mẫu 4',
-          latitude: '21.045000',
-          longitude: '105.841900',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-          deleted_by: null,
-          delete_reason: null,
-        },
-        {
-          id: 900095,
-          name: 'Phòng khám Thai sản Mẫu 5',
-          code: 'FACI-0905',
-          owner_id: 900015,
-          phone: '0900900005',
-          email: 'facilities.0905@example.com',
-          open_time: '12:00:00',
-          close_time: '21:00:00',
-          working_days: '1,2,3,4,5,6',
-          address: 'Số 50, đường Mẫu, Hà Nội',
-          province: 'Hà Nội',
-          ward: 'Phường mẫu 5',
-          latitude: '21.055000',
-          longitude: '105.851900',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-          deleted_by: null,
-          delete_reason: null,
-        },
-      ],
+      question: 'Làm thế nào để hủy lịch hẹn?',
+      answer:
+        'Bạn mở chi tiết lịch hẹn, chọn Hủy lịch và cung cấp lý do. Việc hoàn phí, nếu có, được thực hiện theo chính sách của cơ sở.',
+      category: 'appointment',
     },
     {
-      names: ['staff_password_reset_tokens'],
-      rows: [
-        {
-          id: 900101,
-          staff_id: 900011,
-          token_hash: 'seed-token-hash-staff_password_reset_tokens-1',
-          expires_at: '2026-08-11 09:00:00',
-          used_at: null,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900102,
-          staff_id: 900012,
-          token_hash: 'seed-token-hash-staff_password_reset_tokens-2',
-          expires_at: '2026-08-12 10:00:00',
-          used_at: null,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900103,
-          staff_id: 900013,
-          token_hash: 'seed-token-hash-staff_password_reset_tokens-3',
-          expires_at: '2026-08-13 11:00:00',
-          used_at: null,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900104,
-          staff_id: 900014,
-          token_hash: 'seed-token-hash-staff_password_reset_tokens-4',
-          expires_at: '2026-08-14 12:00:00',
-          used_at: null,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900105,
-          staff_id: 900015,
-          token_hash: 'seed-token-hash-staff_password_reset_tokens-5',
-          expires_at: '2026-08-15 13:00:00',
-          used_at: null,
-          created_at: now,
-          updated_at: now,
-        },
-      ],
+      question: 'Tôi nên đến trước giờ khám bao lâu?',
+      answer:
+        'Bạn nên đến trước giờ hẹn khoảng 15 đến 30 phút để thực hiện thủ tục tiếp nhận và chuẩn bị các giấy tờ cần thiết.',
+      category: 'appointment',
     },
     {
-      names: ['staff_refresh_tokens'],
-      rows: [
-        {
-          id: 900111,
-          staff_id: 900011,
-          token_hash: 'seed-token-hash-staff_refresh_tokens-1',
-          expires_at: '2026-08-11 09:00:00',
-          revoked_at: null,
-          replaced_by_token_hash: 'replacedByTokenHash mẫu 1',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900112,
-          staff_id: 900012,
-          token_hash: 'seed-token-hash-staff_refresh_tokens-2',
-          expires_at: '2026-08-12 10:00:00',
-          revoked_at: null,
-          replaced_by_token_hash: 'replacedByTokenHash mẫu 2',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900113,
-          staff_id: 900013,
-          token_hash: 'seed-token-hash-staff_refresh_tokens-3',
-          expires_at: '2026-08-13 11:00:00',
-          revoked_at: null,
-          replaced_by_token_hash: 'replacedByTokenHash mẫu 3',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900114,
-          staff_id: 900014,
-          token_hash: 'seed-token-hash-staff_refresh_tokens-4',
-          expires_at: '2026-08-14 12:00:00',
-          revoked_at: null,
-          replaced_by_token_hash: 'replacedByTokenHash mẫu 4',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900115,
-          staff_id: 900015,
-          token_hash: 'seed-token-hash-staff_refresh_tokens-5',
-          expires_at: '2026-08-15 13:00:00',
-          revoked_at: null,
-          replaced_by_token_hash: 'replacedByTokenHash mẫu 5',
-          created_at: now,
-          updated_at: now,
-        },
-      ],
+      question: 'Tôi cần mang theo những gì khi đến khám?',
+      answer:
+        'Bạn nên mang giấy tờ tùy thân, thông tin lịch hẹn, hồ sơ hoặc kết quả khám trước đây và các giấy tờ khác theo hướng dẫn của cơ sở.',
+      category: 'appointment',
     },
     {
-      names: ['facility_services'],
-      rows: [
-        {
-          id: 900121,
-          facility_id: 900091,
-          service_id: 900491,
-          price: '250000.00',
-          duration_minutes: 30,
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900122,
-          facility_id: 900092,
-          service_id: 900492,
-          price: '500000.00',
-          duration_minutes: 30,
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900123,
-          facility_id: 900093,
-          service_id: 900493,
-          price: '750000.00',
-          duration_minutes: 30,
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900124,
-          facility_id: 900094,
-          service_id: 900494,
-          price: '1000000.00',
-          duration_minutes: 30,
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900125,
-          facility_id: 900095,
-          service_id: 900495,
-          price: '1250000.00',
-          duration_minutes: 30,
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-      ],
+      question: 'Gói thai sản bao gồm những dịch vụ nào?',
+      answer:
+        'Mỗi gói có danh sách dịch vụ, số lần sử dụng, thời hạn và điều kiện áp dụng khác nhau. Bạn có thể xem chi tiết tại trang thông tin của từng gói.',
+      category: 'package',
     },
     {
-      names: ['doctors'],
-      rows: [
-        {
-          id: 900131,
-          staff_id: 900011,
-          license_no: 'CCHN-SEED-1301',
-          title: 'Nội dung mẫu 1 của doctors',
-          specialty: 'Sản phụ khoa',
-          years_of_experience: 5,
-          bio: 'Thông tin mẫu số 1 cho doctors.',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900132,
-          staff_id: 900012,
-          license_no: 'CCHN-SEED-1302',
-          title: 'Nội dung mẫu 2 của doctors',
-          specialty: 'Sản phụ khoa',
-          years_of_experience: 6,
-          bio: 'Thông tin mẫu số 2 cho doctors.',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900133,
-          staff_id: 900013,
-          license_no: 'CCHN-SEED-1303',
-          title: 'Nội dung mẫu 3 của doctors',
-          specialty: 'Sản phụ khoa',
-          years_of_experience: 7,
-          bio: 'Thông tin mẫu số 3 cho doctors.',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900134,
-          staff_id: 900014,
-          license_no: 'CCHN-SEED-1304',
-          title: 'Nội dung mẫu 4 của doctors',
-          specialty: 'Sản phụ khoa',
-          years_of_experience: 8,
-          bio: 'Thông tin mẫu số 4 cho doctors.',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900135,
-          staff_id: 900015,
-          license_no: 'CCHN-SEED-1305',
-          title: 'Nội dung mẫu 5 của doctors',
-          specialty: 'Sản phụ khoa',
-          years_of_experience: 9,
-          bio: 'Thông tin mẫu số 5 cho doctors.',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-      ],
+      question: 'Tôi có thể mua thêm dịch vụ ngoài gói không?',
+      answer:
+        'Bạn có thể chọn thêm các dịch vụ ngoài phạm vi của gói nếu dịch vụ đang được cung cấp tại cơ sở và đáp ứng điều kiện sử dụng.',
+      category: 'package',
     },
     {
-      names: ['rooms'],
-      rows: [
-        {
-          id: 900141,
-          facility_id: 900091,
-          name: 'Nguyễn An',
-          room_type_id: 900161,
-          floor: '1',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-          deleted_by: null,
-          deleted_reason: null,
-        },
-        {
-          id: 900142,
-          facility_id: 900092,
-          name: 'Trần Bình',
-          room_type_id: 900162,
-          floor: '2',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-          deleted_by: null,
-          deleted_reason: null,
-        },
-        {
-          id: 900143,
-          facility_id: 900093,
-          name: 'Lê Chi',
-          room_type_id: 900163,
-          floor: '3',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-          deleted_by: null,
-          deleted_reason: null,
-        },
-        {
-          id: 900144,
-          facility_id: 900094,
-          name: 'Phạm Dũng',
-          room_type_id: 900164,
-          floor: '4',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-          deleted_by: null,
-          deleted_reason: null,
-        },
-        {
-          id: 900145,
-          facility_id: 900095,
-          name: 'Hoàng Giang',
-          room_type_id: 900165,
-          floor: '5',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-          deleted_at: null,
-          deleted_by: null,
-          deleted_reason: null,
-        },
-      ],
+      question: 'Gói thai sản có thể sử dụng tại tất cả cơ sở không?',
+      answer:
+        'Phạm vi sử dụng phụ thuộc vào chính sách của từng gói. Một số gói áp dụng tại nhiều cơ sở, trong khi một số khác chỉ áp dụng tại cơ sở đã đăng ký.',
+      category: 'package',
     },
     {
-      names: ['room_types'],
-      rows: [
-        {
-          id: 900161,
-          name: 'Phòng khám',
-          description: 'Thông tin mẫu số 1 cho room_types.',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900162,
-          name: 'Phòng siêu âm',
-          description: 'Thông tin mẫu số 2 cho room_types.',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900163,
-          name: 'Phòng xét nghiệm',
-          description: 'Thông tin mẫu số 3 cho room_types.',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900164,
-          name: 'Phòng tư vấn',
-          description: 'Thông tin mẫu số 4 cho room_types.',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900165,
-          name: 'Phòng theo dõi',
-          description: 'Thông tin mẫu số 5 cho room_types.',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-      ],
+      question: 'Làm thế nào để xem số quyền lợi còn lại trong gói?',
+      answer:
+        'Bạn truy cập mục Gói của tôi để xem các dịch vụ được bao gồm, số lượt đã sử dụng, số lượt còn lại và thời hạn của gói.',
+      category: 'package',
     },
     {
-      names: ['maternity_packages'],
-      rows: [
-        {
-          id: 900211,
-          code: 'MATE-2101',
-          facility_id: 900091,
-          name: 'Gói thai sản mẫu 1',
-          description: 'Thông tin mẫu số 1 cho maternity_packages.',
-          price: '250000.00',
-          duration_days: 30,
-          priority_level: 1,
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900212,
-          code: 'MATE-2102',
-          facility_id: 900092,
-          name: 'Gói thai sản mẫu 2',
-          description: 'Thông tin mẫu số 2 cho maternity_packages.',
-          price: '500000.00',
-          duration_days: 30,
-          priority_level: 2,
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900213,
-          code: 'MATE-2103',
-          facility_id: 900093,
-          name: 'Gói thai sản mẫu 3',
-          description: 'Thông tin mẫu số 3 cho maternity_packages.',
-          price: '750000.00',
-          duration_days: 30,
-          priority_level: 3,
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900214,
-          code: 'MATE-2104',
-          facility_id: 900094,
-          name: 'Gói thai sản mẫu 4',
-          description: 'Thông tin mẫu số 4 cho maternity_packages.',
-          price: '1000000.00',
-          duration_days: 30,
-          priority_level: 4,
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900215,
-          code: 'MATE-2105',
-          facility_id: 900095,
-          name: 'Gói thai sản mẫu 5',
-          description: 'Thông tin mẫu số 5 cho maternity_packages.',
-          price: '1250000.00',
-          duration_days: 30,
-          priority_level: 5,
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-      ],
+      question: 'Tôi có thể xem kết quả khám ở đâu?',
+      answer:
+        'Sau khi kết quả được cập nhật, bạn có thể xem tại mục Hồ sơ thai sản hoặc Lịch sử khám. Hệ thống có thể gửi thông báo khi có kết quả mới.',
+      category: 'medical_record',
     },
     {
-      names: ['package_items'],
-      rows: [
-        {
-          id: 900221,
-          package_id: 900211,
-          facility_service_id: 900121,
-          included_quantity: 2,
-          is_required: true,
-          is_optional: false,
-          allowed_facility_scope: 1,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900222,
-          package_id: 900212,
-          facility_service_id: 900122,
-          included_quantity: 2,
-          is_required: true,
-          is_optional: false,
-          allowed_facility_scope: 2,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900223,
-          package_id: 900213,
-          facility_service_id: 900123,
-          included_quantity: 2,
-          is_required: true,
-          is_optional: false,
-          allowed_facility_scope: 3,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900224,
-          package_id: 900214,
-          facility_service_id: 900124,
-          included_quantity: 2,
-          is_required: true,
-          is_optional: false,
-          allowed_facility_scope: 4,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900225,
-          package_id: 900215,
-          facility_service_id: 900125,
-          included_quantity: 2,
-          is_required: true,
-          is_optional: false,
-          allowed_facility_scope: 5,
-          created_at: now,
-          updated_at: now,
-        },
-      ],
+      question: 'Kết quả siêu âm và xét nghiệm có được lưu trên hệ thống không?',
+      answer:
+        'Các kết quả được cơ sở cập nhật có thể được lưu cùng hồ sơ khám dưới dạng thông tin hoặc tệp đính kèm để thuận tiện cho việc theo dõi.',
+      category: 'medical_record',
     },
     {
-      names: ['articles'],
-      rows: [
-        {
-          id: 900431,
-          author_id: 900011,
-          title: 'Nội dung mẫu 1 của articles',
-          slug: 'articles-mau-1',
-          summary: 'Thông tin mẫu số 1 cho articles.',
-          content: 'Nội dung dữ liệu mẫu số 1 cho bảng articles.',
-          status: 'published',
-          approved_by: 900011,
-          approved_at: null,
-          published_at: '2026-08-11 09:00:00',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900432,
-          author_id: 900012,
-          title: 'Nội dung mẫu 2 của articles',
-          slug: 'articles-mau-2',
-          summary: 'Thông tin mẫu số 2 cho articles.',
-          content: 'Nội dung dữ liệu mẫu số 2 cho bảng articles.',
-          status: 'published',
-          approved_by: 900012,
-          approved_at: null,
-          published_at: '2026-08-12 10:00:00',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900433,
-          author_id: 900013,
-          title: 'Nội dung mẫu 3 của articles',
-          slug: 'articles-mau-3',
-          summary: 'Thông tin mẫu số 3 cho articles.',
-          content: 'Nội dung dữ liệu mẫu số 3 cho bảng articles.',
-          status: 'published',
-          approved_by: 900013,
-          approved_at: null,
-          published_at: '2026-08-13 11:00:00',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900434,
-          author_id: 900014,
-          title: 'Nội dung mẫu 4 của articles',
-          slug: 'articles-mau-4',
-          summary: 'Thông tin mẫu số 4 cho articles.',
-          content: 'Nội dung dữ liệu mẫu số 4 cho bảng articles.',
-          status: 'published',
-          approved_by: 900014,
-          approved_at: null,
-          published_at: '2026-08-14 12:00:00',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900435,
-          author_id: 900015,
-          title: 'Nội dung mẫu 5 của articles',
-          slug: 'articles-mau-5',
-          summary: 'Thông tin mẫu số 5 cho articles.',
-          content: 'Nội dung dữ liệu mẫu số 5 cho bảng articles.',
-          status: 'published',
-          approved_by: 900015,
-          approved_at: null,
-          published_at: '2026-08-15 13:00:00',
-          created_at: now,
-          updated_at: now,
-        },
-      ],
+      question: 'Tôi có thể xem lại đơn thuốc đã được kê không?',
+      answer:
+        'Bạn có thể xem đơn thuốc trong chi tiết lần khám tương ứng. Việc sử dụng thuốc cần tuân theo chỉ định của bác sĩ.',
+      category: 'prescription',
     },
     {
-      names: ['faqs'],
-      rows: [
-        {
-          id: 900441,
-          author_id: 900011,
-          question: 'Câu hỏi thai sản mẫu số 1?',
-          answer: 'Câu trả lời tham khảo cho câu hỏi mẫu số 1.',
-          category: 'Chăm sóc thai kỳ',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900442,
-          author_id: 900012,
-          question: 'Câu hỏi thai sản mẫu số 2?',
-          answer: 'Câu trả lời tham khảo cho câu hỏi mẫu số 2.',
-          category: 'Chăm sóc thai kỳ',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900443,
-          author_id: 900013,
-          question: 'Câu hỏi thai sản mẫu số 3?',
-          answer: 'Câu trả lời tham khảo cho câu hỏi mẫu số 3.',
-          category: 'Chăm sóc thai kỳ',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900444,
-          author_id: 900014,
-          question: 'Câu hỏi thai sản mẫu số 4?',
-          answer: 'Câu trả lời tham khảo cho câu hỏi mẫu số 4.',
-          category: 'Chăm sóc thai kỳ',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900445,
-          author_id: 900015,
-          question: 'Câu hỏi thai sản mẫu số 5?',
-          answer: 'Câu trả lời tham khảo cho câu hỏi mẫu số 5.',
-          category: 'Chăm sóc thai kỳ',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-      ],
+      question: 'Khi nào tôi nhận được thông báo nhắc lịch?',
+      answer:
+        'Hệ thống có thể gửi thông báo trước lịch hẹn theo cấu hình của cơ sở. Bạn nên kiểm tra thông báo trong ứng dụng và thông tin liên hệ đã đăng ký.',
+      category: 'notification',
     },
     {
-      names: ['services'],
-      rows: [
-        {
-          id: 900491,
-          code: 'SERV-4901',
-          name: 'Khám thai định kỳ',
-          description: 'Thông tin mẫu số 1 cho services.',
-          service_type: 'prenatal',
-          default_duration_minutes: 30,
-          base_price: '250000.00',
-          requires_doctor_warning: false,
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900492,
-          code: 'SERV-4902',
-          name: 'Siêu âm thai',
-          description: 'Thông tin mẫu số 2 cho services.',
-          service_type: 'prenatal',
-          default_duration_minutes: 30,
-          base_price: '500000.00',
-          requires_doctor_warning: false,
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900493,
-          code: 'SERV-4903',
-          name: 'Xét nghiệm máu',
-          description: 'Thông tin mẫu số 3 cho services.',
-          service_type: 'prenatal',
-          default_duration_minutes: 30,
-          base_price: '750000.00',
-          requires_doctor_warning: false,
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900494,
-          code: 'SERV-4904',
-          name: 'Tư vấn dinh dưỡng',
-          description: 'Thông tin mẫu số 4 cho services.',
-          service_type: 'prenatal',
-          default_duration_minutes: 30,
-          base_price: '1000000.00',
-          requires_doctor_warning: false,
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900495,
-          code: 'SERV-4905',
-          name: 'Theo dõi tim thai',
-          description: 'Thông tin mẫu số 5 cho services.',
-          service_type: 'prenatal',
-          default_duration_minutes: 30,
-          base_price: '1250000.00',
-          requires_doctor_warning: false,
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-      ],
+      question: 'Thông tin sức khỏe của tôi có được bảo mật không?',
+      answer:
+        'Hệ thống giới hạn quyền truy cập theo vai trò và mục đích công việc. Bạn cũng nên bảo vệ mật khẩu, không chia sẻ mã xác minh và đăng xuất khi sử dụng thiết bị công cộng.',
+      category: 'security',
     },
     {
-      names: ['forum_topics'],
-      rows: [
-        {
-          id: 900501,
-          author_id: 900011,
-          title: 'Nội dung mẫu 1 của forum_topics',
-          slug: 'forum-topics-mau-1',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900502,
-          author_id: 900012,
-          title: 'Nội dung mẫu 2 của forum_topics',
-          slug: 'forum-topics-mau-2',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900503,
-          author_id: 900013,
-          title: 'Nội dung mẫu 3 của forum_topics',
-          slug: 'forum-topics-mau-3',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900504,
-          author_id: 900014,
-          title: 'Nội dung mẫu 4 của forum_topics',
-          slug: 'forum-topics-mau-4',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900505,
-          author_id: 900015,
-          title: 'Nội dung mẫu 5 của forum_topics',
-          slug: 'forum-topics-mau-5',
-          status: 'active',
-          created_at: now,
-          updated_at: now,
-        },
-      ],
-    },
-    {
-      names: ['shift_slots'],
-      rows: [
-        {
-          id: 900511,
-          facility_id: 900091,
-          name: 'Nguyễn An',
-          start_time: '08:00:00',
-          end_time: '17:00:00',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900512,
-          facility_id: 900092,
-          name: 'Trần Bình',
-          start_time: '09:00:00',
-          end_time: '18:00:00',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900513,
-          facility_id: 900093,
-          name: 'Lê Chi',
-          start_time: '10:00:00',
-          end_time: '19:00:00',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900514,
-          facility_id: 900094,
-          name: 'Phạm Dũng',
-          start_time: '11:00:00',
-          end_time: '20:00:00',
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: 900515,
-          facility_id: 900095,
-          name: 'Hoàng Giang',
-          start_time: '12:00:00',
-          end_time: '21:00:00',
-          created_at: now,
-          updated_at: now,
-        },
-      ],
+      question: 'Tôi cần làm gì khi có dấu hiệu sức khỏe bất thường?',
+      answer:
+        'Bạn nên liên hệ ngay với cơ sở y tế hoặc nhân viên y tế để được hướng dẫn phù hợp. Không nên chỉ dựa vào nội dung trên hệ thống để tự chẩn đoán hoặc trì hoãn việc thăm khám.',
+      category: 'health_support',
     },
   ];
+  const admins = await staffRepository.find({
+    relations: { roles: true },
+    where: {
+      roles: { name: RoleEnum.ADMIN },
+    },
+  });
+  const faqs = faqData.map((faq, index) => ({
+    authorId: admins[index % admins.length].id,
+    question: faq.question,
+    answer: faq.answer,
+    category: faq.category,
+    status: FaqStatusEnum.ACTIVE,
+    createdAt: new Date(new Date().getTime() - 6 * (180 + index) * 24 * 60 * 60 * 1000),
+    updatedAt: new Date(new Date().getTime() - 6 * (180 + index) * 24 * 60 * 60 * 1000),
+  }));
+  await faqRepository.save(faqs);
 }
 
-export class DatabaseSeeder {
-  constructor(private readonly connection: DataSource) {}
+async function insertArticles() {
+  const doctors = await staffRepository.find({
+    relations: { roles: true },
+    where: { roles: { name: RoleEnum.DOCTOR } },
+  });
 
-  async run(): Promise<void> {
-    const passwordHash = await bcrypt.hash(
-      SEED_PASSWORD,
-      Number(process.env.BCRYPT_SALT_ROUNDS ?? 10),
-    );
-    const seedData = await buildSeedData(passwordHash);
-    const queryRunner = this.connection.createQueryRunner();
+  const admins = await staffRepository.find({
+    relations: { roles: true },
+    where: {
+      roles: { name: RoleEnum.ADMIN },
+    },
+  });
+  const articleSummary =
+    'Bài viết cung cấp những kiến thức cơ bản và thông tin tham khảo hữu ích, giúp mẹ bầu chủ động hơn trong quá trình theo dõi và chăm sóc thai kỳ.';
 
-    await queryRunner.connect();
-    await queryRunner.query('SET FOREIGN_KEY_CHECKS = 0');
-    await queryRunner.startTransaction();
-    try {
-      for (const spec of seedData) {
-        await upsertRows(queryRunner, spec);
+  const articleContent = `
+  <h2>Thông tin tổng quan</h2>
+  <p>
+    Thai kỳ là một hành trình quan trọng, trong đó việc theo dõi sức khỏe thường xuyên
+    và duy trì thói quen sinh hoạt phù hợp có vai trò thiết yếu đối với mẹ và bé.
+  </p>
+
+  <h2>Những điều cần lưu ý</h2>
+  <p>
+    Mẹ bầu nên thực hiện lịch khám theo hướng dẫn của nhân viên y tế, duy trì chế độ
+    sinh hoạt hợp lý, nghỉ ngơi đầy đủ và theo dõi những thay đổi của cơ thể.
+  </p>
+
+  <p>
+    Nội dung trong bài viết chỉ mang tính chất tham khảo và không thay thế cho việc
+    thăm khám, chẩn đoán hoặc tư vấn trực tiếp từ bác sĩ.
+  </p>
+`;
+
+  const articleTitles = [
+    'Những điều cần biết trong ba tháng đầu thai kỳ',
+    'Lịch khám thai định kỳ dành cho mẹ bầu',
+    'Vai trò của dinh dưỡng trong quá trình mang thai',
+    'Những thay đổi thường gặp của cơ thể khi mang thai',
+    'Cách chuẩn bị cho lần khám thai đầu tiên',
+    'Tầm quan trọng của việc theo dõi sức khỏe thai kỳ',
+    'Những xét nghiệm thường gặp trong thai kỳ',
+    'Siêu âm thai và những thông tin mẹ bầu cần biết',
+    'Cách xây dựng thói quen nghỉ ngơi phù hợp khi mang thai',
+    'Vận động an toàn và phù hợp trong thai kỳ',
+    'Những vật dụng cần chuẩn bị trước khi sinh',
+    'Cách theo dõi lịch hẹn và kết quả khám thai',
+    'Những điều cần biết về hồ sơ thai sản',
+    'Vai trò của gia đình trong việc chăm sóc mẹ bầu',
+    'Cách lựa chọn cơ sở khám thai phù hợp',
+    'Tìm hiểu về các gói dịch vụ chăm sóc thai sản',
+    'Những lưu ý khi sử dụng thuốc trong thai kỳ',
+    'Cách theo dõi các chỉ số sức khỏe khi mang thai',
+    'Chuẩn bị tâm lý và kiến thức trước ngày sinh',
+    'Chăm sóc sức khỏe mẹ sau sinh và những điều cần biết',
+  ];
+
+  const createSlug = (value: string): string => {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
+  };
+
+  const data = articleTitles.map((title, index) => ({
+    authorId: doctors[index % doctors.length].id,
+    title,
+    // Thêm số thứ tự để chắc chắn slug không trùng
+    slug: `${createSlug(title)}-${String(index + 1).padStart(2, '0')}`,
+    summary: articleSummary,
+    content: articleContent,
+    status: ArticleStatus.PUBLISHED,
+    approvedBy: admins[index % admins.length].id,
+    approvedAt: new Date(new Date().getTime() - index * 7 * 24 * 60 * 60 * 1000),
+    publishedAt: new Date(new Date().getTime() - index * 7 * 24 * 60 * 60 * 1000),
+    createdAt: new Date(new Date().getTime() - (index * 7 + 1) * 24 * 60 * 60 * 1000),
+    updatedAt: new Date(new Date().getTime() - (index * 7 + 1) * 24 * 60 * 60 * 1000),
+  }));
+
+  await articleRepository.save(data);
+}
+
+async function insertFacility() {
+  const normalizeVietnameseText = (value: string) => {
+    return String(value)
+      .trim()
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase();
+  };
+
+  const buildProvinceAbbreviation = (province?: string | null) => {
+    if (!province || !String(province).trim()) {
+      return 'VN';
+    }
+
+    const normalizedProvince = normalizeVietnameseText(province)
+      .replace(/[^\w\s]/g, ' ')
+      .replace(/\b(THANH PHO|TINH|TP)\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const words = normalizedProvince.split(' ').filter(Boolean);
+    if (words.length === 0) return 'VN';
+    return words
+      .map((word) => word[0])
+      .join('')
+      .toUpperCase();
+  };
+
+  const generateFacilityCode = async (province?: string | null) => {
+    const prefix = `CS-${buildProvinceAbbreviation(province)}`;
+    const rows = await facilityRepository
+      .createQueryBuilder('facility')
+      .withDeleted()
+      .select('facility.code', 'code')
+      .where('facility.code LIKE :pattern', { pattern: `${prefix}-%` })
+      .getRawMany<{ code: string }>();
+
+    const existingCodes = rows.map((row) => row.code);
+    const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const nextSequence =
+      existingCodes.reduce((maxSequence, code) => {
+        const match = code.match(new RegExp(`^${escapedPrefix}-(\\d+)$`));
+        return match ? Math.max(maxSequence, Number(match[1])) : maxSequence;
+      }, 0) + 1;
+
+    return `${prefix}-${String(nextSequence).padStart(2, '0')}`;
+  };
+
+  const admins = await staffRepository.find({
+    relations: { roles: true },
+    where: { roles: { name: RoleEnum.ADMIN } },
+  });
+  const baseFacilities = [
+    {
+      name: 'MCS Cầu Giấy',
+      phone: '02473010001',
+      email: 'caugiay@mcs.com.vn',
+      address: 'Số 15 phố Trần Thái Tông, phường Cầu Giấy, Hà Nội',
+      province: 'Hà Nội',
+      ward: 'Cầu Giấy',
+      latitude: '21.0338890',
+      longitude: '105.7887220',
+      status: 'active',
+    },
+    {
+      name: 'MCS Hà Đông',
+      phone: '02473010002',
+      email: 'hadong@mcs.com.vn',
+      address: 'Số 28 đường Tố Hữu, phường Hà Đông, Hà Nội',
+      province: 'Hà Nội',
+      ward: 'Hà Đông',
+      latitude: '20.9903270',
+      longitude: '105.7870800',
+      status: 'active',
+    },
+    {
+      name: 'MCS Thanh Xuân',
+      phone: '02473010003',
+      email: 'thanhxuan@mcs.com.vn',
+      address: 'Số 42 đường Nguyễn Trãi, phường Thanh Xuân, Hà Nội',
+      province: 'Hà Nội',
+      ward: 'Thanh Xuân',
+      latitude: '21.0021710',
+      longitude: '105.8195040',
+      status: 'active',
+    },
+    {
+      name: 'MCS Hai Bà Trưng',
+      phone: '02473010004',
+      email: 'haibatrung@mcs.com.vn',
+      address: 'Số 36 phố Đại Cồ Việt, phường Hai Bà Trưng, Hà Nội',
+      province: 'Hà Nội',
+      ward: 'Hai Bà Trưng',
+      latitude: '21.0071010',
+      longitude: '105.8489530',
+      status: 'active',
+    },
+    {
+      name: 'MCS Long Biên',
+      phone: '02473010005',
+      email: 'longbien@mcs.com.vn',
+      address: 'Số 52 đường Nguyễn Văn Cừ, phường Long Biên, Hà Nội',
+      province: 'Hà Nội',
+      ward: 'Long Biên',
+      latitude: '21.0416610',
+      longitude: '105.8750880',
+      status: 'active',
+    },
+  ];
+  const facilities: Facility[] = [];
+
+  for (let i = 0; i < baseFacilities.length; i++) {
+    const item = {
+      ...baseFacilities[i],
+      code: await generateFacilityCode(baseFacilities[i].province),
+      ownerId: admins[baseFacilities.indexOf(baseFacilities[i]) % admins.length].id,
+      status: ActiveStatus.ACTIVE,
+      createdAt: new Date(new Date().getTime() - 180 * 7 * 24 * 60 * 60 * 1000),
+      updatedAt: new Date(new Date().getTime() - 180 * 7 * 24 * 60 * 60 * 1000),
+    };
+    const saved = await facilityRepository.save(item);
+    facilities.push(saved);
+  }
+
+  admins.forEach((admin, index) => {
+    admin.facilityId =
+      facilities.find((f) => f.ownerId === admin.id)?.id ||
+      facilities[index % facilities.length].id;
+  });
+  await staffRepository.save(admins);
+  const staffs = await staffRepository.find({
+    relations: { roles: true },
+    where: { roles: { name: Not(In([RoleEnum.SUPER_ADMIN, RoleEnum.ADMIN])) } },
+  });
+
+  staffs.forEach((staff, index) => {
+    staff.facilityId = facilities[index % facilities.length].id;
+  });
+  await staffRepository.save(staffs);
+}
+
+async function insertRoomTypes() {
+  const roomTypes = [
+    {
+      name: 'Phòng lễ tân',
+      description:
+        'Khu vực tiếp đón người bệnh, kiểm tra thông tin lịch hẹn, hướng dẫn thủ tục và thực hiện check-in.',
+    },
+    {
+      name: 'Phòng chờ',
+      description:
+        'Khu vực dành cho người bệnh và người nhà chờ đến lượt khám hoặc sử dụng dịch vụ.',
+    },
+    {
+      name: 'Phòng tư vấn',
+      description:
+        'Phòng dành cho bác sĩ hoặc nhân viên y tế tư vấn sức khỏe và hướng dẫn chăm sóc thai kỳ.',
+    },
+    {
+      name: 'Phòng khám sản',
+      description:
+        'Phòng thực hiện thăm khám sản khoa, đánh giá tình trạng sức khỏe của mẹ và quá trình phát triển của thai nhi.',
+    },
+    {
+      name: 'Phòng khám tổng quát',
+      description:
+        'Phòng thực hiện khám sức khỏe tổng quát và đánh giá các chỉ số sức khỏe cơ bản.',
+    },
+    {
+      name: 'Phòng siêu âm',
+      description:
+        'Phòng được trang bị thiết bị phục vụ việc siêu âm và theo dõi sự phát triển của thai nhi.',
+    },
+    {
+      name: 'Phòng lấy mẫu xét nghiệm',
+      description: 'Phòng tiếp nhận và lấy các loại mẫu xét nghiệm theo chỉ định của bác sĩ.',
+    },
+    {
+      name: 'Phòng xét nghiệm',
+      description:
+        'Khu vực thực hiện phân tích mẫu và xử lý các kết quả xét nghiệm phục vụ hoạt động khám chữa bệnh.',
+    },
+    {
+      name: 'Phòng thủ thuật',
+      description: 'Phòng thực hiện các thủ thuật y tế phù hợp với phạm vi chuyên môn của cơ sở.',
+    },
+    {
+      name: 'Phòng điều dưỡng',
+      description: 'Phòng làm việc của điều dưỡng, phục vụ theo dõi và hỗ trợ chăm sóc người bệnh.',
+    },
+    {
+      name: 'Phòng làm việc bác sĩ',
+      description:
+        'Phòng làm việc chuyên môn, kiểm tra hồ sơ và trao đổi nghiệp vụ dành cho bác sĩ.',
+    },
+    {
+      name: 'Phòng làm việc nhân viên',
+      description: 'Phòng làm việc dành cho nhân viên hành chính và nhân viên vận hành của cơ sở.',
+    },
+    {
+      name: 'Phòng quản lý',
+      description: 'Phòng làm việc dành cho quản lý cơ sở và xử lý các công việc điều hành.',
+    },
+    {
+      name: 'Phòng họp',
+      description:
+        'Phòng tổ chức họp, trao đổi chuyên môn, đào tạo và điều phối hoạt động của nhân viên.',
+    },
+    {
+      name: 'Phòng lưu trữ hồ sơ',
+      description: 'Khu vực quản lý và lưu trữ hồ sơ, tài liệu chuyên môn của cơ sở.',
+    },
+    {
+      name: 'Kho vật tư y tế',
+      description:
+        'Khu vực lưu trữ dụng cụ, vật tư và thiết bị phục vụ hoạt động chuyên môn của cơ sở.',
+    },
+    {
+      name: 'Phòng cấp phát thuốc',
+      description: 'Khu vực tiếp nhận đơn và cấp phát thuốc theo quy định và chỉ định chuyên môn.',
+    },
+    {
+      name: 'Quầy thanh toán',
+      description:
+        'Khu vực tiếp nhận thanh toán, xử lý hóa đơn và hướng dẫn các vấn đề liên quan đến chi phí dịch vụ.',
+    },
+    {
+      name: 'Phòng nghỉ nhân viên',
+      description: 'Phòng nghỉ giữa ca dành cho bác sĩ, điều dưỡng và các nhân viên của cơ sở.',
+    },
+    {
+      name: 'Phòng kỹ thuật và giám sát',
+      description:
+        'Phòng dành cho thiết bị công nghệ, hệ thống giám sát và hoạt động hỗ trợ kỹ thuật.',
+    },
+  ];
+
+  const getNextSequence = (existingCodes: string[], prefix: string, padding: number) => {
+    const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`^${escapedPrefix}[-_](\\d+)$`);
+    const maxSequence = existingCodes.reduce((max, code) => {
+      if (code === prefix) return Math.max(max, 1);
+      const match = code.match(pattern);
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0);
+
+    return maxSequence + 1;
+  };
+
+  const buildCodePrefixFromName = (name: string) => {
+    const normalized = String(name)
+      .trim()
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase();
+
+    return normalized ? normalized.split(' ').join('_').slice(0, 40) : 'ROOM_TYPE';
+  };
+
+  const generateRoomTypeCode = async (name: string) => {
+    const prefix = buildCodePrefixFromName(name);
+    const rows = await roomTypeRepository
+      .createQueryBuilder('roomType')
+      .withDeleted()
+      .select('roomType.code', 'code')
+      .where('roomType.code LIKE :pattern', { pattern: `${prefix}%` })
+      .getRawMany<{ code: string }>();
+
+    const existingCodes = rows.map((row) => row.code);
+    const nextSequence = getNextSequence(existingCodes, prefix, 2);
+
+    return nextSequence === 1 && !existingCodes.includes(prefix)
+      ? prefix
+      : `${prefix}_${String(nextSequence).padStart(2, '0')}`;
+  };
+
+  const savedRoomType: RoomType[] = [];
+
+  for (const roomType of roomTypes) {
+    const item = {
+      ...roomType,
+      code: await generateRoomTypeCode(roomType.name),
+      status: ActiveStatus.ACTIVE,
+    };
+    const saved = await roomTypeRepository.save(item);
+    savedRoomType.push(saved);
+  }
+}
+
+async function insertRooms() {
+  const facilities = await facilityRepository.find();
+  const roomTypes = await roomTypeRepository.find();
+
+  const getNextSequence = (existingCodes: string[], prefix: string, padding: number) => {
+    const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`^${escapedPrefix}[-_](\\d+)$`);
+    const maxSequence = existingCodes.reduce((max, code) => {
+      if (code === prefix) return Math.max(max, 1);
+      const match = code.match(pattern);
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0);
+
+    return maxSequence + 1;
+  };
+
+  const generateRoomCode = async (facility: Facility, codeSequenceCache?: Map<string, number>) => {
+    const prefix = `R-${facility.code}`;
+    const cacheKey = `${facility.id}:${prefix}`;
+
+    if (!codeSequenceCache?.has(cacheKey)) {
+      const rows = await roomRepository
+        .createQueryBuilder('room')
+        .withDeleted()
+        .select('room.code', 'code')
+        .where('room.facilityId = :facilityId', { facilityId: facility.id })
+        .andWhere('room.code LIKE :pattern', { pattern: `${prefix}-%` })
+        .getRawMany<{ code: string }>();
+
+      const existingCodes = rows.map((row) => row.code);
+      const nextSequence = getNextSequence(existingCodes, prefix, 3);
+      codeSequenceCache?.set(cacheKey, nextSequence);
+      if (!codeSequenceCache) {
+        return `${prefix}-${String(nextSequence).padStart(3, '0')}`;
       }
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.query('SET FOREIGN_KEY_CHECKS = 1');
-      await queryRunner.release();
+    }
+
+    const sequence = codeSequenceCache!.get(cacheKey)!;
+    codeSequenceCache!.set(cacheKey, sequence + 1);
+    return `${prefix}-${String(sequence).padStart(3, '0')}`;
+  };
+
+  for (let index = 0; index < facilities.length; index++) {
+    const floorCount = (index % 2) + 4;
+    for (let floor = 1; floor <= floorCount; floor++) {
+      const roomCount = Math.floor(Math.random() * 5) + 5;
+      for (let room = 1; room <= roomCount; room++) {
+        const roomType = roomTypes[Math.floor(Math.random() * roomTypes.length)];
+        const newRoom = {
+          facilityId: facilities[index].id,
+          floor: `Tầng ${floor}`,
+          roomTypeId: roomType.id,
+          code: await generateRoomCode(facilities[index]),
+          name: `Phòng ${floor}${String(room).padStart(2, '0')}`,
+          status: ActiveStatus.ACTIVE,
+          createdAt: new Date(facilities[index].createdAt),
+          updatedAt: new Date(facilities[index].updatedAt),
+        };
+        await roomRepository.save(newRoom);
+      }
     }
   }
 }
 
-async function seed(): Promise<void> {
-  await dataSource.initialize();
+async function seedCustomData(): Promise<void> {
   try {
-    await new DatabaseSeeder(dataSource).run();
-    console.log('DatabaseSeeder completed successfully');
+    await dataSource.initialize();
+    console.log('Kết nối với database thành công.');
+
+    // Gọi các hàm chèn dữ liệu
+    // await insertPermission();
+    // await insertRoles();
+    // await insertRolePermission();
+    // await insertStaffs();
+    // await insertDoctor();
+    // await insertFaqs();
+    // await insertArticles();
+    // await insertFacility();
+    // await insertRoomTypes();
+    // await insertRooms();
+
+    console.log('Tất cả dữ liệu đã được chèn thành công!');
+  } catch (error: unknown) {
+    console.error('Lỗi khi chèn dữ liệu:', error);
+    process.exitCode = 1;
   } finally {
-    if (dataSource.isInitialized) await dataSource.destroy();
+    if (dataSource.isInitialized) {
+      await dataSource.destroy();
+      console.log('Đã đóng kết nối database.');
+    }
   }
 }
 
-seed().catch((error: unknown) => {
-  console.error('DatabaseSeeder failed:', error);
-  process.exit(1);
-});
+void seedCustomData();

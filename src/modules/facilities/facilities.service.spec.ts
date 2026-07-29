@@ -10,6 +10,7 @@ import { RoleEnum } from '../../common/constants/role.enum';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { FacilitiesController } from './facilities.controller';
 import { FacilitiesService } from './facilities.service';
+import { PublicFacilitiesController } from './public.facilities.controller';
 import { Facility } from './entities/facility.entity';
 import { FacilityClosureDay } from './entities/facility-closure-day.entity';
 
@@ -32,6 +33,8 @@ const createFacility = (overrides: Partial<Facility> = {}): Facility => ({
   deletedAt: null,
   deletedBy: null,
   deleteReason: null,
+  facilityServices: [],
+  appointments: [],
   ...overrides,
 });
 
@@ -312,7 +315,6 @@ describe('FacilitiesService', () => {
     const facility = createFacility();
     repository.findById.mockResolvedValue(facility);
     repository.findOperatingHoursByFacilityId
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         { dayOfWeek: 'MON', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false },
         { dayOfWeek: 'TUE', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false },
@@ -806,7 +808,7 @@ describe('FacilitiesController', () => {
 
     await expect(controller.findAll(facilityAdmin, { page: 2 } as any)).resolves.toEqual({
       message: RESPONSE_MESSAGES.FACILITIES_RETRIEVED,
-      data: { items: [facility], total: 1, page: 2, limit: 1 },
+      data: { items: [facility], total: 1, page: 2, limit: 20, totalPages: 1 },
     });
     expect(mockService.findAllPaginated).not.toHaveBeenCalled();
   });
@@ -824,18 +826,18 @@ describe('FacilitiesController', () => {
     });
   });
 
-  // Vai tro: kiem tra controller dung service danh sach thuong khi khong co page.
-  it('uses non-paginated service for super admin when page is omitted', async () => {
+  // Vai tro: controller luon tra response phan trang de FE khong phai xu ly hai shape khac nhau.
+  it('uses paginated service for super admin when page is omitted', async () => {
     const mockService = createService();
-    const facilities = [createFacility()];
-    mockService.findAll.mockResolvedValue(facilities);
+    const paged = { items: [createFacility()], total: 1, page: 1, limit: 20, totalPages: 1 };
+    mockService.findAllPaginated.mockResolvedValue(paged);
     const controller = new FacilitiesController(mockService as any);
 
     await expect(controller.findAll(superAdmin, {} as any)).resolves.toEqual({
       message: RESPONSE_MESSAGES.FACILITIES_RETRIEVED,
-      data: facilities,
+      data: paged,
     });
-    expect(mockService.findAll).toHaveBeenCalledWith({});
+    expect(mockService.findAllPaginated).toHaveBeenCalledWith({});
   });
 
   // Vai tro: chan user co scope facility truy cap chi tiet facility khac.
@@ -996,9 +998,39 @@ describe('FacilitiesController', () => {
   // Vai tro: dam bao loi bat ngo o controller duoc chuan hoa thanh InternalServerErrorException.
   it('converts unknown controller errors to internal server error', async () => {
     const mockService = createService();
-    mockService.findAll.mockRejectedValue(new Error('unexpected'));
+    mockService.findAllPaginated.mockRejectedValue(new Error('unexpected'));
     const controller = new FacilitiesController(mockService as any);
 
     await expect(controller.findAll(superAdmin, {} as any)).rejects.toBeInstanceOf(InternalServerErrorException);
+  });
+});
+
+describe('PublicFacilitiesController', () => {
+  const createService = () => ({
+    findAllPaginated: jest.fn(),
+    findDetailsById: jest.fn(),
+  });
+
+  it('returns paginated active facilities for public list', async () => {
+    const service = createService();
+    const paged = { items: [createFacility()], total: 1, page: 1, limit: 20, totalPages: 1 };
+    service.findAllPaginated.mockResolvedValue(paged);
+    const controller = new PublicFacilitiesController(service as any);
+    const query = {} as any;
+
+    await expect(controller.findAll(query)).resolves.toEqual({
+      message: RESPONSE_MESSAGES.FACILITIES.GET_LIST_SUCCESS,
+      data: paged,
+    });
+    expect(query.status).toBe(FacilityStatus.ACTIVE);
+    expect(service.findAllPaginated).toHaveBeenCalledWith(query);
+  });
+
+  it('hides inactive facility detail from public users', async () => {
+    const service = createService();
+    service.findDetailsById.mockResolvedValue(createFacility({ status: FacilityStatus.INACTIVE }));
+    const controller = new PublicFacilitiesController(service as any);
+
+    await expect(controller.findById('fac-1')).rejects.toBeInstanceOf(NotFoundException);
   });
 });

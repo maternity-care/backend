@@ -5,12 +5,29 @@ import { FacilityDayOfWeek } from '../entities/facility-operating-hour.entity';
 import { FacilityStatus } from '../../../common/constants/status.enum';
 import { SearchFacilityClosureDayDto } from '../dto/requests/facility-closure-day.dto';
 import { LookupFacilityDto, SearchFacilityDto } from '../dto/requests/search-facility.dto';
+import { SearchFacilityAdminOptionsDto } from '../dto/requests/search-facility-admin-options.dto';
 import {PaginationResult} from '../../../common/helpers/pagination';
 import { FacilityLookupResponseDto, FacilityResponseDto } from '../dto/responds/facilities-respond';
 export const FACILITIES_REPOSITORY = Symbol('FACILITIES_REPOSITORY');
 
 export type FacilityWithDetails = FacilityResponseDto;
 export type FacilityLookup = FacilityLookupResponseDto;
+
+export interface FacilityAdminOption {
+  id: string;
+  name: string;
+  email: string;
+  personalEmail: string | null;
+  phone: string;
+  employeeCode: string;
+  status: string;
+  homeFacilityId: string | null;
+  homeFacilityName: string | null;
+  homeFacilityCode: string | null;
+  roleId: string;
+  roleName: string;
+  ownedFacilityCount: number;
+}
 
 export interface FacilityShiftScheduleViolation {
   id: string;
@@ -50,6 +67,7 @@ export interface IFacilitiesRepository {
   findByName(name: string): Promise<Facility | null>;
   findByEmail(email: string): Promise<Facility | null>;
   findByPhone(phone: string): Promise<Facility | null>;
+  findAdminOptions(filters?: SearchFacilityAdminOptionsDto): Promise<PaginationResult<FacilityAdminOption>>;
   existsActiveOwner(ownerId: string): Promise<boolean>;
   lookup(filters?: LookupFacilityDto): Promise<FacilityLookup[]>;
   remove(facility: Facility): Promise<void>;

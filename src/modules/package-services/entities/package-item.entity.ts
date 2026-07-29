@@ -1,4 +1,5 @@
 import { FacilityService } from './../../facility-services/entities/facility-service.entity';
+import { PackageStage } from './../../maternity-packages/entities/package-stage.entity';
 import { MaternityPackage } from './../../maternity-packages/entities/maternity-package.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
@@ -7,9 +8,12 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { PackageServiceFacilityScope } from '../dto/requests/create-package-service.dto';
+import { PackageServiceFacility } from './package-service-facility.entity';
 
 @Entity('package_items')
 export class PackageItem {
@@ -39,6 +43,17 @@ export class PackageItem {
   @JoinColumn({ name: 'facility_service_id' })
   facilityService: FacilityService;
 
+  @ApiProperty({ type: String, nullable: true, required: false })
+  @Column({ name: 'package_stage_id', type: 'bigint', nullable: true })
+  packageStageId: string | null;
+
+  @ManyToOne(() => PackageStage, (stage) => stage.items, {
+    nullable: true,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'package_stage_id' })
+  stage: PackageStage | null;
+
   @ApiProperty({ type: Number })
   @Column({ name: 'included_quantity', type: 'int' })
   includedQuantity: number;
@@ -51,9 +66,21 @@ export class PackageItem {
   @Column({ name: 'is_optional', type: 'boolean' })
   isOptional: boolean | number;
 
+  @ApiProperty({ enum: PackageServiceFacilityScope })
+  @Column({
+    name: 'allowed_facility_scope',
+    type: 'varchar',
+    length: 20,
+    default: PackageServiceFacilityScope.ALL,
+  })
+  allowedFacilityScope: PackageServiceFacilityScope;
+
   @ApiProperty({ type: Number })
-  @Column({ name: 'allowed_facility_scope', type: 'int' })
-  allowedFacilityScope: number;
+  @Column({ name: 'sort_order', type: 'int', default: 0 })
+  sortOrder: number;
+
+  @OneToMany(() => PackageServiceFacility, (facility) => facility.packageItem)
+  facilities: PackageServiceFacility[];
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })

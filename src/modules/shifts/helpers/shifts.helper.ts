@@ -18,6 +18,10 @@ export interface BulkCreateDateRangeInput {
   durationDays?: number;
 }
 
+const DAY_MINUTES = 24 * 60;
+const START_OF_DAY = '00:00:00';
+const END_OF_DAY = '23:59:00';
+
 /** Kiểm tra id nhận từ path trước khi truy vấn database. */
 export function validateShiftId(id: string): void {
   if (!/^[1-9]\d*$/.test(id)) {
@@ -34,12 +38,10 @@ export function validateSchedule(
 ): void {
   const normalizedStart = normalizeTime(startTime);
   const normalizedEnd = normalizeTime(endTime);
-  if (normalizedStart >= normalizedEnd) {
+  if (normalizedStart === normalizedEnd) {
     throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.END_TIME_AFTER_START_TIME);
   }
-  const [startHour, startMinute] = normalizedStart.split(':').map(Number);
-  const [endHour, endMinute] = normalizedEnd.split(':').map(Number);
-  const duration = endHour * 60 + endMinute - (startHour * 60 + startMinute);
+  const duration = getTimeRangeDurationMinutes(normalizedStart, normalizedEnd);
   if (duration < 15 || duration > 12 * 60) {
     throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.DURATION_INVALID);
   }
@@ -61,6 +63,7 @@ export function validateFacilityHours(
   startTime: string,
   endTime: string,
   status: DoctorShiftStatus,
+  nextOperatingHour?: FacilityOperatingHourLike | null,
 ): void {
   if (status === DoctorShiftStatus.OFF || status === DoctorShiftStatus.CANCELLED) return;
 
@@ -76,6 +79,31 @@ export function validateFacilityHours(
 
   const normalizedStart = normalizeTime(startTime);
   const normalizedEnd = normalizeTime(endTime);
+  if (isOvernightRange(normalizedStart, normalizedEnd)) {
+    if (normalizedStart < openTime || END_OF_DAY > closeTime) {
+      throw new BadRequestException(
+        `${RESPONSE_MESSAGES.SHIFTS.FACILITY_HOURS_INVALID} (${openTime} - ${closeTime})`,
+      );
+    }
+
+    if (!nextOperatingHour || nextOperatingHour.isClosed) {
+      throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.FACILITY_CLOSED_ON_DATE);
+    }
+
+    const nextOpenTime = nextOperatingHour.openTime ? normalizeTime(String(nextOperatingHour.openTime)) : null;
+    const nextCloseTime = nextOperatingHour.closeTime ? normalizeTime(String(nextOperatingHour.closeTime)) : null;
+    if (!nextOpenTime || !nextCloseTime) {
+      throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.FACILITY_HOURS_NOT_CONFIGURED);
+    }
+
+    if (START_OF_DAY < nextOpenTime || normalizedEnd > nextCloseTime) {
+      throw new BadRequestException(
+        `${RESPONSE_MESSAGES.SHIFTS.FACILITY_HOURS_INVALID} (${nextOpenTime} - ${nextCloseTime})`,
+      );
+    }
+    return;
+  }
+
   if (normalizedStart < openTime || normalizedEnd > closeTime) {
     throw new BadRequestException(
       `${RESPONSE_MESSAGES.SHIFTS.FACILITY_HOURS_INVALID} (${openTime} - ${closeTime})`,
@@ -176,11 +204,42 @@ export function timeToMinutes(value: string): number {
 }
 
 export function minutesToTime(value: number): string {
-  const hour = Math.floor(value / 60)
+  const normalizedValue = ((value % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
+  const hour = Math.floor(normalizedValue / 60)
     .toString()
     .padStart(2, '0');
-  const minute = (value % 60).toString().padStart(2, '0');
+  const minute = (normalizedValue % 60).toString().padStart(2, '0');
   return `${hour}:${minute}:00`;
+}
+
+export function isOvernightRange(startTime: string, endTime: string): boolean {
+  return timeToMinutes(endTime) <= timeToMinutes(startTime);
+}
+
+export function getTimeRangeDurationMinutes(startTime: string, endTime: string): number {
+  const start = timeToMinutes(startTime);
+  let end = timeToMinutes(endTime);
+  if (end <= start) end += DAY_MINUTES;
+  return end - start;
+}
+
+export function getTimeRangeEndMinute(startTime: string, endTime: string): number {
+  const start = timeToMinutes(startTime);
+  let end = timeToMinutes(endTime);
+  if (end <= start) end += DAY_MINUTES;
+  return end;
+}
+
+function toDayTimeSegments(startTime: string, endTime: string): Array<{ start: number; end: number }> {
+  const start = timeToMinutes(startTime);
+  const end = timeToMinutes(endTime);
+  if (end <= start) {
+    return [
+      { start, end: DAY_MINUTES },
+      { start: 0, end },
+    ];
+  }
+  return [{ start, end }];
 }
 
 //trả về true nếu hai khoảng thời gian overlap nhau, ngược lại trả về false
@@ -190,10 +249,32 @@ export function timesOverlap(
   secondStart: string,
   secondEnd: string,
 ): boolean {
-  return (
-    normalizeTime(firstStart) < normalizeTime(secondEnd) &&
-    normalizeTime(firstEnd) > normalizeTime(secondStart)
+  const firstSegments = toDayTimeSegments(firstStart, firstEnd);
+  const secondSegments = toDayTimeSegments(secondStart, secondEnd);
+  return firstSegments.some(first =>
+    secondSegments.some(second => first.start < second.end && first.end > second.start),
   );
+}
+
+export function shiftIntervalsOverlap(
+  firstDate: string,
+  firstStart: string,
+  firstEnd: string,
+  secondDate: string,
+  secondStart: string,
+  secondEnd: string,
+): boolean {
+  const firstDateOffset = dateDiffInDays('1970-01-01', firstDate) * DAY_MINUTES;
+  const secondDateOffset = dateDiffInDays('1970-01-01', secondDate) * DAY_MINUTES;
+  const firstStartAbsolute = firstDateOffset + timeToMinutes(firstStart);
+  let firstEndAbsolute = firstDateOffset + timeToMinutes(firstEnd);
+  if (firstEndAbsolute <= firstStartAbsolute) firstEndAbsolute += DAY_MINUTES;
+
+  const secondStartAbsolute = secondDateOffset + timeToMinutes(secondStart);
+  let secondEndAbsolute = secondDateOffset + timeToMinutes(secondEnd);
+  if (secondEndAbsolute <= secondStartAbsolute) secondEndAbsolute += DAY_MINUTES;
+
+  return firstStartAbsolute < secondEndAbsolute && firstEndAbsolute > secondStartAbsolute;
 }
 
 export function dateTimeToTime(value: Date | string): string {

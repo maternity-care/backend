@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { plainToInstance } from 'class-transformer';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -11,6 +11,7 @@ import { DoctorResponseDto } from './dto/response/doctor-response.dto';
 import { DoctorsService } from './doctors.service';
 
 @ApiTags('Doctor Profile')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('doctors')
 export class DoctorsController {
@@ -37,6 +38,18 @@ export class DoctorsController {
     return {
       message: 'Cập nhật hồ sơ bác sĩ thành công',
       data: plainToInstance(DoctorResponseDto, doctor),
+    };
+  }
+
+  @Get()
+  @Roles(RoleEnum.DOCTOR)
+  @ApiOperation({ summary: 'Get all doctors' })
+  @ApiResponse({ status: 200, type: [DoctorResponseDto] })
+  async findAll() {
+    const doctors = await this.doctorsService.findAll();
+    return {
+      message: 'Thành công',
+      data: doctors.map((doctor) => plainToInstance(DoctorResponseDto, doctor)),
     };
   }
 }
