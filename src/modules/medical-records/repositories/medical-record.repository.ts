@@ -30,6 +30,10 @@ export class MedicalRecordRepository implements IMedicalRecordRepository {
     await this.repository.remove(record);
   }
 
+  async createMedicalFiles(data: DeepPartial<MedicalFile>[]): Promise<MedicalFile[]> {
+    return this.medicalFileRepository.save(data);
+  }
+
   findById(id: string): Promise<MedicalRecord | null> {
     return this.repository.findOne({
       where: { id },

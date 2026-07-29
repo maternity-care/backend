@@ -25,20 +25,20 @@ export class MedicalFile {
   medicalRecordId: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'file_type', type: 'varchar', length: 255 })
-  fileType: string;
+  @Column({ name: 'file_type', type: 'varchar', length: 255, nullable: true, default: 'pdf' })
+  fileType: string | null;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'file_name', type: 'varchar', length: 255 })
-  fileName: string;
+  @Column({ name: 'file_name', type: 'varchar', length: 255, nullable: true, default: '' })
+  fileName: string | null;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'file_url', type: 'varchar', length: 500 })
-  fileUrl: string;
+  @Column({ name: 'file_url', type: 'varchar', length: 500, nullable: true })
+  fileUrl: string | null;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'mime_type', type: 'varchar', length: 255 })
-  mimeType: string;
+  @Column({ name: 'mime_type', type: 'varchar', length: 255, nullable: true, default: '' })
+  mimeType: string | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'uploaded_by', type: 'varchar', length: 255 })

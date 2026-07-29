@@ -26,7 +26,7 @@ import { CreateUserDto } from './dto/request/create-user.dto';
 @ApiTags('Management - Users')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-@Roles(RoleEnum.SUPER_ADMIN, RoleEnum.ADMIN)
+@Roles(RoleEnum.SUPER_ADMIN, RoleEnum.ADMIN, RoleEnum.DOCTOR, RoleEnum.STAFF)
 @Controller('management/users')
 export class ManagementSystemUsersController {
   constructor(private readonly usersService: UsersService) {}
