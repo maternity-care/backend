@@ -6,7 +6,7 @@ export const DOCTORS_REPOSITORY = 'DOCTORS_REPOSITORY';
 
 export interface IDoctorsRepository {
   findById(id: string): Promise<Doctor | null>;
-  findAll(filters?: SearchDoctorDto): Promise<Doctor[]>;
+  findAll(filters?: SearchDoctorDto): Promise<{ data: Doctor[]; count: number }>;
   create(data: DeepPartial<Doctor>): Doctor;
   save(doctor: Doctor): Promise<Doctor>;
   remove(doctor: Doctor): Promise<void>;
