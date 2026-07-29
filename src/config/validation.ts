@@ -159,6 +159,42 @@ class EnvironmentVariables {
   @Max(3600)
   @IsOptional()
   UPLOAD_PRESIGN_EXPIRES_IN?: number;
+
+  @IsString()
+  @IsOptional()
+  UPLOAD_OBJECT_ACL?: string;
+
+  @IsInt()
+  @Min(60)
+  @Max(604800)
+  @IsOptional()
+  UPLOAD_DOWNLOAD_EXPIRES_IN?: number;
+
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  @IsOptional()
+  UPLOAD_USER_RATE_LIMIT?: number;
+
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  @IsOptional()
+  UPLOAD_MANAGEMENT_RATE_LIMIT?: number;
+
+  @IsInt()
+  @Min(60)
+  @Max(86400)
+  @IsOptional()
+  UPLOAD_RATE_LIMIT_WINDOW_SECONDS?: number;
+
+  @IsString()
+  @IsOptional()
+  GEMINI_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  GEMINI_MODEL?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

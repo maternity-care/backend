@@ -1,7 +1,9 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ObjectCannedACL } from '@aws-sdk/client-s3';
 import { extname, basename } from 'path';
 import { randomBytes } from 'crypto';
+import { IRedisCacheService, REDIS_CACHE_SERVICE } from '../../common/cache/redis-cache.interface';
 import {
   CreateManagementPresignedUploadDto,
   CreatePresignedUploadDto,
@@ -18,25 +20,42 @@ export class UploadsService {
     @Inject(STORAGE_SERVICE)
     private readonly storageService: IStorageService,
     private readonly configService: ConfigService,
+    @Inject(REDIS_CACHE_SERVICE)
+    private readonly cacheService: IRedisCacheService,
   ) {}
 
-  createUserPresignedUpload(
+  async createUserPresignedUpload(
     userId: string,
     dto: CreatePresignedUploadDto,
   ): Promise<PresignedUploadResult> {
     this.validateFileMetadata(dto.mimeType, dto.size);
+    await this.assertUploadRateLimit(`user:${userId}`, 'storage.userRateLimit');
     const key = `${userId}/${this.buildSluggedFileName(dto.fileName)}`;
     return this.createPresignedUpload(key, dto.mimeType);
   }
 
-  createManagementPresignedUpload(
+  async createManagementPresignedUpload(
     dto: CreateManagementPresignedUploadDto,
+    actorId?: string,
   ): Promise<PresignedUploadResult> {
     this.validateFileMetadata(dto.mimeType, dto.size);
+    await this.assertUploadRateLimit(
+      `management:${actorId || 'unknown'}`,
+      'storage.managementRateLimit',
+    );
     const path = this.sanitizePath(dto.path);
     const fileName = this.buildSluggedFileName(dto.baseName ?? dto.fileName, dto.fileName);
     const key = `${path}/${fileName}`;
     return this.createPresignedUpload(key, dto.mimeType);
+  }
+
+  createPresignedDownload(key: string): Promise<string> {
+    const expiresIn = this.configService.get<number>('storage.downloadExpiresIn') ?? 3600;
+    return this.storageService.createPresignedDownload({ key, expiresIn });
+  }
+
+  createPublicUrl(key: string): string {
+    return this.storageService.createPublicUrl(key);
   }
 
   private createPresignedUpload(key: string, mimeType: string): Promise<PresignedUploadResult> {
@@ -45,7 +64,24 @@ export class UploadsService {
       key,
       mimeType,
       expiresIn,
+      objectAcl: (this.configService.get<string>('storage.objectAcl') || undefined) as
+        | ObjectCannedACL
+        | undefined,
     });
+  }
+
+  private async assertUploadRateLimit(scopeKey: string, limitConfigKey: string): Promise<void> {
+    const limit = this.configService.get<number>(limitConfigKey) ?? 20;
+    const windowSeconds = this.configService.get<number>('storage.rateLimitWindowSeconds') ?? 600;
+    const redisKey = `upload:presign:${scopeKey}`;
+    const count = await this.cacheService.increment(redisKey, windowSeconds);
+
+    if (count > limit) {
+      throw new HttpException(
+        `Bạn upload quá nhanh. Vui lòng thử lại sau ít phút.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
   }
 
   private validateFileMetadata(mimeType: string, size: number): void {

@@ -838,8 +838,8 @@ describe('ShiftsService business validation', () => {
     ]);
   });
 
-  // Vai tro: dam bao ca full hoac da dat het slot khong con sinh slot trong.
-  it('TC-UNIT-DSHIFT-038 does not generate slots for full or fully booked shifts', async () => {
+  // Vai tro: dam bao ca full khong sinh slot, con ca dat theo slot chi an slot bi trung gio.
+  it('TC-UNIT-DSHIFT-038 hides full shifts and keeps non-overlapping slots available', async () => {
     const { repo, service } = createService();
     repo.findDoctorShiftsForDate.mockResolvedValueOnce([
       { ...shift, id: 'full', startTime: '08:00:00', endTime: '09:00:00', status: DoctorShiftStatus.FULL, maxAppointments: 10 },
@@ -860,7 +860,11 @@ describe('ShiftsService business validation', () => {
 
     expect(result.shifts).toEqual([
       expect.objectContaining({ shiftId: 'full', availableSlots: [] }),
-      expect.objectContaining({ shiftId: 'limited', bookedAppointments: 1, availableSlots: [] }),
+      expect.objectContaining({
+        shiftId: 'limited',
+        bookedAppointments: 1,
+        availableSlots: [{ startTime: '09:30:00', endTime: '10:00:00' }],
+      }),
     ]);
   });
 

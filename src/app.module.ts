@@ -26,6 +26,8 @@ import { PregnancyProfileModule } from './modules/pregnancy-profile/pregnancy-pr
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { DoctorsModule } from './modules/doctors/doctors.module';
 import { MedicalRecordsModule } from './modules/medical-records/medical-records.module';
+import { ChatbotModule } from './modules/chatbot/chatbot.module';
+import { AppointmentsModule } from './modules/appointments/appointments.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -68,6 +70,8 @@ import { MedicalRecordsModule } from './modules/medical-records/medical-records.
     NotificationsModule,
     DoctorsModule,
     MedicalRecordsModule,
+    ChatbotModule,
+    AppointmentsModule,
   ],
 })
 export class AppModule {}
