@@ -194,7 +194,11 @@ export class RoomsRepository implements IRoomsRepository {
 
     if (filters?.search) {
       query.andWhere(
-        '(LOWER(roomType.name) LIKE LOWER(:search) OR LOWER(roomType.description) LIKE LOWER(:search))',
+        `(${[
+          'CAST(roomType.id AS CHAR) LIKE :search',
+          'LOWER(roomType.code) LIKE LOWER(:search)',
+          'LOWER(roomType.name) LIKE LOWER(:search)',
+        ].join(' OR ')})`,
         { search: `%${filters.search}%` },
       );
     }
@@ -243,7 +247,11 @@ export class RoomsRepository implements IRoomsRepository {
 
     if (filters?.search) {
       query.andWhere(
-        '(LOWER(roomType.name) LIKE LOWER(:search) OR LOWER(roomType.description) LIKE LOWER(:search))',
+        `(${[
+          'CAST(roomType.id AS CHAR) LIKE :search',
+          'LOWER(roomType.code) LIKE LOWER(:search)',
+          'LOWER(roomType.name) LIKE LOWER(:search)',
+        ].join(' OR ')})`,
         { search: `%${filters.search}%` },
       );
     }
@@ -350,15 +358,11 @@ export class RoomsRepository implements IRoomsRepository {
 
     if (filters?.search) {
       query.andWhere(
-        [
+        `(${[
+          'CAST(room.id AS CHAR) LIKE :search',
+          'LOWER(room.code) LIKE LOWER(:search)',
           'LOWER(room.name) LIKE LOWER(:search)',
-          'LOWER(room.floor) LIKE LOWER(:search)',
-          'LOWER(room.status) LIKE LOWER(:search)',
-          'LOWER(facility.name) LIKE LOWER(:search)',
-          'LOWER(facility.code) LIKE LOWER(:search)',
-          'LOWER(roomType.name) LIKE LOWER(:search)',
-          'LOWER(roomType.description) LIKE LOWER(:search)',
-        ].join(' OR '),
+        ].join(' OR ')})`,
         { search: `%${filters.search}%` },
       );
     }
@@ -399,7 +403,11 @@ export class RoomsRepository implements IRoomsRepository {
 
     if (filters?.search) {
       query.andWhere(
-        '(LOWER(roomType.name) LIKE LOWER(:search) OR LOWER(roomType.description) LIKE LOWER(:search))',
+        `(${[
+          'CAST(roomType.id AS CHAR) LIKE :search',
+          'LOWER(roomType.code) LIKE LOWER(:search)',
+          'LOWER(roomType.name) LIKE LOWER(:search)',
+        ].join(' OR ')})`,
         { search: `%${filters.search}%` },
       );
     }

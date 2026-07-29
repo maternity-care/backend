@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
 import { ActiveStatus } from '../../../common/constants/status.enum';
 import { paginate } from '../../../common/helpers/pagination';
-import { searchBuilder } from '../../../common/helpers/search-builder';
 import { SearchServiceDto } from '../dto/requests/search-service.dto';
 import { Service } from '../entities/service.entity';
 import { IServicesRepository } from '../interfaces/services-repository.interface';
@@ -136,12 +135,16 @@ export class ServicesRepository implements IServicesRepository {
       .createQueryBuilder('service')
       .leftJoinAndSelect('service.serviceType', 'serviceType');
 
-    searchBuilder(query, filters?.search, {
-      columns: ['code', 'name', 'description'],
-      relations: {
-        serviceType: ['code', 'name', 'description'],
-      },
-    });
+    if (filters?.search) {
+      query.andWhere(
+        `(${[
+          'CAST(service.id AS CHAR) LIKE :search',
+          'LOWER(service.code) LIKE LOWER(:search)',
+          'LOWER(service.name) LIKE LOWER(:search)',
+        ].join(' OR ')})`,
+        { search: `%${filters.search}%` },
+      );
+    }
 
     if (filters?.serviceTypeId) {
       query.andWhere('service.serviceTypeId = :serviceTypeId', {
