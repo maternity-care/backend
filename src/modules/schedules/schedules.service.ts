@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { UserSchedule } from './entities/user-schedule.entity';
 import { CreateUserScheduleDto } from './dto/create-user-schedule.dto';
 
@@ -72,7 +73,7 @@ export class SchedulesService {
     });
 
     if (!schedule) {
-      throw new NotFoundException('Không tìm thấy lịch cá nhân để xóa.');
+      throw new NotFoundException(RESPONSE_MESSAGES.SCHEDULES.NOT_FOUND);
     }
 
     await this.schedulesRepository.remove(schedule);

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import { IsOptional, IsString, Matches } from 'class-validator';
 
 const BIGINT_ID_PATTERN = /^[1-9]\d*$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -40,12 +40,6 @@ export class CreateAppointmentDto {
   @IsString()
   @Matches(TIME_PATTERN)
   endTime: string;
-
-  @ApiPropertyOptional({ example: '1' })
-  @IsOptional()
-  @IsString()
-  @Matches(BIGINT_ID_PATTERN)
-  pregnancyProfileId?: string;
 
   @ApiPropertyOptional({ example: 'Thai phụ muốn khám nhanh.' })
   @IsOptional()

@@ -5,7 +5,7 @@ import 'tsconfig-paths/register';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { config } from 'dotenv';
 import { join } from 'path';
-import { Appointment } from './entities/appointment.entity';
+import { Appointment } from '../modules/appointments/entities/appointment.entity';
 import { AppointmentReminder } from './entities/appointment-reminder.entity';
 import { AppointmentStatusLog } from './entities/appointment-status-log.entity';
 import { Article } from './entities/article.entity';

@@ -8,7 +8,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Appointment } from './appointment.entity';
+import { Appointment } from '../../modules/appointments/entities/appointment.entity';
 
 @Entity('appointment_reminders')
 export class AppointmentReminder {

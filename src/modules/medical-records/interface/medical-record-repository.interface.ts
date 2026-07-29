@@ -1,7 +1,7 @@
 import { MedicalFile } from './../../../database/entities/medical-file.entity';
 import { DeepPartial } from 'typeorm';
 import { PaginationResult } from '../../../common/helpers/pagination';
-import { Appointment } from '../../../database/entities/appointment.entity';
+import { Appointment } from '../../appointments/entities/appointment.entity';
 import { SearchMedicalRecordDto } from '../dto/requests/search-medical-record.dto';
 import { MedicalRecord } from '../entities/medical-record.entity';
 
