@@ -1,6 +1,6 @@
 import { ActiveStatus } from './../../../../common/constants/status.enum';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class SearchDoctorDto {
   @ApiPropertyOptional()
@@ -56,14 +56,12 @@ export class SearchDoctorDto {
   sortYearsOfExperience?: 'ASC' | 'DESC';
 
   @ApiPropertyOptional()
-  @IsNumber()
   @Min(1)
   @Max(100)
   @IsOptional()
   page?: number;
 
   @ApiPropertyOptional()
-  @IsNumber()
   @Min(1)
   @Max(50)
   @IsOptional()
