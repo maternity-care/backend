@@ -28,7 +28,7 @@ export class DoctorsService {
     return this.usersService.createUser(dto, actor);
   }
 
-  async findAll(filters?: SearchDoctorDto): Promise<Doctor[]> {
+  async findAll(filters?: SearchDoctorDto): Promise<{ data: Doctor[]; count: number }> {
     return this.repository.findAll(filters);
   }
 

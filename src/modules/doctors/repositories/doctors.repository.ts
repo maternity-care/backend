@@ -1,7 +1,8 @@
+import { Staff } from './../../staffs/entities/staff.entity';
 import { ActiveStatus } from './../../../common/constants/status.enum';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DeepPartial, Repository } from 'typeorm';
+import { DeepPartial, FindOptionsWhere, Like, Repository } from 'typeorm';
 import { Doctor } from '../entities/doctor.entity';
 import { IDoctorsRepository } from '../interfaces/doctors-repository.interface';
 import { SearchDoctorDto } from '../dto/requests/search-doctor.dto';
@@ -25,24 +26,66 @@ export class DoctorsRepository implements IDoctorsRepository {
     return this.repository.findOne({ where: { id } });
   }
 
-  findAll(filters?: SearchDoctorDto): Promise<Doctor[]> {
-    const query = this.repository
-      .createQueryBuilder('doctor')
-      .leftJoinAndSelect('doctor.staff', 'staff')
-      .orderBy('doctor.createdAt', 'DESC');
+  async findAll(filters?: SearchDoctorDto): Promise<{ data: Doctor[], count: number }> {
+    const where: FindOptionsWhere<Doctor> = {};
+    const staffWhere: FindOptionsWhere<Staff> = {};
 
-    if (filters?.search) {
-      query.andWhere(
-        `(${[
-          'CAST(doctor.id AS CHAR) LIKE :search',
-          'LOWER(staff.employeeCode) LIKE LOWER(:search)',
-          'LOWER(staff.name) LIKE LOWER(:search)',
-        ].join(' OR ')})`,
-        { search: `%${filters.search}%` },
-      );
+    if (filters?.licenseNo) {
+      where.licenseNo = Like(`%${filters.licenseNo}%`);
     }
 
-    return query.getMany();
+    if (filters?.name) {
+      staffWhere.name = Like(`%${filters.name}%`);
+    }
+
+    if (filters?.employeeCode) {
+      staffWhere.employeeCode = Like(`%${filters.employeeCode}%`);
+    }
+
+    if (filters?.personalEmail) {
+      staffWhere.personalEmail = Like(`%${filters.personalEmail}%`);
+    }
+
+    if (filters?.email) {
+      staffWhere.email = Like(`%${filters.email}%`);
+    }
+
+    if (filters?.phone) {
+      staffWhere.phone = Like(`%${filters.phone}%`);
+    }
+
+    if (filters?.specialty) {
+      where.specialty = Like(`%${filters.specialty}%`);
+    }
+
+    if (filters?.status) {
+      where.status = filters.status === 'active' ? ActiveStatus.ACTIVE : ActiveStatus.INACTIVE;
+    }
+
+    if (filters?.facilityId) {
+      staffWhere.facilityId = filters.facilityId;
+    }
+
+    const sortYoE = filters?.sortYearsOfExperience || 'DESC';
+
+    const page = Math.max(1, Number(filters?.page) || 1);
+    const limit = Math.max(1, Number(filters?.limit) || 20);
+
+    const dataOut = await this.repository.findAndCount({
+      relations: { staff: true },
+      where: {
+        ...where,
+        staff: staffWhere,
+      },
+      order: { yearsOfExperience: sortYoE, createdAt: 'DESC' },
+      take: limit,
+      skip: (page - 1) * limit,
+    });
+
+    return {
+      data: dataOut[0],
+      count: dataOut[1],
+    };
   }
 
   findByFacilityId(facilityId: string): Promise<Doctor[]> {

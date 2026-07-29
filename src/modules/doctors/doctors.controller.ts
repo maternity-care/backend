@@ -49,7 +49,10 @@ export class DoctorsController {
     const doctors = await this.doctorsService.findAll();
     return {
       message: 'Thành công',
-      data: doctors.map((doctor) => plainToInstance(DoctorResponseDto, doctor)),
+      data: {
+        count: doctors.count,
+        data: doctors?.data.map((doctor) => plainToInstance(DoctorResponseDto, doctor)),
+      },
     };
   }
 }
