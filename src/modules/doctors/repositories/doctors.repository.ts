@@ -26,7 +26,7 @@ export class DoctorsRepository implements IDoctorsRepository {
     return this.repository.findOne({ where: { id } });
   }
 
-  async findAll(filters?: SearchDoctorDto): Promise<{ data: Doctor[], count: number }> {
+  async findAll(filters?: SearchDoctorDto): Promise<{ data: Doctor[]; count: number }> {
     const where: FindOptionsWhere<Doctor> = {};
     const staffWhere: FindOptionsWhere<Staff> = {};
 
