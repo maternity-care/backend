@@ -37,12 +37,12 @@ export class CreateMedicalRecordDto {
   @MaxLength(10000)
   diagnosis?: string | null;
 
-  @ApiProperty({ example: 'Sức khỏe mẹ và thai nhi ổn định' })
+  @ApiPropertyOptional({ example: 'Sức khỏe mẹ và thai nhi ổn định' })
   @Transform(({ value }) => trimText(value))
   @IsString()
   @IsNotEmpty()
   @MaxLength(10000)
-  conclusion: string;
+  conclusion?: string;
 
   @ApiPropertyOptional({ nullable: true, example: 'Tái khám sau 4 tuần' })
   @IsOptional()
