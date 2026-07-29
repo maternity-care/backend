@@ -5,7 +5,7 @@ import { MedicalFile } from '../../database/entities/medical-file.entity';
 import { MedicalRecord } from './entities/medical-record.entity';
 import { MEDICAL_RECORD_REPOSITORY } from './interface/medical-record-repository.interface';
 import { MEDICAL_RECORD_SERVICE } from './interface/medical-record-service.inteface';
-import { MedicalRecordsController } from './medical-records.controller';
+import { MedicalRecordsController } from './manage-medical-records.controller';
 import { MedicalRecordsService } from './medical-records.service';
 import { MedicalRecordRepository } from './repositories/medical-record.repository';
 

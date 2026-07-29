@@ -5,6 +5,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -18,6 +19,7 @@ export class Faq {
 
   @ApiProperty({ type: String })
   @ManyToOne(() => Staff, { nullable: true })
+  @JoinColumn({ name: 'author_id' })
   author: string;
 
   @ApiProperty({ type: String })

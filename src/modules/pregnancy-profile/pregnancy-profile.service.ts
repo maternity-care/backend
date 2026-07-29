@@ -44,10 +44,6 @@ export class PregnancyProfileService {
       throw new NotFoundException(RESPONSE_MESSAGES.NOT_FOUND_CURRENT_USER);
     }
 
-    if (dto.paraFullTerm + dto.paraPremature + dto.paraAbortion < dto.gravida) {
-      throw new ConflictException(RESPONSE_MESSAGES.PREGNANCY_PROFILES.PARA_CONFLICT);
-    }
-
     const code = await this.pregnancyProfileRepository.generatePregnancyCode();
 
     const profile = this.pregnancyProfileRepository.create({
@@ -90,9 +86,7 @@ export class PregnancyProfileService {
     }
 
     Object.assign(profile, dto);
-    if (profile.paraFullTerm + profile.paraPremature + profile.paraAbortion < profile.gravida) {
-      throw new ConflictException(RESPONSE_MESSAGES.PREGNANCY_PROFILES.PARA_CONFLICT);
-    }
+
     return this.pregnancyProfileRepository.save(profile);
   }
 

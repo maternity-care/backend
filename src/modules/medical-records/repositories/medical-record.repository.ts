@@ -39,6 +39,7 @@ export class MedicalRecordRepository implements IMedicalRecordRepository {
         pregnancyProfile: true,
         files: true,
       },
+      order: { files: { createdAt: 'DESC' } },
     });
   }
 

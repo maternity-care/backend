@@ -1,7 +1,7 @@
 import { User } from './../../../users/entities/user.entity';
-import { Staff } from './../../../staffs/entities/staff.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { UserResponseDto } from '../../../users/dto/response/user-response.dto';
+import { SafeStaffDto } from './safe-staff.dto';
 
 export class AuthResponseDto {
   @ApiProperty()
@@ -11,5 +11,5 @@ export class AuthResponseDto {
   refresh_token: string;
 
   @ApiProperty({ type: UserResponseDto })
-  user: UserResponseDto | User | Staff;
+  user: UserResponseDto | User | SafeStaffDto;
 }

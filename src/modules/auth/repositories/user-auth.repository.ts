@@ -19,7 +19,6 @@ export class UserAuthRepository implements IUserAuthRepository {
         user: true,
       },
     });
-    console.log('===========Data:', user);
     return user;
   }
   async create(UserAuth: DeepPartial<UserAuth>): Promise<UserAuth> {

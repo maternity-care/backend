@@ -1,4 +1,6 @@
 import { Permission } from './../../permissions/entities/permission.entity';
+import { RolePermission } from './../../../database/entities/role-permission.entity';
+import { Staff } from './../../staffs/entities/staff.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   Column,
@@ -7,6 +9,7 @@ import {
   Entity,
   JoinTable,
   ManyToMany,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -25,6 +28,9 @@ export class Role {
     inverseJoinColumn: { name: 'permission_id', referencedColumnName: 'id' },
   })
   permissions: Permission[];
+
+  @ManyToMany(() => Staff, (staff) => staff.roles)
+  staffs: Staff[];
 
   @ApiProperty({ type: String })
   @Column({ name: 'name', type: 'varchar', length: 100, unique: true })

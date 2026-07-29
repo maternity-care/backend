@@ -35,6 +35,18 @@ export class ManagementDoctorsController {
     };
   }
 
+  @Get('/facility/:id')
+  @Permissions(PermissionEnum.DOCTOR_VIEW)
+  @ApiOperation({ summary: 'List doctors by facility' })
+  @ApiResponse({ status: 200, type: [DoctorResponseDto] })
+  async findByFacilityId(@Param('id') id: string) {
+    const doctors = await this.doctorsService.findByFacilityId(id);
+    return {
+      message: 'Thành công',
+      data: doctors.map((doctor) => plainToInstance(DoctorResponseDto, doctor)),
+    };
+  }
+
   @Get(':id')
   @Permissions(PermissionEnum.DOCTOR_VIEW)
   @ApiOperation({ summary: 'Get doctor detail' })

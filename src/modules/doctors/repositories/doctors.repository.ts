@@ -1,3 +1,4 @@
+import { ActiveStatus } from './../../../common/constants/status.enum';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository } from 'typeorm';
@@ -44,8 +45,31 @@ export class DoctorsRepository implements IDoctorsRepository {
     return query.getMany();
   }
 
-  findByStaffId(staffId: string): Promise<Doctor | null> {
-    return this.repository.findOne({ where: { staffId } });
+  findByFacilityId(facilityId: string): Promise<Doctor[]> {
+    return this.repository.find({
+      relations: { staff: true },
+      where: {
+        status: ActiveStatus.ACTIVE,
+        staff: { facilityId: facilityId },
+      },
+    });
+  }
+
+  async findByStaffId(staffId: string): Promise<Doctor | null> {
+    const doctor = await this.repository.findOne({
+      where: { staffId },
+      relations: { staff: true },
+    });
+    if (!doctor) {
+      return null;
+    }
+    return {
+      ...doctor,
+      staff: {
+        ...doctor.staff,
+        password: '',
+      },
+    };
   }
 
   findByLicenseNo(licenseNo: string): Promise<Doctor | null> {

@@ -1,15 +1,7 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import { OmitType, PartialType } from '@nestjs/swagger';
+import { CreatePregnantUserDto } from './create-pregnant-user.dto';
 
-export class UpdateProfileDto {
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  name?: string;
-
-  @ApiPropertyOptional({ minLength: 6 })
-  @IsString()
-  @MinLength(6)
-  @IsOptional()
-  password?: string;
-}
+// Email/mật khẩu thuộc luồng xác thực riêng, không cập nhật lẫn trong hồ sơ cá nhân.
+export class UpdateProfileDto extends PartialType(
+  OmitType(CreatePregnantUserDto, ['email'] as const),
+) {}
