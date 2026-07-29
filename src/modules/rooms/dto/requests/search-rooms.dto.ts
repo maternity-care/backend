@@ -7,7 +7,7 @@ import { trimText } from '../../../../common/helpers/dto-transform.helper';
 import { POSITIVE_ID_PATTERN } from './create-room.dto';
 
 export class SearchRoomsDto {
-  @ApiPropertyOptional({ description: 'Free text search theo room/facility/roomType' })
+  @ApiPropertyOptional({ description: 'Free text search theo id, code hoac name cua phong' })
   @IsOptional()
   @Transform(({ value }) => trimText(value))
   @IsString()
@@ -55,7 +55,7 @@ export class SearchRoomsDto {
 }
 
 export class LookupRoomsDto {
-  @ApiPropertyOptional({ description: 'Tu khoa goi y theo ten phong, loai phong, co so' })
+  @ApiPropertyOptional({ description: 'Tu khoa goi y theo id, code hoac name cua phong' })
   @IsOptional()
   @Transform(({ value }) => trimText(value))
   @IsString()
@@ -83,7 +83,7 @@ export class LookupRoomsDto {
 }
 
 export class LookupRoomTypesDto {
-  @ApiPropertyOptional({ description: 'Tu khoa goi y theo ten/mo ta loai phong' })
+  @ApiPropertyOptional({ description: 'Tu khoa goi y theo id, code hoac name cua loai phong' })
   @IsOptional()
   @Transform(({ value }) => trimText(value))
   @IsString()

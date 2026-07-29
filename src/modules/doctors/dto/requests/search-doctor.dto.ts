@@ -1,44 +1,13 @@
+import { Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNumber, IsString, Max, Min } from 'class-validator';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { trimText } from '../../../../common/helpers/dto-transform.helper';
 
 export class SearchDoctorDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Free text search theo id, ma nhan vien hoac ten bac si' })
+  @IsOptional()
+  @Transform(({ value }) => trimText(value))
   @IsString()
-  name?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  email?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  phone?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  licenseNo?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  specialtyId?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  status?: string;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  sortYearsOfExperience?: boolean;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @Min(1)
-  @Max(100)
-  page?: number;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @Min(1)
-  @Max(50)
-  limit?: number;
+  @MaxLength(100)
+  search?: string;
 }
