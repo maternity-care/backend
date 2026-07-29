@@ -51,8 +51,8 @@ export class Appointment {
   patientId: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'pregnancy_profile_id', type: 'bigint' })
-  pregnancyProfileId: string;
+  @Column({ name: 'pregnancy_profile_id', type: 'bigint', nullable: true })
+  pregnancyProfileId: string | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'room_id', type: 'bigint' })
@@ -79,11 +79,11 @@ export class Appointment {
   patientExtraServiceId: string | null;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'scheduled_start', type: 'date' })
+  @Column({ name: 'scheduled_start', type: 'timestamp' })
   scheduledStart: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'scheduled_end', type: 'date' })
+  @Column({ name: 'scheduled_end', type: 'timestamp' })
   scheduledEnd: string;
 
   @ApiPropertyOptional({ type: Date, nullable: true, required: false })

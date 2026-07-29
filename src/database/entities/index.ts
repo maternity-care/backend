@@ -27,8 +27,6 @@ export { Payment } from './payment.entity';
 export { Invoice } from './invoice.entity';
 export { MedicalRecord } from '../../modules/medical-records/entities/medical-record.entity';
 export { MedicalFile } from './medical-file.entity';
-export { ChatConversation } from './chat-conversation.entity';
-export { ChatMessage } from './chat-message.entity';
 export { Article } from './article.entity';
 export { Faq } from './faq.entity';
 export { ForumPost } from './forum-post.entity';

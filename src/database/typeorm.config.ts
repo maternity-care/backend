@@ -9,8 +9,8 @@ import { Appointment } from './entities/appointment.entity';
 import { AppointmentReminder } from './entities/appointment-reminder.entity';
 import { AppointmentStatusLog } from './entities/appointment-status-log.entity';
 import { Article } from './entities/article.entity';
-import { ChatConversation } from './entities/chat-conversation.entity';
-import { ChatMessage } from './entities/chat-message.entity';
+import { ChatConversation } from '../modules/chatbot/entities/chat-conversation.entity';
+import { ChatMessage } from '../modules/chatbot/entities/chat-message.entity';
 import { ContentReport } from './entities/content-report.entity';
 import { Doctor } from '../modules/doctors/entities/doctor.entity';
 import { DoctorShiftChangeLog } from '../modules/shifts/entities/doctor-shift-change-log.entity';
@@ -56,6 +56,10 @@ import { UpdateServicePackageDesign1785120000000 } from './migrations/1785120000
 import { UseDynamicServiceTypes1785200000000 } from './migrations/1785200000000-UseDynamicServiceTypes';
 import { MakeFacilityLocationNullable1785300000000 } from './migrations/1785300000000-MakeFacilityLocationNullable';
 import { AddPackageStages1785400000000 } from './migrations/1785400000000-AddPackageStages';
+import { AddChatbotPersistence1785500000000 } from './migrations/1785500000000-AddChatbotPersistence';
+import { AddChatbotGuestAndUploadRateLimit1785600000000 } from './migrations/1785600000000-AddChatbotGuestAndUploadRateLimit';
+import { UseAppointmentTimestamps1785700000000 } from './migrations/1785700000000-UseAppointmentTimestamps';
+import { MakeAppointmentPregnancyProfileNullable1785800000000 } from './migrations/1785800000000-MakeAppointmentPregnancyProfileNullable';
 
 config();
 
@@ -126,6 +130,10 @@ export const typeOrmConfig: DataSourceOptions = {
     UseDynamicServiceTypes1785200000000,
     MakeFacilityLocationNullable1785300000000,
     AddPackageStages1785400000000,
+    AddChatbotPersistence1785500000000,
+    AddChatbotGuestAndUploadRateLimit1785600000000,
+    UseAppointmentTimestamps1785700000000,
+    MakeAppointmentPregnancyProfileNullable1785800000000,
   ],
   charset: 'utf8mb4_unicode_ci',
 };

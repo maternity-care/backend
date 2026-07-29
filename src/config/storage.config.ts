@@ -10,6 +10,11 @@ export default () => ({
     forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
     maxFileSizeMb: Number(process.env.UPLOAD_MAX_FILE_SIZE_MB ?? 10),
     presignExpiresIn: Number(process.env.UPLOAD_PRESIGN_EXPIRES_IN ?? 300),
+    objectAcl: process.env.UPLOAD_OBJECT_ACL ?? 'public-read',
+    downloadExpiresIn: Number(process.env.UPLOAD_DOWNLOAD_EXPIRES_IN ?? 3600),
+    userRateLimit: Number(process.env.UPLOAD_USER_RATE_LIMIT ?? 20),
+    managementRateLimit: Number(process.env.UPLOAD_MANAGEMENT_RATE_LIMIT ?? 60),
+    rateLimitWindowSeconds: Number(process.env.UPLOAD_RATE_LIMIT_WINDOW_SECONDS ?? 600),
     allowedMimeTypes: (
       process.env.UPLOAD_ALLOWED_MIME_TYPES ?? 'image/jpeg,image/png,image/webp,application/pdf'
     )

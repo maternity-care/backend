@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
   CreatePresignedUploadInput,
@@ -35,14 +35,26 @@ export class S3StorageService implements IStorageService {
       Bucket: bucket,
       Key: input.key,
       ContentType: input.mimeType,
+      ACL: input.objectAcl,
     });
     const signedUrl = await getSignedUrl(this.client, command, {
       expiresIn: input.expiresIn,
     });
+    const downloadUrl = await getSignedUrl(
+      this.client,
+      new GetObjectCommand({
+        Bucket: bucket,
+        Key: input.key,
+      }),
+      {
+        expiresIn: this.configService.get<number>('storage.downloadExpiresIn') ?? 3600,
+      },
+    );
 
     return {
       key: input.key,
       url: signedUrl,
+      downloadUrl,
       publicUrl: this.buildPublicUrl(bucket, input.key),
       bucket,
       method: 'PUT',
@@ -51,6 +63,23 @@ export class S3StorageService implements IStorageService {
       },
       expiresIn: input.expiresIn,
     };
+  }
+
+  async createPresignedDownload(input: { key: string; expiresIn: number }): Promise<string> {
+    const bucket = this.configService.getOrThrow<string>('storage.bucket');
+    return getSignedUrl(
+      this.client,
+      new GetObjectCommand({
+        Bucket: bucket,
+        Key: input.key,
+      }),
+      { expiresIn: input.expiresIn },
+    );
+  }
+
+  createPublicUrl(key: string): string {
+    const bucket = this.configService.getOrThrow<string>('storage.bucket');
+    return this.buildPublicUrl(bucket, key);
   }
 
   private buildPublicUrl(bucket: string, key: string): string {
