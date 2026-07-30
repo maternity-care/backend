@@ -5,6 +5,11 @@ export class SearchAppointmentsDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  search?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   facilityId?: string;
 
   @ApiPropertyOptional()
