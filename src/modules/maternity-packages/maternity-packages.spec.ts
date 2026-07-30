@@ -151,6 +151,12 @@ describe('MaternityPackagesService business logic', () => {
     findById: jest.fn().mockResolvedValue({ id: '1', status: 'active' }),
   };
   const facilityServicesService = {
+    ensureAvailableForPackage: jest.fn().mockResolvedValue({
+      id: '10',
+      facilityId: '1',
+      serviceId: '5',
+      status: 'active',
+    }),
     findDetailsById: jest.fn().mockResolvedValue({
       id: '10',
       facilityId: '1',
@@ -228,6 +234,45 @@ describe('MaternityPackagesService business logic', () => {
           facilityServiceId: '10',
           includedQuantity: 2,
           allowedFacilityScope: 'all',
+        }),
+      ],
+    );
+  });
+
+  // Vai tro: facility co the chon service goc trong catalog, backend tu tao/tim facility-service de dua vao goi.
+  it('creates package items from global service ids without manual facility assignment', async () => {
+    const { repo, service } = createService();
+
+    await expect(service.createQuantity({
+      facilityId: '1',
+      name: 'Goi thai san theo so luot',
+      price: '900000.00',
+      status: MaternityPackageStatus.DRAFT,
+      services: [
+        {
+          serviceId: '5',
+          includedQuantity: 2,
+          isRequired: true,
+          isOptional: false,
+        },
+      ],
+    })).resolves.toMatchObject({
+      id: '1',
+      services: [
+        expect.objectContaining({
+          facilityServiceId: '10',
+          includedQuantity: 2,
+        }),
+      ],
+    });
+
+    expect(facilityServicesService.ensureAvailableForPackage).toHaveBeenCalledWith('1', '5');
+    expect(repo.saveWithItems).toHaveBeenCalledWith(
+      expect.objectContaining({ facilityId: '1' }),
+      [
+        expect.objectContaining({
+          facilityServiceId: '10',
+          includedQuantity: 2,
         }),
       ],
     );

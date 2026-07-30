@@ -12,7 +12,12 @@ import {
   CreateFacilityServiceDto,
 } from './dto/requests/create-facility-service.dto';
 import { SearchFacilityServiceDto } from './dto/requests/search-facility-service.dto';
+import { PackageItem } from '../package-services/entities/package-item.entity';
+import { PackageServiceFacility } from '../package-services/entities/package-service-facility.entity';
+import { ServiceSaleMode } from '../services/dto/requests/create-service.dto';
+import { FacilityService } from './entities/facility-service.entity';
 import { FacilityServicesController } from './facility-services.controller';
+import { FacilityServicesRepository } from './repositories/facility-services.repository';
 import { FacilityServicesService } from './facility-services.service';
 import { PublicFacilityServicesController } from './public-facility-services.controller';
 
@@ -84,6 +89,7 @@ describe('FacilityServicesService business logic', () => {
     status: ActiveStatus.ACTIVE,
     serviceTypeId: '1',
     serviceType: { id: '1', code: 'ULTRASOUND', name: 'Siêu âm', status: ActiveStatus.ACTIVE },
+    saleMode: ServiceSaleMode.BOTH,
     basePrice: '300000.00',
     defaultDurationMinutes: 30,
   };
@@ -132,6 +138,30 @@ describe('FacilityServicesService business logic', () => {
     expect(facilitiesService.findById).toHaveBeenCalledWith('1');
     expect(servicesService.findById).toHaveBeenCalledWith('2');
     expect(repo.findByFacilityAndService).toHaveBeenCalledWith('1', '2');
+  });
+
+  // Vai tro: khi co so dua service global vao goi, backend tu tao mapping facility-service neu chua co.
+  it('ensures a global service is available for package usage without manual assignment', async () => {
+    const { repo, service: facilityServicesService } = createService();
+
+    await expect(facilityServicesService.ensureAvailableForPackage('1', '2')).resolves.toMatchObject({
+      id: '10',
+      facilityId: '1',
+      serviceId: '2',
+      price: '300000.00',
+      durationMinutes: 30,
+      status: ActiveStatus.ACTIVE,
+    });
+
+    expect(repo.findByFacilityAndService).toHaveBeenCalledWith('1', '2');
+    expect(repo.create).toHaveBeenCalledWith({
+      facilityId: '1',
+      serviceId: '2',
+      price: '300000.00',
+      durationMinutes: 30,
+      status: ActiveStatus.ACTIVE,
+    });
+    expect(repo.save).toHaveBeenCalled();
   });
 
   // Vai tro: gan hang loat service vao co so va tu lay gia/thoi luong mac dinh neu item khong gui.
@@ -295,6 +325,65 @@ describe('FacilityServicesService business logic', () => {
       expect.objectContaining({ id: '10' }),
       ActiveStatus.INACTIVE,
     );
+  });
+});
+
+describe('FacilityServicesRepository remove rules', () => {
+  const createQueryBuilderMock = (count = '0') => ({
+    select: jest.fn().mockReturnThis(),
+    from: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    getRawOne: jest.fn().mockResolvedValue({ count }),
+  });
+
+  const createRepository = () => {
+    const transactionManager = {
+      find: jest.fn().mockResolvedValue([{ id: 'package-item-1' }]),
+      delete: jest.fn().mockResolvedValue(undefined),
+      remove: jest.fn().mockResolvedValue(undefined),
+    };
+    const manager = {
+      createQueryBuilder: jest.fn(),
+      transaction: jest.fn(async (callback) => callback(transactionManager)),
+    };
+    const repository = {
+      manager,
+    };
+
+    return {
+      repository,
+      transactionManager,
+      facilityServicesRepository: new FacilityServicesRepository(repository as never),
+    };
+  };
+
+  it('counts only generated facility-service history as delete dependency', async () => {
+    const { repository, facilityServicesRepository } = createRepository();
+    repository.manager.createQueryBuilder.mockImplementation(() => createQueryBuilderMock('1'));
+
+    await expect(facilityServicesRepository.countDependencies('1', '2', '10')).resolves.toBe(2);
+    expect(repository.manager.createQueryBuilder).toHaveBeenCalledTimes(2);
+  });
+
+  it('hard deletes package configuration before removing the facility-service mapping', async () => {
+    const { repository, transactionManager, facilityServicesRepository } = createRepository();
+    const entity = { id: '10', facilityId: '1', serviceId: '2' } as FacilityService;
+
+    await facilityServicesRepository.remove(entity);
+
+    expect(repository.manager.transaction).toHaveBeenCalled();
+    expect(transactionManager.find).toHaveBeenCalledWith(PackageItem, {
+      where: { facilityServiceId: '10' },
+      select: { id: true },
+    });
+    expect(transactionManager.delete).toHaveBeenNthCalledWith(1, PackageServiceFacility, {
+      packageItemId: expect.any(Object),
+    });
+    expect(transactionManager.delete).toHaveBeenNthCalledWith(2, PackageItem, {
+      id: expect.any(Object),
+    });
+    expect(transactionManager.remove).toHaveBeenCalledWith(FacilityService, entity);
   });
 });
 

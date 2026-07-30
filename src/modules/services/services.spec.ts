@@ -5,7 +5,12 @@ import { ActiveStatus } from '../../common/constants/status.enum';
 import { SERVICE_CONSTANT } from '../../common/constants/service.constant';
 import { CreateServiceDto } from './dto/requests/create-service.dto';
 import { SearchServiceDto } from './dto/requests/search-service.dto';
+import { FacilityService } from '../facility-services/entities/facility-service.entity';
+import { PackageItem } from '../package-services/entities/package-item.entity';
+import { PackageServiceFacility } from '../package-services/entities/package-service-facility.entity';
 import { ServicesController } from './services.controller';
+import { Service } from './entities/service.entity';
+import { ServicesRepository } from './repositories/services.repository';
 import { ServicesService } from './services.service';
 
 describe('Services DTO validation', () => {
@@ -282,6 +287,73 @@ describe('ServicesService business logic', () => {
       expect.objectContaining({ id: '1' }),
       ActiveStatus.INACTIVE,
     );
+  });
+});
+
+describe('ServicesRepository remove rules', () => {
+  const createQueryBuilderMock = (count = '0') => ({
+    select: jest.fn().mockReturnThis(),
+    from: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    getRawOne: jest.fn().mockResolvedValue({ count }),
+  });
+
+  const createRepository = () => {
+    const transactionManager = {
+      find: jest.fn()
+        .mockResolvedValueOnce([{ id: 'facility-service-1' }])
+        .mockResolvedValueOnce([{ id: 'package-item-1' }]),
+      delete: jest.fn().mockResolvedValue(undefined),
+      remove: jest.fn().mockResolvedValue(undefined),
+    };
+    const manager = {
+      createQueryBuilder: jest.fn(),
+      transaction: jest.fn(async (callback) => callback(transactionManager)),
+    };
+    const repository = {
+      manager,
+    };
+
+    return {
+      repository,
+      transactionManager,
+      servicesRepository: new ServicesRepository(repository as never),
+    };
+  };
+
+  it('counts only generated standalone service history as delete dependency', async () => {
+    const { repository, servicesRepository } = createRepository();
+    repository.manager.createQueryBuilder.mockImplementation(() => createQueryBuilderMock('1'));
+
+    await expect(servicesRepository.countDependencies('1')).resolves.toBe(3);
+    expect(repository.manager.createQueryBuilder).toHaveBeenCalledTimes(3);
+  });
+
+  it('hard deletes service configuration before removing the base service', async () => {
+    const { repository, transactionManager, servicesRepository } = createRepository();
+    const entity = { id: '1' } as Service;
+
+    await servicesRepository.remove(entity);
+
+    expect(repository.manager.transaction).toHaveBeenCalled();
+    expect(transactionManager.find).toHaveBeenNthCalledWith(1, FacilityService, {
+      where: { serviceId: '1' },
+      select: { id: true },
+    });
+    expect(transactionManager.find).toHaveBeenNthCalledWith(2, PackageItem, {
+      where: { facilityServiceId: expect.any(Object) },
+      select: { id: true },
+    });
+    expect(transactionManager.delete).toHaveBeenNthCalledWith(1, PackageServiceFacility, {
+      packageItemId: expect.any(Object),
+    });
+    expect(transactionManager.delete).toHaveBeenNthCalledWith(2, PackageItem, {
+      id: expect.any(Object),
+    });
+    expect(transactionManager.delete).toHaveBeenNthCalledWith(3, FacilityService, {
+      id: expect.any(Object),
+    });
+    expect(transactionManager.remove).toHaveBeenCalledWith(Service, entity);
   });
 });
 
