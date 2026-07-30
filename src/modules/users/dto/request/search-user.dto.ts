@@ -6,6 +6,11 @@ export class SearchUserDto {
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
+  search?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
   name?: string;
 
   @ApiPropertyOptional()
@@ -27,6 +32,11 @@ export class SearchUserDto {
   @IsEnum(AccountStatus)
   @IsOptional()
   status?: AccountStatus;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  roleId?: string;
 
   @ApiPropertyOptional()
   @IsString()

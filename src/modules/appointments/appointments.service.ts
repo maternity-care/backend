@@ -222,6 +222,23 @@ export class AppointmentsService {
     if (query.dateFrom) qb.andWhere('DATE(appointment.scheduled_start) >= :dateFrom', { dateFrom: query.dateFrom });
     if (query.dateTo) qb.andWhere('DATE(appointment.scheduled_start) <= :dateTo', { dateTo: query.dateTo });
     if (query.scope === 'mine') qb.andWhere('appointment.doctor_id = :actorId', { actorId });
+    if (query.search?.trim()) {
+      const keyword = `%${query.search.trim().toLowerCase()}%`;
+      qb.andWhere(
+        `(
+          LOWER(CAST(appointment.id AS CHAR)) LIKE :keyword
+          OR LOWER(CAST(patient.id AS CHAR)) LIKE :keyword
+          OR LOWER(COALESCE(patient.name, '')) LIKE :keyword
+          OR LOWER(COALESCE(patient.phone, '')) LIKE :keyword
+          OR LOWER(COALESCE(patient.email, '')) LIKE :keyword
+          OR LOWER(COALESCE(service.name, '')) LIKE :keyword
+          OR LOWER(COALESCE(staff.name, '')) LIKE :keyword
+          OR LOWER(COALESCE(facility.name, '')) LIKE :keyword
+          OR LOWER(COALESCE(profile.code, '')) LIKE :keyword
+        )`,
+        { keyword },
+      );
+    }
 
     const rows = await qb
       .orderBy('appointment.created_at', 'DESC')
