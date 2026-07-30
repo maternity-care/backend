@@ -41,6 +41,11 @@ export class SearchUserDto {
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
+  facilityId?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
   page?: number;
 
   @ApiPropertyOptional()
