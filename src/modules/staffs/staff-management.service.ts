@@ -29,14 +29,17 @@ export class StaffManagementService {
     const keyword = searchValue('keyword') || query.name || query.email || query.phone || query.cccd;
     const role = searchValue('role');
     const roleId = searchValue('roleId') || query.roleId;
+    const facilityId = searchValue('facilityId') || query.facilityId;
     const status = searchValue('status') || query.status;
     const normalizedKeyword = keyword?.trim().toLowerCase();
     const normalizedRole = role?.trim().toLowerCase();
     const normalizedRoleId = roleId?.trim();
+    const normalizedFacilityId = facilityId?.trim();
 
     const staffs = await this.staffProfileRepository.findAll();
     const filteredStaffs = staffs.filter((staff) => {
       if (status && staff.status !== status) return false;
+      if (normalizedFacilityId && String(staff.facilityId) !== normalizedFacilityId) return false;
       if (
         normalizedKeyword &&
         ![staff.name, staff.email, staff.personalEmail, staff.phone, staff.employeeCode]
