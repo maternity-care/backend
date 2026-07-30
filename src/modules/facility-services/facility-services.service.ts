@@ -6,6 +6,7 @@ import {
 import { FACILITY_SERVICE_CONSTANT } from '../../common/constants/facility-service.constant';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
 import { ServicesService } from '../services/services.service';
+import { ServiceSaleMode } from '../services/dto/requests/create-service.dto';
 import { FacilityService } from './entities/facility-service.entity';
 import { FacilitiesService } from '../facilities/facilities.service';
 import {
@@ -153,6 +154,40 @@ export class FacilityServicesService {
       throw new NotFoundException(FACILITY_SERVICE_CONSTANT.NOT_FOUND);
     }
     return services;
+  }
+
+  async ensureAvailableForPackage(facilityId: string, serviceId: string): Promise<FacilityService> {
+    const [facility, service] = await Promise.all([
+      this.facilitiesService.findById(facilityId),
+      this.servicesService.findById(serviceId),
+    ]);
+
+    if (facility.status !== FacilityStatus.ACTIVE) {
+      throw new ConflictException(FACILITY_SERVICE_CONSTANT.FACILITY_INACTIVE);
+    }
+    if (service.status !== ActiveStatus.ACTIVE) {
+      throw new ConflictException(FACILITY_SERVICE_CONSTANT.SERVICE_INACTIVE);
+    }
+    if (service.saleMode === ServiceSaleMode.STANDALONE) {
+      throw new ConflictException(FACILITY_SERVICE_CONSTANT.SERVICE_INACTIVE);
+    }
+
+    const existing = await this.repository.findByFacilityAndService(facilityId, serviceId);
+    if (existing) {
+      if (existing.status !== ActiveStatus.ACTIVE) {
+        existing.status = ActiveStatus.ACTIVE;
+        return this.repository.save(existing);
+      }
+      return existing;
+    }
+
+    return this.repository.save(this.repository.create({
+      facilityId,
+      serviceId,
+      price: service.basePrice,
+      durationMinutes: service.defaultDurationMinutes,
+      status: ActiveStatus.ACTIVE,
+    }));
   }
 
   // Tìm một mapping theo id, dùng cho detail/update/delete.

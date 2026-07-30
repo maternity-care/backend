@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
+import { DeepPartial, In, Repository, SelectQueryBuilder } from 'typeorm';
 import {
   ActiveStatus,
   FacilityStatus,
 } from '../../../common/constants/status.enum';
+import { PackageItem } from '../../package-services/entities/package-item.entity';
+import { PackageServiceFacility } from '../../package-services/entities/package-service-facility.entity';
+import { ServiceSaleMode } from '../../services/dto/requests/create-service.dto';
 import { FacilityServiceResponseDto } from '../dto/responses/facility-service-response.dto';
 import { SearchFacilityServiceDto } from '../dto/requests/search-facility-service.dto';
 import { FacilityService } from '../entities/facility-service.entity';
@@ -37,7 +40,20 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
 
   // Xóa cứng mapping khi chưa có dữ liệu phụ thuộc.
   async remove(entity: FacilityService): Promise<void> {
-    await this.repository.remove(entity);
+    await this.repository.manager.transaction(async (manager) => {
+      const packageItems = await manager.find(PackageItem, {
+        where: { facilityServiceId: entity.id },
+        select: { id: true },
+      });
+      const packageItemIds = packageItems.map((item) => item.id);
+
+      if (packageItemIds.length > 0) {
+        await manager.delete(PackageServiceFacility, { packageItemId: In(packageItemIds) });
+        await manager.delete(PackageItem, { id: In(packageItemIds) });
+      }
+
+      await manager.remove(FacilityService, entity);
+    });
   }
 
   // Tìm mapping theo id, dùng cho update/delete.
@@ -82,6 +98,9 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
       .andWhere('facilityService.status = :facilityServiceActive', { facilityServiceActive: ActiveStatus.ACTIVE })
       .andWhere('service.status = :active', { active: ActiveStatus.ACTIVE })
       .andWhere('facility.status = :facilityActive', { facilityActive: FacilityStatus.ACTIVE })
+      .andWhere('service.sale_mode IN (:...publicSaleModes)', {
+        publicSaleModes: [ServiceSaleMode.STANDALONE, ServiceSaleMode.BOTH],
+      })
       .orderBy('service.name', 'ASC');
 
     if (filters?.serviceTypeId) {
@@ -107,13 +126,12 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
     const tables = [
       { table: 'appointments', facilityColumn: 'facility_id', serviceColumn: 'service_id' },
       { table: 'patient_extra_services', facilityColumn: 'facility_id', serviceColumn: 'service_id' },
-      { table: 'package_items', facilityColumn: null, serviceColumn: 'facility_service_id' },
     ];
 
     const rows = await Promise.all(
-      tables.map((item) => item.facilityColumn
-        ? this.countRowsIfTableExists(item.table, item.facilityColumn, item.serviceColumn, facilityId, serviceId)
-        : this.countRowsByFacilityServiceIdIfTableExists(item.table, item.serviceColumn, facilityServiceId ?? '0')),
+      tables.map((item) =>
+        this.countRowsIfTableExists(item.table, item.facilityColumn, item.serviceColumn, facilityId, serviceId),
+      ),
     );
 
     return rows.reduce((total, count) => total + count, 0);
@@ -220,27 +238,6 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
         .from(table, table)
         .where(`${table}.${facilityColumn} = :facilityId`, { facilityId })
         .andWhere(`${table}.${serviceColumn} = :serviceId`, { serviceId })
-        .getRawOne<{ count: string }>();
-      return Number(row?.count ?? 0);
-    } catch (error) {
-      if ((error as { code?: string; errno?: number }).code === 'ER_NO_SUCH_TABLE' || (error as { errno?: number }).errno === 1146) {
-        return 0;
-      }
-      throw error;
-    }
-  }
-
-  private async countRowsByFacilityServiceIdIfTableExists(
-    table: string,
-    column: string,
-    facilityServiceId: string,
-  ): Promise<number> {
-    try {
-      const row = await this.repository.manager
-        .createQueryBuilder()
-        .select('COUNT(*)', 'count')
-        .from(table, table)
-        .where(`${table}.${column} = :facilityServiceId`, { facilityServiceId })
         .getRawOne<{ count: string }>();
       return Number(row?.count ?? 0);
     } catch (error) {

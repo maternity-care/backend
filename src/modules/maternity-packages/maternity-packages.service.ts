@@ -315,23 +315,18 @@ export class MaternityPackagesService {
       throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_INVALID);
     }
 
-    this.ensureNoDuplicatedFacilityServiceInSameGroup(services);
-
     const items: Partial<PackageItem>[] = [];
+    const facilityServiceIds = new Set<string>();
     for (const [index, item] of services.entries()) {
-      const facilityService = await this.facilityServicesService.findDetailsById(item.facilityServiceId);
-      if (facilityService.facilityId !== packageFacilityId) {
-        throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_NOT_IN_PACKAGE_FACILITY);
+      const facilityServiceId = await this.resolvePackageFacilityServiceId(packageFacilityId, item);
+
+      if (facilityServiceIds.has(facilityServiceId)) {
+        throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.PACKAGE_ITEM_DUPLICATED);
       }
-      if (facilityService.status !== ActiveStatus.ACTIVE) {
-        throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_UNAVAILABLE);
-      }
-      if (facilityService.service.status !== ActiveStatus.ACTIVE) {
-        throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_INVALID);
-      }
+      facilityServiceIds.add(facilityServiceId);
 
       items.push({
-        facilityServiceId: item.facilityServiceId,
+        facilityServiceId,
         includedQuantity: item.includedQuantity,
         isRequired: item.isRequired,
         isOptional: item.isOptional,
@@ -343,15 +338,36 @@ export class MaternityPackagesService {
     return items;
   }
 
-  private ensureNoDuplicatedFacilityServiceInSameGroup(
-    services: MaternityPackageServiceInputDto[],
-  ): void {
-    const ids = new Set<string>();
-    for (const service of services) {
-      if (ids.has(service.facilityServiceId)) {
-        throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.PACKAGE_ITEM_DUPLICATED);
-      }
-      ids.add(service.facilityServiceId);
+  private async resolvePackageFacilityServiceId(
+    packageFacilityId: string,
+    item: MaternityPackageServiceInputDto,
+  ): Promise<string> {
+    if (!this.facilityServicesService) {
+      throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_INVALID);
     }
+
+    if (item.serviceId) {
+      const facilityService = await this.facilityServicesService.ensureAvailableForPackage(
+        packageFacilityId,
+        item.serviceId,
+      );
+      return facilityService.id;
+    }
+
+    if (!item.facilityServiceId) {
+      throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_INVALID);
+    }
+
+    const facilityService = await this.facilityServicesService.findDetailsById(item.facilityServiceId);
+    if (facilityService.facilityId !== packageFacilityId) {
+      throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_NOT_IN_PACKAGE_FACILITY);
+    }
+    if (facilityService.status !== ActiveStatus.ACTIVE) {
+      throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_UNAVAILABLE);
+    }
+    if (facilityService.service.status !== ActiveStatus.ACTIVE) {
+      throw new ConflictException(MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_INVALID);
+    }
+    return item.facilityServiceId;
   }
 }

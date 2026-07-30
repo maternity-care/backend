@@ -15,6 +15,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { MaternityPackageStatus } from '../../../../common/constants/status.enum';
@@ -40,10 +41,17 @@ function parseBooleanInput(value: unknown): unknown {
 }
 
 export class MaternityPackageServiceInputDto {
-  @ApiProperty({ example: '3', description: 'ID của bảng facility_services, không phải services.id' })
+  @ApiPropertyOptional({ example: '5', description: 'ID cua bang services; backend se tu tao facility_services neu can' })
+  @ValidateIf((item: MaternityPackageServiceInputDto) => !item.facilityServiceId)
   @IsString()
   @Matches(POSITIVE_ID_PATTERN)
-  facilityServiceId: string;
+  serviceId?: string;
+
+  @ApiPropertyOptional({ example: '3', description: 'ID cua bang facility_services; giu de tuong thich payload cu' })
+  @ValidateIf((item: MaternityPackageServiceInputDto) => !item.serviceId)
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  facilityServiceId?: string;
 
   @ApiProperty({ example: 2, minimum: 1, maximum: 100 })
   @Type(() => Number)
@@ -135,7 +143,7 @@ export class MaternityPackageStageInputDto {
 
   @ApiProperty({
     type: [MaternityPackageServiceInputDto],
-    description: 'Danh sách dịch vụ thuộc mốc/lộ trình này; phải là facilityServiceId của cùng cơ sở với gói',
+    description: 'Danh sach dich vu thuoc moc/lo trinh nay; uu tien gui serviceId, backend se tu tao facility_services neu can',
   })
   @IsArray()
   @ArrayNotEmpty()
@@ -208,12 +216,12 @@ export class CreateMaternityPackageDto {
 
   @ApiPropertyOptional({
     type: [MaternityPackageServiceInputDto],
-    description: 'Dùng cho packageType = quantity. Danh sách dịch vụ trong gói; dùng facilityServiceId để giữ đúng giá/thời lượng theo cơ sở',
+    description: 'Dung cho packageType = quantity. Uu tien gui serviceId; backend se tu tao facility_services neu can',
   })
   @IsOptional()
   @IsArray()
   @ArrayNotEmpty()
-  @ArrayUnique((item: MaternityPackageServiceInputDto) => item.facilityServiceId)
+  @ArrayUnique((item: MaternityPackageServiceInputDto) => item.serviceId ?? item.facilityServiceId)
   @ValidateNested({ each: true })
   @Type(() => MaternityPackageServiceInputDto)
   services?: MaternityPackageServiceInputDto[];
@@ -238,11 +246,11 @@ export class CreateQuantityMaternityPackageDto extends OmitType(CreateMaternityP
 ] as const) {
   @ApiProperty({
     type: [MaternityPackageServiceInputDto],
-    description: 'Danh sach dich vu trong goi theo so luot; dung facilityServiceId cua co so dang tao goi',
+    description: 'Danh sach dich vu trong goi theo so luot; uu tien dung serviceId cua catalog global',
   })
   @IsArray()
   @ArrayNotEmpty()
-  @ArrayUnique((item: MaternityPackageServiceInputDto) => item.facilityServiceId)
+  @ArrayUnique((item: MaternityPackageServiceInputDto) => item.serviceId ?? item.facilityServiceId)
   @ValidateNested({ each: true })
   @Type(() => MaternityPackageServiceInputDto)
   services: MaternityPackageServiceInputDto[];

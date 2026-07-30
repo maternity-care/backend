@@ -151,6 +151,12 @@ describe('MaternityPackagesService business logic', () => {
     findById: jest.fn().mockResolvedValue({ id: '1', status: 'active' }),
   };
   const facilityServicesService = {
+    ensureAvailableForPackage: jest.fn().mockResolvedValue({
+      id: '10',
+      facilityId: '1',
+      serviceId: '5',
+      status: 'active',
+    }),
     findDetailsById: jest.fn().mockResolvedValue({
       id: '10',
       facilityId: '1',
@@ -228,6 +234,45 @@ describe('MaternityPackagesService business logic', () => {
           facilityServiceId: '10',
           includedQuantity: 2,
           allowedFacilityScope: 'all',
+        }),
+      ],
+    );
+  });
+
+  // Vai tro: facility co the chon service goc trong catalog, backend tu tao/tim facility-service de dua vao goi.
+  it('creates package items from global service ids without manual facility assignment', async () => {
+    const { repo, service } = createService();
+
+    await expect(service.createQuantity({
+      facilityId: '1',
+      name: 'Goi thai san theo so luot',
+      price: '900000.00',
+      status: MaternityPackageStatus.DRAFT,
+      services: [
+        {
+          serviceId: '5',
+          includedQuantity: 2,
+          isRequired: true,
+          isOptional: false,
+        },
+      ],
+    })).resolves.toMatchObject({
+      id: '1',
+      services: [
+        expect.objectContaining({
+          facilityServiceId: '10',
+          includedQuantity: 2,
+        }),
+      ],
+    });
+
+    expect(facilityServicesService.ensureAvailableForPackage).toHaveBeenCalledWith('1', '5');
+    expect(repo.saveWithItems).toHaveBeenCalledWith(
+      expect.objectContaining({ facilityId: '1' }),
+      [
+        expect.objectContaining({
+          facilityServiceId: '10',
+          includedQuantity: 2,
         }),
       ],
     );
@@ -632,6 +677,35 @@ describe('MaternityPackagesRepository remove rules', () => {
     expect(transactionManager.delete).toHaveBeenNthCalledWith(2, PackageStage, { packageId: '1' });
     expect(transactionManager.remove).toHaveBeenCalledWith(MaternityPackage, entity);
   });
+
+  it('applies plain text package search to code, name, and description', () => {
+    const queryBuilder = {
+      andWhere: jest.fn().mockReturnThis(),
+    };
+    const repository = {
+      createQueryBuilder: jest.fn().mockReturnValue(queryBuilder),
+    };
+    const maternityPackagesRepository = new MaternityPackagesRepository(
+      repository as never,
+      {} as never,
+      {} as never,
+    );
+
+    (maternityPackagesRepository as any).buildBasePackageQuery({ search: 'abc' });
+
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+      expect.stringContaining('pkg.code'),
+      { search: '%abc%' },
+    );
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+      expect.stringContaining('pkg.name'),
+      { search: '%abc%' },
+    );
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+      expect.stringContaining('pkg.description'),
+      { search: '%abc%' },
+    );
+  });
 });
 
 describe('PublicMaternityPackagesController', () => {
@@ -647,8 +721,8 @@ describe('PublicMaternityPackagesController', () => {
       findAllPaginated: jest.fn().mockResolvedValue({ items: [activePackage], total: 1 }),
     };
     const controller = new PublicMaternityPackagesController(service as never);
-    const plainQuery = {} as SearchMaternityPackageDto;
-    const pagedQuery = { page: 1 } as SearchMaternityPackageDto;
+    const plainQuery = { search: 'basic' } as SearchMaternityPackageDto;
+    const pagedQuery = { page: 1, search: 'vip' } as SearchMaternityPackageDto;
 
     await expect(controller.findAll(plainQuery)).resolves.toMatchObject({
       message: MATERNITY_PACKAGE_CONSTANT.FOUND,
@@ -660,6 +734,15 @@ describe('PublicMaternityPackagesController', () => {
     });
     expect(plainQuery.status).toBe(MaternityPackageStatus.ACTIVE);
     expect(pagedQuery.status).toBe(MaternityPackageStatus.ACTIVE);
+    expect(service.findAll).toHaveBeenCalledWith({
+      search: 'basic',
+      status: MaternityPackageStatus.ACTIVE,
+    });
+    expect(service.findAllPaginated).toHaveBeenCalledWith({
+      page: 1,
+      search: 'vip',
+      status: MaternityPackageStatus.ACTIVE,
+    });
   });
 
   // Vai tro: dam bao public detail tra package khi package dang active.
@@ -714,11 +797,11 @@ describe('PublicFacilityMaternityPackagesController', () => {
     const service = createServiceMock();
     const controller = new PublicFacilityMaternityPackagesController(service as never);
 
-    await expect(controller.findAvailablePackagesByFacility('1', {} as never)).resolves.toMatchObject({
+    await expect(controller.findAvailablePackagesByFacility('1', { search: 'basic' } as never)).resolves.toMatchObject({
       message: MATERNITY_PACKAGE_CONSTANT.FOUND,
       data: [availablePackage],
     });
-    expect(service.findAvailableByFacilityId).toHaveBeenCalledWith('1', {});
+    expect(service.findAvailableByFacilityId).toHaveBeenCalledWith('1', { search: 'basic' });
   });
 
   // Vai tro: dam bao API public theo facility chon ham phan trang khi query co page.
@@ -726,11 +809,11 @@ describe('PublicFacilityMaternityPackagesController', () => {
     const service = createServiceMock();
     const controller = new PublicFacilityMaternityPackagesController(service as never);
 
-    await expect(controller.findAvailablePackagesByFacility('1', { page: 1 } as never)).resolves.toMatchObject({
+    await expect(controller.findAvailablePackagesByFacility('1', { page: 1, search: 'vip' } as never)).resolves.toMatchObject({
       message: MATERNITY_PACKAGE_CONSTANT.FOUND,
       data: { total: 1 },
     });
-    expect(service.findAvailableByFacilityIdPaginated).toHaveBeenCalledWith('1', { page: 1 });
+    expect(service.findAvailableByFacilityIdPaginated).toHaveBeenCalledWith('1', { page: 1, search: 'vip' });
   });
 });
 

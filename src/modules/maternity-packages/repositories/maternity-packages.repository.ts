@@ -6,7 +6,6 @@ import {
   MaternityPackageStatus,
 } from '../../../common/constants/status.enum';
 import { PaginationResult } from '../../../common/helpers/pagination';
-import { searchBuilder } from '../../../common/helpers/search-builder';
 import { PackageItem } from '../../package-services/entities/package-item.entity';
 import { PackageServiceFacilityScope } from '../../package-services/dto/requests/create-package-service.dto';
 import { MaternityPackageResponseDto } from '../dto/responses/maternity-package-response.dto';
@@ -328,9 +327,16 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
   ): SelectQueryBuilder<MaternityPackage> {
     const query = this.repository.createQueryBuilder('pkg');
 
-    searchBuilder(query, filters?.search, {
-      columns: ['code', 'name', 'description'],
-    });
+    if (filters?.search) {
+      query.andWhere(
+        `(${[
+          'LOWER(pkg.code) LIKE LOWER(:search)',
+          'LOWER(pkg.name) LIKE LOWER(:search)',
+          'LOWER(pkg.description) LIKE LOWER(:search)',
+        ].join(' OR ')})`,
+        { search: `%${filters.search}%` },
+      );
+    }
 
     if (filters?.status) {
       query.andWhere('pkg.status = :status', { status: filters.status });

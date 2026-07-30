@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
+import { DeepPartial, In, Repository, SelectQueryBuilder } from 'typeorm';
 import { ActiveStatus } from '../../../common/constants/status.enum';
 import { paginate } from '../../../common/helpers/pagination';
+import { FacilityService } from '../../facility-services/entities/facility-service.entity';
+import { PackageItem } from '../../package-services/entities/package-item.entity';
+import { PackageServiceFacility } from '../../package-services/entities/package-service-facility.entity';
 import { SearchServiceDto } from '../dto/requests/search-service.dto';
 import { Service } from '../entities/service.entity';
 import { IServicesRepository } from '../interfaces/services-repository.interface';
@@ -23,7 +26,30 @@ export class ServicesRepository implements IServicesRepository {
   }
 
   async remove(service: Service): Promise<void> {
-    await this.repository.remove(service);
+    await this.repository.manager.transaction(async (manager) => {
+      const facilityServices = await manager.find(FacilityService, {
+        where: { serviceId: service.id },
+        select: { id: true },
+      });
+      const facilityServiceIds = facilityServices.map((item) => item.id);
+
+      if (facilityServiceIds.length > 0) {
+        const packageItems = await manager.find(PackageItem, {
+          where: { facilityServiceId: In(facilityServiceIds) },
+          select: { id: true },
+        });
+        const packageItemIds = packageItems.map((item) => item.id);
+
+        if (packageItemIds.length > 0) {
+          await manager.delete(PackageServiceFacility, { packageItemId: In(packageItemIds) });
+          await manager.delete(PackageItem, { id: In(packageItemIds) });
+        }
+
+        await manager.delete(FacilityService, { id: In(facilityServiceIds) });
+      }
+
+      await manager.remove(Service, service);
+    });
   }
 
   findById(id: string): Promise<Service | null> {
@@ -76,8 +102,7 @@ export class ServicesRepository implements IServicesRepository {
       tables.map((item) => this.countRowsIfTableExists(item.table, item.column, serviceId)),
     );
 
-    const packageItemCount = await this.countPackageItemsByServiceIfTableExists(serviceId);
-    return rows.reduce((total, count) => total + count, packageItemCount);
+    return rows.reduce((total, count) => total + count, 0);
   }
 
   updateStatus(service: Service, status: ActiveStatus): Promise<Service> {
@@ -96,27 +121,6 @@ export class ServicesRepository implements IServicesRepository {
         .select('COUNT(*)', 'count')
         .from(table, table)
         .where(`${table}.${column} = :serviceId`, { serviceId })
-        .getRawOne<{ count: string }>();
-      return Number(row?.count ?? 0);
-    } catch (error) {
-      if (
-        (error as { code?: string; errno?: number }).code === 'ER_NO_SUCH_TABLE' ||
-        (error as { errno?: number }).errno === 1146
-      ) {
-        return 0;
-      }
-      throw error;
-    }
-  }
-
-  private async countPackageItemsByServiceIfTableExists(serviceId: string): Promise<number> {
-    try {
-      const row = await this.repository.manager
-        .createQueryBuilder()
-        .select('COUNT(*)', 'count')
-        .from('package_items', 'packageItem')
-        .innerJoin('facility_services', 'facilityService', 'facilityService.id = packageItem.facility_service_id')
-        .where('facilityService.service_id = :serviceId', { serviceId })
         .getRawOne<{ count: string }>();
       return Number(row?.count ?? 0);
     } catch (error) {
