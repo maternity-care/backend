@@ -38,6 +38,10 @@ function formatDateTime(date: string, time: string) {
   return `${date} ${normalizeTime(time)}`;
 }
 
+function isPastDateTime(date: string, time: string) {
+  return new Date(`${date}T${normalizeTime(time)}`).getTime() <= Date.now();
+}
+
 function toDateTimeParts(value: string | Date) {
   const text = value instanceof Date
     ? `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')} ${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}:${String(value.getSeconds()).padStart(2, '0')}`
@@ -78,6 +82,9 @@ export class AppointmentsService {
 
     if (timeToMinutes(startTime) >= timeToMinutes(endTime)) {
       throw new BadRequestException(RESPONSE_MESSAGES.APPOINTMENTS.END_TIME_AFTER_START_TIME);
+    }
+    if (isPastDateTime(dto.date, startTime)) {
+      throw new BadRequestException(RESPONSE_MESSAGES.APPOINTMENTS.PAST_SLOT_INVALID);
     }
 
     return this.dataSource.transaction(async (manager) => {
@@ -308,6 +315,9 @@ export class AppointmentsService {
       const endTime = normalizeTime(dto.endTime);
       if (timeToMinutes(startTime) >= timeToMinutes(endTime)) {
         throw new BadRequestException(RESPONSE_MESSAGES.APPOINTMENTS.END_TIME_AFTER_START_TIME);
+      }
+      if (isPastDateTime(dto.date, startTime)) {
+        throw new BadRequestException(RESPONSE_MESSAGES.APPOINTMENTS.PAST_SLOT_INVALID);
       }
       const shift = await this.findShiftForDoctor(manager, dto.doctorId, appointment.facilityId, dto.date, startTime, endTime);
       await this.ensureSlotFree(manager, appointment.facilityId, shift.staffId, dto.date, startTime, endTime, id);
