@@ -54,6 +54,7 @@ export const RESPONSE_MESSAGES = {
     SERVICE_NOT_AVAILABLE_AT_FACILITY: 'Dịch vụ không khả dụng tại cơ sở đã chọn.',
     SHIFT_NOT_AVAILABLE: 'Ca trực không tồn tại hoặc không còn khả dụng.',
     SHIFT_ROOM_REQUIRED: 'Ca trực chưa có phòng khám để đặt lịch.',
+    PAST_SLOT_INVALID: 'Không thể đặt lịch trong quá khứ.',
   },
   SCHEDULES: {
     GET_LIST_SUCCESS: 'Lấy lịch cá nhân thành công.',
