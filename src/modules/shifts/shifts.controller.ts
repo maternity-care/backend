@@ -9,14 +9,13 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { assertFacilityAccess, getActiveFacilityId } from '../../common/helpers/facility-scope.helper';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { AutoGenerateShiftsDto } from './dto/requests/auto-generate-shifts.dto';
 import { CheckShiftConflictDto } from './dto/requests/check-shift-conflict.dto';
-import { BulkCreateDoctorShiftDto } from './dto/requests/bulk-create-doctor-shift.dto';
 import { CopyWeekDoctorShiftDto } from './dto/requests/copy-week-doctor-shift.dto';
 import { CreateDoctorShiftDto } from './dto/requests/create-doctor-shift.dto';
 import { DoctorAvailabilityQueryDto } from './dto/requests/doctor-availability.dto';
@@ -65,56 +64,87 @@ export class ShiftsController {
     };
   }
 
-  @Post('bulk-create')
-  @ApiOperation({ summary: 'Create many shifts by date range and working days' })
-  async bulkCreate(@Body() dto: BulkCreateDoctorShiftDto) {
-    return {
-      message: RESPONSE_MESSAGES.SHIFTS.BULK_CREATED,
-      data: await this.service.bulkCreate(dto),
-    };
-  }
-
-  @Post('auto-generate/preview')
-  @ApiOperation({ summary: 'Preview auto-generated shifts before saving' })
-  async previewAutoGenerate(
-    @Body() dto: AutoGenerateShiftsDto,
-  ): Promise<AutoGeneratePreviewApiResponse> {
-    return {
-      message: RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_PREVIEW_SUCCESS,
-      data: await this.service.previewAutoGenerate(dto),
-    };
-  }
-
-  @Post('auto-generate/confirm')
-  @ApiOperation({ summary: 'Confirm and save valid auto-generated shifts' })
-  async confirmAutoGenerate(
-    @Body() dto: AutoGenerateShiftsDto,
-  ): Promise<AutoGenerateConfirmApiResponse> {
-    return {
-      message: RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_CONFIRM_SUCCESS,
-      data: await this.service.confirmAutoGenerate(dto),
-    };
-  }
-
   @Post('bulk-generate/preview')
   @ApiOperation({ summary: 'Preview bulk generated shifts before saving' })
+  @ApiBody({
+    type: AutoGenerateShiftsDto,
+    examples: {
+      slotAssignments: {
+        summary: 'Generate shifts by slot and staff assignments',
+        value: {
+          facilityId: '1',
+          fromDate: '2026-08-01',
+          toDate: '2026-08-31',
+          slotAssignments: [
+            {
+              slotId: '1',
+              assignments: [
+                {
+                  staffId: '10',
+                  roleId: '3',
+                  roomId: '2',
+                  workingDays: ['MON', 'WED', 'FRI'],
+                  maxAppointments: 10,
+                  status: 'available',
+                },
+              ],
+            },
+          ],
+          saveOnlyValid: true,
+        },
+      },
+    },
+  })
   async previewBulkGenerate(
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: AutoGenerateShiftsDto,
   ): Promise<AutoGeneratePreviewApiResponse> {
+    this.applyFacilityScope(user, dto);
     return {
       message: RESPONSE_MESSAGES.SHIFTS.BULK_GENERATE_PREVIEW_SUCCESS,
-      data: await this.service.previewAutoGenerate(dto),
+      data: await this.service.previewBulkGenerate(dto),
     };
   }
 
   @Post('bulk-generate/confirm')
   @ApiOperation({ summary: 'Confirm and save valid bulk generated shifts' })
+  @ApiBody({
+    type: AutoGenerateShiftsDto,
+    examples: {
+      slotAssignments: {
+        summary: 'Generate and save shifts by slot and staff assignments',
+        value: {
+          facilityId: '1',
+          fromDate: '2026-08-01',
+          toDate: '2026-08-31',
+          slotAssignments: [
+            {
+              slotId: '1',
+              assignments: [
+                {
+                  staffId: '10',
+                  roleId: '3',
+                  roomId: '2',
+                  workingDays: ['MON', 'WED', 'FRI'],
+                  maxAppointments: 10,
+                  status: 'available',
+                },
+              ],
+            },
+          ],
+          saveOnlyValid: true,
+        },
+      },
+    },
+  })
   async confirmBulkGenerate(
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: AutoGenerateShiftsDto,
   ): Promise<AutoGenerateConfirmApiResponse> {
+    this.applyFacilityScope(user, dto);
     return {
       message: RESPONSE_MESSAGES.SHIFTS.BULK_GENERATE_CONFIRM_SUCCESS,
-      data: await this.service.confirmAutoGenerate(dto),
+      data: await this.service.confirmBulkGenerate(dto),
     };
   }
 
@@ -204,5 +234,14 @@ export class ShiftsController {
     if (user) assertFacilityAccess(user, existing.facilityId);
     const data = await this.service.remove(id, reason, user?.id ?? null);
     return { message: RESPONSE_MESSAGES.SHIFTS.DELETED, data };
+  }
+
+  private applyFacilityScope(user: AuthenticatedUser | undefined, dto: { facilityId: string }): void {
+    const activeFacilityId = getActiveFacilityId(user);
+    if (activeFacilityId) {
+      dto.facilityId = activeFacilityId;
+      return;
+    }
+    assertFacilityAccess(user, dto.facilityId);
   }
 }

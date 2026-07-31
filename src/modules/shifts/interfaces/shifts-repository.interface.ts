@@ -12,6 +12,15 @@ export const SHIFTS_REPOSITORY = Symbol('SHIFTS_REPOSITORY');
 
 export type ShiftWithDetails = DoctorShiftResponseDto;
 
+export interface ShiftAssigneeDetails {
+  staffId: string;
+  staffName: string;
+  facilityId: string;
+  roleId?: string | null;
+  roleName?: string | null;
+  doctorId?: string | null;
+}
+
 export interface IShiftsRepository {
   create(data: DeepPartial<Shift>): Shift;
   insertMonthlyShifts(shifts: DeepPartial<Shift>[]): Promise<Shift[]>;
@@ -51,5 +60,6 @@ export interface IShiftsRepository {
   isDoctorAssignedToFacility(doctorId: string, facilityId: string): Promise<boolean>;
   findDoctorStaffId(doctorId: string, facilityId?: string): Promise<string | null>;
   findDoctorIdByStaffId(staffId: string, facilityId?: string): Promise<string | null>;
+  findShiftAssignee(staffId: string, facilityId: string, roleId?: string | null): Promise<ShiftAssigneeDetails | null>;
   findShiftSlotById(slotId: string): Promise<ShiftSlot | null>;
 }

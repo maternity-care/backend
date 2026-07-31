@@ -3,7 +3,12 @@ import { DoctorShift } from '../entities/shift.entity';
 
 /** Candidate ca truc duoc sinh ra trong buoc preview/confirm auto-generate. */
 export interface AutoGenerateCandidate {
-  doctorId: string;
+  index?: number;
+  slotAssignmentIndex?: number;
+  assignmentIndex?: number;
+  doctorId?: string;
+  staffId?: string;
+  roleId?: string | null;
   facilityId: string;
   roomId?: string | null;
   slotId?: string | null;
@@ -21,6 +26,9 @@ export interface AutoGenerateValidItem extends AutoGenerateCandidate {
 
 /** Candidate bi bo qua hoac bi conflict, kem ly do de FE hien thi cho quan ly. */
 export interface AutoGenerateIssueItem {
+  index: number;
+  slotAssignmentIndex?: number;
+  assignmentIndex?: number;
   shiftDate: string;
   reason: string;
   candidate: Partial<AutoGenerateCandidate>;
@@ -49,6 +57,8 @@ export type AutoGeneratePreviewResult = Omit<AutoGeneratePlan, 'internalValidEnt
 /** Response public cua API confirm: gom preview summary va danh sach ca da duoc luu. */
 export interface AutoGenerateConfirmResult extends AutoGeneratePreviewResult {
   createdShifts: DoctorShift[];
+  createdCount: number;
+  allOrNothingRejected?: boolean;
 }
 
 /** Wrapper response dung o controller preview auto/bulk generate. */

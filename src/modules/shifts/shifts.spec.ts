@@ -5,6 +5,7 @@ import { ActiveStatus, DoctorShiftStatus, FacilityStatus } from '../../common/co
 import { RoleEnum } from '../../common/constants/role.enum';
 import { BulkCreateDoctorShiftDto, ShiftWorkingDay } from './dto/requests/bulk-create-doctor-shift.dto';
 import { CheckShiftConflictDto } from './dto/requests/check-shift-conflict.dto';
+import { AutoGenerateShiftsDto } from './dto/requests/auto-generate-shifts.dto';
 import { CopyWeekDoctorShiftDto } from './dto/requests/copy-week-doctor-shift.dto';
 import { CreateDoctorShiftDto } from './dto/requests/create-doctor-shift.dto';
 import { DoctorAvailabilityQueryDto } from './dto/requests/doctor-availability.dto';
@@ -116,6 +117,33 @@ describe('DoctorShifts DTO validation', () => {
 
     expect(await validate(dto)).toHaveLength(0);
     expect(dto.durationDays).toBe(14);
+  });
+
+  it('validates slot-first bulk-generate payload', async () => {
+    const dto = plainToInstance(AutoGenerateShiftsDto, {
+      facilityId: '1',
+      fromDate: '2099-08-01',
+      toDate: '2099-08-31',
+      slotAssignments: [
+        {
+          slotId: '1',
+          assignments: [
+            {
+              staffId: '10',
+              roleId: '3',
+              roomId: '2',
+              workingDays: [ShiftWorkingDay.MON, ShiftWorkingDay.WED, ShiftWorkingDay.FRI],
+              maxAppointments: '10',
+              status: DoctorShiftStatus.AVAILABLE,
+            },
+          ],
+        },
+      ],
+      saveOnlyValid: true,
+    });
+
+    expect(await validate(dto)).toHaveLength(0);
+    expect(dto.slotAssignments?.[0].assignments[0].maxAppointments).toBe(10);
   });
 
   // Vai tro: chan tao hang loat voi so ngay qua ngan; bulk phai toi thieu 7 ngay.
@@ -266,6 +294,21 @@ describe('ShiftsService business validation', () => {
     findAppointmentsForShift: jest.fn().mockResolvedValue([]),
     cancelShiftWithDisruption: jest.fn().mockResolvedValue({ shift: { ...shift, status: DoctorShiftStatus.CANCELLED }, disruptionId: '77' }),
     isDoctorAssignedToFacility: jest.fn().mockResolvedValue(true),
+    findShiftSlotById: jest.fn(async (slotId: string) => ({
+      id: slotId,
+      facilityId: '1',
+      startTime: slotId === '2' ? '13:00:00' : '08:00:00',
+      endTime: slotId === '2' ? '17:00:00' : '12:00:00',
+      status: ActiveStatus.ACTIVE,
+    })),
+    findShiftAssignee: jest.fn(async (staffId: string, facilityId: string, roleId?: string | null) => ({
+      staffId,
+      staffName: `Staff ${staffId}`,
+      facilityId,
+      roleId: roleId ?? '3',
+      roleName: roleId === '4' ? RoleEnum.NURSE : RoleEnum.DOCTOR,
+      doctorId: roleId === '4' ? null : staffId,
+    })),
     insertMonthlyShifts: jest.fn(),
     saveMany: jest.fn(async (items: Record<string, unknown>[]) => items.map((item, index: number) => ({
       ...item,
@@ -366,10 +409,10 @@ describe('ShiftsService business validation', () => {
     expect(repo.findWeeklyWithDetails).toHaveBeenCalledWith('1', '2099-07-06', '2099-07-12', '1');
   });
 
-  // Vai tro: dam bao bulk-create chi sinh ca vao cac ngay lam viec duoc chon.
-  it('bulk creates shifts only on selected working days', async () => {
+  // Vai tro: dam bao bulk-generate confirm chi sinh ca vao cac ngay lam viec duoc chon.
+  it('confirms generated shifts only on selected working days', async () => {
     const { repo, service } = createService();
-    const result = await service.bulkCreate({
+    const result = await service.confirmBulkGenerate({
       doctorId: '1',
       facilityId: '1',
       roomId: '2',
@@ -380,20 +423,69 @@ describe('ShiftsService business validation', () => {
       endTime: '12:00',
       maxAppointments: 8,
       status: DoctorShiftStatus.AVAILABLE,
+      saveOnlyValid: true,
     });
-    expect(result).toHaveLength(2);
+    expect(result.createdShifts).toHaveLength(2);
     expect(repo.saveMany).toHaveBeenCalledWith(expect.arrayContaining([
       expect.objectContaining({ shiftDate: '2099-07-06' }),
       expect.objectContaining({ shiftDate: '2099-07-08' }),
     ]));
   });
 
-  // Vai tro: dam bao bulk-create co the lay fromDate la ngay hien tai va tinh toDate tu durationDays.
-  it('bulk creates shifts from today when durationDays is provided without fromDate', async () => {
+  it('confirms slot-first bulk-generated shifts by staff, role, slot, and working days', async () => {
+    const { repo, service } = createService();
+
+    const result = await service.confirmBulkGenerate({
+      facilityId: '1',
+      fromDate: '2099-07-06',
+      toDate: '2099-07-12',
+      slotAssignments: [
+        {
+          slotId: '1',
+          assignments: [
+            {
+              staffId: '10',
+              roleId: '3',
+              roomId: '2',
+              workingDays: [ShiftWorkingDay.MON, ShiftWorkingDay.WED],
+              maxAppointments: 10,
+              status: DoctorShiftStatus.AVAILABLE,
+            },
+          ],
+        },
+        {
+          slotId: '2',
+          assignments: [
+            {
+              staffId: '12',
+              roleId: '4',
+              workingDays: [ShiftWorkingDay.TUE, ShiftWorkingDay.THU],
+              status: DoctorShiftStatus.AVAILABLE,
+            },
+          ],
+        },
+      ],
+      saveOnlyValid: true,
+    });
+
+    expect(result.summary).toEqual({ totalCandidates: 4, valid: 4, skipped: 0, conflicted: 0 });
+    expect(result.createdShifts).toHaveLength(4);
+    expect(repo.findShiftAssignee).toHaveBeenCalledWith('10', '1', '3');
+    expect(repo.findShiftAssignee).toHaveBeenCalledWith('12', '1', '4');
+    expect(repo.saveMany).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ staffId: '10', roleId: '3', slotId: '1', shiftDate: '2099-07-06' }),
+      expect.objectContaining({ staffId: '10', roleId: '3', slotId: '1', shiftDate: '2099-07-08' }),
+      expect.objectContaining({ staffId: '12', roleId: '4', slotId: '2', shiftDate: '2099-07-07' }),
+      expect.objectContaining({ staffId: '12', roleId: '4', slotId: '2', shiftDate: '2099-07-09' }),
+    ]));
+  });
+
+  // Vai tro: dam bao bulk-generate co the lay fromDate la ngay hien tai va tinh toDate tu durationDays.
+  it('confirms generated shifts from today when durationDays is provided without fromDate', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-07-25T03:00:00.000Z'));
     const { repo, service } = createService();
 
-    const result = await service.bulkCreate({
+    const result = await service.confirmBulkGenerate({
       doctorId: '1',
       facilityId: '1',
       roomId: '2',
@@ -403,9 +495,10 @@ describe('ShiftsService business validation', () => {
       endTime: '12:00',
       maxAppointments: 8,
       status: DoctorShiftStatus.AVAILABLE,
+      saveOnlyValid: true,
     });
 
-    expect(result).toHaveLength(2);
+    expect(result.createdShifts).toHaveLength(2);
     expect(repo.saveMany).toHaveBeenCalledWith(expect.arrayContaining([
       expect.objectContaining({ shiftDate: '2026-07-25' }),
       expect.objectContaining({ shiftDate: '2026-07-31' }),
@@ -413,8 +506,8 @@ describe('ShiftsService business validation', () => {
   });
 
   // Vai tro: tranh nhap nhang khi FE vua gui toDate vua gui durationDays.
-  it('rejects bulk-create when both toDate and durationDays are provided', async () => {
-    await expect(createService().service.bulkCreate({
+  it('rejects bulk-generate when both toDate and durationDays are provided', async () => {
+    await expect(createService().service.previewBulkGenerate({
       doctorId: '1',
       facilityId: '1',
       roomId: '2',
@@ -426,6 +519,7 @@ describe('ShiftsService business validation', () => {
       endTime: '12:00',
       maxAppointments: 8,
       status: DoctorShiftStatus.AVAILABLE,
+      saveOnlyValid: true,
     })).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -439,7 +533,7 @@ describe('ShiftsService business validation', () => {
       .mockResolvedValueOnce({ doctorConflicts: [], roomConflicts: [] })
       .mockResolvedValueOnce({ doctorConflicts: [shift], roomConflicts: [] });
 
-    const result = await service.previewAutoGenerate({
+    const result = await service.previewBulkGenerate({
       doctorId: '1',
       facilityId: '1',
       roomId: '2',
@@ -450,6 +544,7 @@ describe('ShiftsService business validation', () => {
       endTime: '12:00',
       maxAppointments: 8,
       status: DoctorShiftStatus.AVAILABLE,
+      saveOnlyValid: true,
     });
 
     expect(result.summary).toEqual({ totalCandidates: 3, valid: 1, skipped: 1, conflicted: 1 });
@@ -466,7 +561,7 @@ describe('ShiftsService business validation', () => {
       { closureDate: '2099-07-08', status: ActiveStatus.ACTIVE },
     ]);
 
-    const result = await service.confirmAutoGenerate({
+    const result = await service.confirmBulkGenerate({
       doctorId: '1',
       facilityId: '1',
       roomId: '2',
@@ -477,6 +572,7 @@ describe('ShiftsService business validation', () => {
       endTime: '12:00',
       maxAppointments: 8,
       status: DoctorShiftStatus.AVAILABLE,
+      saveOnlyValid: true,
     });
 
     expect(result.summary).toEqual({ totalCandidates: 2, valid: 1, skipped: 1, conflicted: 0 });
@@ -565,13 +661,13 @@ describe('ShiftsService business validation', () => {
     } as never)).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  // Vai tro: dam bao dateFrom/fromDate khong duoc lon hon dateTo/toDate o list va bulk-create.
-  it('TC-UNIT-DSHIFT-014 rejects list and bulk-create when date range is reversed', async () => {
+  // Vai tro: dam bao dateFrom/fromDate khong duoc lon hon dateTo/toDate o list va bulk-generate.
+  it('TC-UNIT-DSHIFT-014 rejects list and bulk-generate when date range is reversed', async () => {
     const { repo, service } = createService();
 
     await expect(service.findAll({ dateFrom: '2099-07-20', dateTo: '2099-07-01' })).rejects.toBeInstanceOf(BadRequestException);
     expect(repo.findAll).not.toHaveBeenCalled();
-    await expect(service.bulkCreate({
+    await expect(service.previewBulkGenerate({
       doctorId: '1',
       facilityId: '1',
       roomId: '2',
@@ -581,12 +677,13 @@ describe('ShiftsService business validation', () => {
       startTime: '08:00',
       endTime: '12:00',
       status: DoctorShiftStatus.AVAILABLE,
+      saveOnlyValid: true,
     })).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  // Vai tro: chan bulk-create neu khoang ngay ngan hon 7 ngay.
-  it('TC-UNIT-DSHIFT-015 rejects bulk-create ranges shorter than 7 days', async () => {
-    await expect(createService().service.bulkCreate({
+  // Vai tro: chan bulk-generate neu khoang ngay ngan hon 7 ngay.
+  it('TC-UNIT-DSHIFT-015 rejects bulk-generate ranges shorter than 7 days', async () => {
+    await expect(createService().service.previewBulkGenerate({
       doctorId: '1',
       facilityId: '1',
       roomId: '2',
@@ -596,12 +693,13 @@ describe('ShiftsService business validation', () => {
       startTime: '08:00',
       endTime: '12:00',
       status: DoctorShiftStatus.AVAILABLE,
+      saveOnlyValid: true,
     })).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  // Vai tro: gioi han bulk-create khong tao qua dai de tranh thao tac nham/qua tai.
-  it('TC-UNIT-DSHIFT-016 rejects bulk-create ranges longer than 92 days', async () => {
-    await expect(createService().service.bulkCreate({
+  // Vai tro: gioi han bulk-generate khong tao qua dai de tranh thao tac nham/qua tai.
+  it('TC-UNIT-DSHIFT-016 rejects bulk-generate ranges longer than 92 days', async () => {
+    await expect(createService().service.previewBulkGenerate({
       doctorId: '1',
       facilityId: '1',
       roomId: '2',
@@ -611,17 +709,18 @@ describe('ShiftsService business validation', () => {
       startTime: '08:00',
       endTime: '12:00',
       status: DoctorShiftStatus.AVAILABLE,
+      saveOnlyValid: true,
     })).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  // Vai tro: dam bao bulk-create co mot ca conflict thi rollback logic va khong save bat ky ca nao.
-  it('TC-UNIT-DSHIFT-017 does not save bulk payloads when one generated shift conflicts', async () => {
+  // Vai tro: saveOnlyValid=false giup API mot buoc validate het nhung khong luu neu con bat ky dong loi nao.
+  it('TC-UNIT-DSHIFT-017 returns row issues and does not save when strict bulk-generate has a conflict', async () => {
     const { repo, service } = createService();
     repo.findConflicts
       .mockResolvedValueOnce({ doctorConflicts: [], roomConflicts: [] })
       .mockResolvedValueOnce({ doctorConflicts: [shift], roomConflicts: [] });
 
-    await expect(service.bulkCreate({
+    const result = await service.confirmBulkGenerate({
       doctorId: '1',
       facilityId: '1',
       roomId: '2',
@@ -631,7 +730,14 @@ describe('ShiftsService business validation', () => {
       startTime: '08:00',
       endTime: '12:00',
       status: DoctorShiftStatus.AVAILABLE,
-    })).rejects.toBeInstanceOf(ConflictException);
+      saveOnlyValid: false,
+    });
+
+    expect(result).toMatchObject({
+      createdCount: 0,
+      allOrNothingRejected: true,
+      summary: { totalCandidates: 2, valid: 1, skipped: 0, conflicted: 1 },
+    });
     expect(repo.saveMany).not.toHaveBeenCalled();
   });
 
@@ -1126,9 +1232,8 @@ describe('ShiftsController unit routing and scope', () => {
       findAll: jest.fn().mockResolvedValue([shift]),
       findAllPaginated: jest.fn().mockResolvedValue({ items: [shift], total: 1, page: 1, limit: 20 }),
       checkConflicts: jest.fn().mockResolvedValue({ hasConflict: false, doctorConflicts: [], roomConflicts: [] }),
-      bulkCreate: jest.fn().mockResolvedValue([shift]),
-      previewAutoGenerate: jest.fn().mockResolvedValue({ summary: { validCount: 1 } }),
-      confirmAutoGenerate: jest.fn().mockResolvedValue({ createdShifts: [shift] }),
+      previewBulkGenerate: jest.fn().mockResolvedValue({ summary: { validCount: 1 } }),
+      confirmBulkGenerate: jest.fn().mockResolvedValue({ createdShifts: [shift] }),
       copyWeek: jest.fn().mockResolvedValue([shift]),
       getDoctorAvailability: jest.fn().mockResolvedValue({ shifts: [] }),
       getWeeklySchedule: jest.fn().mockResolvedValue({ days: [] }),
@@ -1209,28 +1314,16 @@ describe('ShiftsController unit routing and scope', () => {
     expect(service.checkConflicts).toHaveBeenCalledWith(dto);
   });
 
-  // Vai tro: dam bao controller route dung lenh bulk-create va copy-week xuong service.
-  it('routes bulk-create and copy-week commands to the service', async () => {
+  // Vai tro: dam bao controller route copy-week xuong service.
+  it('routes copy-week commands to the service', async () => {
     const { service, controller } = createController();
-    const bulkDto = {
-      doctorId: '1',
-      facilityId: '1',
-      fromDate: '2099-07-06',
-      toDate: '2099-07-13',
-      workingDays: [ShiftWorkingDay.MON],
-      startTime: '08:00',
-      endTime: '12:00',
-      status: DoctorShiftStatus.AVAILABLE,
-    };
     const copyDto = {
       facilityId: '1',
       sourceWeekStart: '2099-07-06',
       targetWeekStart: '2099-07-13',
     };
 
-    await expect(controller.bulkCreate(bulkDto as never)).resolves.toMatchObject({ data: [shift] });
     await expect(controller.copyWeek(copyDto)).resolves.toMatchObject({ data: [shift] });
-    expect(service.bulkCreate).toHaveBeenCalledWith(bulkDto);
     expect(service.copyWeek).toHaveBeenCalledWith(copyDto);
   });
 
@@ -1248,14 +1341,14 @@ describe('ShiftsController unit routing and scope', () => {
       status: DoctorShiftStatus.AVAILABLE,
     };
 
-    await expect(controller.previewBulkGenerate(dto as never)).resolves.toMatchObject({
+    await expect(controller.previewBulkGenerate(superUser as never, dto as never)).resolves.toMatchObject({
       data: { summary: { validCount: 1 } },
     });
-    await expect(controller.confirmBulkGenerate(dto as never)).resolves.toMatchObject({
+    await expect(controller.confirmBulkGenerate(superUser as never, dto as never)).resolves.toMatchObject({
       data: { createdShifts: [shift] },
     });
-    expect(service.previewAutoGenerate).toHaveBeenCalledWith(dto);
-    expect(service.confirmAutoGenerate).toHaveBeenCalledWith(dto);
+    expect(service.previewBulkGenerate).toHaveBeenCalledWith(dto);
+    expect(service.confirmBulkGenerate).toHaveBeenCalledWith(dto);
   });
 
   // Vai tro: dam bao controller route availability va weekly schedule hop le xuong dung service method.
