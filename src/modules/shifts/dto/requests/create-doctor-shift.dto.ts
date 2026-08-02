@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsEnum, IsIn, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsIn, IsInt, IsOptional, IsString, Matches, Max, Min, ValidateIf } from 'class-validator';
 import { DoctorShiftStatus } from '../../../../common/constants/status.enum';
 import { RESPONSE_MESSAGES } from '../../../../common/constants/response-message.constant';
 import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
@@ -10,10 +10,23 @@ import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto
 export const SHIFT_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/;
 
 export class CreateDoctorShiftDto {
-  @ApiProperty({ example: '1' })
+  @ApiProperty({ example: '1', description: 'Legacy doctor profile id. Prefer staffId for new shift APIs.' })
+  @ValidateIf((dto: CreateDoctorShiftDto) => !dto.staffId)
   @IsString()
   @Matches(POSITIVE_ID_PATTERN)
-  doctorId: string;
+  doctorId?: string;
+
+  @ApiPropertyOptional({ example: '10', description: 'Staff id assigned to this shift. New APIs should use this field.' })
+  @IsOptional()
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  staffId?: string;
+
+  @ApiPropertyOptional({ example: '3', nullable: true, description: 'Role used by the staff member for this shift.' })
+  @IsOptional()
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  roleId?: string | null;
 
   @ApiProperty({ example: '1' })
   @IsString()
