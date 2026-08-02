@@ -8,12 +8,17 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
+import { PermissionEnum } from '../../common/constants/permission.enum';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { assertFacilityAccess, getActiveFacilityId } from '../../common/helpers/facility-scope.helper';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AutoGenerateShiftsDto } from './dto/requests/auto-generate-shifts.dto';
 import { CheckShiftConflictDto } from './dto/requests/check-shift-conflict.dto';
 import { BulkCreateDoctorShiftDto } from './dto/requests/bulk-create-doctor-shift.dto';
@@ -30,15 +35,14 @@ import {
 import { ShiftsService } from './shifts.service';
 
 @ApiTags('Management - Shifts')
-// TEMP DEV: JwtAuthGuard dang duoc tam tat de test shifts khi auth module chua dong bo entity moi.
-// Khi sua xong auth, bat lai:
-// @ApiBearerAuth()
-// @UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('management/shifts')
 export class ShiftsController {
   constructor(private readonly service: ShiftsService) {}
 
   @Get()
+  @Permissions(PermissionEnum.SHIFT_VIEW)
   @ApiOperation({ summary: 'List shifts' })
   @ApiResponse({ status: 200, type: DoctorShiftPaginatedResponseDto })
   async findAll(
@@ -51,6 +55,7 @@ export class ShiftsController {
   }
 
   @Post('check-conflicts')
+  @Permissions(PermissionEnum.SHIFT_CREATE)
   @ApiOperation({ summary: 'Check doctor and room shift conflicts before saving' })
   async checkConflicts(
     @CurrentUser() user: AuthenticatedUser,
@@ -66,6 +71,7 @@ export class ShiftsController {
   }
 
   @Post('bulk-create')
+  @Permissions(PermissionEnum.SHIFT_CREATE)
   @ApiOperation({ summary: 'Create many shifts by date range and working days' })
   async bulkCreate(@Body() dto: BulkCreateDoctorShiftDto) {
     return {
@@ -75,6 +81,7 @@ export class ShiftsController {
   }
 
   @Post('auto-generate/preview')
+  @Permissions(PermissionEnum.SHIFT_CREATE)
   @ApiOperation({ summary: 'Preview auto-generated shifts before saving' })
   async previewAutoGenerate(
     @Body() dto: AutoGenerateShiftsDto,
@@ -86,6 +93,7 @@ export class ShiftsController {
   }
 
   @Post('auto-generate/confirm')
+  @Permissions(PermissionEnum.SHIFT_CREATE)
   @ApiOperation({ summary: 'Confirm and save valid auto-generated shifts' })
   async confirmAutoGenerate(
     @Body() dto: AutoGenerateShiftsDto,
@@ -97,6 +105,7 @@ export class ShiftsController {
   }
 
   @Post('bulk-generate/preview')
+  @Permissions(PermissionEnum.SHIFT_CREATE)
   @ApiOperation({ summary: 'Preview bulk generated shifts before saving' })
   async previewBulkGenerate(
     @Body() dto: AutoGenerateShiftsDto,
@@ -108,6 +117,7 @@ export class ShiftsController {
   }
 
   @Post('bulk-generate/confirm')
+  @Permissions(PermissionEnum.SHIFT_CREATE)
   @ApiOperation({ summary: 'Confirm and save valid bulk generated shifts' })
   async confirmBulkGenerate(
     @Body() dto: AutoGenerateShiftsDto,
@@ -119,6 +129,7 @@ export class ShiftsController {
   }
 
   @Post('copy-week')
+  @Permissions(PermissionEnum.SHIFT_CREATE)
   @ApiOperation({ summary: 'Copy shift schedule from one week to another week' })
   async copyWeek(@Body() dto: CopyWeekDoctorShiftDto) {
     return {
@@ -128,6 +139,7 @@ export class ShiftsController {
   }
 
   @Get('availability/doctors/:doctorId')
+  @Permissions(PermissionEnum.SHIFT_VIEW)
   @ApiOperation({ summary: 'Get available appointment slots of a doctor on a date' })
   async getDoctorAvailability(
     @Param('doctorId') doctorId: string,
@@ -140,6 +152,7 @@ export class ShiftsController {
   }
 
   @Get('weekly')
+  @Permissions(PermissionEnum.SHIFT_VIEW)
   @ApiOperation({ summary: 'Get weekly shift calendar' })
   @ApiResponse({ status: 200, type: [DoctorShiftResponseDto] })
   async getWeekly(
@@ -158,6 +171,7 @@ export class ShiftsController {
   }
 
   @Get(':id')
+  @Permissions(PermissionEnum.SHIFT_VIEW)
   @ApiOperation({ summary: 'Get shift details' })
   @ApiResponse({ status: 200, type: DoctorShiftResponseDto })
   async findOne(
@@ -169,6 +183,7 @@ export class ShiftsController {
   }
 
   @Post()
+  @Permissions(PermissionEnum.SHIFT_CREATE)
   @ApiOperation({ summary: 'Create shift' })
   async create(
      @CurrentUser() user: AuthenticatedUser,
@@ -180,6 +195,7 @@ export class ShiftsController {
   }
 
   @Patch(':id')
+  @Permissions(PermissionEnum.SHIFT_UPDATE)
   @ApiOperation({ summary: 'Update shift' })
   async update(
     @CurrentUser() user: AuthenticatedUser,
@@ -194,6 +210,7 @@ export class ShiftsController {
   }
 
   @Delete(':id')
+  @Permissions(PermissionEnum.SHIFT_DELETE)
   @ApiOperation({ summary: 'Delete shift' })
   async remove(
     @CurrentUser() user: AuthenticatedUser,

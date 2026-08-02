@@ -66,6 +66,7 @@ import { AddUserSchedules1785900000000 } from './migrations/1785900000000-AddUse
 import { BackfillAppointmentSchedules1786000000000 } from './migrations/1786000000000-BackfillAppointmentSchedules';
 import { AddForumModeration1786100000000 } from './migrations/1786100000000-AddForumModeration';
 import { AddForumCategories1786200000000 } from './migrations/1786200000000-AddForumCategories';
+import { AddManagementModulePermissions1786300000000 } from './migrations/1786300000000-AddManagementModulePermissions';
 
 config();
 
@@ -146,6 +147,7 @@ export const typeOrmConfig: DataSourceOptions = {
     BackfillAppointmentSchedules1786000000000,
     AddForumModeration1786100000000,
     AddForumCategories1786200000000,
+    AddManagementModulePermissions1786300000000,
   ],
   charset: 'utf8mb4_unicode_ci',
 };
