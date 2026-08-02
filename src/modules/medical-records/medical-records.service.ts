@@ -24,21 +24,46 @@ export class MedicalRecordsService implements IMedicalRecordService {
   ) {}
 
   async create(dto: CreateMedicalRecordDto): Promise<MedicalRecord> {
-    await this.validateAppointmentData(dto.appointmentId, dto.pregnancyProfileId, dto.doctorId);
+    const medicalRecord = await this.repository.findByAppointmentId(dto.appointmentId);
+    if (medicalRecord) {
+      // đã có, cập nhật
+      medicalRecord.diagnosis = dto?.diagnosis ?? medicalRecord.diagnosis;
+      medicalRecord.conclusion = dto?.conclusion ?? medicalRecord.conclusion;
+      medicalRecord.recommendation = dto?.recommendation ?? medicalRecord.recommendation;
+      medicalRecord.nextAppointmentSuggestedAt = dto.nextAppointmentSuggestedAt
+        ? new Date(dto.nextAppointmentSuggestedAt)
+        : medicalRecord.nextAppointmentSuggestedAt;
 
-    if (await this.repository.findByAppointmentId(dto.appointmentId)) {
-      throw new ConflictException(MEDICAL_RECORD_MESSAGES.APPOINTMENT_ALREADY_HAS_RECORD);
+      await this.repository.save(medicalRecord);
+
+      if (dto?.files?.length) {
+        await this.repository.createMedicalFiles(
+          dto.files?.map((file) => ({ ...file, medicalRecordId: medicalRecord.id })),
+        );
+      }
+
+      return this.findById(medicalRecord.id);
     }
+
+    await this.validateAppointmentData(dto.appointmentId, dto.pregnancyProfileId, dto.doctorId);
 
     const record = this.repository.create({
       ...dto,
-      diagnosis: dto.diagnosis ?? null,
-      recommendation: dto.recommendation ?? null,
+      diagnosis: dto?.diagnosis ?? null,
+      recommendation: dto?.recommendation ?? null,
       nextAppointmentSuggestedAt: dto.nextAppointmentSuggestedAt
         ? new Date(dto.nextAppointmentSuggestedAt)
         : null,
     });
     const saved = await this.repository.save(record);
+    const medicalFiles = dto?.files
+      ? dto.files?.map((file) => ({ ...file, medicalRecordId: saved.id }))
+      : [];
+    await this.repository.createMedicalFiles(medicalFiles);
+    // TODO: đặt lịch và thông báo cho bệnh nhân
+    if (dto?.nextAppointmentSuggestedAt) {
+      // TODO: tạo lịch hẹn
+    }
     return this.findById(saved.id);
   }
 

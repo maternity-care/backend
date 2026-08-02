@@ -1,4 +1,4 @@
-import { Appointment } from './../../../database/entities/appointment.entity';
+import { Appointment } from '../../appointments/entities/appointment.entity';
 import { FacilityService } from './../../facility-services/entities/facility-service.entity';
 import { Staff } from './../../staffs/entities/staff.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';

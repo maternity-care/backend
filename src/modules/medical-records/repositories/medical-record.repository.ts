@@ -3,8 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
 import { paginate } from '../../../common/helpers/pagination';
 import { searchBuilder } from '../../../common/helpers/search-builder';
-import { Appointment } from '../../../database/entities/appointment.entity';
 import { MedicalFile } from '../../../database/entities/medical-file.entity';
+import { Appointment } from '../../appointments/entities/appointment.entity';
 import { SearchMedicalRecordDto } from '../dto/requests/search-medical-record.dto';
 import { MedicalRecord } from '../entities/medical-record.entity';
 import { IMedicalRecordRepository } from '../interface/medical-record-repository.interface';
@@ -28,6 +28,10 @@ export class MedicalRecordRepository implements IMedicalRecordRepository {
 
   async remove(record: MedicalRecord): Promise<void> {
     await this.repository.remove(record);
+  }
+
+  async createMedicalFiles(data: DeepPartial<MedicalFile>[]): Promise<MedicalFile[]> {
+    return this.medicalFileRepository.save(data);
   }
 
   findById(id: string): Promise<MedicalRecord | null> {

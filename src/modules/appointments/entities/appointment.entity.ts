@@ -1,7 +1,3 @@
-import { Facility } from './../../modules/facilities/entities/facility.entity';
-import { Staff } from './../../modules/staffs/entities/staff.entity';
-import { Service } from './../../modules/services/entities/service.entity';
-import { Room } from './../../modules/rooms/entities/room.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   Column,
@@ -12,8 +8,12 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { AppointmentStatus } from '../../common/constants/status.enum';
-import { User } from './../../modules/users/entities/user.entity';
+import { AppointmentStatus } from '../../../common/constants/status.enum';
+import { Facility } from '../../facilities/entities/facility.entity';
+import { Room } from '../../rooms/entities/room.entity';
+import { Service } from '../../services/entities/service.entity';
+import { Staff } from '../../staffs/entities/staff.entity';
+import { User } from '../../users/entities/user.entity';
 
 @Entity('appointments')
 export class Appointment {
@@ -51,8 +51,8 @@ export class Appointment {
   patientId: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'pregnancy_profile_id', type: 'bigint' })
-  pregnancyProfileId: string;
+  @Column({ name: 'pregnancy_profile_id', type: 'bigint', nullable: true })
+  pregnancyProfileId: string | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'room_id', type: 'bigint' })
@@ -79,11 +79,11 @@ export class Appointment {
   patientExtraServiceId: string | null;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'scheduled_start', type: 'date' })
+  @Column({ name: 'scheduled_start', type: 'timestamp' })
   scheduledStart: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'scheduled_end', type: 'date' })
+  @Column({ name: 'scheduled_end', type: 'timestamp' })
   scheduledEnd: string;
 
   @ApiPropertyOptional({ type: Date, nullable: true, required: false })

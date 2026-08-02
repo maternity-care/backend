@@ -8,6 +8,9 @@ export class PresignedUploadResponseDto {
   url: string;
 
   @ApiProperty()
+  downloadUrl: string;
+
+  @ApiProperty()
   publicUrl: string;
 
   @ApiProperty()

@@ -265,10 +265,11 @@ export class ShiftsService {
         const appointmentBlocks = appointments.filter(appointment =>
           this.appointmentOverlapsShift(shift, appointment),
         );
-        const fullyBookedByLimit = Boolean(
-          shift.maxAppointments && appointmentBlocks.length >= shift.maxAppointments,
-        );
-        const canGenerateSlots = shift.status === DoctorShiftStatus.AVAILABLE && !fullyBookedByLimit;
+        // Quick booking đang đặt theo từng slot 30/60 phút. Nếu dùng maxAppointments
+        // để chặn cả ca thì ca có maxAppointments=1 sẽ mất toàn bộ slot còn lại ngay
+        // sau booking đầu tiên. Availability nên loại đúng slot bị overlap; capacity
+        // của ca dùng để tham khảo/quản trị, không thay thế kiểm tra overlap theo giờ.
+        const canGenerateSlots = shift.status === DoctorShiftStatus.AVAILABLE;
 
         return {
           shiftId: shift.id,
@@ -573,12 +574,18 @@ export class ShiftsService {
       const end = start + slotMinutes;
       const startTime = minutesToTime(start);
       const endTime = minutesToTime(end);
-      const isBooked = appointmentBlocks.some(appointment => timesOverlap(
-        startTime,
-        endTime,
-        dateTimeToTime(appointment.scheduledStart),
-        dateTimeToTime(appointment.scheduledEnd),
-      ));
+      const isBooked = appointmentBlocks.some(appointment => {
+        const appointmentStart = dateTimeToTime(appointment.scheduledStart);
+        const appointmentEnd = dateTimeToTime(appointment.scheduledEnd);
+        if (appointmentStart === appointmentEnd) return false;
+
+        return timesOverlap(
+          startTime,
+          endTime,
+          appointmentStart,
+          appointmentEnd,
+        );
+      });
       if (!isBooked) slots.push({ startTime, endTime });
     }
 
@@ -590,13 +597,17 @@ export class ShiftsService {
     shift: DoctorShift,
     appointment: { scheduledStart: Date | string; scheduledEnd: Date | string },
   ): boolean {
+    const appointmentStart = dateTimeToTime(appointment.scheduledStart);
+    const appointmentEnd = dateTimeToTime(appointment.scheduledEnd);
+    if (appointmentStart === appointmentEnd) return false;
+
     return shiftIntervalsOverlap(
       this.toDateOnly(shift.shiftDate),
       shift.startTime,
       shift.endTime,
       this.toDateOnly(appointment.scheduledStart),
-      dateTimeToTime(appointment.scheduledStart),
-      dateTimeToTime(appointment.scheduledEnd),
+      appointmentStart,
+      appointmentEnd,
     );
   }
 

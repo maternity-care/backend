@@ -40,6 +40,14 @@ export class RedisCacheService implements IRedisCacheService, OnModuleDestroy {
     await this.redis.set(key, JSON.stringify(value), 'EX', ttlSeconds);
   }
 
+  async increment(key: string, ttlSeconds: number): Promise<number> {
+    const count = await this.redis.incr(key);
+    if (count === 1) {
+      await this.redis.expire(key, ttlSeconds);
+    }
+    return count;
+  }
+
   async del(key: string): Promise<void> {
     await this.redis.del(key);
   }

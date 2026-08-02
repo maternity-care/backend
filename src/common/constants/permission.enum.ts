@@ -55,6 +55,31 @@ export enum PermissionEnum {
   APPOINTMENT_APPROVE = 'appointment.approve',
   APPOINTMENT_ASSIGN_DOCTOR = 'appointment.assign_doctor',
 
+  FACILITY_VIEW = 'facility.view',
+  FACILITY_CREATE = 'facility.create',
+  FACILITY_UPDATE = 'facility.update',
+  FACILITY_DELETE = 'facility.delete',
+
+  ROOM_VIEW = 'room.view',
+  ROOM_CREATE = 'room.create',
+  ROOM_UPDATE = 'room.update',
+  ROOM_DELETE = 'room.delete',
+
+  ROOM_TYPE_VIEW = 'room_type.view',
+  ROOM_TYPE_CREATE = 'room_type.create',
+  ROOM_TYPE_UPDATE = 'room_type.update',
+  ROOM_TYPE_DELETE = 'room_type.delete',
+
+  SHIFT_VIEW = 'shift.view',
+  SHIFT_CREATE = 'shift.create',
+  SHIFT_UPDATE = 'shift.update',
+  SHIFT_DELETE = 'shift.delete',
+
+  SHIFT_SLOT_VIEW = 'shift_slot.view',
+  SHIFT_SLOT_CREATE = 'shift_slot.create',
+  SHIFT_SLOT_UPDATE = 'shift_slot.update',
+  SHIFT_SLOT_DELETE = 'shift_slot.delete',
+
   MEDICAL_RECORD_VIEW = 'medical_record.view',
   MEDICAL_RECORD_CREATE = 'medical_record.create',
   MEDICAL_RECORD_UPDATE = 'medical_record.update',
@@ -81,6 +106,19 @@ export enum PermissionEnum {
   ARTICLE_UPDATE = 'article.update',
   ARTICLE_DELETE = 'article.delete',
   ARTICLE_PUBLISH = 'article.publish',
+
+  FORUM_VIEW = 'forum.view',
+  FORUM_CREATE = 'forum.create',
+  FORUM_UPDATE = 'forum.update',
+  FORUM_DELETE = 'forum.delete',
+  FORUM_MODERATE = 'forum.moderate',
+  FORUM_REPORT_VIEW = 'forum_report.view',
+  FORUM_REPORT_RESOLVE = 'forum_report.resolve',
+
+  SERVICE_VIEW = 'service.view',
+  SERVICE_CREATE = 'service.create',
+  SERVICE_UPDATE = 'service.update',
+  SERVICE_DELETE = 'service.delete',
 
   SERVICE_PACKAGE_VIEW = 'service_package.view',
   SERVICE_PACKAGE_CREATE = 'service_package.create',

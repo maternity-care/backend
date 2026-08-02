@@ -1,3 +1,4 @@
+import { CurrentUser } from './../../common/decorators/current-user.decorator';
 import {
   Body,
   Controller,
@@ -16,6 +17,7 @@ import { SearchMedicalRecordDto } from './dto/requests/search-medical-record.dto
 import { UpdateMedicalRecordDto } from './dto/requests/update-medical-record.dto';
 import { MEDICAL_RECORD_MESSAGES } from './medical-record.constant';
 import { MedicalRecordsService } from './medical-records.service';
+import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 
 @ApiTags('Management - Medical Records')
 @ApiBearerAuth()
@@ -44,7 +46,10 @@ export class MedicalRecordsController {
 
   @Post()
   @ApiOperation({ summary: 'Create a medical record' })
-  async create(@Body() dto: CreateMedicalRecordDto) {
+  async create(@Body() dto: CreateMedicalRecordDto, @CurrentUser() user: AuthenticatedUser) {
+    dto.files?.forEach((file) => {
+      file.uploadedBy = user.id;
+    });
     return {
       message: MEDICAL_RECORD_MESSAGES.CREATED,
       data: await this.service.create(dto),

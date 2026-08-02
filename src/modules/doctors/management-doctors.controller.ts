@@ -1,6 +1,16 @@
 import { CurrentUser } from './../../common/decorators/current-user.decorator';
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { plainToInstance } from 'class-transformer';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
@@ -15,8 +25,10 @@ import { DoctorsService } from './doctors.service';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { AdminCreateUserDto } from '../users/dto/request/admin-create-user.dto';
 import { SearchDoctorDto } from './dto/requests/search-doctor.dto';
+import { Doctor } from './entities/doctor.entity';
 
 @ApiTags('Management - Doctors')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.ADMIN)
 @Controller('management/doctors')
@@ -31,7 +43,10 @@ export class ManagementDoctorsController {
     const doctors = await this.doctorsService.findAll(query);
     return {
       message: 'Thành công',
-      data: doctors.map((doctor) => plainToInstance(DoctorResponseDto, doctor)),
+      data: {
+        count: doctors.count,
+        data: doctors?.data.map((doctor: Doctor) => plainToInstance(DoctorResponseDto, doctor)),
+      },
     };
   }
 
