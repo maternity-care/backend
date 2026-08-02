@@ -162,8 +162,10 @@ export enum ArticleStatus {
 }
 
 export enum ForumContentStatus {
+  PENDING = 'pending',
   PUBLISHED = 'published',
   HIDDEN = 'hidden',
+  REJECTED = 'rejected',
   DELETED = 'deleted',
 }
 

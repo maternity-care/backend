@@ -19,6 +19,7 @@ import { Facility } from '../modules/facilities/entities/facility.entity';
 import { FacilityOperatingHour } from '../modules/facilities/entities/facility-operating-hour.entity';
 import { FacilityService } from '../modules/facility-services/entities/facility-service.entity';
 import { Faq } from './entities/faq.entity';
+import { ForumCategoryMetadata } from './entities/forum-category-metadata.entity';
 import { HealthMetric } from './entities/health-metric.entity';
 import { Invoice } from './entities/invoice.entity';
 import { MaternityPackage } from '../modules/maternity-packages/entities/maternity-package.entity';
@@ -63,6 +64,9 @@ import { UseAppointmentTimestamps1785700000000 } from './migrations/178570000000
 import { MakeAppointmentPregnancyProfileNullable1785800000000 } from './migrations/1785800000000-MakeAppointmentPregnancyProfileNullable';
 import { AddUserSchedules1785900000000 } from './migrations/1785900000000-AddUserSchedules';
 import { BackfillAppointmentSchedules1786000000000 } from './migrations/1786000000000-BackfillAppointmentSchedules';
+import { AddForumModeration1786100000000 } from './migrations/1786100000000-AddForumModeration';
+import { AddForumCategories1786200000000 } from './migrations/1786200000000-AddForumCategories';
+import { AddManagementModulePermissions1786300000000 } from './migrations/1786300000000-AddManagementModulePermissions';
 
 config();
 
@@ -112,6 +116,7 @@ export const typeOrmConfig: DataSourceOptions = {
     ChatMessage,
     ContentReport,
     Faq,
+    ForumCategoryMetadata,
     HealthMetric,
     Invoice,
     MedicalFile,
@@ -140,6 +145,9 @@ export const typeOrmConfig: DataSourceOptions = {
     MakeAppointmentPregnancyProfileNullable1785800000000,
     AddUserSchedules1785900000000,
     BackfillAppointmentSchedules1786000000000,
+    AddForumModeration1786100000000,
+    AddForumCategories1786200000000,
+    AddManagementModulePermissions1786300000000,
   ],
   charset: 'utf8mb4_unicode_ci',
 };

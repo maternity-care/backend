@@ -4,6 +4,7 @@ export enum RoleEnum {
   DOCTOR = 'doctor',
   NURSE = 'nurse',
   STAFF = 'staff',
+  MODERATOR = 'moderator',
   MEMBER = 'member',
   PARTNER = 'partner',
 }

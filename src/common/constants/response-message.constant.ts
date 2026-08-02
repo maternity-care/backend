@@ -174,6 +174,7 @@ export const RESPONSE_MESSAGES = {
     NOT_FOUND: 'Loại phòng không tồn tại',
     ACTIVE_NOT_FOUND: 'Loại phòng không tồn tại hoặc đang ngừng hoạt động',
     ALREADY_EXISTS: 'Loại phòng đã tồn tại',
+    IN_USE: 'Loại phòng đang được sử dụng, vui lòng chuyển các phòng sang loại khác trước khi xóa',
   },
   SHIFTS: {
     CREATED: 'Tạo ca trực bác sĩ thành công',
