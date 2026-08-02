@@ -338,7 +338,16 @@ export class UsersService implements IUsersService, IAdminManageService {
     await this.staffProfileRepository.save(staff);
   }
 
-  async searchUsers(query: SearchUserDto): Promise<SearchUserResponseDto> {
+  async searchUsers(
+    query: SearchUserDto,
+    actor?: AuthenticatedUser,
+  ): Promise<SearchUserResponseDto> {
+    if (actor && !isSuperAdmin(actor)) {
+      return this.usersRepository.searchUsers({
+        ...query,
+        facilityId: getActiveFacilityId(actor) ?? undefined,
+      });
+    }
     return this.usersRepository.searchUsers(query);
   }
 

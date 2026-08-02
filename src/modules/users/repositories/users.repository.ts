@@ -1,3 +1,4 @@
+import { Appointment } from './../../appointments/entities/appointment.entity';
 import { RESPONSE_MESSAGES } from './../../../common/constants/response-message.constant';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -13,6 +14,8 @@ export class UsersRepository implements IUsersRepository {
   constructor(
     @InjectRepository(User)
     private readonly repository: Repository<User>,
+    @InjectRepository(Appointment)
+    private readonly appointmentRepository: Repository<Appointment>,
   ) {}
 
   create(data: DeepPartial<User>): User {
@@ -113,6 +116,35 @@ export class UsersRepository implements IUsersRepository {
       query.sort = 'ASC';
     } else {
       query.sort = 'DESC';
+    }
+
+    if (query?.facilityId) {
+      const data = await this.appointmentRepository.findAndCount({
+        select: [],
+        relations: {
+          patient: true,
+        },
+        where: {
+          facilityId: query.facilityId,
+          patient: {
+            ...where,
+          },
+        },
+        order: {
+          patient: {
+            priorityLevel: query.sort,
+            pregnancyProfiles: { createdAt: query.sort, riskLevel: query.sort },
+          },
+        },
+        skip: offset,
+        take: limit,
+      });
+
+      const [appointments, total] = data;
+      return {
+        users: appointments.map((appointment) => appointment.patient),
+        total,
+      };
     }
 
     const data = this.repository.findAndCount({
