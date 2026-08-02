@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Inject, Injectable } from '@nestjs/common';
 import { ActiveStatus, DoctorShiftStatus, FacilityStatus } from '../../../common/constants/status.enum';
 import { RESPONSE_MESSAGES } from '../../../common/constants/response-message.constant';
+import { RoleEnum } from '../../../common/constants/role.enum';
 import { Facility } from '../../facilities/entities/facility.entity';
 import { FacilitiesService } from '../../facilities/facilities.service';
 import { RoomsService } from '../../rooms/rooms.service';
@@ -56,7 +57,7 @@ export class ShiftsValidator {
 
   /** Validate candidate tao ca nhung chua check conflict, dung cho preview auto-generate de tra conflict details. */
   async prepareForCreate(dto: CreateDoctorShiftDto): Promise<PreparedDoctorShiftInput> {
-    const { facility, staffId } = await this.validateReferences(dto.doctorId, dto.facilityId, dto.roomId);
+    const { facility, staffId } = await this.validateReferences(dto, dto.facilityId, dto.roomId);
     const timing = await this.resolveShiftTiming(dto);
 
     validateSchedule(dto.shiftDate, timing.startTime, timing.endTime, true);
@@ -72,7 +73,7 @@ export class ShiftsValidator {
     doctorId: string,
     options?: { slotWasProvided?: boolean; timeWasProvided?: boolean },
   ): Promise<PreparedDoctorShiftInput> {
-    const { facility, staffId } = await this.validateReferences(doctorId, shift.facilityId, shift.roomId);
+    const { facility, staffId } = await this.validateReferences({ ...shift, doctorId }, shift.facilityId, shift.roomId);
     const timing = await this.resolveShiftTiming(shift, false, options);
 
     validateSchedule(shift.shiftDate, timing.startTime, timing.endTime, false);
@@ -96,7 +97,7 @@ export class ShiftsValidator {
 
   /** Validate input API check-conflict; nếu dùng slotId thì tự lấy start/end từ shift_slots. */
   async validateForConflictCheck(dto: CheckShiftConflictDto): Promise<PreparedDoctorShiftInput> {
-    const { facility, staffId } = await this.validateReferences(dto.doctorId, dto.facilityId, dto.roomId);
+    const { facility, staffId } = await this.validateReferences(dto, dto.facilityId, dto.roomId);
     const timing = await this.resolveShiftTiming(dto);
 
     validateSchedule(dto.shiftDate, timing.startTime, timing.endTime, true);
@@ -142,17 +143,41 @@ export class ShiftsValidator {
 
   /** Kiểm tra facility, doctor assignment, room; đồng thời trả staffId để lưu vào shifts.staff_id. */
   private async validateReferences(
-    doctorId: string,
+    input: { doctorId?: string; staffId?: string; roleId?: string | null },
     facilityId: string,
     roomId?: string | null,
   ): Promise<{ facility: Facility; staffId: string }> {
     const facility = await this.ensureActiveFacility(facilityId);
+
+    if (input.staffId) {
+      const assignee = await this.repository.findShiftAssignee(input.staffId, facilityId, input.roleId);
+      if (!assignee) {
+        throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.STAFF_ROLE_INVALID);
+      }
+      if (assignee.roleName === RoleEnum.DOCTOR && !assignee.doctorId) {
+        throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.STAFF_DOCTOR_PROFILE_REQUIRED);
+      }
+
+      if (roomId) {
+        const room = await this.roomsService.findById(roomId);
+        if (room.facilityId !== facilityId || room.status !== ActiveStatus.ACTIVE) {
+          throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.ROOM_INVALID);
+        }
+      }
+
+      return { facility, staffId: assignee.staffId };
+    }
+
+    if (!input.doctorId) {
+      throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.STAFF_OR_DOCTOR_REQUIRED);
+    }
+
     const repository = this.repository as IShiftsRepository & {
       findDoctorStaffId?: (doctorId: string, facilityId?: string) => Promise<string | null>;
     };
     const staffId = repository.findDoctorStaffId
-      ? await repository.findDoctorStaffId(doctorId, facilityId)
-      : await this.resolveStaffIdWithLegacyRepository(doctorId, facilityId);
+      ? await repository.findDoctorStaffId(input.doctorId, facilityId)
+      : await this.resolveStaffIdWithLegacyRepository(input.doctorId, facilityId);
     if (!staffId) {
       throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.DOCTOR_NOT_ASSIGNED);
     }

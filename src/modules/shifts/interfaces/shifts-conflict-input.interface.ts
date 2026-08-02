@@ -1,6 +1,7 @@
 export interface ShiftConflictInput {
-  doctorId: string;
+  doctorId?: string;
   staffId?: string;
+  roleId?: string | null;
   slotId?: string | null;
   roomId?: string | null;
   shiftDate: string;

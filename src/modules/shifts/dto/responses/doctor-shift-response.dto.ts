@@ -6,11 +6,14 @@ export class DoctorShiftResponseDto {
   @ApiProperty()
   id: string;
 
-  @ApiProperty()
-  doctorId: string;
+  @ApiPropertyOptional({ nullable: true })
+  doctorId?: string | null;
 
   @ApiPropertyOptional()
   staffId?: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  roleId?: string | null;
 
   @ApiPropertyOptional({ nullable: true })
   slotId?: string | null;
@@ -41,6 +44,12 @@ export class DoctorShiftResponseDto {
 
   @ApiProperty()
   updatedAt: Date;
+
+  @ApiPropertyOptional()
+  staffName?: string;
+
+  @ApiPropertyOptional()
+  roleName?: string;
 
   @ApiPropertyOptional()
   doctorName?: string;

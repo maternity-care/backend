@@ -4,7 +4,7 @@ import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
 import { DoctorShift } from '../entities/shift.entity';
 import { ShiftSlot } from '../../../database/entities/shift-slot.entity';
 import { SearchDoctorShiftDto } from '../dto/requests/search-doctor-shift.dto';
-import { ShiftWithDetails, IShiftsRepository } from '../interfaces/shifts-repository.interface';
+import { ShiftAssigneeDetails, ShiftWithDetails, IShiftsRepository } from '../interfaces/shifts-repository.interface';
 import { ShiftConflictInput } from '../interfaces/shifts-conflict-input.interface';
 import { ShiftConflicts } from '../interfaces/shift-conflicts.interface';
 import { DoctorAppointmentBlock } from '../interfaces/doctor-appointment-block.interface';
@@ -437,6 +437,44 @@ export class ShiftsRepository implements IShiftsRepository {
     return row?.doctorId ?? null;
   }
 
+  async findShiftAssignee(
+    staffId: string,
+    facilityId: string,
+    roleId?: string | null,
+  ): Promise<ShiftAssigneeDetails | null> {
+    const query = this.repository.manager
+      .createQueryBuilder()
+      .select('staff.id', 'staffId')
+      .addSelect('staff.name', 'staffName')
+      .addSelect('staff.facility_id', 'facilityId')
+      .addSelect('role.id', 'roleId')
+      .addSelect('role.name', 'roleName')
+      .addSelect('doctor.id', 'doctorId')
+      .from('staffs', 'staff')
+      .innerJoin('staff_roles', 'staffRole', 'staffRole.staff_id = staff.id')
+      .innerJoin('roles', 'role', 'role.id = staffRole.role_id AND role.deleted_at IS NULL')
+      .leftJoin('doctors', 'doctor', 'doctor.staff_id = staff.id AND doctor.status = :active', { active: 'active' })
+      .where('staff.id = :staffId', { staffId })
+      .andWhere('staff.facility_id = :facilityId', { facilityId })
+      .andWhere('staff.status = :active', { active: 'active' });
+
+    if (roleId) {
+      query.andWhere('role.id = :roleId', { roleId });
+    }
+
+    const row = await query.getRawOne<Record<string, unknown>>();
+    if (!row) return null;
+
+    return {
+      staffId: String(row.staffId),
+      staffName: String(row.staffName),
+      facilityId: String(row.facilityId),
+      roleId: row.roleId ? String(row.roleId) : null,
+      roleName: row.roleName ? String(row.roleName) : null,
+      doctorId: row.doctorId ? String(row.doctorId) : null,
+    };
+  }
+
   findShiftSlotById(slotId: string): Promise<ShiftSlot | null> {
     if (!this.shiftSlotRepository) {
       return Promise.resolve(null);
@@ -496,13 +534,15 @@ export class ShiftsRepository implements IShiftsRepository {
       .createQueryBuilder('shift')
       .innerJoin('facilities', 'facility', 'facility.id = shift.facilityId')
       .innerJoin('staffs', 'staff', 'staff.id = shift.staffId')
-      .innerJoin('doctors', 'doctor', 'doctor.staff_id = staff.id')
+      .leftJoin('doctors', 'doctor', 'doctor.staff_id = staff.id')
+      .leftJoin('roles', 'role', 'role.id = shift.roleId')
       .leftJoin('shift_slots', 'slot', 'slot.id = shift.slotId')
       .leftJoin('rooms', 'room', 'room.id = shift.roomId')
       .leftJoin('room_types', 'roomType', 'roomType.id = room.roomTypeId')
       .select('shift.id', 'id')
       .addSelect('doctor.id', 'doctorId')
       .addSelect('shift.staffId', 'staffId')
+      .addSelect('shift.roleId', 'roleId')
       .addSelect('shift.slotId', 'slotId')
       .addSelect('shift.facilityId', 'facilityId')
       .addSelect('shift.roomId', 'roomId')
@@ -517,6 +557,8 @@ export class ShiftsRepository implements IShiftsRepository {
       .addSelect('shift.createdAt', 'createdAt')
       .addSelect('shift.updatedAt', 'updatedAt')
       .addSelect('staff.name', 'doctorName')
+      .addSelect('staff.name', 'staffName')
+      .addSelect('role.name', 'roleName')
       .addSelect('doctor.title', 'doctorTitle')
       .addSelect('doctor.specialty', 'doctorSpecialty')
       .addSelect('facility.code', 'facilityCode')

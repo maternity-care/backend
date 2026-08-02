@@ -1,4 +1,5 @@
 import { ActiveStatus } from './../../common/constants/status.enum';
+import { ForumCategory } from './../../common/constants/forum.enum';
 import { Staff } from './../../modules/staffs/entities/staff.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
@@ -33,6 +34,19 @@ export class ForumTopic {
   @ApiProperty({ type: String })
   @Column({ name: 'slug', type: 'varchar', length: 255 })
   slug: string;
+
+  @ApiProperty({ enum: ForumCategory, enumName: 'ForumCategory' })
+  @Column({
+    name: 'category',
+    type: 'enum',
+    enum: ForumCategory,
+    default: ForumCategory.PREGNANCY,
+  })
+  category: ForumCategory;
+
+  @ApiProperty({ type: String, required: false })
+  @Column({ name: 'description', type: 'varchar', length: 500, nullable: true })
+  description: string | null;
 
   @ApiProperty({ enum: ActiveStatus, enumName: 'ActiveStatus' })
   @Column({ name: 'status', type: 'enum', enum: ActiveStatus, default: ActiveStatus.ACTIVE })

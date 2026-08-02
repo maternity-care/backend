@@ -174,6 +174,7 @@ export const RESPONSE_MESSAGES = {
     NOT_FOUND: 'Loại phòng không tồn tại',
     ACTIVE_NOT_FOUND: 'Loại phòng không tồn tại hoặc đang ngừng hoạt động',
     ALREADY_EXISTS: 'Loại phòng đã tồn tại',
+    IN_USE: 'Loại phòng đang được sử dụng, vui lòng chuyển các phòng sang loại khác trước khi xóa',
   },
   SHIFTS: {
     CREATED: 'Tạo ca trực bác sĩ thành công',
@@ -192,6 +193,9 @@ export const RESPONSE_MESSAGES = {
     WEEKLY_SUCCESS: 'Lấy lịch trực theo tuần thành công',
     NOT_FOUND: 'Ca trực bác sĩ không tồn tại',
     DOCTOR_NOT_ASSIGNED: 'Bác sĩ không hoạt động hoặc chưa được phân công tại cơ sở này',
+    STAFF_OR_DOCTOR_REQUIRED: 'Cần chọn nhân viên hoặc bác sĩ cho ca trực',
+    STAFF_ROLE_INVALID: 'Nhân viên không hoạt động, không thuộc cơ sở này hoặc không có vai trò đã chọn',
+    STAFF_DOCTOR_PROFILE_REQUIRED: 'Nhân viên trực vai trò bác sĩ phải có hồ sơ bác sĩ đang hoạt động',
     ROOM_INVALID: 'Phòng không hoạt động hoặc không thuộc cơ sở của ca trực',
     FACILITY_INACTIVE: 'Không thể xếp ca tại cơ sở không hoạt động',
     DOCTOR_CONFLICT: 'Bác sĩ đã có ca trực trùng thời gian',

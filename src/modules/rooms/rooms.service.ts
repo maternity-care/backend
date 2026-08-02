@@ -185,12 +185,10 @@ export class RoomsService {
       return { action: 'hard_deleted', affectedCount: 0 };
     }
 
-    roomType.status = ActiveStatus.INACTIVE;
-    roomType.deletedAt = new Date();
-    roomType.deleteReason = null;
-    roomType.deletedBy = null;
-    await this.roomsRepository.saveRoomType(roomType);
-    return { action: 'soft_deleted', affectedCount: dependencyCount };
+    throw new ConflictException({
+      message: RESPONSE_MESSAGES.ROOM_TYPES.IN_USE,
+      data: { affectedCount: dependencyCount },
+    });
   }
 
   async findById(id: string): Promise<Room> {

@@ -4,7 +4,6 @@ import { DoctorShiftStatus } from '../../common/constants/status.enum';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
 import { DoctorShift } from './entities/shift.entity';
 import { AutoGenerateShiftsDto } from './dto/requests/auto-generate-shifts.dto';
-import { BulkCreateDoctorShiftDto } from './dto/requests/bulk-create-doctor-shift.dto';
 import { CheckShiftConflictDto } from './dto/requests/check-shift-conflict.dto';
 import { CopyWeekDoctorShiftDto } from './dto/requests/copy-week-doctor-shift.dto';
 import { CreateDoctorShiftDto } from './dto/requests/create-doctor-shift.dto';
@@ -34,6 +33,7 @@ import {
 import {
   AutoGenerateIssueItem,
   AutoGenerateConfirmResult,
+  AutoGenerateCandidate,
   AutoGeneratePlan,
   AutoGeneratePreviewResult,
   AutoGenerateValidItem,
@@ -58,63 +58,39 @@ export class ShiftsService {
     return this.repository.save(this.buildShiftEntity(dto, prepared));
   }
 
-  /** Tạo nhiều ca theo khoảng ngày + workingDays, ví dụ tạo ca thứ 2/4/6 trong 1 tháng. */
-  async bulkCreate(dto: BulkCreateDoctorShiftDto): Promise<DoctorShift[]> {
-    const range = resolveBulkCreateDateRange(dto);
-    validateDateRange(range.fromDate, range.toDate);
-    validateBulkCreateRangeLength(range.fromDate, range.toDate);
-
-    const dates = buildShiftDates(range.fromDate, range.toDate, dto.workingDays);
-    if (dates.length === 0) {
-      throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.BULK_NO_MATCHING_DATE);
-    }
-    if (dateDiffInDays(range.fromDate, range.toDate) > 92) {
-      throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.BULK_RANGE_TOO_LONG);
-    }
-
-    const shifts: DoctorShift[] = [];
-    for (const shiftDate of dates) {
-      const payload = {
-        doctorId: dto.doctorId,
-        facilityId: dto.facilityId,
-        roomId: dto.roomId,
-        slotId: dto.slotId,
-        shiftDate,
-        startTime: dto.startTime,
-        endTime: dto.endTime,
-        maxAppointments: dto.maxAppointments,
-        status: dto.status,
-      } as CreateDoctorShiftDto;
-      const prepared = await this.validator.validateForCreate(payload);
-      shifts.push(this.buildShiftEntity(payload, prepared));
-    }
-
-    return this.repository.saveMany(shifts);
-  }
-
-  /** Preview auto-generate: sinh candidate theo ngay/slot nhung khong luu DB, tra ro valid/skip/conflict. */
-  async previewAutoGenerate(dto: AutoGenerateShiftsDto): Promise<AutoGeneratePreviewResult> {
+  /** Preview bulk-generate: sinh candidate theo ngay/slot nhung khong luu DB, tra ro valid/skip/conflict. */
+  async previewBulkGenerate(dto: AutoGenerateShiftsDto): Promise<AutoGeneratePreviewResult> {
     const plan = await this.buildAutoGeneratePlan(dto);
     const { internalValidEntities: _internalValidEntities, ...response } = plan;
     return response;
   }
 
-  /** Confirm auto-generate: chi luu cac candidate hop le trong preview, cac ngay loi van duoc tra ve trong summary. */
-  async confirmAutoGenerate(dto: AutoGenerateShiftsDto): Promise<AutoGenerateConfirmResult> {
+  /**
+   * Confirm bulk-generate la API mot buoc cho FE:
+   * - Tu validate/preview lai day du.
+   * - saveOnlyValid=true: luu cac dong hop le, dong loi van tra ve skipped/conflict.
+   * - saveOnlyValid=false: neu con bat ky loi nao thi khong luu dong nao, nhung van tra ve bang loi.
+   */
+  async confirmBulkGenerate(dto: AutoGenerateShiftsDto): Promise<AutoGenerateConfirmResult> {
     const plan = await this.buildAutoGeneratePlan(dto);
-    if (plan.internalValidEntities.length === 0) {
-      throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_NO_VALID_SHIFT);
-    }
+    const { internalValidEntities: _internalValidEntities, ...response } = plan;
+    const hasIssues = plan.skippedItems.length > 0 || plan.conflictItems.length > 0;
 
-    if (dto.saveOnlyValid === false && (plan.skippedItems.length > 0 || plan.conflictItems.length > 0)) {
-      throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_STRICT_HAS_ISSUES);
+    if (plan.internalValidEntities.length === 0 || (dto.saveOnlyValid === false && hasIssues)) {
+      return {
+        ...response,
+        canConfirm: false,
+        createdShifts: [],
+        createdCount: 0,
+        allOrNothingRejected: dto.saveOnlyValid === false && hasIssues,
+      };
     }
 
     const createdShifts = await this.repository.saveMany(plan.internalValidEntities);
-    const { internalValidEntities: _internalValidEntities, ...response } = plan;
     return {
       ...response,
       createdShifts,
+      createdCount: createdShifts.length,
     };
   }
 
@@ -342,35 +318,36 @@ export class ShiftsService {
       throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_RANGE_TOO_LONG);
     }
 
-    const dates = buildShiftDates(range.fromDate, range.toDate, dto.workingDays);
-    if (dates.length === 0) {
-      throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.BULK_NO_MATCHING_DATE);
-    }
-
     const closureDates = await this.validator.getActiveClosureDates(dto.facilityId, range.fromDate, range.toDate);
     const validShifts: AutoGenerateValidItem[] = [];
     const skippedItems: AutoGenerateIssueItem[] = [];
     const conflictItems: AutoGenerateIssueItem[] = [];
     const internalValidEntities: DoctorShift[] = [];
+    const candidateInputs = this.buildAutoGenerateInputs(dto, range, skippedItems);
+    const preValidationSkippedCount = skippedItems.length;
 
-    for (const shiftDate of dates) {
-      const payload = this.buildAutoGeneratePayload(dto, shiftDate);
+    for (const candidateInput of candidateInputs) {
+      const { index, slotAssignmentIndex, assignmentIndex, shiftDate, payload } = candidateInput;
 
       if (closureDates.has(shiftDate)) {
         skippedItems.push({
+          index,
+          slotAssignmentIndex,
+          assignmentIndex,
           shiftDate,
           reason: RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_CLOSURE_DAY,
-          candidate: payload,
+          candidate: { ...payload, index, slotAssignmentIndex, assignmentIndex },
         });
         continue;
       }
 
       try {
         const prepared = await this.validator.prepareForCreate(payload);
-        const candidate = this.buildAutoGenerateCandidate(payload, prepared);
+        const candidate = this.buildAutoGenerateCandidate(payload, prepared, index, slotAssignmentIndex, assignmentIndex);
         const conflicts = await this.repository.findConflicts({
           ...payload,
           staffId: prepared.staffId,
+          roleId: payload.roleId,
           slotId: prepared.slotId,
           startTime: prepared.startTime,
           endTime: prepared.endTime,
@@ -378,6 +355,9 @@ export class ShiftsService {
 
         if (conflicts.doctorConflicts.length > 0 || conflicts.roomConflicts.length > 0) {
           conflictItems.push({
+            index,
+            slotAssignmentIndex,
+            assignmentIndex,
             shiftDate,
             reason: RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_CONFLICT,
             candidate,
@@ -391,17 +371,21 @@ export class ShiftsService {
         internalValidEntities.push(this.buildShiftEntity(payload, prepared));
       } catch (error) {
         skippedItems.push({
+          index,
+          slotAssignmentIndex,
+          assignmentIndex,
           shiftDate,
           reason: this.extractErrorMessage(error),
-          candidate: payload,
+          candidate: { ...payload, index, slotAssignmentIndex, assignmentIndex },
         });
       }
     }
+    const hasIssues = skippedItems.length > 0 || conflictItems.length > 0;
 
     return {
-      canConfirm: validShifts.length > 0,
+      canConfirm: validShifts.length > 0 && (dto.saveOnlyValid !== false || !hasIssues),
       summary: {
-        totalCandidates: dates.length,
+        totalCandidates: candidateInputs.length + preValidationSkippedCount,
         valid: validShifts.length,
         skipped: skippedItems.length,
         conflicted: conflictItems.length,
@@ -413,8 +397,91 @@ export class ShiftsService {
     };
   }
 
+  private buildAutoGenerateInputs(
+    dto: AutoGenerateShiftsDto,
+    range: { fromDate: string; toDate: string },
+    skippedItems: AutoGenerateIssueItem[],
+  ): Array<{
+    index: number;
+    slotAssignmentIndex?: number;
+    assignmentIndex?: number;
+    shiftDate: string;
+    payload: CreateDoctorShiftDto;
+  }> {
+    const inputs: Array<{
+      index: number;
+      slotAssignmentIndex?: number;
+      assignmentIndex?: number;
+      shiftDate: string;
+      payload: CreateDoctorShiftDto;
+    }> = [];
+
+    if (dto.slotAssignments?.length) {
+      for (const [slotAssignmentIndex, slotAssignment] of dto.slotAssignments.entries()) {
+        for (const [assignmentIndex, assignment] of slotAssignment.assignments.entries()) {
+          const dates = buildShiftDates(range.fromDate, range.toDate, assignment.workingDays);
+          if (dates.length === 0) {
+            skippedItems.push({
+              index: inputs.length + skippedItems.length,
+              slotAssignmentIndex,
+              assignmentIndex,
+              shiftDate: range.fromDate,
+              reason: RESPONSE_MESSAGES.SHIFTS.BULK_NO_MATCHING_DATE,
+              candidate: {
+                facilityId: dto.facilityId,
+                slotId: slotAssignment.slotId,
+                staffId: assignment.staffId,
+                roleId: assignment.roleId,
+                roomId: assignment.roomId ?? null,
+                maxAppointments: assignment.maxAppointments,
+                status: assignment.status,
+              },
+            });
+            continue;
+          }
+
+          for (const shiftDate of dates) {
+            inputs.push({
+              index: inputs.length + skippedItems.length,
+              slotAssignmentIndex,
+              assignmentIndex,
+              shiftDate,
+              payload: {
+                staffId: assignment.staffId,
+                roleId: assignment.roleId,
+                facilityId: dto.facilityId,
+                roomId: assignment.roomId ?? undefined,
+                slotId: slotAssignment.slotId,
+                shiftDate,
+                maxAppointments: assignment.maxAppointments,
+                status: assignment.status,
+              } as CreateDoctorShiftDto,
+            });
+          }
+        }
+      }
+
+      return inputs;
+    }
+
+    const dates = buildShiftDates(range.fromDate, range.toDate, dto.workingDays ?? []);
+    if (dates.length === 0) {
+      throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.BULK_NO_MATCHING_DATE);
+    }
+
+    for (const shiftDate of dates) {
+      inputs.push({
+        index: inputs.length,
+        shiftDate,
+        payload: this.buildLegacyAutoGeneratePayload(dto, shiftDate),
+      });
+    }
+
+    return inputs;
+  }
+
   /** Chuyen payload auto-generate theo tung ngay thanh payload create shift binh thuong. */
-  private buildAutoGeneratePayload(dto: AutoGenerateShiftsDto, shiftDate: string): CreateDoctorShiftDto {
+  private buildLegacyAutoGeneratePayload(dto: AutoGenerateShiftsDto, shiftDate: string): CreateDoctorShiftDto {
     return {
       doctorId: dto.doctorId,
       facilityId: dto.facilityId,
@@ -432,13 +499,20 @@ export class ShiftsService {
   private buildAutoGenerateCandidate(
     payload: CreateDoctorShiftDto,
     prepared: PreparedDoctorShiftInput,
+    index: number,
+    slotAssignmentIndex?: number,
+    assignmentIndex?: number,
   ): AutoGenerateValidItem {
     return {
+      index,
+      slotAssignmentIndex,
+      assignmentIndex,
       doctorId: payload.doctorId,
       facilityId: payload.facilityId,
       roomId: payload.roomId ?? null,
       slotId: prepared.slotId,
       staffId: prepared.staffId,
+      roleId: payload.roleId ?? null,
       shiftDate: payload.shiftDate,
       startTime: prepared.startTime,
       endTime: prepared.endTime,
