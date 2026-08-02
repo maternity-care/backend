@@ -10,7 +10,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { PermissionEnum } from '../../common/constants/permission.enum';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -20,6 +20,7 @@ import { assertFacilityAccess, getActiveFacilityId } from '../../common/helpers/
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AutoGenerateShiftsDto } from './dto/requests/auto-generate-shifts.dto';
+import { BulkCreateDoctorShiftDto } from './dto/requests/bulk-create-doctor-shift.dto';
 import { CheckShiftConflictDto } from './dto/requests/check-shift-conflict.dto';
 import { CopyWeekDoctorShiftDto } from './dto/requests/copy-week-doctor-shift.dto';
 import { CreateDoctorShiftDto } from './dto/requests/create-doctor-shift.dto';
@@ -72,10 +73,14 @@ export class ShiftsController {
   @Post('bulk-create')
   @Permissions(PermissionEnum.SHIFT_CREATE)
   @ApiOperation({ summary: 'Create many shifts by date range and working days' })
-  async bulkCreate(@Body() dto: BulkCreateDoctorShiftDto) {
+  async bulkCreate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: BulkCreateDoctorShiftDto,
+  ) {
+    this.applyFacilityScope(user, dto);
     return {
       message: RESPONSE_MESSAGES.SHIFTS.BULK_CREATED,
-      data: await this.service.bulkCreate(dto),
+      data: await this.service.confirmBulkGenerate(dto as AutoGenerateShiftsDto),
     };
   }
 
@@ -83,11 +88,13 @@ export class ShiftsController {
   @Permissions(PermissionEnum.SHIFT_CREATE)
   @ApiOperation({ summary: 'Preview auto-generated shifts before saving' })
   async previewAutoGenerate(
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: AutoGenerateShiftsDto,
   ): Promise<AutoGeneratePreviewApiResponse> {
+    this.applyFacilityScope(user, dto);
     return {
       message: RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_PREVIEW_SUCCESS,
-      data: await this.service.previewAutoGenerate(dto),
+      data: await this.service.previewBulkGenerate(dto),
     };
   }
 
@@ -95,11 +102,13 @@ export class ShiftsController {
   @Permissions(PermissionEnum.SHIFT_CREATE)
   @ApiOperation({ summary: 'Confirm and save valid auto-generated shifts' })
   async confirmAutoGenerate(
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: AutoGenerateShiftsDto,
   ): Promise<AutoGenerateConfirmApiResponse> {
+    this.applyFacilityScope(user, dto);
     return {
       message: RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_CONFIRM_SUCCESS,
-      data: await this.service.confirmAutoGenerate(dto),
+      data: await this.service.confirmBulkGenerate(dto),
     };
   }
 
