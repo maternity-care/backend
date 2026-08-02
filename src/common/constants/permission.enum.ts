@@ -82,6 +82,14 @@ export enum PermissionEnum {
   ARTICLE_DELETE = 'article.delete',
   ARTICLE_PUBLISH = 'article.publish',
 
+  FORUM_VIEW = 'forum.view',
+  FORUM_CREATE = 'forum.create',
+  FORUM_UPDATE = 'forum.update',
+  FORUM_DELETE = 'forum.delete',
+  FORUM_MODERATE = 'forum.moderate',
+  FORUM_REPORT_VIEW = 'forum_report.view',
+  FORUM_REPORT_RESOLVE = 'forum_report.resolve',
+
   SERVICE_PACKAGE_VIEW = 'service_package.view',
   SERVICE_PACKAGE_CREATE = 'service_package.create',
   SERVICE_PACKAGE_UPDATE = 'service_package.update',

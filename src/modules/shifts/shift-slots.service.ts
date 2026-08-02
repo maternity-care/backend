@@ -149,19 +149,12 @@ export class ShiftSlotsService {
     return this.repository.save(slot);
   }
 
-  /** Xoa an toan: chua co shifts thi hard delete, da duoc dung thi soft delete + inactive. */
+  /** Xoa cung khung ca. Ca truc cu giu startTime/endTime va slotId duoc DB set null. */
   async remove(id: string) {
     const slot = await this.findById(id);
     const dependencyCount = await this.countShiftDependencies(slot.id);
-    if (dependencyCount === 0) {
-      await this.repository.remove(slot);
-      return { action: 'hard_deleted', affectedCount: 0 };
-    }
-
-    slot.status = ActiveStatus.INACTIVE;
-    slot.deletedAt = new Date();
-    await this.repository.save(slot);
-    return { action: 'soft_deleted', affectedCount: dependencyCount };
+    await this.repository.remove(slot);
+    return { action: 'hard_deleted', affectedCount: dependencyCount };
   }
 
   private buildListQuery(filters?: SearchShiftSlotDto): SelectQueryBuilder<ShiftSlot> {

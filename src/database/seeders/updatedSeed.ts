@@ -79,6 +79,9 @@ async function insertRolePermission() {
       PermissionEnum.CHECKLIST_VIEW,
       PermissionEnum.CONSULTATION_VIEW,
       PermissionEnum.CONSULTATION_REPLY,
+      PermissionEnum.FORUM_VIEW,
+      PermissionEnum.FORUM_CREATE,
+      PermissionEnum.FORUM_MODERATE,
     ],
     [RoleEnum.NURSE]: [
       PermissionEnum.MEMBER_VIEW,
@@ -95,6 +98,8 @@ async function insertRolePermission() {
       PermissionEnum.CHECKLIST_UPDATE,
       PermissionEnum.CONSULTATION_VIEW,
       PermissionEnum.CONSULTATION_REPLY,
+      PermissionEnum.FORUM_VIEW,
+      PermissionEnum.FORUM_CREATE,
     ],
     [RoleEnum.STAFF]: [
       PermissionEnum.MEMBER_VIEW,
@@ -108,6 +113,17 @@ async function insertRolePermission() {
       PermissionEnum.SERVICE_PACKAGE_VIEW,
       PermissionEnum.PAYMENT_VIEW,
       PermissionEnum.ARTICLE_VIEW,
+      PermissionEnum.FORUM_VIEW,
+      PermissionEnum.FORUM_CREATE,
+    ],
+    [RoleEnum.MODERATOR]: [
+      PermissionEnum.FORUM_VIEW,
+      PermissionEnum.FORUM_CREATE,
+      PermissionEnum.FORUM_UPDATE,
+      PermissionEnum.FORUM_DELETE,
+      PermissionEnum.FORUM_MODERATE,
+      PermissionEnum.FORUM_REPORT_VIEW,
+      PermissionEnum.FORUM_REPORT_RESOLVE,
     ],
     [RoleEnum.MEMBER]: [
       PermissionEnum.PREGNANCY_VIEW,
@@ -130,6 +146,8 @@ async function insertRolePermission() {
       PermissionEnum.ARTICLE_VIEW,
       PermissionEnum.SERVICE_PACKAGE_VIEW,
       PermissionEnum.PAYMENT_VIEW,
+      PermissionEnum.FORUM_VIEW,
+      PermissionEnum.FORUM_CREATE,
     ],
     [RoleEnum.PARTNER]: [
       PermissionEnum.PREGNANCY_VIEW,
@@ -139,6 +157,7 @@ async function insertRolePermission() {
       PermissionEnum.REMINDER_VIEW,
       PermissionEnum.CHECKLIST_VIEW,
       PermissionEnum.ARTICLE_VIEW,
+      PermissionEnum.FORUM_VIEW,
     ],
   };
   const data = roles

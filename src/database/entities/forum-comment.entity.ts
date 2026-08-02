@@ -50,6 +50,10 @@ export class ForumComment {
   @Column({ name: 'content', type: 'text' })
   content: string;
 
+  @ApiProperty({ type: Boolean })
+  @Column({ name: 'is_doctor_answer', type: 'boolean', default: false })
+  isDoctorAnswer: boolean | number;
+
   @ApiProperty({ enum: ForumContentStatus, enumName: 'ForumContentStatus' })
   @Column({
     name: 'status',
@@ -58,6 +62,22 @@ export class ForumComment {
     default: ForumContentStatus.PUBLISHED,
   })
   status: ForumContentStatus;
+
+  @ApiProperty({ type: String, required: false })
+  @Column({ name: 'moderated_by', type: 'bigint', nullable: true })
+  moderatedBy: string | null;
+
+  @ApiProperty({ type: Date, required: false })
+  @Column({ name: 'moderated_at', type: 'timestamp', nullable: true })
+  moderatedAt: Date | null;
+
+  @ApiProperty({ type: String, required: false })
+  @Column({ name: 'moderation_reason', type: 'text', nullable: true })
+  moderationReason: string | null;
+
+  @ApiProperty({ type: Date, required: false })
+  @Column({ name: 'deleted_at', type: 'timestamp', nullable: true })
+  deletedAt: Date | null;
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
