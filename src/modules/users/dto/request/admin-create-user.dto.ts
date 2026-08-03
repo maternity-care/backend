@@ -70,6 +70,11 @@ export class AdminCreateUserDto {
   @Min(0)
   yearsOfExperience?: number;
 
+  @ApiPropertyOptional({ description: 'ID loại phòng làm việc' })
+  @IsOptional()
+  @IsString()
+  workingRoomTypeId: string;
+
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
