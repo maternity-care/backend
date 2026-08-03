@@ -18,10 +18,11 @@ import { MAIL_SERVICE } from '../mail/interfaces/mail-service.interface';
 import { ManagementSystemUsersController } from './management-system-users.controller';
 import { Facility } from '../facilities/entities/facility.entity';
 import { Doctor } from '../doctors/entities/doctor.entity';
+import { Appointment } from '../appointments/entities/appointment.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Staff, Facility, Doctor]),
+    TypeOrmModule.forFeature([User, Staff, Facility, Doctor, Appointment]),
     RolesModule,
     PermissionsModule,
     MailModule,

@@ -1,3 +1,4 @@
+import { Doctor } from './../../modules/doctors/entities/doctor.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ActiveStatus } from '../../common/constants/status.enum';
 import {
@@ -6,6 +7,7 @@ import {
   DeleteDateColumn,
   Entity,
   Index,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -18,6 +20,9 @@ export class RoomType {
   @ApiProperty({ type: String, example: '1' })
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: string;
+
+  @OneToMany(() => Doctor, (doctor) => doctor.workingRoomType)
+  doctors: Doctor[];
 
   @ApiProperty({ type: String })
   @Column({ name: 'code', type: 'varchar', length: 50 })

@@ -50,6 +50,16 @@ export class SearchDoctorDto {
   status?: string;
 
   @ApiPropertyOptional({
+    description: 'Filter by years of experience, level 1-(1-5),2-(6-10),3-(11-20),4-(>20)',
+  })
+  @Type(() => Number)
+  @IsInt()
+  @IsOptional()
+  @Min(1)
+  @Max(4)
+  filterYearsOfExperienceLevel?: number;
+
+  @ApiPropertyOptional({
     description: 'Sort by years of experience asc or desc, default is desc',
   })
   @IsString()

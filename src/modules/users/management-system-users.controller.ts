@@ -22,6 +22,8 @@ import { UpdatePregnantUserDto } from './dto/request/update-pregnant-user.dto';
 import { UserStatusEnum } from './users.enum';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/request/create-user.dto';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 
 @ApiTags('Management - Users')
 @ApiBearerAuth()
@@ -33,8 +35,8 @@ export class ManagementSystemUsersController {
 
   @Get()
   @Permissions(PermissionEnum.USER_VIEW)
-  async findAll(@Query() query: SearchUserDto) {
-    const data = await this.usersService.searchUsers(query);
+  async findAll(@Query() query: SearchUserDto, @CurrentUser() currentUser: AuthenticatedUser) {
+    const data = await this.usersService.searchUsers(query, currentUser);
     return { data, success: true, message: 'Lấy danh sách người dùng thành công.' };
   }
 

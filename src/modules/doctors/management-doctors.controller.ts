@@ -39,7 +39,11 @@ export class ManagementDoctorsController {
   @Permissions(PermissionEnum.DOCTOR_VIEW)
   @ApiOperation({ summary: 'List doctors' })
   @ApiResponse({ status: 200, type: [DoctorResponseDto] })
-  async findAll(@Query() query: SearchDoctorDto) {
+  async findAll(@Query() query: SearchDoctorDto, @CurrentUser() user: AuthenticatedUser) {
+    if (user?.roles[0].name === RoleEnum.ADMIN && user?.activeFacilityId) {
+      query.facilityId = user?.activeFacilityId;
+    }
+
     const doctors = await this.doctorsService.findAll(query);
     return {
       message: 'Thành công',

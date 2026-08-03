@@ -1,4 +1,8 @@
 import {
+  IStaffProfileRepository,
+  STAFF_PROFILE_REPOSITORY,
+} from './../staffs/interfaces/staff-profile-repository.interface';
+import {
   BadRequestException,
   ConflictException,
   Inject,
@@ -22,6 +26,8 @@ export class DoctorsService {
     private readonly repository: IDoctorsRepository,
     @Inject(USERS_SERVICE)
     private readonly usersService: UsersService,
+    @Inject(STAFF_PROFILE_REPOSITORY)
+    private readonly staffRepository: IStaffProfileRepository,
   ) {}
 
   async create(dto: AdminCreateUserDto, actor: AuthenticatedUser): Promise<User> {
@@ -67,8 +73,32 @@ export class DoctorsService {
       await this.ensureUniqueStaffId(dto.staffId, doctor.id);
     }
 
-    Object.assign(doctor, dto);
-    return this.repository.save(doctor);
+    if (doctor.yearsOfExperience > dto.yearsOfExperience) {
+      throw new BadRequestException('Mức năm kinh nghiệm không được giảm');
+    }
+
+    doctor.licenseNo = dto.licenseNo ?? doctor?.licenseNo;
+    doctor.title = dto.title ?? doctor?.title;
+    doctor.specialty = dto.specialty ?? doctor?.specialty;
+    doctor.yearsOfExperience = dto.yearsOfExperience ?? doctor?.yearsOfExperience;
+    doctor.workingRoomTypeId = dto.workingRoomTypeId ?? doctor?.workingRoomTypeId;
+    doctor.bio = dto.bio ?? doctor?.bio;
+    doctor.status = dto.status ?? doctor?.status;
+
+    const staff = await this.staffRepository.findById(doctor.staffId);
+    if (!staff) {
+      throw new NotFoundException('Nhân viên không tồn tại');
+    }
+
+    staff.name = dto.name ?? staff.name;
+    staff.phone = dto.phone ?? staff.phone;
+    staff.personalEmail = dto.personalEmail ?? staff.personalEmail;
+    staff.address = dto.address ?? staff.address;
+    await this.staffRepository.save(staff);
+
+    const newDoctor = this.repository.save(doctor);
+
+    return newDoctor;
   }
 
   async updateMine(user: AuthenticatedUser, dto: UpdateDoctorDto): Promise<Doctor> {

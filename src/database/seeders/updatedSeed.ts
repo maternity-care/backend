@@ -1,13 +1,16 @@
+import { User } from './../../modules/users/entities/user.entity';
 import { Room } from './../../modules/rooms/entities/room.entity';
 import { RoomType } from './../entities/room-type.entity';
 import { Facility } from './../../modules/facilities/entities/facility.entity';
 import { Article } from './../entities/article.entity';
-import { EMAIL_DOMAIN } from './../../modules/users/users.enum';
+import { EMAIL_DOMAIN, UserStatusEnum } from './../../modules/users/users.enum';
 import {
   AccountStatus,
   ActiveStatus,
   ArticleStatus,
   FaqStatusEnum,
+  PregnancyProfileStatus,
+  RiskLevel,
 } from './../../common/constants/status.enum';
 import { Staff } from './../../modules/staffs/entities/staff.entity';
 import { RoleEnum } from './../../common/constants/role.enum';
@@ -15,7 +18,15 @@ import { Permission } from './../../modules/permissions/entities/permission.enti
 import { PermissionEnum } from './../../common/constants/permission.enum';
 import { Role } from './../../modules/roles/entities/role.entity';
 import dataSource from '../typeorm.config';
-import { Doctor, Faq, RolePermission } from '../entities';
+import {
+  Doctor,
+  Faq,
+  PregnancyProfile,
+  RolePermission,
+  Shift,
+  ShiftSlot,
+  UserAuth,
+} from '../entities';
 import * as bcrypt from 'bcrypt';
 import { Not, In } from 'typeorm';
 
@@ -30,6 +41,11 @@ const articleRepository = dataSource.getRepository(Article);
 const facilityRepository = dataSource.getRepository(Facility);
 const roomTypeRepository = dataSource.getRepository(RoomType);
 const roomRepository = dataSource.getRepository(Room);
+const userRepository = dataSource.getRepository(User);
+const pregnancyProfileRepository = dataSource.getRepository(PregnancyProfile);
+const userAuthRepository = dataSource.getRepository(UserAuth);
+const shiftSlotRepository = dataSource.getRepository(ShiftSlot);
+const shiftRepository = dataSource.getRepository(Shift);
 
 //---------------------------------
 
@@ -1108,6 +1124,665 @@ async function insertRooms() {
   }
 }
 
+async function insertUsers() {
+  const lastNameList = [
+    'Nguyễn',
+    'Trần',
+    'Lê',
+    'Phạm',
+    'Hoàng',
+    'Vũ',
+    'Đặng',
+    'Bùi',
+    'Đỗ',
+    'Hồ',
+    'Ngô',
+    'Dương',
+    'Lý',
+    'Phan',
+    'Trương',
+    'Đoàn',
+    'Cao',
+    'Võ',
+    'Đinh',
+    'Hà',
+    'Mạc',
+    'Tạ',
+    'Lâm',
+    'Tô',
+  ];
+  const firstNameList = [
+    'Minh',
+    'Anh',
+    'Hà',
+    'Hương',
+    'Lan',
+    'Linh',
+    'Mai',
+    'Ngọc',
+    'Phương',
+    'Quỳnh',
+    'Thảo',
+    'Trang',
+    'Tuấn',
+    'Vân',
+    'Vy',
+    'Yến',
+    'Bảo',
+    'Châu',
+    'Duy',
+    'Giang',
+    'Hải',
+    'Khang',
+    'Khánh',
+    'Nguyên',
+    'Phát',
+    'Quang',
+    'Sơn',
+    'Thành',
+    'Thiên',
+    'Trường',
+    'Tuệ',
+    'Vinh',
+    'Yên',
+    'An',
+    'Anh',
+    'Bình',
+    'Chi',
+    'Dung',
+    'Dương',
+    'Giang',
+    'Hà',
+    'Hạnh',
+    'Hiền',
+    'Hoa',
+    'Hương',
+    'Lan',
+    'Linh',
+    'Mai',
+    'Minh',
+    'My',
+    'Nga',
+    'Ngân',
+    'Ngọc',
+    'Nhung',
+    'Phương',
+    'Quỳnh',
+    'Thảo',
+    'Trang',
+    'Trâm',
+    'Uyên',
+    'Vân',
+    'Yến',
+  ];
+  const middleNameList = [
+    'Văn',
+    'Thị',
+    'Hữu',
+    'Ngọc',
+    'Quốc',
+    'Đức',
+    'Thanh',
+    'Minh',
+    'Bảo',
+    'Gia',
+    'Hoàng',
+    'Khánh',
+    'Phương',
+    'Trọng',
+    'Anh',
+  ];
+  const seedLocations = [
+    // Hà Nội
+    {
+      street: 'Đường Trần Thái Tông',
+      ward: 'Cầu Giấy',
+      province: 'Hà Nội',
+    },
+    {
+      street: 'Đường Nguyễn Phong Sắc',
+      ward: 'Cầu Giấy',
+      province: 'Hà Nội',
+    },
+    {
+      street: 'Đường Hoàng Quốc Việt',
+      ward: 'Nghĩa Đô',
+      province: 'Hà Nội',
+    },
+    {
+      street: 'Phố Kim Mã',
+      ward: 'Ba Đình',
+      province: 'Hà Nội',
+    },
+    {
+      street: 'Phố Đội Cấn',
+      ward: 'Ngọc Hà',
+      province: 'Hà Nội',
+    },
+    {
+      street: 'Phố Tôn Đức Thắng',
+      ward: 'Đống Đa',
+      province: 'Hà Nội',
+    },
+    {
+      street: 'Đường Tây Sơn',
+      ward: 'Đống Đa',
+      province: 'Hà Nội',
+    },
+    {
+      street: 'Đường Nguyễn Trãi',
+      ward: 'Thanh Xuân',
+      province: 'Hà Nội',
+    },
+    {
+      street: 'Đường Lê Trọng Tấn',
+      ward: 'Thanh Xuân',
+      province: 'Hà Nội',
+    },
+    {
+      street: 'Phố Minh Khai',
+      ward: 'Hai Bà Trưng',
+      province: 'Hà Nội',
+    },
+    {
+      street: 'Phố Bạch Mai',
+      ward: 'Bạch Mai',
+      province: 'Hà Nội',
+    },
+    {
+      street: 'Đường Tam Trinh',
+      ward: 'Hoàng Mai',
+      province: 'Hà Nội',
+    },
+    {
+      street: 'Đường Nguyễn Văn Cừ',
+      ward: 'Long Biên',
+      province: 'Hà Nội',
+    },
+    {
+      street: 'Đường Ngô Gia Tự',
+      ward: 'Việt Hưng',
+      province: 'Hà Nội',
+    },
+    {
+      street: 'Đường Tố Hữu',
+      ward: 'Hà Đông',
+      province: 'Hà Nội',
+    },
+    {
+      street: 'Đường Quang Trung',
+      ward: 'Hà Đông',
+      province: 'Hà Nội',
+    },
+    {
+      street: 'Đường Xuân La',
+      ward: 'Tây Hồ',
+      province: 'Hà Nội',
+    },
+    {
+      street: 'Đường Hồ Tùng Mậu',
+      ward: 'Từ Liêm',
+      province: 'Hà Nội',
+    },
+    {
+      street: 'Đường 32',
+      ward: 'Hoài Đức',
+      province: 'Hà Nội',
+    },
+    {
+      street: 'Đường tỉnh 419',
+      ward: 'Thạch Thất',
+      province: 'Hà Nội',
+    },
+
+    // Hải Phòng
+    {
+      street: 'Đường Lạch Tray',
+      ward: 'Lê Chân',
+      province: 'Hải Phòng',
+    },
+    {
+      street: 'Đường Tô Hiệu',
+      ward: 'Lê Chân',
+      province: 'Hải Phòng',
+    },
+    {
+      street: 'Đường Đà Nẵng',
+      ward: 'Ngô Quyền',
+      province: 'Hải Phòng',
+    },
+
+    // Quảng Ninh
+    {
+      street: 'Đường Trần Quốc Nghiễn',
+      ward: 'Hạ Long',
+      province: 'Quảng Ninh',
+    },
+    {
+      street: 'Đường Hạ Long',
+      ward: 'Bãi Cháy',
+      province: 'Quảng Ninh',
+    },
+    {
+      street: 'Đường Trần Phú',
+      ward: 'Cẩm Phả',
+      province: 'Quảng Ninh',
+    },
+
+    // Bắc Ninh
+    {
+      street: 'Đường Lý Thái Tổ',
+      ward: 'Kinh Bắc',
+      province: 'Bắc Ninh',
+    },
+    {
+      street: 'Đường Nguyễn Gia Thiều',
+      ward: 'Võ Cường',
+      province: 'Bắc Ninh',
+    },
+
+    // Hưng Yên
+    {
+      street: 'Đường Nguyễn Văn Linh',
+      ward: 'Phố Hiến',
+      province: 'Hưng Yên',
+    },
+    {
+      street: 'Đường Nguyễn Bình',
+      ward: 'Mỹ Hào',
+      province: 'Hưng Yên',
+    },
+
+    // Ninh Bình
+    {
+      street: 'Đường Tràng An',
+      ward: 'Hoa Lư',
+      province: 'Ninh Bình',
+    },
+    {
+      street: 'Đường Đinh Tiên Hoàng',
+      ward: 'Ninh Bình',
+      province: 'Ninh Bình',
+    },
+
+    // Thanh Hóa
+    {
+      street: 'Đường Lê Hoàn',
+      ward: 'Hạc Thành',
+      province: 'Thanh Hóa',
+    },
+    {
+      street: 'Đường Bà Triệu',
+      ward: 'Hạc Thành',
+      province: 'Thanh Hóa',
+    },
+    {
+      street: 'Đường Hồ Xuân Hương',
+      ward: 'Sầm Sơn',
+      province: 'Thanh Hóa',
+    },
+
+    // Nghệ An
+    {
+      street: 'Đường Lê Lợi',
+      ward: 'Vinh',
+      province: 'Nghệ An',
+    },
+    {
+      street: 'Đường Nguyễn Sỹ Sách',
+      ward: 'Trường Vinh',
+      province: 'Nghệ An',
+    },
+
+    // Đà Nẵng
+    {
+      street: 'Đường Nguyễn Văn Linh',
+      ward: 'Hải Châu',
+      province: 'Đà Nẵng',
+    },
+    {
+      street: 'Đường Ngô Quyền',
+      ward: 'An Hải',
+      province: 'Đà Nẵng',
+    },
+    {
+      street: 'Đường Điện Biên Phủ',
+      ward: 'Thanh Khê',
+      province: 'Đà Nẵng',
+    },
+
+    // Khánh Hòa
+    {
+      street: 'Đường Trần Phú',
+      ward: 'Nha Trang',
+      province: 'Khánh Hòa',
+    },
+    {
+      street: 'Đường 23 Tháng 10',
+      ward: 'Tây Nha Trang',
+      province: 'Khánh Hòa',
+    },
+
+    // Thành phố Hồ Chí Minh
+    {
+      street: 'Đường Nguyễn Thị Minh Khai',
+      ward: 'Bàn Cờ',
+      province: 'Thành phố Hồ Chí Minh',
+    },
+    {
+      street: 'Đường Điện Biên Phủ',
+      ward: 'Gia Định',
+      province: 'Thành phố Hồ Chí Minh',
+    },
+    {
+      street: 'Đường Võ Văn Ngân',
+      ward: 'Thủ Đức',
+      province: 'Thành phố Hồ Chí Minh',
+    },
+    {
+      street: 'Đường Nguyễn Văn Linh',
+      ward: 'Tân Hưng',
+      province: 'Thành phố Hồ Chí Minh',
+    },
+
+    // Cần Thơ
+    {
+      street: 'Đường 30 Tháng 4',
+      ward: 'Ninh Kiều',
+      province: 'Cần Thơ',
+    },
+    {
+      street: 'Đường Võ Văn Kiệt',
+      ward: 'Bình Thủy',
+      province: 'Cần Thơ',
+    },
+
+    // Huế
+    {
+      street: 'Đường Lê Lợi',
+      ward: 'Thuận Hóa',
+      province: 'Huế',
+    },
+    {
+      street: 'Đường Nguyễn Huệ',
+      ward: 'Phú Xuân',
+      province: 'Huế',
+    },
+  ];
+
+  const removeVietnameseTones = (value: string): string => {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D');
+  };
+
+  const generateName = (index: number): string => {
+    const lastName = lastNameList[index % lastNameList.length];
+
+    const middleName =
+      middleNameList[Math.floor(index / lastNameList.length) % middleNameList.length];
+
+    const firstName =
+      firstNameList[
+        Math.floor(index / (lastNameList.length * middleNameList.length)) % firstNameList.length
+      ];
+
+    return `${lastName} ${middleName} ${firstName}`;
+  };
+
+  const generateEmail = (name: string, sequence: number): string => {
+    const normalizedName = removeVietnameseTones(name).toLowerCase().trim().replace(/\s+/g, '.');
+
+    return `${normalizedName}.${String(sequence).padStart(4, '0')}@example.test`;
+  };
+
+  const generateDateOfBirth = (index: number): string => {
+    const year = 1985 + (index % 18);
+    const month = String((index % 12) + 1).padStart(2, '0');
+    const day = String((index % 28) + 1).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  };
+
+  for (let i = 0; i < 11; i++) {
+    // chia insert 100 user 1 lần
+    for (let j = 0; j < 100; j++) {
+      const name = generateName(i * 100 + j);
+      const email = generateEmail(name, i * 100 + j + 1);
+      const dateOfBirth = generateDateOfBirth(i * 100 + j);
+      const addressInfo = seedLocations[i % seedLocations.length];
+      const cccd = '0123456' + String(i * 100 + j + 1).padStart(5, '0');
+      const phone = '098765' + String(i * 100 + j + 1).padStart(4, '0');
+      const userCreatedAt = new Date(
+        new Date().getTime() - (3 * 370 - i * 100 + j) * 24 * 60 * 60 * 1000,
+      );
+
+      const userData = {
+        cccd,
+        name,
+        phone,
+        email,
+        dateOfBirth,
+        address: addressInfo.street,
+        priorityLevel: Math.floor(Math.random() * 3),
+        province: addressInfo.province,
+        ward: addressInfo.ward,
+        status: UserStatusEnum.ACTIVE,
+        emergencyContactName: generateName(i * 100 + j + 1),
+        emergencyContactPhone: '096754' + String(i * 100 + j + 1).padStart(4, '0'),
+        emergencyContactRelation: 'Người thân',
+        createdAt: userCreatedAt,
+        updatedAt: userCreatedAt,
+      };
+      await userRepository.save(userData);
+    }
+  }
+}
+
+async function insertPregnancyProfiles() {
+  const generatePregnancyCode = async (date: Date) => {
+    const year = date.getFullYear().toString().slice(-2); // Lấy 2 chữ số cuối của năm hiện tại
+    const result = await pregnancyProfileRepository.query(
+      `
+  SELECT COALESCE(
+    MAX(
+      CAST(
+        RIGHT(code, 4)
+        AS UNSIGNED
+      )
+    ),
+    0
+  ) AS max_number
+  FROM pregnancy_profiles
+  WHERE code LIKE ?
+  `,
+      [`PW${year}%`], // dùng prefix là PW là pregnant woman
+    );
+
+    // tạo string nextNumber với 4 chữ số, ví dụ: 0001, 0002, 0003, ...
+    const nextNumber = (Number(result[0].max_number) + 1).toString().padStart(4, '0');
+    return `PW${year}${nextNumber}`;
+  };
+
+  const formatDateOnly = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  };
+
+  const staffs = await staffRepository.find({
+    where: { roles: { name: RoleEnum.STAFF } },
+  });
+
+  const users = await userRepository.find({
+    where: { status: UserStatusEnum.ACTIVE },
+  });
+  const data = [];
+
+  for (const user of users) {
+    const lastMenstrualPeriod = new Date(
+      new Date(user.createdAt).getTime() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000,
+    );
+    const random = Math.floor(Math.random() * 100) + 1;
+    const fetalCount = random <= 90 ? 1 : random <= 99 ? 2 : 3; // Xác suất: 90% đơn thai, 9% song thai, 1% tam thai
+    const paraFullTerm = Math.floor(Math.random() * 5);
+    const paraPremature = Math.floor(Math.random() * 5);
+    const paraAbortion = Math.floor(Math.random() * 5);
+
+    const pregnancyProfileData: Partial<PregnancyProfile> = {
+      patientId: user.id,
+      // code: await generatePregnancyCode(new Date(user.createdAt)),
+      lastMenstrualPeriod: formatDateOnly(lastMenstrualPeriod),
+      expectedDueDate: formatDateOnly(
+        new Date(lastMenstrualPeriod.getTime() + 280 * 24 * 60 * 60 * 1000),
+      ),
+      fetalCount: fetalCount,
+      status: PregnancyProfileStatus.ACTIVE,
+      gravida: paraFullTerm + paraPremature + paraAbortion + 1,
+      paraFullTerm: paraFullTerm,
+      paraPremature: paraPremature,
+      paraAbortion: paraAbortion,
+      paraLivingChildren: paraFullTerm + paraPremature,
+      riskLevel: Math.floor(Math.random() * 100 + 1) > 10 ? RiskLevel.LOW : RiskLevel.HIGH,
+      createdAt: new Date(user.createdAt),
+      updatedAt: new Date(user.createdAt),
+      createdBy: staffs[Math.floor(Math.random() * staffs.length)].id,
+    };
+    data.push(pregnancyProfileData);
+
+    if (
+      // Nếu người dùng đã được tạo hơn 2 năm trước và chưa quá 1 ngày trước, tạo thêm một hồ sơ thai kỳ khác
+      new Date(user.createdAt).getTime() + 2 * 365 * 24 * 60 * 60 * 1000 <
+      new Date().getTime() - 1 * 24 * 60 * 60 * 1000
+    ) {
+      const lastMenstrualPeriod2 = new Date(
+        lastMenstrualPeriod.getTime() + 2 * 365 * 24 * 60 * 60 * 1000,
+      );
+      const fetalCount2 = random <= 90 ? 1 : random <= 99 ? 2 : 3; // Xác suất: 90% đơn thai, 9% song thai, 1% tam thai
+
+      const pregnancyProfileData2: Partial<PregnancyProfile> = {
+        patientId: user.id,
+        // code: await generatePregnancyCode(new Date(user.createdAt)),
+        lastMenstrualPeriod: formatDateOnly(lastMenstrualPeriod2),
+        expectedDueDate: formatDateOnly(
+          new Date(lastMenstrualPeriod2.getTime() + 280 * 24 * 60 * 60 * 1000),
+        ),
+        fetalCount: fetalCount2,
+        status: PregnancyProfileStatus.ACTIVE,
+        gravida: paraFullTerm + paraPremature + paraAbortion + 2,
+        paraFullTerm: paraFullTerm + 1,
+        paraPremature: paraPremature,
+        paraAbortion: paraAbortion,
+        paraLivingChildren: paraFullTerm + paraPremature + fetalCount,
+        riskLevel: Math.floor(Math.random() * 100 + 1) > 10 ? RiskLevel.LOW : RiskLevel.HIGH,
+        createdAt: new Date(user.createdAt),
+        updatedAt: new Date(user.createdAt),
+        createdBy: staffs[Math.floor(Math.random() * staffs.length)].id,
+      };
+      data.push(pregnancyProfileData2);
+    }
+  }
+  const fullData = data.sort((a, b) => {
+    const timeA = a.createdAt?.getTime() ?? 0;
+    const timeB = b.createdAt?.getTime() ?? 0;
+
+    return timeA - timeB;
+  });
+  for (const item of fullData) {
+    item.code = await generatePregnancyCode(new Date(item.createdAt!));
+    await pregnancyProfileRepository.save(item);
+  }
+}
+
+async function insertUserAuths(): Promise<void> {
+  const users = await userRepository.find();
+  const hashPassword = await bcrypt.hash('Password@123', 10);
+  const data = users.map((user) => {
+    const userAuth = {
+      userId: user.id,
+      email: user.email,
+      password: hashPassword,
+      status: UserStatusEnum.ACTIVE,
+      createdAt: new Date(user.createdAt),
+      updatedAt: new Date(user.createdAt),
+    };
+    return userAuth;
+  });
+  await userAuthRepository.save(data);
+}
+
+async function insertShiftSlots(): Promise<void> {
+  const facilities = await facilityRepository.find();
+  const shiftSlots = [
+    {
+      name: 'Ca sáng',
+      startTime: '07:00:00',
+      endTime: '11:00:00',
+      code: 'CA_SANG',
+    },
+    {
+      name: 'Ca chiều',
+      startTime: '13:00:00',
+      endTime: '17:00:00',
+      code: 'CA_CHIEU',
+    },
+    {
+      name: 'Ca tối',
+      startTime: '18:00:00',
+      endTime: '22:00:00',
+      code: 'CA_TOI',
+    },
+    {
+      name: 'Ca đêm',
+      startTime: '22:00:00',
+      endTime: '06:00:00',
+      code: 'CA_DEM',
+      overnight: true,
+    },
+  ];
+
+  for (const facility of facilities) {
+    for (const shiftSlot of shiftSlots) {
+      const newShiftSlot = {
+        facilityId: facility.id,
+        code: shiftSlot.code,
+        name: shiftSlot.name,
+        startTime: shiftSlot.startTime,
+        endTime: shiftSlot.endTime,
+        isOvernight: shiftSlot.overnight ?? false,
+      };
+      await shiftSlotRepository.save(newShiftSlot);
+    }
+  }
+}
+
+async function insertShifts() {
+  const staffs = await staffRepository.find();
+  const shiftSlots = await shiftSlotRepository.find();
+  const rooms = await roomRepository.find({
+    relations: { facility: true },
+  });
+
+  for (const staff of staffs) {
+    for (const room of rooms) {
+      for (const shiftSlot of shiftSlots) {
+        const newShift = {
+          staffId: staff.id,
+          roomId: room.id,
+          shiftSlotId: shiftSlot.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        await shiftRepository.save(newShift);
+      }
+    }
+  }
+}
+
 async function seedCustomData(): Promise<void> {
   try {
     await dataSource.initialize();
@@ -1124,6 +1799,10 @@ async function seedCustomData(): Promise<void> {
     // await insertFacility();
     // await insertRoomTypes();
     // await insertRooms();
+    // await insertUsers();
+    // await insertPregnancyProfiles();
+    // await insertUserAuths();
+    // await insertShiftSlots();
 
     console.log('Tất cả dữ liệu đã được chèn thành công!');
   } catch (error: unknown) {
