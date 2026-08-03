@@ -260,6 +260,7 @@ export class UsersService implements IUsersService, IAdminManageService {
           title: dto.title!,
           specialty: dto.specialty!,
           yearsOfExperience: dto.yearsOfExperience!,
+          workingRoomTypeId: dto.workingRoomTypeId,
           bio: dto.bio,
           status: ActiveStatus.ACTIVE,
         }),

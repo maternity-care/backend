@@ -66,6 +66,10 @@ export class DoctorsRepository implements IDoctorsRepository {
       staffWhere.facilityId = filters.facilityId;
     }
 
+    if (filters?.filterYearsOfExperienceLevel) {
+      where.yearsOfExperience = filters.filterYearsOfExperienceLevel;
+    }
+
     const sortYoE = filters?.sortYearsOfExperience || 'DESC';
 
     const page = Math.max(1, Number(filters?.page) || 1);

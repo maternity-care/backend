@@ -6,6 +6,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -46,11 +47,23 @@ export class CreateDoctorDto {
   @MaxLength(150)
   specialty: string;
 
-  @ApiProperty({ example: 12, minimum: 0 })
+  @ApiProperty({
+    example: '1 or 2 or 3 or 4',
+    minimum: 1,
+    description: 'các level năm kinh nghiệm',
+  })
   @Type(() => Number)
   @IsInt()
-  @Min(0)
+  @Min(1)
+  @Max(4)
   yearsOfExperience: number;
+
+  @ApiPropertyOptional({
+    description: 'id của loại phòng làm việc (room type)',
+  })
+  @IsOptional()
+  @IsString()
+  workingRoomTypeId: string;
 
   @ApiPropertyOptional({ example: 'Bác sĩ chuyên về sản phụ khoa', nullable: true })
   @IsOptional()

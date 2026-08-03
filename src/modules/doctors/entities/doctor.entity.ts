@@ -1,3 +1,4 @@
+import { RoomType } from './../../../database/entities/room-type.entity';
 import { ActiveStatus } from './../../../common/constants/status.enum';
 import { Staff } from './../../staffs/entities/staff.entity';
 import { ApiProperty } from '@nestjs/swagger';
@@ -37,6 +38,17 @@ export class Doctor {
   @ApiProperty({ type: String })
   @Column({ name: 'specialty', type: 'varchar', length: 255, default: 'obstetrics and gynecology' })
   specialty: string;
+
+  @ApiProperty({ type: String })
+  @Column({ name: 'working_room_type', type: 'bigint', nullable: true })
+  workingRoomTypeId: string;
+
+  @JoinColumn({ name: 'working_room_type' })
+  @ManyToOne(() => RoomType, (roomType) => roomType.doctors, {
+    onDelete: 'RESTRICT',
+    nullable: true,
+  })
+  workingRoomType: RoomType;
 
   @ApiProperty({ type: Number })
   @Column({ name: 'years_of_experience', type: 'int', default: 0 })
