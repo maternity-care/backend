@@ -215,6 +215,17 @@ export class AppointmentsService {
     });
   }
 
+  async getAppointmentOfDoctorAndPregnancyProfile(doctorId: string, pregnancyProfileId: string) {
+    const appointmentRepository = this.dataSource.getRepository(Appointment);
+    return await appointmentRepository
+      .createQueryBuilder('appointment')
+      .where('appointment.doctorId = :doctorId', { doctorId })
+      .andWhere('appointment.pregnancyProfileId = :pregnancyProfileId', { pregnancyProfileId })
+      .andWhere('appointment.status =:status', { status: AppointmentStatus.COMPLETED })
+      .andWhere('appointment.checkedInAt < :now', { now: new Date() })
+      .getMany();
+  }
+
   async findManagement(query: SearchAppointmentsDto, actorId: string, scopedFacilityId?: string | null) {
     const qb = this.buildManagementQuery();
 
