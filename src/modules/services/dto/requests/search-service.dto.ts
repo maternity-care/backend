@@ -36,11 +36,11 @@ export class SearchServiceDto {
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 20 })
+  @ApiPropertyOptional({ minimum: 1, maximum: 200, default: 20 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(200)
   limit?: number;
 }
