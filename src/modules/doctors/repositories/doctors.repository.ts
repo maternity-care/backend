@@ -76,7 +76,7 @@ export class DoctorsRepository implements IDoctorsRepository {
     const limit = Math.max(1, Number(filters?.limit) || 20);
 
     const dataOut = await this.repository.findAndCount({
-      relations: { staff: true },
+      relations: { staff: { roles: true } },
       where: {
         ...where,
         staff: staffWhere,
@@ -94,7 +94,7 @@ export class DoctorsRepository implements IDoctorsRepository {
 
   findByFacilityId(facilityId: string): Promise<Doctor[]> {
     return this.repository.find({
-      relations: { staff: true },
+      relations: { staff: { roles: true } },
       where: {
         status: ActiveStatus.ACTIVE,
         staff: { facilityId: facilityId },
@@ -105,7 +105,7 @@ export class DoctorsRepository implements IDoctorsRepository {
   async findByStaffId(staffId: string): Promise<Doctor | null> {
     const doctor = await this.repository.findOne({
       where: { staffId },
-      relations: { staff: true },
+      relations: { staff: { roles: true } },
     });
     if (!doctor) {
       return null;
