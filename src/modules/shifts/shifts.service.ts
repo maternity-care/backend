@@ -25,6 +25,7 @@ import {
   validateDateRange,
   validateShiftId,
 } from './helpers/shifts.helper';
+import { roleOccupiesPrimaryRoom } from './helpers/shift-role-policy.helper';
 import {
   SHIFTS_REPOSITORY,
   ShiftWithDetails,
@@ -153,6 +154,7 @@ export class ShiftsService {
     const { doctorId: _doctorId, ...shiftData } = dto;
     Object.assign(shift, shiftData, {
       staffId: prepared.staffId,
+      roleName: prepared.roleName,
       slotId: prepared.slotId,
       startTime: prepared.startTime,
       endTime: prepared.endTime,
@@ -194,6 +196,7 @@ export class ShiftsService {
     const conflicts = await this.repository.findConflicts({
       ...dto,
       staffId: prepared.staffId,
+      roleName: prepared.roleName,
       slotId: prepared.slotId,
       startTime: prepared.startTime,
       endTime: prepared.endTime,
@@ -344,10 +347,13 @@ export class ShiftsService {
       try {
         const prepared = await this.validator.prepareForCreate(payload);
         const candidate = this.buildAutoGenerateCandidate(payload, prepared, index, slotAssignmentIndex, assignmentIndex);
+        // Kiem tra conflict voi cac ca da ton tai trong DB.
+        // Buoc nay bat cac lich da duoc tao truoc do, nhung khong thay duoc cac ca dang nam trong cung payload bulk hien tai.
         const conflicts = await this.repository.findConflicts({
           ...payload,
           staffId: prepared.staffId,
           roleId: payload.roleId,
+          roleName: prepared.roleName,
           slotId: prepared.slotId,
           startTime: prepared.startTime,
           endTime: prepared.endTime,
@@ -363,6 +369,25 @@ export class ShiftsService {
             candidate,
             doctorConflicts: conflicts.doctorConflicts,
             roomConflicts: conflicts.roomConflicts,
+          });
+          continue;
+        }
+
+        // Kiem tra conflict noi bo trong chinh lan bulk-generate nay.
+        // Vi cac candidate hop le phia tren chua duoc save vao DB, repository.findConflicts khong the bat truong hop:
+        // - cung bac si bi xep 2 ca giao nhau trong cung ngay
+        // - hai bac si khac nhau bi xep vao cung phong, cung ngay, cung khung gio
+        const internalConflicts = this.findInternalAutoGenerateConflicts(candidate, validShifts);
+        if (internalConflicts.doctorConflicts.length > 0 || internalConflicts.roomConflicts.length > 0) {
+          conflictItems.push({
+            index,
+            slotAssignmentIndex,
+            assignmentIndex,
+            shiftDate,
+            reason: RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_CONFLICT,
+            candidate,
+            doctorConflicts: internalConflicts.doctorConflicts,
+            roomConflicts: internalConflicts.roomConflicts,
           });
           continue;
         }
@@ -395,6 +420,57 @@ export class ShiftsService {
       conflictItems,
       internalValidEntities,
     };
+  }
+
+  private findInternalAutoGenerateConflicts(
+    candidate: AutoGenerateValidItem,
+    existingShifts: AutoGenerateValidItem[],
+  ): { doctorConflicts: AutoGenerateValidItem[]; roomConflicts: AutoGenerateValidItem[] } {
+    // Conflict theo bac si: available/full/off deu chiem thoi gian cua nhan su.
+    // OFF khong phai ca lam, nhung van co y nghia la bac si khong san sang trong khung gio do.
+    const doctorConflictStatuses = [
+      DoctorShiftStatus.AVAILABLE,
+      DoctorShiftStatus.FULL,
+      DoctorShiftStatus.OFF,
+    ];
+    // Conflict theo phong: chi available/full moi chiem phong.
+    // OFF khong gan phong nen khong tinh vao xung dot phong.
+    const roomConflictStatuses = [
+      DoctorShiftStatus.AVAILABLE,
+      DoctorShiftStatus.FULL,
+    ];
+
+    // Dung shiftIntervalsOverlap de xu ly ca giao nhau theo ngay + gio, ke ca truong hop ca qua dem.
+    const overlapsCandidate = (shift: AutoGenerateValidItem) =>
+      shiftIntervalsOverlap(
+        candidate.shiftDate,
+        candidate.startTime,
+        candidate.endTime,
+        shift.shiftDate,
+        shift.startTime,
+        shift.endTime,
+      );
+
+    const doctorConflicts = existingShifts.filter(shift =>
+      shift.staffId === candidate.staffId &&
+      doctorConflictStatuses.includes(shift.status) &&
+      doctorConflictStatuses.includes(candidate.status) &&
+      overlapsCandidate(shift),
+    );
+
+    const roomConflicts =
+      candidate.roomId &&
+      roomConflictStatuses.includes(candidate.status) &&
+      roleOccupiesPrimaryRoom(candidate.roleName, candidate.status)
+      ? existingShifts.filter(shift =>
+        shift.roomId === candidate.roomId &&
+        roomConflictStatuses.includes(shift.status) &&
+        roleOccupiesPrimaryRoom(shift.roleName, shift.status) &&
+        overlapsCandidate(shift),
+      )
+      : [];
+
+    return { doctorConflicts, roomConflicts };
   }
 
   private buildAutoGenerateInputs(
@@ -513,6 +589,7 @@ export class ShiftsService {
       slotId: prepared.slotId,
       staffId: prepared.staffId,
       roleId: payload.roleId ?? null,
+      roleName: prepared.roleName,
       shiftDate: payload.shiftDate,
       startTime: prepared.startTime,
       endTime: prepared.endTime,
