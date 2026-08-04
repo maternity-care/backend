@@ -76,7 +76,7 @@ describe('Services DTO validation', () => {
       serviceTypeId: '0',
       status: 'deleted',
       page: '0',
-      limit: '201',
+      limit: '101',
     });
     expect((await validate(dto)).map(error => error.property)).toEqual(
       expect.arrayContaining(['serviceTypeId', 'status', 'page', 'limit']),

@@ -22,6 +22,7 @@ import {
   timeToMinutes,
 } from './helpers/shifts.helper';
 import { ShiftsController } from './shifts.controller';
+import { PublicShiftsController } from './public-shifts.controller';
 import { ShiftsRepository } from './repositories/shifts.repository';
 import { ShiftsService } from './shifts.service';
 import { ShiftsValidator } from './validators/shifts.validator';
@@ -1375,6 +1376,23 @@ describe('ShiftsController unit routing and scope', () => {
       slotMinutes: 30,
     });
     expect(service.getWeeklySchedule).toHaveBeenCalledWith('1', '2099-07-06', '2');
+  });
+
+  // Vai tro: dam bao public API availability cho booking chi nhan doctorId va dung chung logic service.
+  it('routes public doctor availability requests to the service', async () => {
+    const { service } = createController();
+    const publicController = new PublicShiftsController(service as never);
+
+    await expect(publicController.getDoctorAvailability('1', {
+      facilityId: '1',
+      date: '2099-07-07',
+      slotMinutes: 30,
+    })).resolves.toMatchObject({ data: { shifts: [] } });
+    expect(service.getDoctorAvailability).toHaveBeenCalledWith('1', {
+      facilityId: '1',
+      date: '2099-07-07',
+      slotMinutes: 30,
+    });
   });
 });
 

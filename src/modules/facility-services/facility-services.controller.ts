@@ -1,9 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { PermissionEnum } from '../../common/constants/permission.enum';
 import { FACILITY_SERVICE_CONSTANT } from '../../common/constants/facility-service.constant';
-import { Permissions } from '../../common/decorators/permissions.decorator';
-import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
   FacilityServicePaginatedResponseDto,
@@ -18,15 +15,15 @@ import {
 } from './dto/requests/create-facility-service.dto';
 
 @ApiTags('Management - Facility Service Settings')
-// @ApiBearerAuth()
-// @UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('management/facility-services')
 export class FacilityServicesController {
   constructor(private readonly facilityServicesService: FacilityServicesService) {}
 
   // Lấy danh sách dịch vụ theo từng facility; dùng cho màn hình quản trị giá/thời lượng.
   @Get()
-  // @Permissions(PermissionEnum.SERVICE_VIEW)
+  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_VIEW)
   @ApiOperation({ summary: 'List facility services' })
   @ApiResponse({ status: 200, type: FacilityServicePaginatedResponseDto })
   async findAll(@Query() query: SearchFacilityServiceDto) {
@@ -38,7 +35,7 @@ export class FacilityServicesController {
 
   // Lấy chi tiết một mapping facility-service.
   @Get(':id')
-  // @Permissions(PermissionEnum.SERVICE_VIEW)
+  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_VIEW)
   @ApiOperation({ summary: 'Get facility service details' })
   @ApiResponse({ status: 200, type: FacilityServiceResponseDto })
   async findOne(@Param('id') id: string) {
@@ -51,7 +48,7 @@ export class FacilityServicesController {
   // Gán một service gốc cho facility với giá/thời lượng riêng tại facility đó.
   // Cập nhật giá, thời lượng hoặc trạng thái available/unavailable của service tại facility.
   @Post()
-  // @Permissions(PermissionEnum.SERVICE_UPDATE)
+  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_UPDATE)
   @ApiOperation({ summary: 'Assign a service to a facility' })
   async create(@Body() dto: CreateFacilityServiceDto) {
     return {
@@ -61,7 +58,7 @@ export class FacilityServicesController {
   }
 
   @Post('bulk')
-  // @Permissions(PermissionEnum.SERVICE_UPDATE)
+  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_UPDATE)
   @ApiOperation({ summary: 'Bulk assign services to a facility' })
   async bulkCreate(@Body() dto: BulkCreateFacilityServicesDto) {
     return {
@@ -71,7 +68,7 @@ export class FacilityServicesController {
   }
 
   @Patch(':id')
-  // @Permissions(PermissionEnum.SERVICE_UPDATE)
+  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_UPDATE)
   @ApiOperation({ summary: 'Update facility service' })
   async update(@Param('id') id: string, @Body() dto: UpdateFacilityServiceDto) {
     return {
@@ -82,7 +79,7 @@ export class FacilityServicesController {
 
   // Xóa an toàn: nếu đã có appointment/extra-service thì chuyển unavailable.
   @Delete(':id')
-  // @Permissions(PermissionEnum.SERVICE_DELETE)
+  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_DELETE)
   @ApiOperation({ summary: 'Delete facility service safely' })
   async remove(@Param('id') id: string) {
     return {

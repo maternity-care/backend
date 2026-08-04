@@ -23,14 +23,11 @@ import {
   assertFacilityAccess,
   getActiveFacilityId,
 } from '../../common/helpers/facility-scope.helper';
-import { PermissionEnum } from '../../common/constants/permission.enum';
-import { Permissions } from '../../common/decorators/permissions.decorator';
-import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Management - Rooms')
-// @ApiBearerAuth()
-// @UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('management/rooms')
 export class RoomsController {
   constructor(private readonly roomsService: RoomsService) {}
@@ -43,7 +40,7 @@ export class RoomsController {
   }
 
   @Get()
-  // @Permissions(PermissionEnum.ROOM_VIEW)
+  // Permission tam tat: @Permissions(PermissionEnum.ROOM_VIEW)
   @ApiOperation({ summary: 'List rooms' })
   @ApiResponse({ status: 200, description: 'Rooms found', type: RoomPaginatedResponseDto })
   async findAll(
@@ -86,7 +83,7 @@ export class RoomsController {
   // }
 
   @Get('room-types/lookup')
-  // @Permissions(PermissionEnum.ROOM_TYPE_VIEW)
+  // Permission tam tat: @Permissions(PermissionEnum.ROOM_TYPE_VIEW)
   @ApiOperation({ summary: 'Lookup room types for room form select/autocomplete' })
   @ApiResponse({ status: 200, type: [RoomTypeLookupResponseDto] })
   async lookupRoomTypes(@Query() query: LookupRoomTypesDto) {
@@ -101,7 +98,7 @@ export class RoomsController {
   }
 
   @Get('room-types')
-  // @Permissions(PermissionEnum.ROOM_TYPE_VIEW)
+  // Permission tam tat: @Permissions(PermissionEnum.ROOM_TYPE_VIEW)
   @ApiOperation({ summary: 'List room types' })
   @ApiResponse({ status: 200, type: RoomTypePaginatedResponseDto })
   async findAllRoomTypes(@Query() query: SearchRoomTypesDto) {
@@ -116,7 +113,7 @@ export class RoomsController {
   }
 
   @Get('room-types/:id')
-  // @Permissions(PermissionEnum.ROOM_TYPE_VIEW)
+  // Permission tam tat: @Permissions(PermissionEnum.ROOM_TYPE_VIEW)
   @ApiOperation({ summary: 'Get room type details' })
   @ApiResponse({ status: 200, type: RoomTypeResponseDto })
   async findRoomTypeById(@Param('id') id: string) {
@@ -131,7 +128,7 @@ export class RoomsController {
   }
 
   @Post('room-types')
-  // @Permissions(PermissionEnum.ROOM_TYPE_CREATE)
+  // Permission tam tat: @Permissions(PermissionEnum.ROOM_TYPE_CREATE)
   @ApiOperation({ summary: 'Create room type' })
   @ApiResponse({ status: 201, type: RoomTypeResponseDto })
   async createRoomType(@Body() dto: CreateRoomTypeDto) {
@@ -146,7 +143,7 @@ export class RoomsController {
   }
 
   @Patch('room-types/:id')
-  // @Permissions(PermissionEnum.ROOM_TYPE_UPDATE)
+  // Permission tam tat: @Permissions(PermissionEnum.ROOM_TYPE_UPDATE)
   @ApiOperation({ summary: 'Update room type' })
   @ApiResponse({ status: 200, type: RoomTypeResponseDto })
   async updateRoomType(
@@ -164,7 +161,7 @@ export class RoomsController {
   }
 
   @Delete('room-types/:id')
-  // @Permissions(PermissionEnum.ROOM_TYPE_DELETE)
+  // Permission tam tat: @Permissions(PermissionEnum.ROOM_TYPE_DELETE)
   @ApiOperation({ summary: 'Delete room type when unused, otherwise deactivate it' })
   @ApiResponse({ status: 200 })
   async removeRoomType(@Param('id') id: string) {
@@ -179,7 +176,7 @@ export class RoomsController {
   }
 
   @Get('all/by-facilities')
-  // @Permissions(PermissionEnum.ROOM_VIEW)
+  // Permission tam tat: @Permissions(PermissionEnum.ROOM_VIEW)
   @ApiOperation({ summary: 'List facilities with their rooms' })
   async findAllByFacilities(@CurrentUser() user: AuthenticatedUser) {
     const activeFacilityId = getActiveFacilityId(user);
@@ -194,7 +191,7 @@ export class RoomsController {
   }
 
   @Get(':id')
-  // @Permissions(PermissionEnum.ROOM_VIEW)
+  // Permission tam tat: @Permissions(PermissionEnum.ROOM_VIEW)
   @ApiOperation({ summary: 'Get room details' })
   @ApiResponse({ status: 200, description: 'Room found', type: RoomWithDetailsResponseDto })
   async findOne(
@@ -214,7 +211,7 @@ export class RoomsController {
   }
 
   @Post()
-  // @Permissions(PermissionEnum.ROOM_CREATE)
+  // Permission tam tat: @Permissions(PermissionEnum.ROOM_CREATE)
   @ApiOperation({ summary: 'Create room' })
   @ApiResponse({ status: 201, type: RoomResponseDto })
   async create(
@@ -237,7 +234,7 @@ export class RoomsController {
   }
 
   @Post('bulk')
-  // @Permissions(PermissionEnum.ROOM_CREATE)
+  // Permission tam tat: @Permissions(PermissionEnum.ROOM_CREATE)
   @ApiOperation({ summary: 'Bulk create rooms' })
   @ApiResponse({ status: 201, type: [RoomWithDetailsResponseDto] })
   async bulkCreate(
@@ -299,7 +296,7 @@ export class RoomsController {
   // }
 
   @Patch(':id')
-  // @Permissions(PermissionEnum.ROOM_UPDATE)
+  // Permission tam tat: @Permissions(PermissionEnum.ROOM_UPDATE)
   @ApiOperation({ summary: 'Update room' })
   @ApiResponse({ status: 200, type: RoomResponseDto })
   async update(
@@ -321,7 +318,7 @@ export class RoomsController {
   }
 
   @Delete(':id')
-  // @Permissions(PermissionEnum.ROOM_DELETE)
+  // Permission tam tat: @Permissions(PermissionEnum.ROOM_DELETE)
   @ApiOperation({ summary: 'Delete room' })
   @ApiResponse({ status: 200 })
   async remove(

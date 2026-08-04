@@ -7,14 +7,11 @@ import { RESPONSE_MESSAGES } from '../../common/constants/response-message.const
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { assertFacilityAccess } from '../../common/helpers/facility-scope.helper';
-import { PermissionEnum } from '../../common/constants/permission.enum';
-import { Permissions } from '../../common/decorators/permissions.decorator';
-import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Management - Facilities')
-// @ApiBearerAuth()
-// @UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('management/facilities')
 export class FacilityRoomTypesController {
   constructor(private readonly roomsService: RoomsService) {}
@@ -27,7 +24,7 @@ export class FacilityRoomTypesController {
   }
 
   @Get(':facilityId/room-types')
-  // @Permissions(PermissionEnum.ROOM_TYPE_VIEW)
+  // Permission tam tat: @Permissions(PermissionEnum.ROOM_TYPE_VIEW)
   @ApiOperation({ summary: 'List room types currently used by a facility' })
   @ApiResponse({ status: 200, type: [FacilityRoomTypeResponseDto] })
   async findRoomTypesByFacility(

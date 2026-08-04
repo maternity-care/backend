@@ -41,11 +41,21 @@ async function bootstrap(): Promise<void> {
     .setTitle(configService.get<string>('app.name') ?? 'Maternity Care API')
     .setDescription('Maternity Care backend API')
     .setVersion('1.0.0')
-    .addBearerAuth()
+    .addBearerAuth({
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: 'JWT',
+      name: 'Authorization',
+      in: 'header',
+    })
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document);
+  SwaggerModule.setup('api/docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  });
 
   const port = configService.getOrThrow<number>('app.port');
   await app.listen(port);

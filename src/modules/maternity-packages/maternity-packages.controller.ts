@@ -1,9 +1,6 @@
 import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { PermissionEnum } from '../../common/constants/permission.enum';
 import { MATERNITY_PACKAGE_CONSTANT } from '../../common/constants/maternity-package.constant';
-import { Permissions } from '../../common/decorators/permissions.decorator';
-import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import {
   CreateQuantityMaternityPackageDto,
   CreateScheduleMaternityPackageDto,
@@ -22,15 +19,15 @@ import { RESPONSE_MESSAGES } from '../../common/constants/response-message.const
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Management - Maternity Package Catalog')
-// @ApiBearerAuth()
-// @UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('management/maternity-packages')
 export class MaternityPackagesController {
   constructor(private readonly maternityPackagesService: MaternityPackagesService) {}
 
   // Lấy danh sách gói dịch vụ cho quản trị; có page thì trả phân trang.
   @Get()
-  // @Permissions(PermissionEnum.SERVICE_PACKAGE_VIEW)
+  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_PACKAGE_VIEW)
   @ApiOperation({ summary: 'List maternity packages' })
   async findAll(
     @CurrentUser() userOrQuery: AuthenticatedUser | SearchMaternityPackageDto | undefined,
@@ -52,7 +49,7 @@ export class MaternityPackagesController {
 
   // Lấy chi tiết một gói dịch vụ.
   @Get(':id')
-  // @Permissions(PermissionEnum.SERVICE_PACKAGE_VIEW)
+  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_PACKAGE_VIEW)
   @ApiOperation({ summary: 'Get maternity package details' })
   async findOne(
     @CurrentUser() userOrId: AuthenticatedUser | string | undefined,
@@ -74,7 +71,7 @@ export class MaternityPackagesController {
 
   // Tao goi theo so luot: body chi dung services[], khong dung stages[].
   @Post('quantity')
-  // @Permissions(PermissionEnum.SERVICE_PACKAGE_CREATE)
+  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_PACKAGE_CREATE)
   @ApiOperation({ summary: 'Create quantity-based maternity package' })
   async createQuantity(
     @CurrentUser() userOrDto: AuthenticatedUser | CreateQuantityMaternityPackageDto | undefined,
@@ -100,7 +97,7 @@ export class MaternityPackagesController {
 
   // Tao goi theo tuan tu/lich trinh: body chi dung stages[], khong dung services[] o root.
   @Post('schedule')
-  // @Permissions(PermissionEnum.SERVICE_PACKAGE_CREATE)
+  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_PACKAGE_CREATE)
   @ApiOperation({ summary: 'Create schedule-based maternity package' })
   async createSchedule(
     @CurrentUser() userOrDto: AuthenticatedUser | CreateScheduleMaternityPackageDto | undefined,
@@ -126,7 +123,7 @@ export class MaternityPackagesController {
 
   // Cập nhật tên, giá final, thời hạn, độ ưu tiên hoặc trạng thái của gói.
   @Patch(':id')
-  // @Permissions(PermissionEnum.SERVICE_PACKAGE_UPDATE)
+  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_PACKAGE_UPDATE)
   @ApiOperation({ summary: 'Update maternity package' })
   async update(
     @CurrentUser() userOrId: AuthenticatedUser | string | undefined,
@@ -159,7 +156,7 @@ export class MaternityPackagesController {
 
   // Xóa an toàn: nếu gói đã có service con hoặc bệnh nhân mua thì chuyển inactive.
   @Delete(':id')
-  // @Permissions(PermissionEnum.SERVICE_PACKAGE_DELETE)
+  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_PACKAGE_DELETE)
   @ApiOperation({ summary: 'Delete maternity package safely' })
   async remove(
     @CurrentUser() userOrId: AuthenticatedUser | string | undefined,

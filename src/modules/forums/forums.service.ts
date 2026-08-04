@@ -352,8 +352,6 @@ export class ForumsService {
 
     if (query.category) builder.andWhere('post.category = :category', { category: query.category });
     if (query.topicId) builder.andWhere('post.forumTopicId = :topicId', { topicId: query.topicId });
-    if (query.authorId) builder.andWhere('post.authorId = :authorId', { authorId: query.authorId });
-    if (query.authorRole) builder.andWhere('post.authorRole = :authorRole', { authorRole: query.authorRole });
     if (query.search) {
       builder.andWhere(new Brackets((qb) => {
         qb.where('post.title LIKE :search', { search: `%${query.search}%` })
