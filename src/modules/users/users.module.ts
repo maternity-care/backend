@@ -1,3 +1,4 @@
+import { UserAuth } from './../auth/entities/user-auth.entity';
 import { Staff } from './../staffs/entities/staff.entity';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -22,7 +23,7 @@ import { Appointment } from '../appointments/entities/appointment.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Staff, Facility, Doctor, Appointment]),
+    TypeOrmModule.forFeature([User, Staff, Facility, Doctor, Appointment, UserAuth]),
     RolesModule,
     PermissionsModule,
     MailModule,

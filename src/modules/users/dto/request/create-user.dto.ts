@@ -1,16 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 import {
-  IsArray,
   IsEmail,
   IsNotEmpty,
   IsOptional,
   IsPhoneNumber,
   IsString,
+  Length,
   MinLength,
-  ValidateNested,
 } from 'class-validator';
-import { UserPermissionOverrideDto } from './user-permission-override.dto';
 
 export class CreateUserDto {
   @ApiProperty()
@@ -22,26 +19,49 @@ export class CreateUserDto {
   @IsEmail()
   email: string;
 
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  @Length(12, 12)
+  cccd: string;
+
   @ApiProperty({ minLength: 6 })
   @IsString()
   @MinLength(6)
   password: string;
 
-  @ApiPropertyOptional({ type: [String] })
-  @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  roleIds?: string[];
-
   @ApiProperty()
-  @IsPhoneNumber()
+  @IsPhoneNumber('VN')
   @IsOptional()
-  phone?: string;
+  phone: string;
 
-  @ApiPropertyOptional({ type: [UserPermissionOverrideDto] })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => UserPermissionOverrideDto)
+  @ApiPropertyOptional()
+  @IsString()
   @IsOptional()
-  permissionOverrides?: UserPermissionOverrideDto[];
+  dateOfBirth?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  address?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  province?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  ward?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  emergencyContactName?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  emergencyContactPhone?: string;
 }

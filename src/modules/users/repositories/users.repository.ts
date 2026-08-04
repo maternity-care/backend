@@ -2,7 +2,7 @@ import { Appointment } from './../../appointments/entities/appointment.entity';
 import { RESPONSE_MESSAGES } from './../../../common/constants/response-message.constant';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DeepPartial, FindOptionsWhere, Like, Repository } from 'typeorm';
+import { DeepPartial, Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { AccountStatus } from '../../../common/constants/status.enum';
 import { IUsersRepository } from '../interfaces/users-repository.interface';
@@ -87,78 +87,72 @@ export class UsersRepository implements IUsersRepository {
   }
 
   async searchUsers(query: SearchUserDto): Promise<SearchUserResponseDto> {
-    const offset = Number(((Number(query?.page) || 1) - 1) * (query?.limit || 10)) || 0;
-    const limit = Number(query.limit) || 10;
+    const page = Math.max(Number(query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 50);
+    const offset = (page - 1) * limit;
 
-    const where: FindOptionsWhere<User> = {};
+    const sort: 'ASC' | 'DESC' = query.sort?.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
-    if (query?.name) {
-      where.name = Like(`%${query.name}%`);
+    const qb = this.repository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.pregnancyProfiles', 'pregnancyProfile');
+
+    if (query.name) {
+      qb.andWhere('user.name LIKE :name', {
+        name: `%${query.name}%`,
+      });
     }
 
-    if (query?.email) {
-      where.email = Like(`%${query.email}%`);
+    if (query.email) {
+      qb.andWhere('user.email LIKE :email', {
+        email: `%${query.email}%`,
+      });
     }
 
-    if (query?.phone) {
-      where.phone = Like(`%${query.phone}%`);
+    if (query.phone) {
+      qb.andWhere('user.phone LIKE :phone', {
+        phone: `%${query.phone}%`,
+      });
     }
 
-    if (query?.status) {
-      where.status = query.status;
+    if (query.cccd) {
+      qb.andWhere('user.cccd LIKE :cccd', {
+        cccd: `%${query.cccd}%`,
+      });
     }
 
-    if (query?.cccd) {
-      where.cccd = Like(`%${query.cccd}%`);
+    if (query.status) {
+      qb.andWhere('user.status = :status', {
+        status: query.status,
+      });
     }
 
-    if (query?.sort && query.sort.toLocaleLowerCase() === 'asc') {
-      query.sort = 'ASC';
-    } else {
-      query.sort = 'DESC';
-    }
+    if (query.facilityId) {
+      qb.andWhere((subQb) => {
+        const appointmentExists = subQb
+          .subQuery()
+          .select('1')
+          .from(Appointment, 'appointment')
+          .where('appointment.patient_id = user.id')
+          .andWhere('appointment.facility_id = :facilityId')
+          .getQuery();
 
-    if (query?.facilityId) {
-      const data = await this.appointmentRepository.findAndCount({
-        select: [],
-        relations: {
-          patient: true,
-        },
-        where: {
-          facilityId: query.facilityId,
-          patient: {
-            ...where,
-          },
-        },
-        order: {
-          patient: {
-            priorityLevel: query.sort,
-            pregnancyProfiles: { createdAt: query.sort, riskLevel: query.sort },
-          },
-        },
-        skip: offset,
-        take: limit,
+        return `EXISTS ${appointmentExists}`;
       });
 
-      const [appointments, total] = data;
-      return {
-        users: appointments.map((appointment) => appointment.patient),
-        total,
-      };
+      qb.setParameter('facilityId', query.facilityId);
     }
 
-    const data = this.repository.findAndCount({
-      relations: { pregnancyProfiles: true },
-      where,
-      order: {
-        priorityLevel: query.sort,
-        pregnancyProfiles: { createdAt: query.sort, riskLevel: query.sort },
-      },
-      skip: offset,
-      take: limit,
-    });
+    qb.distinct(true)
+      .orderBy('user.priorityLevel', sort)
+      .addOrderBy('pregnancyProfile.createdAt', sort)
+      .addOrderBy('pregnancyProfile.riskLevel', sort)
+      .addOrderBy('user.id', 'ASC')
+      .skip(offset)
+      .take(limit);
 
-    const [users, total] = await data;
+    const [users, total] = await qb.getManyAndCount();
+
     return {
       users,
       total,
