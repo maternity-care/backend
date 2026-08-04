@@ -1,6 +1,9 @@
 import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { PermissionEnum } from '../../common/constants/permission.enum';
 import { PACKAGE_SERVICE_CONSTANT } from '../../common/constants/package-service.constant';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { SearchPackageServiceDto } from './dto/requests/search-package-service.dto';
 import { UpdatePackageServiceDto } from './dto/requests/update-package-service.dto';
 import { PackageServicesService } from './package-services.service';
@@ -16,8 +19,8 @@ import { RESPONSE_MESSAGES } from '../../common/constants/response-message.const
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Management - Maternity Package Items')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+// @ApiBearerAuth()
+// @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('management/package-services')
 export class PackageServicesController {
   constructor(
@@ -26,7 +29,7 @@ export class PackageServicesController {
   ) {}
 
   @Get()
-  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_PACKAGE_VIEW)
+  // @Permissions(PermissionEnum.SERVICE_PACKAGE_VIEW)
   @ApiOperation({ summary: 'List services inside maternity packages' })
   async findAll(
     @CurrentUser() userOrQuery: AuthenticatedUser | SearchPackageServiceDto | undefined,
@@ -51,7 +54,7 @@ export class PackageServicesController {
   }
 
   @Get(':id')
-  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_PACKAGE_VIEW)
+  // @Permissions(PermissionEnum.SERVICE_PACKAGE_VIEW)
   @ApiOperation({ summary: 'Get package service item details' })
   async findOne(
     @CurrentUser() userOrId: AuthenticatedUser | string | undefined,
@@ -72,7 +75,7 @@ export class PackageServicesController {
   }
 
   @Patch(':id')
-  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_PACKAGE_UPDATE)
+  // @Permissions(PermissionEnum.SERVICE_PACKAGE_UPDATE)
   @ApiOperation({ summary: 'Update package service item' })
   async update(
     @CurrentUser() userOrId: AuthenticatedUser | string | undefined,
@@ -99,7 +102,7 @@ export class PackageServicesController {
   }
 
   @Delete(':id')
-  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_PACKAGE_DELETE)
+  // @Permissions(PermissionEnum.SERVICE_PACKAGE_DELETE)
   @ApiOperation({ summary: 'Remove package service item safely' })
   async remove(
     @CurrentUser() userOrId: AuthenticatedUser | string | undefined,
