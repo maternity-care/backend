@@ -15,6 +15,7 @@ import {
   DoctorShiftStatus,
 } from '../../../common/constants/status.enum';
 import { addDays, isOvernightRange, shiftIntervalsOverlap } from '../helpers/shifts.helper';
+import { PRIMARY_ROOM_ROLE_NAMES, roleOccupiesPrimaryRoom } from '../helpers/shift-role-policy.helper';
 
 @Injectable()
 export class ShiftsRepository implements IShiftsRepository {
@@ -127,8 +128,14 @@ export class ShiftsRepository implements IShiftsRepository {
     });
     // Conflict theo phòng: chỉ kiểm tra nếu ca có roomId.
     // OFF không dùng phòng nên roomQuery chỉ xét available/full.
-    const roomQuery = input.roomId
-      ? baseQuery(['available', 'full']).andWhere('doctor_shifts.roomId = :roomId', { roomId: input.roomId })
+    const roomQuery = input.roomId && roleOccupiesPrimaryRoom(input.roleName)
+      ? baseQuery(['available', 'full'])
+        .leftJoin('roles', 'shiftRole', 'shiftRole.id = doctor_shifts.roleId')
+        .andWhere('doctor_shifts.roomId = :roomId', { roomId: input.roomId })
+        .andWhere(
+          '(shiftRole.name IN (:...primaryRoomRoleNames) OR doctor_shifts.roleId IS NULL)',
+          { primaryRoomRoleNames: PRIMARY_ROOM_ROLE_NAMES },
+        )
       : null;
       // Promise.all: dùng để thực hiện nhiều promise song song và chờ tất cả chúng hoàn thành.
       // Trong trường hợp này, nó được sử dụng để thực hiện hai truy vấn cơ sở dữ liệu song song: 

@@ -121,17 +121,17 @@ export class ShiftsController {
       slotAssignments: {
         summary: 'Generate shifts by slot and staff assignments',
         value: {
-          facilityId: '1',
+          facilityId: '900094',
           fromDate: '2026-08-01',
           toDate: '2026-08-31',
           slotAssignments: [
             {
-              slotId: '1',
+              slotId: '900520',
               assignments: [
                 {
-                  staffId: '10',
-                  roleId: '3',
-                  roomId: '2',
+                  staffId: '900014',
+                  roleId: '900023',
+                  roomId: '900144',
                   workingDays: ['MON', 'WED', 'FRI'],
                   maxAppointments: 10,
                   status: 'available',
@@ -164,17 +164,17 @@ export class ShiftsController {
       slotAssignments: {
         summary: 'Generate and save shifts by slot and staff assignments',
         value: {
-          facilityId: '1',
+          facilityId: '900094',
           fromDate: '2026-08-01',
           toDate: '2026-08-31',
           slotAssignments: [
             {
-              slotId: '1',
+              slotId: '900520',
               assignments: [
                 {
-                  staffId: '10',
-                  roleId: '3',
-                  roomId: '2',
+                  staffId: '900014',
+                  roleId: '900023',
+                  roomId: '900144',
                   workingDays: ['MON', 'WED', 'FRI'],
                   maxAppointments: 10,
                   status: 'available',

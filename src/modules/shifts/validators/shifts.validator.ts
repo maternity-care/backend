@@ -22,9 +22,11 @@ import {
   SHIFTS_REPOSITORY,
   IShiftsRepository,
 } from '../interfaces/shifts-repository.interface';
+import { getShiftRolePolicy, roleRequiresRoom } from '../helpers/shift-role-policy.helper';
 
 export interface PreparedDoctorShiftInput {
   staffId: string;
+  roleName: string | null;
   slotId: string | null;
   startTime: string;
   endTime: string;
@@ -47,6 +49,7 @@ export class ShiftsValidator {
     throwIfConflicted(await this.repository.findConflicts({
       ...dto,
       staffId: prepared.staffId,
+      roleName: prepared.roleName,
       slotId: prepared.slotId,
       startTime: prepared.startTime,
       endTime: prepared.endTime,
@@ -57,14 +60,15 @@ export class ShiftsValidator {
 
   /** Validate candidate tao ca nhung chua check conflict, dung cho preview auto-generate de tra conflict details. */
   async prepareForCreate(dto: CreateDoctorShiftDto): Promise<PreparedDoctorShiftInput> {
-    const { facility, staffId } = await this.validateReferences(dto, dto.facilityId, dto.roomId);
+    const { facility, staffId, roleName } = await this.validateReferences(dto, dto.facilityId, dto.roomId);
     const timing = await this.resolveShiftTiming(dto);
 
     validateSchedule(dto.shiftDate, timing.startTime, timing.endTime, true);
     validateStatusDetails(dto.status, dto.roomId);
+    this.validateRoomPolicy(roleName, dto.status, dto.roomId);
     await this.validateFacilityOperatingHours(facility.id, dto.shiftDate, timing.startTime, timing.endTime, dto.status);
 
-    return { staffId, ...timing };
+    return { staffId, roleName, ...timing };
   }
 
   /** Validate dữ liệu cập nhật ca, gồm cả trường hợp đổi slotId hoặc đổi giờ thủ công. */
@@ -73,17 +77,19 @@ export class ShiftsValidator {
     doctorId: string,
     options?: { slotWasProvided?: boolean; timeWasProvided?: boolean },
   ): Promise<PreparedDoctorShiftInput> {
-    const { facility, staffId } = await this.validateReferences({ ...shift, doctorId }, shift.facilityId, shift.roomId);
+    const { facility, staffId, roleName } = await this.validateReferences({ ...shift, doctorId }, shift.facilityId, shift.roomId);
     const timing = await this.resolveShiftTiming(shift, false, options);
 
     validateSchedule(shift.shiftDate, timing.startTime, timing.endTime, false);
     validateStatusDetails(shift.status, shift.roomId);
+    this.validateRoomPolicy(roleName, shift.status, shift.roomId);
     await this.validateFacilityOperatingHours(facility.id, shift.shiftDate, timing.startTime, timing.endTime, shift.status);
 
     if (shift.status !== DoctorShiftStatus.CANCELLED) {
       throwIfConflicted(await this.repository.findConflicts({
         doctorId,
         staffId,
+        roleName,
         roomId: shift.roomId,
         shiftDate: shift.shiftDate,
         startTime: timing.startTime,
@@ -92,18 +98,19 @@ export class ShiftsValidator {
       }));
     }
 
-    return { staffId, ...timing };
+    return { staffId, roleName, ...timing };
   }
 
   /** Validate input API check-conflict; nếu dùng slotId thì tự lấy start/end từ shift_slots. */
   async validateForConflictCheck(dto: CheckShiftConflictDto): Promise<PreparedDoctorShiftInput> {
-    const { facility, staffId } = await this.validateReferences(dto, dto.facilityId, dto.roomId);
+    const { facility, staffId, roleName } = await this.validateReferences(dto, dto.facilityId, dto.roomId);
     const timing = await this.resolveShiftTiming(dto);
 
     validateSchedule(dto.shiftDate, timing.startTime, timing.endTime, true);
+    this.validateRoomPolicy(roleName, DoctorShiftStatus.AVAILABLE, dto.roomId);
     await this.validateFacilityOperatingHours(facility.id, dto.shiftDate, timing.startTime, timing.endTime, DoctorShiftStatus.AVAILABLE);
 
-    return { staffId, ...timing };
+    return { staffId, roleName, ...timing };
   }
 
   /** Kiểm tra bác sĩ thuộc cơ sở trước khi sinh danh sách slot đặt lịch. */
@@ -146,7 +153,7 @@ export class ShiftsValidator {
     input: { doctorId?: string; staffId?: string; roleId?: string | null },
     facilityId: string,
     roomId?: string | null,
-  ): Promise<{ facility: Facility; staffId: string }> {
+  ): Promise<{ facility: Facility; staffId: string; roleName: string | null }> {
     const facility = await this.ensureActiveFacility(facilityId);
 
     if (input.staffId) {
@@ -154,7 +161,7 @@ export class ShiftsValidator {
       if (!assignee) {
         throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.STAFF_ROLE_INVALID);
       }
-      if (assignee.roleName === RoleEnum.DOCTOR && !assignee.doctorId) {
+      if (getShiftRolePolicy(assignee.roleName).requiresDoctorProfile && !assignee.doctorId) {
         throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.STAFF_DOCTOR_PROFILE_REQUIRED);
       }
 
@@ -165,7 +172,7 @@ export class ShiftsValidator {
         }
       }
 
-      return { facility, staffId: assignee.staffId };
+      return { facility, staffId: assignee.staffId, roleName: assignee.roleName ?? null };
     }
 
     if (!input.doctorId) {
@@ -189,7 +196,13 @@ export class ShiftsValidator {
       }
     }
 
-    return { facility, staffId };
+    return { facility, staffId, roleName: RoleEnum.DOCTOR };
+  }
+
+  private validateRoomPolicy(roleName: string | null, status: DoctorShiftStatus, roomId?: string | null): void {
+    if (roleRequiresRoom(roleName, status) && !roomId) {
+      throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.ROOM_REQUIRED_FOR_ROLE);
+    }
   }
 
   /** Fallback để các unit test/mock cũ vẫn chạy được trong lúc repository thật đã tách doctorId và staffId. */

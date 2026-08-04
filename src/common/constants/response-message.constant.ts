@@ -197,6 +197,7 @@ export const RESPONSE_MESSAGES = {
     STAFF_ROLE_INVALID: 'Nhân viên không hoạt động, không thuộc cơ sở này hoặc không có vai trò đã chọn',
     STAFF_DOCTOR_PROFILE_REQUIRED: 'Nhân viên trực vai trò bác sĩ phải có hồ sơ bác sĩ đang hoạt động',
     ROOM_INVALID: 'Phòng không hoạt động hoặc không thuộc cơ sở của ca trực',
+    ROOM_REQUIRED_FOR_ROLE: 'Vai trò này cần chọn phòng khi tạo ca trực',
     FACILITY_INACTIVE: 'Không thể xếp ca tại cơ sở không hoạt động',
     DOCTOR_CONFLICT: 'Bác sĩ đã có ca trực trùng thời gian',
     ROOM_CONFLICT: 'Phòng đã được sử dụng bởi ca trực khác trong khoảng thời gian này',
