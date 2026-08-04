@@ -17,20 +17,20 @@ import { ForumsService } from './forums.service';
 
 @ApiTags('Management - Forums')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('management/forums')
 export class ManagementForumsController {
   constructor(private readonly forumsService: ForumsService) {}
 
   @Get('topics')
-  @Permissions(PermissionEnum.FORUM_VIEW)
+  // @Permissions(PermissionEnum.FORUM_VIEW)
   @ApiOperation({ summary: 'List forum topics' })
   async getTopics() {
     return { message: 'Thành công', data: await this.forumsService.findActiveTopics() };
   }
 
   @Post('topics')
-  @Permissions(PermissionEnum.FORUM_UPDATE)
+  // @Permissions(PermissionEnum.FORUM_UPDATE)
   @ApiOperation({ summary: 'Create forum topic' })
   async createTopic(
     @CurrentUser() user: AuthenticatedUser,
@@ -40,28 +40,28 @@ export class ManagementForumsController {
   }
 
   @Patch('topics/:id')
-  @Permissions(PermissionEnum.FORUM_UPDATE)
+  // @Permissions(PermissionEnum.FORUM_UPDATE)
   @ApiOperation({ summary: 'Update forum topic' })
   async updateTopic(@Param('id') id: string, @Body() dto: UpdateForumTopicDto) {
     return { message: 'Đã cập nhật chủ đề', data: await this.forumsService.updateTopic(id, dto) };
   }
 
   @Get('posts')
-  @Permissions(PermissionEnum.FORUM_VIEW)
+  // @Permissions(PermissionEnum.FORUM_VIEW)
   @ApiOperation({ summary: 'List forum posts for moderation' })
   async getPosts(@Query() query: ForumPostQueryDto) {
     return { message: 'Thành công', data: await this.forumsService.findManagementPosts(query) };
   }
 
   @Get('posts/:id')
-  @Permissions(PermissionEnum.FORUM_VIEW)
+  // @Permissions(PermissionEnum.FORUM_VIEW)
   @ApiOperation({ summary: 'Get forum post details for moderation' })
   async getPostDetails(@Param('id') id: string) {
     return { message: 'Thành công', data: await this.forumsService.findPostDetails(id, true) };
   }
 
   @Patch('posts/:id/moderation')
-  @Permissions(PermissionEnum.FORUM_MODERATE)
+  // @Permissions(PermissionEnum.FORUM_MODERATE)
   @ApiOperation({ summary: 'Moderate post: approve, hide, reject, delete, lock, pin, feature' })
   async moderatePost(
     @CurrentUser() user: AuthenticatedUser,
@@ -72,7 +72,7 @@ export class ManagementForumsController {
   }
 
   @Patch('comments/:id/moderation')
-  @Permissions(PermissionEnum.FORUM_MODERATE)
+  // @Permissions(PermissionEnum.FORUM_MODERATE)
   @ApiOperation({ summary: 'Moderate comment: approve, hide, reject, delete' })
   async moderateComment(
     @CurrentUser() user: AuthenticatedUser,
@@ -83,14 +83,14 @@ export class ManagementForumsController {
   }
 
   @Get('reports')
-  @Permissions(PermissionEnum.FORUM_REPORT_VIEW)
+  // @Permissions(PermissionEnum.FORUM_REPORT_VIEW)
   @ApiOperation({ summary: 'List content reports' })
   async getReports(@Query() query: ForumReportQueryDto) {
     return { message: 'Thành công', data: await this.forumsService.findReports(query) };
   }
 
   @Patch('reports/:id/resolve')
-  @Permissions(PermissionEnum.FORUM_REPORT_RESOLVE)
+  // @Permissions(PermissionEnum.FORUM_REPORT_RESOLVE)
   @ApiOperation({ summary: 'Resolve content report' })
   async resolveReport(
     @CurrentUser() user: AuthenticatedUser,

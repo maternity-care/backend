@@ -76,7 +76,7 @@ describe('DoctorShifts DTO validation', () => {
   // Vai tro: dam bao query search ca truc bat loi id, date va page/limit khong hop le.
   it('validates search pagination and date inputs', async () => {
     const dto = plainToInstance(SearchDoctorShiftDto, {
-      facilityId: '-1', dateFrom: 'invalid', page: '0', limit: '101',
+      facilityId: '-1', dateFrom: 'invalid', page: '0', limit: '201',
     });
     expect((await validate(dto)).map(error => error.property)).toEqual(
       expect.arrayContaining(['facilityId', 'dateFrom', 'page', 'limit']),
@@ -1759,8 +1759,8 @@ describe('ShiftSlotsService business validation', () => {
     expect(repository.remove).toHaveBeenCalledWith(slot);
   });
 
-  // Vai tro: dam bao slot da duoc ca truc su dung thi chi soft delete/inactive de giu lich su.
-  it('soft deletes a used shift slot', async () => {
+  // Vai tro: khung ca la cau hinh, xoa la xoa cung; ca truc cu van giu startTime/endTime.
+  it('hard deletes a used shift slot and reports affected shifts', async () => {
     const slot = { id: '1', facilityId: '1', status: ActiveStatus.ACTIVE, deletedAt: null };
     const { service, repository } = createService({
       findOne: jest.fn().mockResolvedValue(slot),
@@ -1769,11 +1769,9 @@ describe('ShiftSlotsService business validation', () => {
       },
     });
 
-    await expect(service.remove('1')).resolves.toEqual({ action: 'soft_deleted', affectedCount: 3 });
-    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({
-      status: ActiveStatus.INACTIVE,
-      deletedAt: expect.any(Date),
-    }));
+    await expect(service.remove('1')).resolves.toEqual({ action: 'hard_deleted', affectedCount: 3 });
+    expect(repository.remove).toHaveBeenCalledWith(slot);
+    expect(repository.save).not.toHaveBeenCalled();
   });
 });
 

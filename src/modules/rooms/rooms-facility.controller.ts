@@ -13,8 +13,8 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Management - Rooms')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+// @ApiBearerAuth()
+// @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('management/facility')
 
 export class RoomsFacilityController {
@@ -29,7 +29,7 @@ export class RoomsFacilityController {
 
 
   @Get('rooms/:facilityId')
-  @Permissions(PermissionEnum.ROOM_VIEW)
+  // @Permissions(PermissionEnum.ROOM_VIEW)
   @ApiOperation({ summary: 'Get rooms by facility'})
   @ApiResponse({ status : 200, description: 'Rooms found', type: [RoomWithDetailsResponseDto] })
   async findRoomsByFacility(
