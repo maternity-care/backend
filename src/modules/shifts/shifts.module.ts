@@ -8,7 +8,6 @@ import { ShiftSlot } from '../../database/entities/shift-slot.entity';
 import { FacilitiesModule } from '../facilities/facilities.module';
 import { RoomsModule } from '../rooms/rooms.module';
 import { ShiftsController } from './shifts.controller';
-import { PublicShiftsController } from './public-shifts.controller';
 import { ShiftSlotsController } from './shift-slots.controller';
 import { ShiftsService } from './shifts.service';
 import { ShiftSlotsService } from './shift-slots.service';
@@ -28,7 +27,7 @@ import { ShiftsValidator } from './validators/shifts.validator';
     FacilitiesModule,
     RoomsModule,
   ],
-  controllers: [PublicShiftsController, ShiftsController, ShiftSlotsController],
+  controllers: [ShiftsController, ShiftSlotsController],
   providers: [
     ShiftsService,
     ShiftSlotsService,

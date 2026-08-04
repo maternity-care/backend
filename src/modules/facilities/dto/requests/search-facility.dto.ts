@@ -39,12 +39,12 @@ export class SearchFacilityDto {
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 20 })
+  @ApiPropertyOptional({ minimum: 1, maximum: 200, default: 20 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(200)
   limit?: number;
 }
 
@@ -61,11 +61,11 @@ export class LookupFacilityDto {
   @IsEnum(FacilityStatus)
   status?: FacilityStatus;
 
-  @ApiPropertyOptional({ minimum: 1, maximum: 50, default: 20 })
+  @ApiPropertyOptional({ minimum: 1, maximum: 200, default: 20 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(50)
+  @Max(200)
   limit?: number;
 }
