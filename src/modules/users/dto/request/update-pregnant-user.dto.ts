@@ -1,7 +1,39 @@
-import { PartialType } from '@nestjs/swagger';
-import { CreatePregnantUserDto } from './create-pregnant-user.dto';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
-// Email không được cập nhật ở hồ sơ vì còn là định danh đăng nhập trong user_auths.
-export class UpdatePregnantUserDto extends PartialType(CreatePregnantUserDto) {
-  email?: never;
+export class UpdatePregnantUserDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  dateOfBirth?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  address?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  province?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  ward?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  emergencyContactName?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  emergencyContactPhone?: string;
 }

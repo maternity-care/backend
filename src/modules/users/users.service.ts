@@ -44,6 +44,7 @@ import { AccountStatus, ActiveStatus, FacilityStatus } from '../../common/consta
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { getActiveFacilityId, isSuperAdmin } from '../../common/helpers/facility-scope.helper';
 import { UserAuthRepository } from '../auth/repositories/user-auth.repository';
+import { UpdatePregnantUserDto } from './dto/request/update-pregnant-user.dto';
 
 @Injectable()
 export class UsersService implements IUsersService, IAdminManageService {
@@ -156,23 +157,18 @@ export class UsersService implements IUsersService, IAdminManageService {
     return this.usersRepository.findMyPregnancyProfiles(id);
   }
 
-  async update(id: string, dto: UpdateUserDto): Promise<User> {
+  async update(id: string, dto: UpdatePregnantUserDto): Promise<User> {
     const user = await this.findById(id);
 
-    if (dto.email && dto.email !== user.email) {
-      const existing = await this.usersRepository.findByEmail(dto.email);
-      if (existing) {
-        throw new ConflictException('Email already exists');
-      }
-    }
-
     user.name = dto.name ?? user.name;
-    user.email = dto.email ?? user.email;
-    user.phone = dto.phone ?? user.phone;
-    user.status = dto.status ?? user.status;
+    user.dateOfBirth = dto.dateOfBirth ?? user.dateOfBirth;
+    user.address = dto.address ?? user.address;
+    user.province = dto.province ?? user.province;
+    user.ward = dto.ward ?? user.ward;
+    user.emergencyContactName = dto.emergencyContactName ?? user.emergencyContactName;
+    user.emergencyContactPhone = dto.emergencyContactPhone ?? user.emergencyContactPhone;
 
     const savedUser = await this.usersRepository.save(user);
-    await this.syncPermissionOverrides(savedUser.id, dto.permissionOverrides);
     await this.clearUsersCache(id);
     return this.findById(savedUser.id);
   }
