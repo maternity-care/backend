@@ -1,9 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { PermissionEnum } from '../../common/constants/permission.enum';
 import { SERVICE_CONSTANT } from '../../common/constants/service.constant';
-import { Permissions } from '../../common/decorators/permissions.decorator';
-import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateServiceTypeDto } from './dto/requests/create-service-type.dto';
 import { SearchServiceTypesDto } from './dto/requests/search-service-types.dto';
@@ -17,13 +14,13 @@ import { ServiceTypesService } from './service-types.service';
 
 @ApiTags('Management - Service Types')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('management/service-types')
 export class ServiceTypesController {
   constructor(private readonly serviceTypesService: ServiceTypesService) {}
 
   @Get('lookup')
-  @Permissions(PermissionEnum.SERVICE_VIEW)
+  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_VIEW)
   @ApiOperation({ summary: 'Lookup service types for service form select/autocomplete' })
   @ApiResponse({ status: 200, type: [ServiceTypeLookupResponseDto] })
   async lookup(@Query() query: SearchServiceTypesDto) {
@@ -34,7 +31,7 @@ export class ServiceTypesController {
   }
 
   @Get()
-  @Permissions(PermissionEnum.SERVICE_VIEW)
+  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_VIEW)
   @ApiOperation({ summary: 'List service types' })
   @ApiResponse({ status: 200, type: ServiceTypePaginatedResponseDto })
   async findAll(@Query() query: SearchServiceTypesDto) {
@@ -45,7 +42,7 @@ export class ServiceTypesController {
   }
 
   @Get(':id')
-  @Permissions(PermissionEnum.SERVICE_VIEW)
+  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_VIEW)
   @ApiOperation({ summary: 'Get service type details' })
   @ApiResponse({ status: 200, type: ServiceTypeResponseDto })
   async findOne(@Param('id') id: string) {
@@ -56,7 +53,7 @@ export class ServiceTypesController {
   }
 
   @Post()
-  @Permissions(PermissionEnum.SERVICE_CREATE)
+  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_CREATE)
   @ApiOperation({ summary: 'Create service type' })
   @ApiResponse({ status: 201, type: ServiceTypeResponseDto })
   async create(@Body() dto: CreateServiceTypeDto) {
@@ -67,7 +64,7 @@ export class ServiceTypesController {
   }
 
   @Patch(':id')
-  @Permissions(PermissionEnum.SERVICE_UPDATE)
+  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_UPDATE)
   @ApiOperation({ summary: 'Update service type' })
   @ApiResponse({ status: 200, type: ServiceTypeResponseDto })
   async update(@Param('id') id: string, @Body() dto: UpdateServiceTypeDto) {
@@ -78,7 +75,7 @@ export class ServiceTypesController {
   }
 
   @Delete(':id')
-  @Permissions(PermissionEnum.SERVICE_DELETE)
+  // Permission tam tat: @Permissions(PermissionEnum.SERVICE_DELETE)
   @ApiOperation({ summary: 'Delete service type when unused, otherwise deactivate it' })
   async remove(@Param('id') id: string) {
     return {

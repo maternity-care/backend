@@ -22,6 +22,7 @@ import {
   timeToMinutes,
 } from './helpers/shifts.helper';
 import { ShiftsController } from './shifts.controller';
+import { PublicShiftsController } from './public-shifts.controller';
 import { ShiftsRepository } from './repositories/shifts.repository';
 import { ShiftsService } from './shifts.service';
 import { ShiftsValidator } from './validators/shifts.validator';
@@ -76,7 +77,7 @@ describe('DoctorShifts DTO validation', () => {
   // Vai tro: dam bao query search ca truc bat loi id, date va page/limit khong hop le.
   it('validates search pagination and date inputs', async () => {
     const dto = plainToInstance(SearchDoctorShiftDto, {
-      facilityId: '-1', dateFrom: 'invalid', page: '0', limit: '101',
+      facilityId: '-1', dateFrom: 'invalid', page: '0', limit: '201',
     });
     expect((await validate(dto)).map(error => error.property)).toEqual(
       expect.arrayContaining(['facilityId', 'dateFrom', 'page', 'limit']),
@@ -1376,6 +1377,23 @@ describe('ShiftsController unit routing and scope', () => {
     });
     expect(service.getWeeklySchedule).toHaveBeenCalledWith('1', '2099-07-06', '2');
   });
+
+  // Vai tro: dam bao public API availability cho booking chi nhan doctorId va dung chung logic service.
+  it('routes public doctor availability requests to the service', async () => {
+    const { service } = createController();
+    const publicController = new PublicShiftsController(service as never);
+
+    await expect(publicController.getDoctorAvailability('1', {
+      facilityId: '1',
+      date: '2099-07-07',
+      slotMinutes: 30,
+    })).resolves.toMatchObject({ data: { shifts: [] } });
+    expect(service.getDoctorAvailability).toHaveBeenCalledWith('1', {
+      facilityId: '1',
+      date: '2099-07-07',
+      slotMinutes: 30,
+    });
+  });
 });
 
 describe('ShiftsRepository unit query behavior', () => {
@@ -1759,8 +1777,8 @@ describe('ShiftSlotsService business validation', () => {
     expect(repository.remove).toHaveBeenCalledWith(slot);
   });
 
-  // Vai tro: dam bao slot da duoc ca truc su dung thi chi soft delete/inactive de giu lich su.
-  it('soft deletes a used shift slot', async () => {
+  // Vai tro: khung ca la cau hinh, xoa la xoa cung; ca truc cu van giu startTime/endTime.
+  it('hard deletes a used shift slot and reports affected shifts', async () => {
     const slot = { id: '1', facilityId: '1', status: ActiveStatus.ACTIVE, deletedAt: null };
     const { service, repository } = createService({
       findOne: jest.fn().mockResolvedValue(slot),
@@ -1769,11 +1787,9 @@ describe('ShiftSlotsService business validation', () => {
       },
     });
 
-    await expect(service.remove('1')).resolves.toEqual({ action: 'soft_deleted', affectedCount: 3 });
-    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({
-      status: ActiveStatus.INACTIVE,
-      deletedAt: expect.any(Date),
-    }));
+    await expect(service.remove('1')).resolves.toEqual({ action: 'hard_deleted', affectedCount: 3 });
+    expect(repository.remove).toHaveBeenCalledWith(slot);
+    expect(repository.save).not.toHaveBeenCalled();
   });
 });
 
