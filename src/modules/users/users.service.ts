@@ -1,3 +1,4 @@
+import { UserAuth } from './../auth/entities/user-auth.entity';
 import { Staff } from './../staffs/entities/staff.entity';
 import {
   BadRequestException,
@@ -42,6 +43,7 @@ import { FacilityStaffAssignmentDto } from './dto/request/facility-staff-assignm
 import { AccountStatus, ActiveStatus, FacilityStatus } from '../../common/constants/status.enum';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { getActiveFacilityId, isSuperAdmin } from '../../common/helpers/facility-scope.helper';
+import { UserAuthRepository } from '../auth/repositories/user-auth.repository';
 
 @Injectable()
 export class UsersService implements IUsersService, IAdminManageService {
@@ -63,24 +65,53 @@ export class UsersService implements IUsersService, IAdminManageService {
     private readonly facilityRepository: Repository<Facility>,
     @InjectRepository(Doctor)
     private readonly doctorRepository: Repository<Doctor>,
+    @InjectRepository(UserAuth)
+    private readonly userAuthRepository: UserAuthRepository,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
-    const existing = await this.usersRepository.findByEmail(dto.email);
-    if (existing) {
+    const existingEmail = await this.usersRepository.findByEmail(dto.email);
+    if (existingEmail) {
       throw new ConflictException('Email đã tồn tại trong hệ thống. Vui lòng sử dụng email khác.');
+    }
+
+    const existingPhone = await this.usersRepository.findByPhone(dto.phone);
+    if (existingPhone) {
+      throw new ConflictException(
+        'Số điện thoại đã tồn tại trong hệ thống. Vui lòng sử dụng số đồ khác.',
+      );
+    }
+
+    const existingCccd = await this.usersRepository.findByCccd(dto.cccd);
+    if (existingCccd) {
+      throw new ConflictException('Cccd đã tồn tại trong hệ thống. Vui lòng sử dụng cccd khác.');
     }
 
     const user = this.usersRepository.create({
       name: dto.name,
+      cccd: dto?.cccd ? dto.cccd : undefined,
       email: dto.email,
       phone: dto?.phone ? dto.phone : undefined,
+      dateOfBirth: dto?.dateOfBirth ? dto.dateOfBirth : undefined,
+      address: dto?.address ? dto.address : undefined,
+      province: dto?.province ? dto.province : undefined,
+      ward: dto?.ward ? dto.ward : undefined,
+      emergencyContactName: dto?.emergencyContactName ? dto.emergencyContactName : undefined,
+      emergencyContactPhone: dto?.emergencyContactPhone ? dto.emergencyContactPhone : undefined,
+      status: UserStatusEnum.ACTIVE,
     });
 
     const savedUser = await this.usersRepository.save(user);
-    await this.syncPermissionOverrides(savedUser.id, dto.permissionOverrides);
-    await this.clearUsersCache();
-    return this.findById(savedUser.id);
+    const userAuth = await this.userAuthRepository.create({
+      userId: savedUser.id,
+      email: dto.email,
+      password: await bcrypt.hash(
+        dto.password,
+        this.configService.getOrThrow<number>('bcrypt.saltRounds'),
+      ),
+    });
+    await this.userAuthRepository.save(userAuth);
+    return savedUser;
   }
 
   async findAll(): Promise<User[]> {

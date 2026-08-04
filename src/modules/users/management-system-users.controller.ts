@@ -28,7 +28,7 @@ import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interfa
 @ApiTags('Management - Users')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-@Roles(RoleEnum.SUPER_ADMIN, RoleEnum.ADMIN, RoleEnum.DOCTOR, RoleEnum.STAFF)
+@Roles(RoleEnum.SUPER_ADMIN, RoleEnum.ADMIN, RoleEnum.DOCTOR, RoleEnum.STAFF, RoleEnum.NURSE)
 @Controller('management/users')
 export class ManagementSystemUsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -41,7 +41,7 @@ export class ManagementSystemUsersController {
   }
 
   @Post()
-  @Permissions(PermissionEnum.USER_CREATE)
+  // @Permissions(PermissionEnum.USER_CREATE)
   async create(@Body() dto: CreateUserDto) {
     const data = await this.usersService.create(dto);
     return { data, success: true, message: 'Tạo người dùng thành công.' };
