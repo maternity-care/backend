@@ -1,3 +1,4 @@
+import { AccountStatus } from './../../../common/constants/status.enum';
 import { DeepPartial } from 'typeorm';
 import { UserAuth } from '../entities/user-auth.entity';
 
@@ -8,4 +9,5 @@ export interface IUserAuthRepository {
   create(data: DeepPartial<UserAuth>): Promise<UserAuth>;
   save(userAuth: UserAuth): Promise<UserAuth>;
   update(id: string, email: string, password: string): Promise<void>;
+  updateStatus(id: string, status: AccountStatus): Promise<void>;
 }
