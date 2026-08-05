@@ -20,10 +20,11 @@ import { ManagementSystemUsersController } from './management-system-users.contr
 import { Facility } from '../facilities/entities/facility.entity';
 import { Doctor } from '../doctors/entities/doctor.entity';
 import { Appointment } from '../appointments/entities/appointment.entity';
+import { StaffPermission } from '../permissions/entities/staff-permission.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Staff, Facility, Doctor, Appointment, UserAuth]),
+    TypeOrmModule.forFeature([User, Staff, Facility, Doctor, Appointment, UserAuth, StaffPermission]),
     RolesModule,
     PermissionsModule,
     MailModule,

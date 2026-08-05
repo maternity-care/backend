@@ -57,7 +57,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   private async validateStaff(request: Request, payload: JwtPayload): Promise<AuthenticatedUser> {
     const staff = await this.staffProfileRepository.findOne({
       where: { id: payload.sub, status: AccountStatus.ACTIVE },
-      relations: { roles: { permissions: true }, doctor: true, facility: true },
+      relations: {
+        roles: { permissions: true },
+        permissions: { permission: true },
+        doctor: true,
+        facility: true,
+      },
     });
 
     if (!staff) {
@@ -77,7 +82,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         name: role.name,
         permissions: role.permissions.map((permission) => permission),
       })),
-      permissionOverrides: [],
+      permissionOverrides: (staff.permissions ?? []).map((override) => ({
+        permission: override.permission,
+        effect: override.effect,
+      })),
       facilities: [
         {
           id: staff.facility.id,

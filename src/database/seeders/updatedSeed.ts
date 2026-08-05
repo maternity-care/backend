@@ -81,6 +81,7 @@ async function insertRolePermission() {
       PermissionEnum.MEMBER_VIEW,
       PermissionEnum.MEMBER_MEDICAL_VIEW,
       PermissionEnum.PREGNANCY_VIEW,
+      PermissionEnum.PREGNANCY_CREATE,
       PermissionEnum.PREGNANCY_UPDATE,
       PermissionEnum.HEALTH_METRIC_VIEW,
       PermissionEnum.HEALTH_METRIC_CREATE,
@@ -109,6 +110,7 @@ async function insertRolePermission() {
     [RoleEnum.NURSE]: [
       PermissionEnum.MEMBER_VIEW,
       PermissionEnum.PREGNANCY_VIEW,
+      PermissionEnum.PREGNANCY_CREATE,
       PermissionEnum.HEALTH_METRIC_VIEW,
       PermissionEnum.HEALTH_METRIC_CREATE,
       PermissionEnum.HEALTH_METRIC_UPDATE,
@@ -133,6 +135,8 @@ async function insertRolePermission() {
     ],
     [RoleEnum.STAFF]: [
       PermissionEnum.MEMBER_VIEW,
+      PermissionEnum.PREGNANCY_VIEW,
+      PermissionEnum.PREGNANCY_CREATE,
       PermissionEnum.APPOINTMENT_VIEW,
       PermissionEnum.APPOINTMENT_CREATE,
       PermissionEnum.APPOINTMENT_UPDATE,

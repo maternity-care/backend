@@ -16,6 +16,9 @@ export default () => ({
     apiKey: process.env.GEMINI_API_KEY,
     model: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash-lite',
   },
+  helper: {
+    uploadSecret: process.env.HELPER_UPLOAD_SECRET,
+  },
   bcrypt: {
     saltRounds: Number(process.env.BCRYPT_SALT_ROUNDS ?? 10),
   },

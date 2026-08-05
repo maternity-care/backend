@@ -40,7 +40,7 @@ export class ManagementStaffsController {
   @ApiOperation({ summary: 'List staff accounts' })
   @ApiResponse({ status: 200, type: SearchUserResponseDto })
   async findAll(@CurrentUser() actor: AuthenticatedUser, @Query() query: SearchUserDto) {
-    const data = await this.staffManagementService.findAll(query);
+    const data = await this.staffManagementService.findAll(query, actor);
     return { data, message: 'Lấy danh sách nhân viên thành công.' };
   }
 

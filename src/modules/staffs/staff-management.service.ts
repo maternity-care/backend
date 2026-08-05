@@ -21,7 +21,7 @@ export class StaffManagementService {
     private readonly staffProfileRepository: IStaffProfileRepository,
   ) {}
 
-  async findAll(query: SearchUserDto): Promise<SearchUserResponseDto> {
+  async findAll(query: SearchUserDto, actor: AuthenticatedUser): Promise<SearchUserResponseDto> {
     const searchFilters = parseSearch(query.search);
     const searchValue = (field: string) =>
       searchFilters.find((filter) => filter.field === field)?.values[0]?.trim();
@@ -67,8 +67,13 @@ export class StaffManagementService {
     const limit = Number(query.limit) || 10;
     const offset = (page - 1) * limit;
 
+    const pagedStaffs = filteredStaffs.slice(offset, offset + limit);
+    const users = await Promise.all(
+      pagedStaffs.map((staff) => this.usersService.findUserById(staff.id, actor)),
+    );
+
     return {
-      users: filteredStaffs.slice(offset, offset + limit) as unknown as User[],
+      users: users.filter(Boolean) as unknown as User[],
       total: filteredStaffs.length,
     };
   }

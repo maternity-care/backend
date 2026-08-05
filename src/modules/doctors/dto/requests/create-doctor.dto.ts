@@ -48,14 +48,15 @@ export class CreateDoctorDto {
   specialty: string;
 
   @ApiProperty({
-    example: '1 or 2 or 3 or 4',
-    minimum: 1,
-    description: 'các level năm kinh nghiệm',
+    example: 5,
+    minimum: 0,
+    maximum: 80,
+    description: 'Số năm kinh nghiệm',
   })
   @Type(() => Number)
   @IsInt()
-  @Min(1)
-  @Max(4)
+  @Min(0)
+  @Max(80)
   yearsOfExperience: number;
 
   @ApiPropertyOptional({
@@ -72,7 +73,8 @@ export class CreateDoctorDto {
   @MaxLength(5000)
   bio?: string;
 
-  @ApiProperty({ enum: ActiveStatus, example: ActiveStatus.ACTIVE })
+  @ApiPropertyOptional({ enum: ActiveStatus, example: ActiveStatus.ACTIVE })
+  @IsOptional()
   @IsEnum(ActiveStatus)
-  status: ActiveStatus;
+  status?: ActiveStatus;
 }
