@@ -63,8 +63,8 @@ export class ManagementSystemUsersController {
 
   @Delete(':id')
   @Permissions(PermissionEnum.USER_DELETE)
-  async remove(@Param('id') id: string) {
-    await this.usersService.updateStatus(id, UserStatusEnum.INACTIVE);
+  async remove(@Param('id') id: string, @Body('reason') reason: string) {
+    await this.usersService.updateStatus(id, UserStatusEnum.INACTIVE, reason);
     return { data: null, success: true, message: 'Đã khóa tài khoản người dùng.' };
   }
 }

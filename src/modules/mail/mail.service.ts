@@ -12,6 +12,7 @@ import { createdAccountTemplate } from './templates/created-account.template';
 import { CreatedAccountInterface } from './interfaces/created-account.interface';
 import { createRequestSoftDeletePregnancyProfileTemplate } from './templates/request-soft-delete-pregnancy-profile.template';
 import { sendOTPEmailTemplate } from './templates/send-otp-email.template';
+import { lockAccountTemplate } from './templates/lock-account.template';
 
 interface MailPayload {
   to: string;
@@ -106,6 +107,17 @@ export class MailService implements IMailService {
 
   async sendOTPEmail(input: SendOTPEmailInput): Promise<void> {
     const template = sendOTPEmailTemplate(input);
+
+    await this.sendMail({
+      to: input.to,
+      subject: template.subject,
+      text: template.text,
+      html: template.html,
+    });
+  }
+
+  async sendLockAccountEmail(input: { to: string; name: string; reason: string }): Promise<void> {
+    const template = lockAccountTemplate(input);
 
     await this.sendMail({
       to: input.to,

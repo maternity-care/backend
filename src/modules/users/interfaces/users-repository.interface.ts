@@ -16,7 +16,7 @@ export interface IUsersRepository {
   findByCccd(cccd: string): Promise<User | null>;
   findByEmailWithPassword(email: string): Promise<User | null>;
   findMyPregnancyProfiles(id: string): Promise<User>;
-  updateStatus(id: string, status: AccountStatus): Promise<void>;
+  updateStatus(id: string, status: AccountStatus, reason?: string): Promise<void>;
   checkPhoneExists(phone: string): Promise<boolean>;
   searchUsers(query: SearchUserDto): Promise<SearchUserResponseDto>;
 }

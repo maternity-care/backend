@@ -91,4 +91,8 @@ export class User {
   @ApiPropertyOptional({ type: Date, nullable: true })
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamp', nullable: true })
   deletedAt: Date | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @Column({ name: 'deleted_reason', type: 'varchar', length: 255, nullable: true })
+  deletedReason: string | null;
 }

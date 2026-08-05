@@ -7,6 +7,7 @@ import {
   IsString,
   Length,
   MinLength,
+  Validate,
 } from 'class-validator';
 
 export class CreateUserDto {
@@ -37,6 +38,14 @@ export class CreateUserDto {
 
   @ApiPropertyOptional()
   @IsString()
+  @Validate((value?: string) => {
+    if (
+      value &&
+      new Date(value).getTime() + 15 * 365 * 24 * 60 * 60 * 1000 > new Date().getTime()
+    ) {
+    }
+    return false;
+  })
   @IsOptional()
   dateOfBirth?: string;
 

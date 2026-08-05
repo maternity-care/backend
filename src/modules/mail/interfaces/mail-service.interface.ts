@@ -30,4 +30,5 @@ export interface IMailService {
   sendCreatedAccountEmail(input: CreatedAccountInterface): Promise<void>;
   sendSoftDeleteRequestEmail(input: RequestSoftDeleteEmailInput): Promise<void>;
   sendOTPEmail(input: SendOTPEmailInput): Promise<void>;
+  sendLockAccountEmail(input: { to: string; name: string; reason: string }): Promise<void>;
 }
