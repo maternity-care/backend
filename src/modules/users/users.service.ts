@@ -45,6 +45,10 @@ import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interfa
 import { getActiveFacilityId, isSuperAdmin } from '../../common/helpers/facility-scope.helper';
 import { UserAuthRepository } from '../auth/repositories/user-auth.repository';
 import { UpdatePregnantUserDto } from './dto/request/update-pregnant-user.dto';
+import {
+  StaffPermission,
+  StaffPermissionEffectEnum,
+} from '../permissions/entities/staff-permission.entity';
 
 @Injectable()
 export class UsersService implements IUsersService, IAdminManageService {
@@ -68,6 +72,8 @@ export class UsersService implements IUsersService, IAdminManageService {
     private readonly doctorRepository: Repository<Doctor>,
     @InjectRepository(UserAuth)
     private readonly userAuthRepository: UserAuthRepository,
+    @InjectRepository(StaffPermission)
+    private readonly staffPermissionRepository: Repository<StaffPermission>,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
@@ -233,8 +239,20 @@ export class UsersService implements IUsersService, IAdminManageService {
     }
 
     if (uniqueOverrides.length === 0) {
+      await this.staffPermissionRepository.delete({ staffId: userId });
       return;
     }
+
+    await this.staffPermissionRepository.delete({ staffId: userId });
+    await this.staffPermissionRepository.save(
+      uniqueOverrides.map((override) =>
+        this.staffPermissionRepository.create({
+          staffId: userId,
+          permissionId: override.permissionId,
+          effect: override.effect as StaffPermissionEffectEnum,
+        }),
+      ),
+    );
   }
 
   async findUserById(id: string, actor?: AuthenticatedUser): Promise<User | null> {
@@ -291,6 +309,7 @@ export class UsersService implements IUsersService, IAdminManageService {
       roles: [],
     });
     await this.syncFacilityAssignments(staff.id, assignments);
+    await this.syncPermissionOverrides(staff.id, dto.permissionOverrides);
     if (hasDoctorRole) {
       await this.doctorRepository.save(
         this.doctorRepository.create({
@@ -330,6 +349,7 @@ export class UsersService implements IUsersService, IAdminManageService {
     staff.phone = dto.phone ?? staff.phone;
     staff.status = dto.status ?? staff.status;
     const updatedStaff = await this.staffProfileRepository.save(staff);
+    await this.syncPermissionOverrides(staff.id, dto.permissionOverrides);
     if (assignments) {
       await this.syncFacilityAssignments(
         staff.id,
@@ -472,6 +492,10 @@ export class UsersService implements IUsersService, IAdminManageService {
     const staffProfile = await this.getStaffProfileSummary(profile.id, actor);
     return {
       ...profile,
+      permissionOverrides: (profile.permissions ?? []).map((override) => ({
+        permission: override.permission,
+        effect: override.effect,
+      })),
       staffProfile,
     };
   }
@@ -489,7 +513,14 @@ export class UsersService implements IUsersService, IAdminManageService {
       personalEmail: profile.personalEmail,
       employeeCode: profile.employeeCode,
       status: profile.status,
-      facilityAssignments: [],
+      facilityAssignments: profile.facilityId
+        ? [
+            {
+              facilityId: String(profile.facilityId),
+              roles: (profile.roles ?? []).map((role) => role.name),
+            },
+          ]
+        : [],
       doctor: doctor
         ? {
             id: doctor.id,

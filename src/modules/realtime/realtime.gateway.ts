@@ -58,4 +58,30 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     client.leave(room);
     return { left: room };
   }
+
+  @SubscribeMessage('appointment:join')
+  joinAppointment(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { appointmentId?: string },
+  ): { joined: string } | { error: string } {
+    const appointmentId = String(payload?.appointmentId ?? '').trim();
+    if (!/^[1-9]\d*$/.test(appointmentId)) return { error: 'appointmentId is invalid' };
+
+    const room = `appointment:${appointmentId}`;
+    client.join(room);
+    return { joined: room };
+  }
+
+  @SubscribeMessage('appointment:leave')
+  leaveAppointment(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { appointmentId?: string },
+  ): { left: string } | { error: string } {
+    const appointmentId = String(payload?.appointmentId ?? '').trim();
+    if (!/^[1-9]\d*$/.test(appointmentId)) return { error: 'appointmentId is invalid' };
+
+    const room = `appointment:${appointmentId}`;
+    client.leave(room);
+    return { left: room };
+  }
 }

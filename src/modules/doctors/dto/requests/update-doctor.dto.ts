@@ -90,8 +90,8 @@ export class UpdateDoctorDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(1)
-  @Max(4)
+  @Min(0)
+  @Max(80)
   yearsOfExperience: number;
 
   @ApiPropertyOptional({ description: 'loại phòng làm việc' })

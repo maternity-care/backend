@@ -32,7 +32,7 @@ export class StaffProfileRepository implements IStaffProfileRepository {
 
   findAll(): Promise<Staff[]> {
     return this.repository.find({
-      relations: { roles: { permissions: true } },
+      relations: { roles: { permissions: true }, permissions: { permission: true } },
       order: { id: 'ASC' },
     });
   }
@@ -40,7 +40,7 @@ export class StaffProfileRepository implements IStaffProfileRepository {
   async findById(id: string): Promise<Staff | null> {
     return this.repository.findOne({
       where: { id },
-      relations: { roles: { permissions: true } },
+      relations: { roles: { permissions: true }, permissions: { permission: true } },
     });
   }
 

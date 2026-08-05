@@ -13,25 +13,43 @@ import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interfa
 import { UpdateDoctorDto } from './dto/requests/update-doctor.dto';
 import { IDoctorsRepository, DOCTORS_REPOSITORY } from './interfaces/doctors-repository.interface';
 import { Doctor } from './entities/doctor.entity';
-import { UsersService } from '../users/users.service';
-import { AdminCreateUserDto } from '../users/dto/request/admin-create-user.dto';
-import { User } from '../users/entities/user.entity';
-import { USERS_SERVICE } from '../users/interfaces/users-service.interface';
 import { SearchDoctorDto } from './dto/requests/search-doctor.dto';
+import { CreateDoctorDto } from './dto/requests/create-doctor.dto';
+import { ActiveStatus } from '../../common/constants/status.enum';
 
 @Injectable()
 export class DoctorsService {
   constructor(
     @Inject(DOCTORS_REPOSITORY)
     private readonly repository: IDoctorsRepository,
-    @Inject(USERS_SERVICE)
-    private readonly usersService: UsersService,
     @Inject(STAFF_PROFILE_REPOSITORY)
     private readonly staffRepository: IStaffProfileRepository,
   ) {}
 
-  async create(dto: AdminCreateUserDto, actor: AuthenticatedUser): Promise<User> {
-    return this.usersService.createUser(dto, actor);
+  async create(dto: CreateDoctorDto): Promise<Doctor> {
+    await this.ensureUniqueLicenseNo(dto.licenseNo);
+    await this.ensureUniqueStaffId(dto.staffId);
+
+    const staff = await this.staffRepository.findById(dto.staffId);
+    if (!staff) {
+      throw new NotFoundException('NhÃ¢n viÃªn khÃ´ng tá»“n táº¡i');
+    }
+
+    const doctor = await this.repository.save(
+      Object.assign(new Doctor(), {
+        staffId: dto.staffId,
+        staff,
+        licenseNo: dto.licenseNo,
+        title: dto.title,
+        specialty: dto.specialty,
+        yearsOfExperience: dto.yearsOfExperience,
+        workingRoomTypeId: dto.workingRoomTypeId,
+        bio: dto.bio ?? '',
+        status: dto.status ?? ActiveStatus.ACTIVE,
+      }),
+    );
+
+    return this.findById(doctor.id);
   }
 
   async findAll(filters?: SearchDoctorDto): Promise<{ data: Doctor[]; count: number }> {
