@@ -7,10 +7,11 @@ import { DoctorsService } from './doctors.service';
 import { DOCTORS_REPOSITORY } from './interfaces/doctors-repository.interface';
 import { DoctorsRepository } from './repositories/doctors.repository';
 import { UsersModule } from '../users/users.module';
+import { LandingPageDoctorController } from './landing-page-doctor.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Doctor]), UsersModule],
-  controllers: [DoctorsController, ManagementDoctorsController],
+  controllers: [DoctorsController, ManagementDoctorsController, LandingPageDoctorController],
   providers: [DoctorsService, { provide: DOCTORS_REPOSITORY, useClass: DoctorsRepository }],
   exports: [DoctorsService],
 })
