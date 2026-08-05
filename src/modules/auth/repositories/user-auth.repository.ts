@@ -42,7 +42,7 @@ export class UserAuthRepository implements IUserAuthRepository {
   }
 
   async updateStatus(id: string, status: AccountStatus): Promise<void> {
-    const user = await this.repository.findOneBy({ userId: id });
+    const user = await this.repository.findOne({ where: { userId: id } });
     if (!user) {
       throw new Error('User account not found');
     }

@@ -129,19 +129,11 @@ export class UsersService implements IUsersService, IAdminManageService {
   }
 
   async findById(id: string): Promise<User> {
-    const cacheKey = `users:${id}`;
-    const cachedUser = await this.cacheService.get<User>(cacheKey);
-
-    if (cachedUser) {
-      return cachedUser;
-    }
-
     const user = await this.usersRepository.findById(id);
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    await this.cacheService.set(cacheKey, user, 300);
     return user;
   }
 
