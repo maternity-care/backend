@@ -340,6 +340,31 @@ describe('ShiftsService business validation', () => {
     expect(repo.findConflicts).toHaveBeenCalled();
   });
 
+  it('requires rooms for doctor shifts but allows support roles without rooms', async () => {
+    const { repo, service } = createService();
+
+    await expect(service.create({
+      staffId: '10',
+      roleId: '3',
+      facilityId: '1',
+      slotId: '1',
+      shiftDate: '2099-07-07',
+      maxAppointments: 8,
+      status: DoctorShiftStatus.AVAILABLE,
+    } as never)).rejects.toBeInstanceOf(ConflictException);
+
+    await expect(service.create({
+      staffId: '12',
+      roleId: '4',
+      facilityId: '1',
+      slotId: '1',
+      shiftDate: '2099-07-07',
+      maxAppointments: 8,
+      status: DoctorShiftStatus.AVAILABLE,
+    } as never)).resolves.toMatchObject({ staffId: '12', roleId: '4' });
+    expect(repo.findShiftAssignee).toHaveBeenCalledWith('12', '1', '4');
+  });
+
   // Vai tro: dam bao so sanh gio lam viec chuan hoa HH:mm va HH:mm:ss nhu nhau.
   it('treats HH:mm shift time as equal to HH:mm:ss facility opening time', async () => {
     facilitiesService.getOperatingHours.mockResolvedValueOnce({
@@ -478,6 +503,156 @@ describe('ShiftsService business validation', () => {
       expect.objectContaining({ staffId: '12', roleId: '4', slotId: '2', shiftDate: '2099-07-07' }),
       expect.objectContaining({ staffId: '12', roleId: '4', slotId: '2', shiftDate: '2099-07-09' }),
     ]));
+  });
+
+  it('marks same-batch doctor and room overlaps as conflicts when bulk-generating shifts', async () => {
+    const { repo, service } = createService();
+
+    // Thu Sau 2099-07-10 co 3 candidate cung slot:
+    // - staff 10 phong 2: hop le dau tien
+    // - staff 11 phong 2: trung phong voi staff 10
+    // - staff 10 phong 4: trung bac si voi chinh staff 10
+    const result = await service.confirmBulkGenerate({
+      facilityId: '1',
+      fromDate: '2099-07-06',
+      toDate: '2099-07-12',
+      slotAssignments: [
+        {
+          slotId: '1',
+          assignments: [
+            {
+              staffId: '10',
+              roleId: '3',
+              roomId: '2',
+              workingDays: [ShiftWorkingDay.MON, ShiftWorkingDay.WED, ShiftWorkingDay.FRI],
+              maxAppointments: 10,
+              status: DoctorShiftStatus.AVAILABLE,
+            },
+            {
+              staffId: '11',
+              roleId: '3',
+              roomId: '2',
+              workingDays: [ShiftWorkingDay.TUE, ShiftWorkingDay.THU, ShiftWorkingDay.FRI],
+              maxAppointments: 10,
+              status: DoctorShiftStatus.AVAILABLE,
+            },
+            {
+              staffId: '10',
+              roleId: '3',
+              roomId: '4',
+              workingDays: [ShiftWorkingDay.FRI],
+              maxAppointments: 10,
+              status: DoctorShiftStatus.AVAILABLE,
+            },
+          ],
+        },
+      ],
+      saveOnlyValid: true,
+    });
+
+    expect(result.summary).toEqual({ totalCandidates: 7, valid: 5, skipped: 0, conflicted: 2 });
+    expect(result.conflictItems).toEqual([
+      expect.objectContaining({
+        shiftDate: '2099-07-10',
+        roomConflicts: [expect.objectContaining({ staffId: '10', roomId: '2' })],
+      }),
+      expect.objectContaining({
+        shiftDate: '2099-07-10',
+        doctorConflicts: [expect.objectContaining({ staffId: '10', roomId: '2' })],
+      }),
+    ]);
+    expect(repo.saveMany).toHaveBeenCalledWith(expect.not.arrayContaining([
+      expect.objectContaining({ staffId: '11', roomId: '2', shiftDate: '2099-07-10' }),
+      expect.objectContaining({ staffId: '10', roomId: '4', shiftDate: '2099-07-10' }),
+    ]));
+    expect(result.createdShifts).toHaveLength(5);
+  });
+
+  it('allows nurses to share the same room and slot with doctors in bulk-generated shifts', async () => {
+    const { repo, service } = createService();
+
+    const result = await service.confirmBulkGenerate({
+      facilityId: '1',
+      fromDate: '2099-07-06',
+      toDate: '2099-07-12',
+      slotAssignments: [
+        {
+          slotId: '1',
+          assignments: [
+            {
+              staffId: '10',
+              roleId: '3',
+              roomId: '2',
+              workingDays: [ShiftWorkingDay.MON],
+              maxAppointments: 10,
+              status: DoctorShiftStatus.AVAILABLE,
+            },
+            {
+              staffId: '12',
+              roleId: '4',
+              roomId: '2',
+              workingDays: [ShiftWorkingDay.MON],
+              maxAppointments: 10,
+              status: DoctorShiftStatus.AVAILABLE,
+            },
+          ],
+        },
+      ],
+      saveOnlyValid: true,
+    });
+
+    expect(result.summary).toEqual({ totalCandidates: 2, valid: 2, skipped: 0, conflicted: 0 });
+    expect(result.createdShifts).toHaveLength(2);
+    expect(repo.saveMany).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ staffId: '10', roleId: '3', roomId: '2' }),
+      expect.objectContaining({ staffId: '12', roleId: '4', roomId: '2' }),
+    ]));
+  });
+
+  it('keeps bulk-generate preview validation in sync with confirm without saving during preview', async () => {
+    const { repo, service } = createService();
+    const dto = {
+      facilityId: '1',
+      fromDate: '2099-07-06',
+      toDate: '2099-07-12',
+      slotAssignments: [
+        {
+          slotId: '1',
+          assignments: [
+            {
+              staffId: '10',
+              roleId: '3',
+              roomId: '2',
+              workingDays: [ShiftWorkingDay.MON, ShiftWorkingDay.FRI],
+              maxAppointments: 10,
+              status: DoctorShiftStatus.AVAILABLE,
+            },
+            {
+              staffId: '11',
+              roleId: '3',
+              roomId: '2',
+              workingDays: [ShiftWorkingDay.FRI],
+              maxAppointments: 10,
+              status: DoctorShiftStatus.AVAILABLE,
+            },
+          ],
+        },
+      ],
+      saveOnlyValid: true,
+    };
+
+    const preview = await service.previewBulkGenerate(dto);
+
+    expect(repo.saveMany).not.toHaveBeenCalled();
+
+    const confirm = await service.confirmBulkGenerate(dto);
+
+    expect(confirm.summary).toEqual(preview.summary);
+    expect(confirm.validShifts).toEqual(preview.validShifts);
+    expect(confirm.skippedItems).toEqual(preview.skippedItems);
+    expect(confirm.conflictItems).toEqual(preview.conflictItems);
+    expect(confirm.createdShifts).toHaveLength(preview.summary.valid);
+    expect(repo.saveMany).toHaveBeenCalledTimes(1);
   });
 
   // Vai tro: dam bao bulk-generate co the lay fromDate la ngay hien tai va tinh toDate tu durationDays.
@@ -1401,6 +1576,7 @@ describe('ShiftsRepository unit query behavior', () => {
       addSelect: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
       innerJoin: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
       insert: jest.fn().mockReturnThis(),
       into: jest.fn().mockReturnThis(),
       values: jest.fn().mockReturnThis(),
@@ -1451,6 +1627,22 @@ describe('ShiftsRepository unit query behavior', () => {
 
     await expect(repository.findConflicts({
       doctorId: '1',
+      shiftDate: '2099-07-07',
+      startTime: '08:00',
+      endTime: '12:00',
+    })).resolves.toEqual({ doctorConflicts: [], roomConflicts: [] });
+    expect(typeormRepo.createQueryBuilder).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the room conflict query for non-primary room roles', async () => {
+    const doctorQb = createQueryBuilder([]);
+    const typeormRepo = { createQueryBuilder: jest.fn().mockReturnValueOnce(doctorQb) };
+    const repository = new ShiftsRepository(typeormRepo as never);
+
+    await expect(repository.findConflicts({
+      staffId: '12',
+      roleName: RoleEnum.NURSE,
+      roomId: '2',
       shiftDate: '2099-07-07',
       startTime: '08:00',
       endTime: '12:00',

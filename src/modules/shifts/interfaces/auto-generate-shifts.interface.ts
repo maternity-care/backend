@@ -9,6 +9,7 @@ export interface AutoGenerateCandidate {
   doctorId?: string;
   staffId?: string;
   roleId?: string | null;
+  roleName?: string | null;
   facilityId: string;
   roomId?: string | null;
   slotId?: string | null;
@@ -24,6 +25,8 @@ export interface AutoGenerateValidItem extends AutoGenerateCandidate {
   staffId: string;
 }
 
+type AutoGenerateConflictReference = Partial<DoctorShift> | Partial<AutoGenerateCandidate>;
+
 /** Candidate bi bo qua hoac bi conflict, kem ly do de FE hien thi cho quan ly. */
 export interface AutoGenerateIssueItem {
   index: number;
@@ -32,8 +35,8 @@ export interface AutoGenerateIssueItem {
   shiftDate: string;
   reason: string;
   candidate: Partial<AutoGenerateCandidate>;
-  doctorConflicts?: DoctorShift[];
-  roomConflicts?: DoctorShift[];
+  doctorConflicts?: AutoGenerateConflictReference[];
+  roomConflicts?: AutoGenerateConflictReference[];
 }
 
 /** Plan noi bo dung chung cho preview va confirm, giup hai API khong lech logic. */
