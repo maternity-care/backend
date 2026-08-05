@@ -167,6 +167,10 @@ export class UsersService implements IUsersService, IAdminManageService {
     user.ward = dto.ward ?? user.ward;
     user.emergencyContactName = dto.emergencyContactName ?? user.emergencyContactName;
     user.emergencyContactPhone = dto.emergencyContactPhone ?? user.emergencyContactPhone;
+    user.status = dto.status ?? user.status;
+    if (dto.status && dto.status === UserStatusEnum.ACTIVE) {
+      await this.userAuthRepository.updateStatus(user.id, AccountStatus.ACTIVE);
+    }
 
     const savedUser = await this.usersRepository.save(user);
     await this.clearUsersCache(id);
@@ -183,10 +187,26 @@ export class UsersService implements IUsersService, IAdminManageService {
     return savedUser;
   }
 
-  async updateStatus(id: string, status: UserStatusEnum): Promise<void> {
+  async updateStatus(id: string, status: UserStatusEnum, reason?: string): Promise<void> {
     const user = await this.findById(id);
     if (!user) {
       throw new NotFoundException('Không tìm thấy thông tin người dùng.');
+    }
+
+    if (status === UserStatusEnum.INACTIVE) {
+      if (!reason) {
+        throw new BadRequestException('Vui lý nhập lý do khóa tài khoản.');
+      }
+
+      await this.usersRepository.updateStatus(id, status, reason);
+      await this.mailService.sendLockAccountEmail({
+        to: user.email,
+        name: user.name,
+        reason: reason,
+      });
+      await this.userAuthRepository.updateStatus(user.id, status);
+      await this.clearUsersCache(id);
+      return;
     }
 
     await this.usersRepository.updateStatus(id, status);

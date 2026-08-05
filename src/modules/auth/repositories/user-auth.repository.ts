@@ -1,3 +1,4 @@
+import { AccountStatus } from './../../../common/constants/status.enum';
 import { IUserAuthRepository } from '../interfaces/user-auth-repository.interface';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserAuth } from '../entities/user-auth.entity';
@@ -37,6 +38,15 @@ export class UserAuthRepository implements IUserAuthRepository {
     }
     user.email = email;
     user.password = password;
+    await this.repository.save(user);
+  }
+
+  async updateStatus(id: string, status: AccountStatus): Promise<void> {
+    const user = await this.repository.findOneBy({ userId: id });
+    if (!user) {
+      throw new Error('User account not found');
+    }
+    user.status = status;
     await this.repository.save(user);
   }
 }

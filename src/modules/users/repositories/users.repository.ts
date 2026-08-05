@@ -77,8 +77,8 @@ export class UsersRepository implements IUsersRepository {
     return user;
   }
 
-  async updateStatus(id: string, status: AccountStatus): Promise<void> {
-    await this.repository.update(id, { status });
+  async updateStatus(id: string, status: AccountStatus, reason?: string): Promise<void> {
+    await this.repository.update(id, { status: status, deletedReason: reason });
   }
 
   async checkPhoneExists(phone: string): Promise<boolean> {
