@@ -15,6 +15,11 @@ export enum FacilityStatus {
   DELETED = 'deleted',
 }
 
+export enum InactiveSource {
+  MANUAL = 'manual',
+  FACILITY_SUSPEND = 'facility_suspend',
+}
+
 export enum FacilityOperatingStatus {
   OPEN = 'open',
   CLOSED = 'closed',

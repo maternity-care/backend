@@ -1,12 +1,12 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Equals, IsNotEmpty, IsOptional, IsString, Validate } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Equals, IsOptional, IsString, Validate } from 'class-validator';
 import { UserStatusEnum } from '../../users.enum';
 
 export class UpdatePregnantUserDto {
-  @ApiProperty()
+  @ApiPropertyOptional()
   @IsString()
-  @IsNotEmpty()
-  name: string;
+  @IsOptional()
+  name?: string;
 
   @ApiPropertyOptional()
   @IsString()

@@ -2,6 +2,7 @@ import { Appointment } from '../../appointments/entities/appointment.entity';
 import { FacilityService } from './../../facility-services/entities/facility-service.entity';
 import { Staff } from './../../staffs/entities/staff.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { InactiveSource } from '../../../common/constants/status.enum';
 import { FacilityClosureDay } from './facility-closure-day.entity';
 import { FacilityOperatingHour } from './facility-operating-hour.entity';
 import {
@@ -88,6 +89,34 @@ export class Facility {
   @ApiProperty({ type: String })
   @Column({ name: 'status', type: 'varchar', length: 50 })
   status: string;
+
+  @ApiPropertyOptional({ type: Date, nullable: true })
+  @Column({ name: 'inactive_from', type: 'timestamp', nullable: true })
+  inactiveFrom: Date | null;
+
+  @ApiPropertyOptional({ type: Date, nullable: true })
+  @Column({ name: 'inactive_until', type: 'timestamp', nullable: true })
+  inactiveUntil: Date | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'inactive_reason', type: 'text', nullable: true })
+  inactiveReason: string | null;
+
+  @ApiPropertyOptional({ enum: InactiveSource, nullable: true, required: false })
+  @Column({ name: 'inactive_source', type: 'varchar', length: 50, nullable: true })
+  inactiveSource: InactiveSource | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'inactive_by', type: 'bigint', nullable: true })
+  inactiveBy: string | null;
+
+  @ApiPropertyOptional({ type: Date, nullable: true })
+  @Column({ name: 'reactivated_at', type: 'timestamp', nullable: true })
+  reactivatedAt: Date | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'reactivated_by', type: 'bigint', nullable: true })
+  reactivatedBy: string | null;
 
   @OneToMany(() => Appointment, (appointment) => appointment.facilityId)
   appointments: Appointment[];

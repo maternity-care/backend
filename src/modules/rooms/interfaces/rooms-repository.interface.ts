@@ -19,6 +19,12 @@ export type RoomTypeLookup = RoomTypeLookupResponseDto;
 export type RoomTypeDetails = RoomTypeResponseDto;
 export type FacilityRoomType = FacilityRoomTypeResponseDto;
 
+export interface RoomSuspendImpact {
+  affectedShifts: number;
+  affectedAppointments: number;
+  cancelledShifts?: number;
+}
+
 export interface IRoomsRepository {
   create(data: DeepPartial<Room>): Room;
   save(room: Room): Promise<Room>;
@@ -45,6 +51,14 @@ export interface IRoomsRepository {
   remove(room: Room): Promise<void>;
   countDependencies(roomId: string): Promise<number>;
   softDelete(room: Room, reason?: string, deletedBy?: string | null): Promise<Room>;
+  countSuspendImpact(roomId: string, from: Date, until?: Date | null): Promise<RoomSuspendImpact>;
+  cancelFutureShiftsForRoom(
+    roomId: string,
+    from: Date,
+    until?: Date | null,
+    reason?: string | null,
+    actorId?: string | null,
+  ): Promise<number>;
   findByFacilityId(facilityId: string, filters?: SearchRoomsDto): Promise<RoomWithDetails[]>;
   findByFacilityIdPaginated?(facilityId: string, filters?: SearchRooms2Dto): Promise<PaginationResult<RoomWithDetails>>;
   findAllRoomsWithFacilitiesPaginated?( filters?: SearchRoomsDto): Promise<PaginationResult<Room>>;
