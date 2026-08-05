@@ -5,8 +5,11 @@ export type RealtimeForumEvent =
   | 'forum:post.created'
   | 'forum:post.updated'
   | 'forum:post.moderated'
+  | 'forum:post.deleted'
   | 'forum:comment.created'
+  | 'forum:comment.updated'
   | 'forum:comment.moderated'
+  | 'forum:comment.deleted'
   | 'forum:report.created'
   | 'forum:report.resolved';
 

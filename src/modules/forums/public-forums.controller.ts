@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
@@ -7,6 +7,8 @@ import { CreateContentReportDto } from './dto/requests/create-content-report.dto
 import { CreateForumCommentDto } from './dto/requests/create-forum-comment.dto';
 import { CreateForumPostDto } from './dto/requests/create-forum-post.dto';
 import { ForumPostQueryDto } from './dto/requests/forum-query.dto';
+import { UpdateForumCommentDto } from './dto/requests/update-forum-comment.dto';
+import { UpdateForumPostDto } from './dto/requests/update-forum-post.dto';
 import { ForumsService } from './forums.service';
 
 @ApiTags('Public - Forums')
@@ -55,6 +57,18 @@ export class PublicForumsController {
     return { message: 'Đã gửi bài viết', data: await this.forumsService.createPost(dto, user) };
   }
 
+  @Patch('posts/:id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Update own pending/rejected forum post' })
+  async updateOwnPost(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateForumPostDto,
+  ) {
+    return { message: 'Da cap nhat bai viet', data: await this.forumsService.updateOwnPost(id, dto, user) };
+  }
+
   @Post('posts/:id/comments')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
@@ -65,6 +79,18 @@ export class PublicForumsController {
     @Body() dto: CreateForumCommentDto,
   ) {
     return { message: 'Đã gửi bình luận', data: await this.forumsService.createComment(id, dto, user) };
+  }
+
+  @Patch('comments/:id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Update own forum comment' })
+  async updateOwnComment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateForumCommentDto,
+  ) {
+    return { message: 'Da cap nhat binh luan', data: await this.forumsService.updateOwnComment(id, dto, user) };
   }
 
   @Post('reports')
