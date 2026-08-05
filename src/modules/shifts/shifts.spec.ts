@@ -26,6 +26,9 @@ import { ShiftsRepository } from './repositories/shifts.repository';
 import { ShiftsService } from './shifts.service';
 import { ShiftsValidator } from './validators/shifts.validator';
 import { ShiftSlotsService } from './shift-slots.service';
+import { AppointmentDisruptionItem } from './entities/appointment-disruption-item.entity';
+import { DoctorShiftChangeLog } from './entities/doctor-shift-change-log.entity';
+import { ShiftDisruption } from './entities/shift-disruption.entity';
 
 // describe: dùng để nhóm các test case liên quan đến một chức năng hoặc module cụ thể,
 //  giúp tổ chức và quản lý các test case dễ dàng hơn. Trong ví dụ này, 
@@ -1681,9 +1684,9 @@ describe('ShiftsRepository unit query behavior', () => {
       deletedReason: 'reason',
     }));
     expect(manager.createQueryBuilder).toHaveBeenCalledTimes(3);
-    expect(insertQb.into).toHaveBeenCalledWith('shift_change_logs');
-    expect(insertQb.into).toHaveBeenCalledWith('shift_disruptions');
-    expect(insertQb.into).toHaveBeenCalledWith('appointment_disruption_items');
+    expect(insertQb.into).toHaveBeenCalledWith(DoctorShiftChangeLog);
+    expect(insertQb.into).toHaveBeenCalledWith(ShiftDisruption);
+    expect(insertQb.into).toHaveBeenCalledWith(AppointmentDisruptionItem);
   });
 
   // Vai tro: dam bao khong tao disruption/item khi cancel shift ma khong co appointment active bi anh huong.
@@ -1705,8 +1708,8 @@ describe('ShiftsRepository unit query behavior', () => {
       disruptionId: undefined,
     });
     expect(manager.createQueryBuilder).toHaveBeenCalledTimes(1);
-    expect(insertQb.into).toHaveBeenCalledWith('shift_change_logs');
-    expect(insertQb.into).not.toHaveBeenCalledWith('shift_disruptions');
+    expect(insertQb.into).toHaveBeenCalledWith(DoctorShiftChangeLog);
+    expect(insertQb.into).not.toHaveBeenCalledWith(ShiftDisruption);
   });
 
   // Vai tro: dam bao availability chi tinh cac appointment status con giu slot.

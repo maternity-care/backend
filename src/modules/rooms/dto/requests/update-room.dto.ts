@@ -1,7 +1,6 @@
 import { Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
-import { ActiveStatus } from '../../../../common/constants/status.enum';
+import { IsNotEmpty, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { RESPONSE_MESSAGES } from '../../../../common/constants/response-message.constant';
 import { trimText } from '../../../../common/helpers/dto-transform.helper';
 import { POSITIVE_ID_PATTERN } from './create-room.dto';
@@ -30,8 +29,4 @@ export class UpdateRoomDto {
   @MaxLength(255)
   floor?: string;
 
-  @ApiPropertyOptional({ enum: ActiveStatus })
-  @IsOptional()
-  @IsEnum(ActiveStatus)
-  status?: ActiveStatus;
 }

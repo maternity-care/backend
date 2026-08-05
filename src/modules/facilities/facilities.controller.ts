@@ -30,6 +30,7 @@ import { PermissionEnum } from '../../common/constants/permission.enum';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { SuspendResourceDto } from '../../common/dto/suspend-resource.dto';
 
 @ApiTags('Management - Facilities')
 // @ApiBearerAuth()
@@ -314,6 +315,45 @@ export class FacilitiesController {
     }
   }
 
+  @Patch(':id/suspend')
+  // @Permissions(PermissionEnum.FACILITY_UPDATE)
+  @ApiOperation({ summary: 'Suspend facility for a period or indefinitely' })
+  @ApiResponse({ status: 200 })
+  async suspend(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: SuspendResourceDto,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITIES.STATUS_UPDATED,
+        data: await this.facilitiesService.suspend(id, dto, user?.id ?? null),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Patch(':id/reactivate')
+  // @Permissions(PermissionEnum.FACILITY_UPDATE)
+  @ApiOperation({ summary: 'Reactivate suspended facility' })
+  @ApiResponse({ status: 200 })
+  async reactivate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITIES.STATUS_UPDATED,
+        data: await this.facilitiesService.reactivate(id, user?.id ?? null),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
 
   @Delete(':id/closure-days/:closureDayId')
   // @Permissions(PermissionEnum.FACILITY_UPDATE)
@@ -354,26 +394,4 @@ export class FacilitiesController {
     }
   }
 
-  @Patch(':id/deactivate')
-  // @Permissions(PermissionEnum.FACILITY_UPDATE)
-  @ApiOperation({ summary: 'Update facility' })
-  @ApiResponse({ status: 200, type: FacilityResponseDto })
-  async deActivateFacility(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-    @Body() dto: UpdateFacilityDto,
-  ) {
-    try {
-      assertFacilityAccess(user, id);
-      const data = await this.facilitiesService.deActivateFacility(id);
-      return {
-        message: RESPONSE_MESSAGES.FACILITIES.STATUS_UPDATED,
-        data: data,
-      };
-    } catch (error) {
-      this.handleError(error);
-    }
-  }
-
-  
 }

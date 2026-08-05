@@ -40,6 +40,15 @@ export interface FacilityShiftScheduleViolation {
   slotName?: string | null;
 }
 
+export interface FacilitySuspendImpact {
+  affectedRooms: number;
+  affectedShifts: number;
+  affectedAppointments: number;
+  suspendedRooms?: number;
+  cancelledShifts?: number;
+  reactivatedRooms?: number;
+}
+
 // truy cap db 
 export interface IFacilitiesRepository {
   // tạo một facility
@@ -74,5 +83,14 @@ export interface IFacilitiesRepository {
   countDependencies(facilityId: string): Promise<number>;
   softDelete(facility: Facility, reason?: string, deletedBy?: string | null): Promise<Facility>;
   updateStatus(id: string, status: FacilityStatus): Promise<Facility>;
-  deActivateFacility(id: string): Promise<Facility>;
+  countSuspendImpact(facilityId: string, from: Date, until?: Date | null): Promise<FacilitySuspendImpact>;
+  suspendActiveRoomsForFacility(facilityId: string, from: Date, until: Date | null, reason?: string | null, actorId?: string | null): Promise<number>;
+  reactivateRoomsSuspendedByFacility(facilityId: string, actorId?: string | null): Promise<number>;
+  cancelFutureShiftsForFacility(
+    facilityId: string,
+    from: Date,
+    until?: Date | null,
+    reason?: string | null,
+    actorId?: string | null,
+  ): Promise<number>;
 }
