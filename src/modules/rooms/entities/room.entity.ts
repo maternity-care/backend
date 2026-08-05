@@ -1,5 +1,5 @@
 import { RoomType } from './../../../database/entities/room-type.entity';
-import { ActiveStatus } from './../../../common/constants/status.enum';
+import { ActiveStatus, InactiveSource } from './../../../common/constants/status.enum';
 import { Facility } from './../../facilities/entities/facility.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
@@ -70,6 +70,10 @@ export class Room {
   @ApiPropertyOptional({ type: String, nullable: true, required: false })
   @Column({ name: 'inactive_reason', type: 'text', nullable: true })
   inactiveReason: string | null;
+
+  @ApiPropertyOptional({ enum: InactiveSource, nullable: true, required: false })
+  @Column({ name: 'inactive_source', type: 'varchar', length: 50, nullable: true })
+  inactiveSource: InactiveSource | null;
 
   @ApiPropertyOptional({ type: String, nullable: true, required: false })
   @Column({ name: 'inactive_by', type: 'varchar', length: 255, nullable: true })

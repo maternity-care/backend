@@ -5,7 +5,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { ActiveStatus, FacilityOperatingStatus, FacilityStatus } from '../../common/constants/status.enum';
+import { ActiveStatus, FacilityOperatingStatus, FacilityStatus, InactiveSource } from '../../common/constants/status.enum';
 import { RoleEnum } from '../../common/constants/role.enum';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { FacilitiesController } from './facilities.controller';
@@ -31,6 +31,7 @@ const createFacility = (overrides: Partial<Facility> = {}): Facility => ({
   inactiveFrom: null,
   inactiveUntil: null,
   inactiveReason: null,
+  inactiveSource: null,
   inactiveBy: null,
   reactivatedAt: null,
   reactivatedBy: null,
@@ -83,6 +84,9 @@ describe('FacilitiesService', () => {
     remove: jest.fn(),
     countDependencies: jest.fn(),
     countSuspendImpact: jest.fn(),
+    suspendActiveRoomsForFacility: jest.fn(),
+    reactivateRoomsSuspendedByFacility: jest.fn(),
+    cancelFutureShiftsForFacility: jest.fn(),
     softDelete: jest.fn(),
     updateStatus: jest.fn(),
   });
@@ -106,6 +110,9 @@ describe('FacilitiesService', () => {
     repository.findClosureDayByDate.mockResolvedValue(null);
     repository.existsActiveOwner.mockResolvedValue(true);
     repository.countSuspendImpact.mockResolvedValue({ affectedRooms: 2, affectedShifts: 3, affectedAppointments: 1 });
+    repository.suspendActiveRoomsForFacility.mockResolvedValue(2);
+    repository.reactivateRoomsSuspendedByFacility.mockResolvedValue(2);
+    repository.cancelFutureShiftsForFacility.mockResolvedValue(3);
     service = new FacilitiesService(repository as any);
   });
 
@@ -622,8 +629,23 @@ describe('FacilitiesService', () => {
     expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({
       status: FacilityStatus.INACTIVE,
       inactiveReason: 'Bao tri',
+      inactiveSource: InactiveSource.MANUAL,
       inactiveBy: 'staff-9',
     }));
+    expect(repository.suspendActiveRoomsForFacility).toHaveBeenCalledWith(
+      'fac-1',
+      expect.any(Date),
+      expect.any(Date),
+      'Bao tri',
+      'staff-9',
+    );
+    expect(repository.cancelFutureShiftsForFacility).toHaveBeenCalledWith(
+      'fac-1',
+      expect.any(Date),
+      expect.any(Date),
+      'Bao tri',
+      'staff-9',
+    );
 
     repository.findById.mockResolvedValue(createFacility({ status: FacilityStatus.INACTIVE }));
     repository.findDetailsById.mockResolvedValue(createFacility({ status: FacilityStatus.ACTIVE }));
@@ -632,8 +654,10 @@ describe('FacilitiesService', () => {
     });
     expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({
       status: FacilityStatus.ACTIVE,
+      inactiveSource: null,
       reactivatedBy: 'staff-9',
     }));
+    expect(repository.reactivateRoomsSuspendedByFacility).toHaveBeenCalledWith('fac-1', 'staff-9');
   });
 
   // Vai tro: cung cap lookup facility cho FE select/autocomplete ma khong can tu ghep API list/filter.

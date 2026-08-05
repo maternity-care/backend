@@ -2,6 +2,7 @@ import { Appointment } from '../../appointments/entities/appointment.entity';
 import { FacilityService } from './../../facility-services/entities/facility-service.entity';
 import { Staff } from './../../staffs/entities/staff.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { InactiveSource } from '../../../common/constants/status.enum';
 import { FacilityClosureDay } from './facility-closure-day.entity';
 import { FacilityOperatingHour } from './facility-operating-hour.entity';
 import {
@@ -100,6 +101,10 @@ export class Facility {
   @ApiPropertyOptional({ type: String, nullable: true, required: false })
   @Column({ name: 'inactive_reason', type: 'text', nullable: true })
   inactiveReason: string | null;
+
+  @ApiPropertyOptional({ enum: InactiveSource, nullable: true, required: false })
+  @Column({ name: 'inactive_source', type: 'varchar', length: 50, nullable: true })
+  inactiveSource: InactiveSource | null;
 
   @ApiPropertyOptional({ type: String, nullable: true, required: false })
   @Column({ name: 'inactive_by', type: 'bigint', nullable: true })

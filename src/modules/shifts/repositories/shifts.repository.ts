@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
 import { DoctorShift } from '../entities/shift.entity';
+import { AppointmentDisruptionItem } from '../entities/appointment-disruption-item.entity';
+import { DoctorShiftChangeLog } from '../entities/doctor-shift-change-log.entity';
+import { ShiftDisruption } from '../entities/shift-disruption.entity';
 import { ShiftSlot } from '../../../database/entities/shift-slot.entity';
 import { SearchDoctorShiftDto } from '../dto/requests/search-doctor-shift.dto';
 import { ShiftAssigneeDetails, ShiftWithDetails, IShiftsRepository } from '../interfaces/shifts-repository.interface';
@@ -11,8 +14,8 @@ import { DoctorAppointmentBlock } from '../interfaces/doctor-appointment-block.i
 import {
   AppointmentDisruptionResolutionStatus,
   AppointmentStatus,
-  DisruptionStatus,
   DoctorShiftStatus,
+  ShiftDisruptionStatus,
 } from '../../../common/constants/status.enum';
 import { addDays, isOvernightRange, shiftIntervalsOverlap } from '../helpers/shifts.helper';
 import { PRIMARY_ROOM_ROLE_NAMES, roleOccupiesPrimaryRoom } from '../helpers/shift-role-policy.helper';
@@ -321,39 +324,39 @@ export class ShiftsRepository implements IShiftsRepository {
 
       //log 2
       // Ghi audit log để sau này biết ai hủy, hủy từ trạng thái nào sang trạng thái nào, lý do gì.
-      await manager.createQueryBuilder().insert().into('shift_change_logs').values({
-        shift_id: shift.id,
+      await manager.createQueryBuilder().insert().into(DoctorShiftChangeLog).values({
+        shiftId: shift.id,
         action: 'cancelled',
-        old_status: shift.status,
-        new_status: DoctorShiftStatus.CANCELLED,
-        old_staff_id: shift.staffId,
-        new_staff_id: shift.staffId,
-        old_room_id: shift.roomId,
-        new_room_id: shift.roomId,
-        old_start_time: shift.startTime,
-        new_start_time: shift.startTime,
-        old_end_time: shift.endTime,
-        new_end_time: shift.endTime,
+        oldStatus: shift.status,
+        newStatus: DoctorShiftStatus.CANCELLED,
+        oldStaffId: shift.staffId,
+        newStaffId: shift.staffId,
+        oldRoomId: shift.roomId,
+        newRoomId: shift.roomId,
+        oldStartTime: shift.startTime,
+        newStartTime: shift.startTime,
+        oldEndTime: shift.endTime,
+        newEndTime: shift.endTime,
         reason: reason ?? null,
-        changed_by: changedBy ?? null,
+        changedBy: changedBy ?? null,
       }).execute();
 
       let disruptionId: string | undefined;
       if (affectedAppointments.length > 0) {
         // shift_disruptions là "hồ sơ sự cố" chung cho lần hủy ca này.
         // Một disruption có thể ảnh hưởng nhiều appointment.
-        const disruptionResult = await manager.createQueryBuilder().insert().into('shift_disruptions').values({
+        const disruptionResult = await manager.createQueryBuilder().insert().into(ShiftDisruption).values({
           type: 'doctor_shift_cancelled',
-          source_type: 'shift',
-          source_id: shift.id,
-          facility_id: shift.facilityId,
-          shift_id: shift.id,
-          staff_id: shift.staffId,
-          doctor_shift_id: shift.id,
-          room_id: shift.roomId ?? null,
+          sourceType: 'shift',
+          sourceId: shift.id,
+          facilityId: shift.facilityId,
+          shiftId: shift.id,
+          staffId: shift.staffId,
+          doctorShiftId: shift.id,
+          roomId: shift.roomId ?? null,
           reason: reason ?? null,
-          status: DisruptionStatus.OPEN,
-          created_by: changedBy ?? null,
+          status: ShiftDisruptionStatus.OPEN,
+          createdBy: changedBy ?? null,
         }).execute();
 
         // TypeORM trả id record vừa insert trong identifiers.
@@ -362,16 +365,16 @@ export class ShiftsRepository implements IShiftsRepository {
 
         // Mỗi appointment bị ảnh hưởng được ghi thành một item riêng.
         // Sau này các API reschedule/reassign/cancel sẽ xử lý từng item này.
-        await manager.createQueryBuilder().insert().into('appointment_disruption_items').values(
+        await manager.createQueryBuilder().insert().into(AppointmentDisruptionItem).values(
           affectedAppointments.map(appointment => ({
-            disruption_id: disruptionId,
-            appointment_id: appointment.id,
-            old_staff_id: shift.staffId,
-            old_doctor_id: shift.staffId,
-            old_room_id: shift.roomId ?? null,
-            old_scheduled_start: appointment.scheduledStart,
-            old_scheduled_end: appointment.scheduledEnd,
-            resolution_status: AppointmentDisruptionResolutionStatus.PENDING,
+            disruptionId,
+            appointmentId: appointment.id,
+            oldStaffId: shift.staffId,
+            oldDoctorId: shift.staffId,
+            oldRoomId: shift.roomId ?? null,
+            oldScheduledStart: appointment.scheduledStart as Date,
+            oldScheduledEnd: appointment.scheduledEnd as Date,
+            resolutionStatus: AppointmentDisruptionResolutionStatus.PENDING,
           })),
         ).execute();
       }

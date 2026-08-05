@@ -2,8 +2,6 @@ import { Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEmail,
-  IsEnum,
-  IsIn,
   IsLatitude,
   IsLongitude,
   IsNotEmpty,
@@ -14,7 +12,6 @@ import {
   MinLength,
   ValidateIf,
 } from 'class-validator';
-import { FacilityStatus } from '../../../../common/constants/status.enum';
 import { RESPONSE_MESSAGES } from '../../../../common/constants/response-message.constant';
 import {
   trimText,
@@ -88,9 +85,4 @@ export class UpdateFacilityDto {
   @IsLongitude({ message: RESPONSE_MESSAGES.FACILITIES.LONGITUDE_INVALID })
   longitude?: string;
 
-  @ApiPropertyOptional({ enum: [FacilityStatus.ACTIVE, FacilityStatus.INACTIVE] })
-  @IsOptional()
-  @IsEnum(FacilityStatus)
-  @IsIn([FacilityStatus.ACTIVE, FacilityStatus.INACTIVE])
-  status?: FacilityStatus;
 }

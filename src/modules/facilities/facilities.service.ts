@@ -17,13 +17,14 @@ import { FacilityDayOfWeek } from './entities/facility-operating-hour.entity';
 import {
   FACILITIES_REPOSITORY,
   FacilityShiftScheduleViolation,
+  FacilitySuspendImpact,
   FacilityLookup,
   FacilityWithDetails,
   IFacilitiesRepository,
 } from './interfaces/facility-repository.interface';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
-import { ActiveStatus, FacilityOperatingStatus, FacilityStatus } from '../../common/constants/status.enum';
+import { ActiveStatus, FacilityOperatingStatus, FacilityStatus, InactiveSource } from '../../common/constants/status.enum';
 import { addDays, isOvernightRange } from '../shifts/helpers/shifts.helper';
 
 @Injectable()
@@ -93,6 +94,7 @@ export class FacilitiesService {
   }
 
   async update(id: string, dto: UpdateFacilityDto): Promise<FacilityWithDetails> {
+    this.ensureStatusIsNotUpdated(dto);
     const facility = await this.findById(id);
     const updatableDto = this.removeReadonlyCode(dto);
 
@@ -131,7 +133,7 @@ export class FacilitiesService {
     id: string,
     dto: SuspendResourceDto,
     actorId?: string | null,
-  ): Promise<{ facility: FacilityWithDetails; impact: { affectedRooms: number; affectedShifts: number; affectedAppointments: number } }> {
+  ): Promise<{ facility: FacilityWithDetails; impact: FacilitySuspendImpact }> {
     const facility = await this.findById(id);
     const now = new Date();
     const inactiveUntil = this.parseInactiveUntil(dto.inactiveUntil, 'inactiveUntil phai lon hon thoi diem hien tai');
@@ -141,29 +143,47 @@ export class FacilitiesService {
     facility.inactiveFrom = now;
     facility.inactiveUntil = inactiveUntil;
     facility.inactiveReason = dto.reason ?? null;
+    facility.inactiveSource = InactiveSource.MANUAL;
     facility.inactiveBy = actorId ?? null;
     facility.reactivatedAt = null;
     facility.reactivatedBy = null;
     await this.facilitiesRepository.save(facility);
+    const suspendedRooms = await this.facilitiesRepository.suspendActiveRoomsForFacility(
+      facility.id,
+      now,
+      inactiveUntil,
+      dto.reason ?? null,
+      actorId ?? null,
+    );
+    const cancelledShifts = await this.facilitiesRepository.cancelFutureShiftsForFacility(
+      facility.id,
+      now,
+      inactiveUntil,
+      dto.reason ?? null,
+      actorId ?? null,
+    );
 
     return {
       facility: await this.findDetailsById(facility.id),
-      impact,
+      impact: { ...impact, suspendedRooms, cancelledShifts },
     };
   }
 
   async reactivate(
     id: string,
     actorId?: string | null,
-  ): Promise<{ facility: FacilityWithDetails }> {
+  ): Promise<{ facility: FacilityWithDetails; impact: Pick<FacilitySuspendImpact, 'reactivatedRooms'> }> {
     const facility = await this.findById(id);
     facility.status = FacilityStatus.ACTIVE;
+    facility.inactiveSource = null;
     facility.reactivatedAt = new Date();
     facility.reactivatedBy = actorId ?? null;
     await this.facilitiesRepository.save(facility);
+    const reactivatedRooms = await this.facilitiesRepository.reactivateRoomsSuspendedByFacility(facility.id, actorId ?? null);
 
     return {
       facility: await this.findDetailsById(facility.id),
+      impact: { reactivatedRooms },
     };
   }
 
@@ -328,6 +348,12 @@ export class FacilitiesService {
     return parsed;
   }
 
+  private ensureStatusIsNotUpdated(dto: UpdateFacilityDto): void {
+    if (Object.prototype.hasOwnProperty.call(dto, 'status')) {
+      throw new BadRequestException('Khong doi status bang API update thong tin. Hay dung /suspend hoac /reactivate.');
+    }
+  }
+
   private async reactivateExpiredFacilityById(id: string): Promise<void> {
     const facility = await this.facilitiesRepository.findById(id);
     if (!facility) return;
@@ -341,9 +367,12 @@ export class FacilitiesService {
       facility.inactiveUntil <= new Date()
     ) {
       facility.status = FacilityStatus.ACTIVE;
+      facility.inactiveSource = null;
       facility.reactivatedAt = new Date();
       facility.reactivatedBy = null;
-      return this.facilitiesRepository.save(facility);
+      const saved = await this.facilitiesRepository.save(facility);
+      await this.facilitiesRepository.reactivateRoomsSuspendedByFacility(facility.id, null);
+      return saved;
     }
 
     return facility;

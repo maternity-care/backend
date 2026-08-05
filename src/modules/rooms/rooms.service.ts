@@ -22,6 +22,7 @@ import {
   ROOMS_REPOSITORY,
   FacilityRoomType,
   RoomLookup,
+  RoomSuspendImpact,
   RoomTypeDetails,
   RoomTypeLookup,
   RoomWithDetails,
@@ -41,7 +42,7 @@ import {
 } from './dto/requests/search-rooms.dto';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
-import { ActiveStatus, FacilityStatus } from '../../common/constants/status.enum';
+import { ActiveStatus, FacilityStatus, InactiveSource } from '../../common/constants/status.enum';
 import { SuspendResourceDto } from '../../common/dto/suspend-resource.dto';
 
 @Injectable()
@@ -214,6 +215,7 @@ export class RoomsService {
   }
 
   async update(id: string, dto: UpdateRoomDto): Promise<RoomWithDetails> {
+    this.ensureStatusIsNotUpdated(dto);
     const room = await this.findById(id);
 
     if (dto.roomTypeId) {
@@ -233,7 +235,7 @@ export class RoomsService {
     id: string,
     dto: SuspendResourceDto,
     actorId?: string | null,
-  ): Promise<{ room: RoomWithDetails; impact: { affectedShifts: number; affectedAppointments: number } }> {
+  ): Promise<{ room: RoomWithDetails; impact: RoomSuspendImpact }> {
     const room = await this.findById(id);
     const now = new Date();
     const inactiveUntil = this.parseInactiveUntil(dto.inactiveUntil, 'inactiveUntil phai lon hon thoi diem hien tai');
@@ -243,14 +245,22 @@ export class RoomsService {
     room.inactiveFrom = now;
     room.inactiveUntil = inactiveUntil;
     room.inactiveReason = dto.reason ?? null;
+    room.inactiveSource = InactiveSource.MANUAL;
     room.inactiveBy = actorId ?? null;
     room.reactivatedAt = null;
     room.reactivatedBy = null;
     await this.roomsRepository.save(room);
+    const cancelledShifts = await this.roomsRepository.cancelFutureShiftsForRoom(
+      room.id,
+      now,
+      inactiveUntil,
+      dto.reason ?? null,
+      actorId ?? null,
+    );
 
     return {
       room: await this.findDetailsById(room.id),
-      impact,
+      impact: { ...impact, cancelledShifts },
     };
   }
 
@@ -260,6 +270,7 @@ export class RoomsService {
   ): Promise<{ room: RoomWithDetails }> {
     const room = await this.findById(id);
     room.status = ActiveStatus.ACTIVE;
+    room.inactiveSource = null;
     room.reactivatedAt = new Date();
     room.reactivatedBy = actorId ?? null;
     await this.roomsRepository.save(room);
@@ -401,6 +412,12 @@ export class RoomsService {
     return parsed;
   }
 
+  private ensureStatusIsNotUpdated(dto: UpdateRoomDto): void {
+    if (Object.prototype.hasOwnProperty.call(dto, 'status')) {
+      throw new BadRequestException('Khong doi status bang API update thong tin. Hay dung /suspend hoac /reactivate.');
+    }
+  }
+
   private async reactivateExpiredRoomById(id: string): Promise<void> {
     const room = await this.roomsRepository.findById(id);
     if (!room) return;
@@ -414,6 +431,7 @@ export class RoomsService {
       room.inactiveUntil <= new Date()
     ) {
       room.status = ActiveStatus.ACTIVE;
+      room.inactiveSource = null;
       room.reactivatedAt = new Date();
       room.reactivatedBy = null;
       return this.roomsRepository.save(room);

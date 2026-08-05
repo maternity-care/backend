@@ -5,7 +5,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { FacilityStatus, ActiveStatus } from '../../common/constants/status.enum';
+import { FacilityStatus, ActiveStatus, InactiveSource } from '../../common/constants/status.enum';
 import { RoleEnum } from '../../common/constants/role.enum';
 import { ROOM_CONSTANT } from '../../common/constants/room.constant';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
@@ -33,6 +33,7 @@ const createFacility = (overrides: Partial<Facility> = {}): Facility => ({
   inactiveFrom: null,
   inactiveUntil: null,
   inactiveReason: null,
+  inactiveSource: null,
   inactiveBy: null,
   reactivatedAt: null,
   reactivatedBy: null,
@@ -71,6 +72,7 @@ const createRoom = (overrides: Partial<Room> = {}): Room => ({
   inactiveFrom: null,
   inactiveUntil: null,
   inactiveReason: null,
+  inactiveSource: null,
   inactiveBy: null,
   reactivatedAt: null,
   reactivatedBy: null,
@@ -125,6 +127,7 @@ describe('RoomsService', () => {
     remove: jest.fn(),
     countDependencies: jest.fn(),
     countSuspendImpact: jest.fn(),
+    cancelFutureShiftsForRoom: jest.fn(),
     softDelete: jest.fn(),
     findByFacilityId: jest.fn(),
     findByFacilityIdPaginated: jest.fn(),
@@ -151,6 +154,7 @@ describe('RoomsService', () => {
     repository.findRoomTypeCodesByPrefix.mockResolvedValue([]);
     repository.findRoomTypesByFacilityId.mockResolvedValue([]);
     repository.countSuspendImpact.mockResolvedValue({ affectedShifts: 3, affectedAppointments: 1 });
+    repository.cancelFutureShiftsForRoom.mockResolvedValue(3);
     facilitiesService = createFacilitiesService();
     service = new RoomsService(repository as any, facilitiesService as any);
   });
@@ -454,8 +458,16 @@ describe('RoomsService', () => {
     expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({
       status: ActiveStatus.INACTIVE,
       inactiveReason: 'Bao tri phong',
+      inactiveSource: InactiveSource.MANUAL,
       inactiveBy: 'staff-9',
     }));
+    expect(repository.cancelFutureShiftsForRoom).toHaveBeenCalledWith(
+      'room-1',
+      expect.any(Date),
+      expect.any(Date),
+      'Bao tri phong',
+      'staff-9',
+    );
 
     repository.findById.mockResolvedValue(createRoom({ status: ActiveStatus.INACTIVE }));
     repository.findDetailsById.mockResolvedValue({ ...createRoom({ status: ActiveStatus.ACTIVE }), facilityName: 'Main Clinic' });
@@ -464,6 +476,7 @@ describe('RoomsService', () => {
     });
     expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({
       status: ActiveStatus.ACTIVE,
+      inactiveSource: null,
       reactivatedBy: 'staff-9',
     }));
   });

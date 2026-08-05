@@ -9,6 +9,7 @@ export class AddFacilityRoomSuspendFields1786400000000 implements MigrationInter
         ADD COLUMN \`inactive_from\` timestamp NULL,
         ADD COLUMN \`inactive_until\` timestamp NULL,
         ADD COLUMN \`inactive_reason\` text NULL,
+        ADD COLUMN \`inactive_source\` varchar(50) NULL,
         ADD COLUMN \`inactive_by\` bigint NULL,
         ADD COLUMN \`reactivated_at\` timestamp NULL,
         ADD COLUMN \`reactivated_by\` bigint NULL
@@ -19,6 +20,7 @@ export class AddFacilityRoomSuspendFields1786400000000 implements MigrationInter
         ADD COLUMN \`inactive_from\` timestamp NULL,
         ADD COLUMN \`inactive_until\` timestamp NULL,
         ADD COLUMN \`inactive_reason\` text NULL,
+        ADD COLUMN \`inactive_source\` varchar(50) NULL,
         ADD COLUMN \`inactive_by\` varchar(255) NULL,
         ADD COLUMN \`reactivated_at\` timestamp NULL,
         ADD COLUMN \`reactivated_by\` varchar(255) NULL
@@ -37,6 +39,7 @@ export class AddFacilityRoomSuspendFields1786400000000 implements MigrationInter
         DROP COLUMN \`reactivated_by\`,
         DROP COLUMN \`reactivated_at\`,
         DROP COLUMN \`inactive_by\`,
+        DROP COLUMN \`inactive_source\`,
         DROP COLUMN \`inactive_reason\`,
         DROP COLUMN \`inactive_until\`,
         DROP COLUMN \`inactive_from\`
@@ -47,6 +50,7 @@ export class AddFacilityRoomSuspendFields1786400000000 implements MigrationInter
         DROP COLUMN \`reactivated_by\`,
         DROP COLUMN \`reactivated_at\`,
         DROP COLUMN \`inactive_by\`,
+        DROP COLUMN \`inactive_source\`,
         DROP COLUMN \`inactive_reason\`,
         DROP COLUMN \`inactive_until\`,
         DROP COLUMN \`inactive_from\`

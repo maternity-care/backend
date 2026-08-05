@@ -1,11 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
+import { DeepPartial, EntityManager, Repository, SelectQueryBuilder } from 'typeorm';
 import { Facility } from '../entities/facility.entity';
 import { FacilityClosureDay } from '../entities/facility-closure-day.entity';
 import { FacilityDayOfWeek, FacilityOperatingHour } from '../entities/facility-operating-hour.entity';
-import { AccountStatus, DoctorShiftStatus, FacilityStatus } from '../../../common/constants/status.enum';
+import {
+  AccountStatus,
+  ActiveStatus,
+  AppointmentDisruptionResolutionStatus,
+  AppointmentStatus,
+  DoctorShiftStatus,
+  FacilityStatus,
+  InactiveSource,
+  ShiftDisruptionStatus,
+} from '../../../common/constants/status.enum';
 import { RoleEnum } from '../../../common/constants/role.enum';
+import { Room } from '../../rooms/entities/room.entity';
+import { Shift } from '../../shifts/entities/shift.entity';
+import { AppointmentDisruptionItem } from '../../shifts/entities/appointment-disruption-item.entity';
+import { DoctorShiftChangeLog } from '../../shifts/entities/doctor-shift-change-log.entity';
+import { ShiftDisruption } from '../../shifts/entities/shift-disruption.entity';
 import {
   FacilityAdminOption,
   FacilityShiftScheduleViolation,
@@ -18,6 +32,16 @@ import { SearchFacilityAdminOptionsDto } from '../dto/requests/search-facility-a
 import { LookupFacilityDto, SearchFacilityDto } from '../dto/requests/search-facility.dto';
 import { PaginationResult } from '../../../common/helpers/pagination';
 import { RESPONSE_MESSAGES } from '../../../common/constants/response-message.constant';
+import { addDays, dateTimeToTime, shiftIntervalsOverlap } from '../../shifts/helpers/shifts.helper';
+
+interface AffectedAppointmentBlock {
+  id: string;
+  doctorId: string;
+  roomId: string | null;
+  scheduledStart: Date | string;
+  scheduledEnd: Date | string;
+  status: string;
+}
 
 @Injectable()
 export class FacilitiesRepository implements IFacilitiesRepository {
@@ -428,6 +452,246 @@ export class FacilitiesRepository implements IFacilitiesRepository {
     };
   }
 
+  async suspendActiveRoomsForFacility(
+    facilityId: string,
+    from: Date,
+    until: Date | null,
+    reason?: string | null,
+    actorId?: string | null,
+  ): Promise<number> {
+    const result = await this.repository.manager
+      .createQueryBuilder()
+      .update(Room)
+      .set({
+        status: ActiveStatus.INACTIVE,
+        inactiveFrom: from,
+        inactiveUntil: until,
+        inactiveReason: reason ?? null,
+        inactiveSource: InactiveSource.FACILITY_SUSPEND,
+        inactiveBy: actorId ?? null,
+        reactivatedAt: null,
+        reactivatedBy: null,
+      })
+      .where('facility_id = :facilityId', { facilityId })
+      .andWhere('deleted_at IS NULL')
+      .andWhere('status = :status', { status: ActiveStatus.ACTIVE })
+      .execute();
+
+    return result.affected ?? 0;
+  }
+
+  async reactivateRoomsSuspendedByFacility(facilityId: string, actorId?: string | null): Promise<number> {
+    const result = await this.repository.manager
+      .createQueryBuilder()
+      .update(Room)
+      .set({
+        status: ActiveStatus.ACTIVE,
+        inactiveSource: null,
+        reactivatedAt: new Date(),
+        reactivatedBy: actorId ?? null,
+      })
+      .where('facility_id = :facilityId', { facilityId })
+      .andWhere('deleted_at IS NULL')
+      .andWhere('status = :status', { status: ActiveStatus.INACTIVE })
+      .andWhere('inactive_source = :source', { source: InactiveSource.FACILITY_SUSPEND })
+      .execute();
+
+    return result.affected ?? 0;
+  }
+
+  async cancelFutureShiftsForFacility(
+    facilityId: string,
+    from: Date,
+    until?: Date | null,
+    reason?: string | null,
+    actorId?: string | null,
+  ): Promise<number> {
+    return this.repository.manager.transaction(async manager => {
+      const shifts = await this.findSuspendAffectedShifts(
+        manager,
+        { facilityId },
+        from,
+        until,
+      );
+
+      for (const shift of shifts) {
+        const affectedAppointments = await this.findActiveAppointmentsForShift(manager, shift);
+
+        await manager.update(Shift, shift.id, {
+          status: DoctorShiftStatus.CANCELLED,
+        });
+
+        await this.insertShiftChangeLog(
+          manager,
+          shift,
+          'facility_suspended',
+          reason,
+          actorId,
+        );
+
+        if (affectedAppointments.length > 0) {
+          await this.insertShiftDisruption(
+            manager,
+            shift,
+            affectedAppointments,
+            {
+              type: 'facility_suspended',
+              sourceType: 'facility',
+              sourceId: facilityId,
+              reason,
+              actorId,
+            },
+          );
+        }
+      }
+
+      return shifts.length;
+    });
+  }
+
+  private findSuspendAffectedShifts(
+    manager: EntityManager,
+    scope: { facilityId: string; roomId?: string },
+    from: Date,
+    until?: Date | null,
+  ): Promise<Shift[]> {
+    const query = manager
+      .getRepository(Shift)
+      .createQueryBuilder('shift')
+      .setLock('pessimistic_write')
+      .where('shift.facilityId = :facilityId', { facilityId: scope.facilityId })
+      .andWhere('shift.deletedAt IS NULL')
+      .andWhere('shift.status IN (:...statuses)', {
+        statuses: [DoctorShiftStatus.AVAILABLE, DoctorShiftStatus.FULL, DoctorShiftStatus.OFF],
+      })
+      .andWhere('shift.shiftDate >= :fromDate', { fromDate: from.toISOString().slice(0, 10) })
+      .orderBy('shift.shiftDate', 'ASC')
+      .addOrderBy('shift.startTime', 'ASC');
+
+    if (scope.roomId) {
+      query.andWhere('shift.roomId = :roomId', { roomId: scope.roomId });
+    }
+
+    if (until) {
+      query.andWhere('shift.shiftDate <= :untilDate', { untilDate: until.toISOString().slice(0, 10) });
+    }
+
+    return query.getMany();
+  }
+
+  private async findActiveAppointmentsForShift(
+    manager: EntityManager,
+    shift: Shift,
+  ): Promise<AffectedAppointmentBlock[]> {
+    const shiftDate = this.formatDateOnly(shift.shiftDate);
+    const nextDate = addDays(shiftDate, 1);
+    const appointments = await manager
+      .createQueryBuilder()
+      .select('appointment.id', 'id')
+      .addSelect('appointment.doctor_id', 'doctorId')
+      .addSelect('appointment.room_id', 'roomId')
+      .addSelect('appointment.scheduled_start', 'scheduledStart')
+      .addSelect('appointment.scheduled_end', 'scheduledEnd')
+      .addSelect('appointment.status', 'status')
+      .from('appointments', 'appointment')
+      .where('appointment.facility_id = :facilityId', { facilityId: shift.facilityId })
+      .andWhere('appointment.doctor_id = :staffId', { staffId: shift.staffId })
+      .andWhere('DATE(appointment.scheduled_start) BETWEEN :shiftDate AND :nextDate', { shiftDate, nextDate })
+      .andWhere('appointment.status IN (:...statuses)', {
+        statuses: [
+          AppointmentStatus.PENDING_PAYMENT,
+          AppointmentStatus.BOOKED,
+          AppointmentStatus.CONFIRMED,
+          AppointmentStatus.CHECKED_IN,
+          AppointmentStatus.IN_PROGRESS,
+        ],
+      })
+      .orderBy('appointment.scheduled_start', 'ASC')
+      .getRawMany<AffectedAppointmentBlock>();
+
+    return appointments.filter(appointment =>
+      shiftIntervalsOverlap(
+        shiftDate,
+        shift.startTime,
+        shift.endTime,
+        this.formatDateOnly(appointment.scheduledStart),
+        dateTimeToTime(appointment.scheduledStart),
+        dateTimeToTime(appointment.scheduledEnd),
+      ),
+    );
+  }
+
+  private async insertShiftChangeLog(
+    manager: EntityManager,
+    shift: Shift,
+    action: string,
+    reason?: string | null,
+    actorId?: string | null,
+  ): Promise<void> {
+    await manager.createQueryBuilder().insert().into(DoctorShiftChangeLog).values({
+      shiftId: shift.id,
+      action,
+      oldStatus: shift.status,
+      newStatus: DoctorShiftStatus.CANCELLED,
+      oldStaffId: shift.staffId,
+      newStaffId: shift.staffId,
+      oldRoomId: shift.roomId,
+      newRoomId: shift.roomId,
+      oldStartTime: shift.startTime,
+      newStartTime: shift.startTime,
+      oldEndTime: shift.endTime,
+      newEndTime: shift.endTime,
+      reason: reason ?? null,
+      changedBy: actorId ?? null,
+    }).execute();
+  }
+
+  private async insertShiftDisruption(
+    manager: EntityManager,
+    shift: Shift,
+    affectedAppointments: AffectedAppointmentBlock[],
+    options: {
+      type: string;
+      sourceType: string;
+      sourceId: string;
+      reason?: string | null;
+      actorId?: string | null;
+    },
+  ): Promise<void> {
+    const result = await manager.createQueryBuilder().insert().into(ShiftDisruption).values({
+      type: options.type,
+      sourceType: options.sourceType,
+      sourceId: options.sourceId,
+      facilityId: shift.facilityId,
+      shiftId: shift.id,
+      staffId: shift.staffId,
+      doctorShiftId: shift.id,
+      roomId: shift.roomId ?? null,
+      reason: options.reason ?? null,
+      status: ShiftDisruptionStatus.OPEN,
+      createdBy: options.actorId ?? null,
+    }).execute();
+    const disruptionId = String(result.identifiers[0]?.id);
+
+    await manager.createQueryBuilder().insert().into(AppointmentDisruptionItem).values(
+      affectedAppointments.map(appointment => ({
+        disruptionId,
+        appointmentId: appointment.id,
+        oldStaffId: shift.staffId,
+        oldDoctorId: shift.staffId,
+        oldRoomId: shift.roomId ?? null,
+        oldScheduledStart: appointment.scheduledStart as Date,
+        oldScheduledEnd: appointment.scheduledEnd as Date,
+        resolutionStatus: AppointmentDisruptionResolutionStatus.PENDING,
+      })),
+    ).execute();
+  }
+
+  private formatDateOnly(value: string | Date): string {
+    if (value instanceof Date) return value.toISOString().slice(0, 10);
+    return String(value).slice(0, 10);
+  }
+
   private buildDetailsQuery(filters?: Pick<SearchFacilityDto, 'search' | 'city' | 'ownerId' | 'status'>): SelectQueryBuilder<Facility> {
     const query = this.repository
       .createQueryBuilder('facility')
@@ -451,6 +715,7 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       .addSelect('facility.inactiveFrom', 'inactiveFrom')
       .addSelect('facility.inactiveUntil', 'inactiveUntil')
       .addSelect('facility.inactiveReason', 'inactiveReason')
+      .addSelect('facility.inactiveSource', 'inactiveSource')
       .addSelect('facility.inactiveBy', 'inactiveBy')
       .addSelect('facility.reactivatedAt', 'reactivatedAt')
       .addSelect('facility.reactivatedBy', 'reactivatedBy')
