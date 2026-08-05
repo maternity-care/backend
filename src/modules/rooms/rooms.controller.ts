@@ -27,6 +27,7 @@ import { PermissionEnum } from '../../common/constants/permission.enum';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { SuspendResourceDto } from '../../common/dto/suspend-resource.dto';
 
 @ApiTags('Management - Rooms')
 // @ApiBearerAuth()
@@ -258,45 +259,45 @@ export class RoomsController {
     }
   }
 
-  // @Post('bulk-create/preview')
-  // @ApiOperation({ summary: 'Preview bulk create rooms before saving' })
-  // async previewBulkCreate(
-  //   @CurrentUser() user: AuthenticatedUser,
-  //   @Body() dto: BulkCreateRoomsPreviewDto,
-  // ) {
-  //   try {
-  //     const activeFacilityId = getActiveFacilityId(user);
-  //     if (activeFacilityId) {
-  //       dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
-  //     }
-  //     return {
-  //       message: RESPONSE_MESSAGES.ROOMS.BULK_PREVIEW_SUCCESS,
-  //       data: await this.roomsService.previewBulkCreate(dto),
-  //     };
-  //   } catch (error) {
-  //     this.handleError(error);
-  //   }
-  // }
+  @Post('bulk-create/preview')
+  @ApiOperation({ summary: 'Preview bulk create rooms before saving' })
+  async previewBulkCreate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: BulkCreateRoomsPreviewDto,
+  ) {
+    try {
+      const activeFacilityId = getActiveFacilityId(user);
+      if (activeFacilityId) {
+        dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
+      }
+      return {
+        message: RESPONSE_MESSAGES.ROOMS.BULK_PREVIEW_SUCCESS,
+        data: await this.roomsService.previewBulkCreate(dto),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
 
-  // @Post('bulk-create/confirm')
-  // @ApiOperation({ summary: 'Confirm and save valid rooms from bulk-create preview' })
-  // async confirmBulkCreate(
-  //   @CurrentUser() user: AuthenticatedUser,
-  //   @Body() dto: BulkCreateRoomsPreviewDto,
-  // ) {
-  //   try {
-  //     const activeFacilityId = getActiveFacilityId(user);
-  //     if (activeFacilityId) {
-  //       dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
-  //     }
-  //     return {
-  //       message: RESPONSE_MESSAGES.ROOMS.BULK_CONFIRM_SUCCESS,
-  //       data: await this.roomsService.confirmBulkCreate(dto),
-  //     };
-  //   } catch (error) {
-  //     this.handleError(error);
-  //   }
-  // }
+  @Post('bulk-create/confirm')
+  @ApiOperation({ summary: 'Confirm and save valid rooms from bulk-create preview' })
+  async confirmBulkCreate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: BulkCreateRoomsPreviewDto,
+  ) {
+    try {
+      const activeFacilityId = getActiveFacilityId(user);
+      if (activeFacilityId) {
+        dto.rooms = dto.rooms.map(room => ({ ...room, facilityId: activeFacilityId }));
+      }
+      return {
+        message: RESPONSE_MESSAGES.ROOMS.BULK_CONFIRM_SUCCESS,
+        data: await this.roomsService.confirmBulkCreate(dto),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
 
   @Patch(':id')
   // @Permissions(PermissionEnum.ROOM_UPDATE)
@@ -314,6 +315,47 @@ export class RoomsController {
       return {
         message: RESPONSE_MESSAGES.ROOMS.UPDATED,
         data: room,
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Patch(':id/suspend')
+  // @Permissions(PermissionEnum.ROOM_UPDATE)
+  @ApiOperation({ summary: 'Suspend room for a period or indefinitely' })
+  @ApiResponse({ status: 200 })
+  async suspend(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: SuspendResourceDto,
+  ) {
+    try {
+      const existingRoom = await this.roomsService.findById(id);
+      assertFacilityAccess(user, existingRoom.facilityId);
+      return {
+        message: RESPONSE_MESSAGES.ROOMS.STATUS_UPDATED,
+        data: await this.roomsService.suspend(id, dto, user?.id ?? null),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Patch(':id/reactivate')
+  // @Permissions(PermissionEnum.ROOM_UPDATE)
+  @ApiOperation({ summary: 'Reactivate suspended room' })
+  @ApiResponse({ status: 200 })
+  async reactivate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    try {
+      const existingRoom = await this.roomsService.findById(id);
+      assertFacilityAccess(user, existingRoom.facilityId);
+      return {
+        message: RESPONSE_MESSAGES.ROOMS.STATUS_UPDATED,
+        data: await this.roomsService.reactivate(id, user?.id ?? null),
       };
     } catch (error) {
       this.handleError(error);

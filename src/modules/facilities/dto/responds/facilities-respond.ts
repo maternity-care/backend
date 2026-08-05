@@ -99,6 +99,24 @@ export class FacilityResponseDto {
   @ApiProperty({ enum: FacilityStatus })
   status: FacilityStatus;
 
+  @ApiPropertyOptional({ nullable: true })
+  inactiveFrom?: Date | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  inactiveUntil?: Date | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  inactiveReason?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  inactiveBy?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  reactivatedAt?: Date | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  reactivatedBy?: string | null;
+
   @ApiPropertyOptional({ enum: FacilityOperatingStatus })
   operatingStatus?: FacilityOperatingStatus;
 

@@ -10,6 +10,7 @@ import {
   SearchFacilityClosureDayDto,
   UpdateFacilityClosureDayDto,
 } from './dto/requests/facility-closure-day.dto';
+import { SuspendResourceDto } from '../../common/dto/suspend-resource.dto';
 import { Facility } from './entities/facility.entity';
 import { FacilityClosureDay } from './entities/facility-closure-day.entity';
 import { FacilityDayOfWeek } from './entities/facility-operating-hour.entity';
@@ -70,10 +71,11 @@ export class FacilitiesService {
       throw new NotFoundException(RESPONSE_MESSAGES.FACILITIES.NOT_FOUND);
     }
 
-    return facility;
+    return this.reactivateExpiredFacilityIfNeeded(facility);
   }
 
   async findDetailsById(id: string): Promise<FacilityWithDetails> {
+    await this.reactivateExpiredFacilityById(id);
     const facility = await this.facilitiesRepository.findDetailsById(id);
     if (!facility) {
       throw new NotFoundException(RESPONSE_MESSAGES.FACILITIES.NOT_FOUND);
@@ -125,9 +127,44 @@ export class FacilitiesService {
     return { action: 'soft_deleted', affectedCount: dependencyCount };
   }
 
-  async deActivateFacility(id: string): Promise<Facility> {
-    const facility = await this.facilitiesRepository.deActivateFacility(id);
-    return facility;
+  async suspend(
+    id: string,
+    dto: SuspendResourceDto,
+    actorId?: string | null,
+  ): Promise<{ facility: FacilityWithDetails; impact: { affectedRooms: number; affectedShifts: number; affectedAppointments: number } }> {
+    const facility = await this.findById(id);
+    const now = new Date();
+    const inactiveUntil = this.parseInactiveUntil(dto.inactiveUntil, 'inactiveUntil phai lon hon thoi diem hien tai');
+    const impact = await this.facilitiesRepository.countSuspendImpact(facility.id, now, inactiveUntil);
+
+    facility.status = FacilityStatus.INACTIVE;
+    facility.inactiveFrom = now;
+    facility.inactiveUntil = inactiveUntil;
+    facility.inactiveReason = dto.reason ?? null;
+    facility.inactiveBy = actorId ?? null;
+    facility.reactivatedAt = null;
+    facility.reactivatedBy = null;
+    await this.facilitiesRepository.save(facility);
+
+    return {
+      facility: await this.findDetailsById(facility.id),
+      impact,
+    };
+  }
+
+  async reactivate(
+    id: string,
+    actorId?: string | null,
+  ): Promise<{ facility: FacilityWithDetails }> {
+    const facility = await this.findById(id);
+    facility.status = FacilityStatus.ACTIVE;
+    facility.reactivatedAt = new Date();
+    facility.reactivatedBy = actorId ?? null;
+    await this.facilitiesRepository.save(facility);
+
+    return {
+      facility: await this.findDetailsById(facility.id),
+    };
   }
 
   async getOperatingHours(id: string) {
@@ -280,6 +317,36 @@ export class FacilitiesService {
         },
       });
     }
+  }
+
+  private parseInactiveUntil(value: string | null | undefined, errorMessage: string): Date | null {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime()) || parsed <= new Date()) {
+      throw new BadRequestException(errorMessage);
+    }
+    return parsed;
+  }
+
+  private async reactivateExpiredFacilityById(id: string): Promise<void> {
+    const facility = await this.facilitiesRepository.findById(id);
+    if (!facility) return;
+    await this.reactivateExpiredFacilityIfNeeded(facility);
+  }
+
+  private async reactivateExpiredFacilityIfNeeded(facility: Facility): Promise<Facility> {
+    if (
+      facility.status === FacilityStatus.INACTIVE &&
+      facility.inactiveUntil &&
+      facility.inactiveUntil <= new Date()
+    ) {
+      facility.status = FacilityStatus.ACTIVE;
+      facility.reactivatedAt = new Date();
+      facility.reactivatedBy = null;
+      return this.facilitiesRepository.save(facility);
+    }
+
+    return facility;
   }
 
   private async findClosureDayOrFail(facilityId: string, closureDayId: string): Promise<FacilityClosureDay> {

@@ -67,6 +67,7 @@ import { BackfillAppointmentSchedules1786000000000 } from './migrations/17860000
 import { AddForumModeration1786100000000 } from './migrations/1786100000000-AddForumModeration';
 import { AddForumCategories1786200000000 } from './migrations/1786200000000-AddForumCategories';
 import { AddManagementModulePermissions1786300000000 } from './migrations/1786300000000-AddManagementModulePermissions';
+import {AddFacilityRoomSuspendFields1786400000000} from './migrations/1786400000000-AddFacilityRoomSuspendFields';
 
 config();
 
@@ -148,6 +149,7 @@ export const typeOrmConfig: DataSourceOptions = {
     AddForumModeration1786100000000,
     AddForumCategories1786200000000,
     AddManagementModulePermissions1786300000000,
+    AddFacilityRoomSuspendFields1786400000000,
   ],
   charset: 'utf8mb4_unicode_ci',
 };

@@ -42,6 +42,7 @@ import {
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
 import { ActiveStatus, FacilityStatus } from '../../common/constants/status.enum';
+import { SuspendResourceDto } from '../../common/dto/suspend-resource.dto';
 
 @Injectable()
 export class RoomsService {
@@ -196,10 +197,11 @@ export class RoomsService {
     if (!room) {
       throw new NotFoundException(RESPONSE_MESSAGES.ROOMS.NOT_FOUND);
     }
-    return room;
+    return this.reactivateExpiredRoomIfNeeded(room);
   }
 
   async findDetailsById(id: string): Promise<RoomWithDetails> {
+    await this.reactivateExpiredRoomById(id);
     const room = await this.roomsRepository.findDetailsById(id);
     if (!room) {
       throw new NotFoundException(RESPONSE_MESSAGES.ROOMS.NOT_FOUND);
@@ -225,6 +227,46 @@ export class RoomsService {
     Object.assign(room, dto);
     const saved = await this.roomsRepository.save(room);
     return this.findDetailsById(saved.id);
+  }
+
+  async suspend(
+    id: string,
+    dto: SuspendResourceDto,
+    actorId?: string | null,
+  ): Promise<{ room: RoomWithDetails; impact: { affectedShifts: number; affectedAppointments: number } }> {
+    const room = await this.findById(id);
+    const now = new Date();
+    const inactiveUntil = this.parseInactiveUntil(dto.inactiveUntil, 'inactiveUntil phai lon hon thoi diem hien tai');
+    const impact = await this.roomsRepository.countSuspendImpact(room.id, now, inactiveUntil);
+
+    room.status = ActiveStatus.INACTIVE;
+    room.inactiveFrom = now;
+    room.inactiveUntil = inactiveUntil;
+    room.inactiveReason = dto.reason ?? null;
+    room.inactiveBy = actorId ?? null;
+    room.reactivatedAt = null;
+    room.reactivatedBy = null;
+    await this.roomsRepository.save(room);
+
+    return {
+      room: await this.findDetailsById(room.id),
+      impact,
+    };
+  }
+
+  async reactivate(
+    id: string,
+    actorId?: string | null,
+  ): Promise<{ room: RoomWithDetails }> {
+    const room = await this.findById(id);
+    room.status = ActiveStatus.ACTIVE;
+    room.reactivatedAt = new Date();
+    room.reactivatedBy = actorId ?? null;
+    await this.roomsRepository.save(room);
+
+    return {
+      room: await this.findDetailsById(room.id),
+    };
   }
 
   async remove(id: string, reason?: string, deletedBy?: string | null): Promise<SafeRemoveResult> {
@@ -348,6 +390,36 @@ export class RoomsService {
       ...roomType,
       roomCount: Number(roomType.roomCount),
     }));
+  }
+
+  private parseInactiveUntil(value: string | null | undefined, errorMessage: string): Date | null {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime()) || parsed <= new Date()) {
+      throw new BadRequestException(errorMessage);
+    }
+    return parsed;
+  }
+
+  private async reactivateExpiredRoomById(id: string): Promise<void> {
+    const room = await this.roomsRepository.findById(id);
+    if (!room) return;
+    await this.reactivateExpiredRoomIfNeeded(room);
+  }
+
+  private async reactivateExpiredRoomIfNeeded(room: Room): Promise<Room> {
+    if (
+      room.status === ActiveStatus.INACTIVE &&
+      room.inactiveUntil &&
+      room.inactiveUntil <= new Date()
+    ) {
+      room.status = ActiveStatus.ACTIVE;
+      room.reactivatedAt = new Date();
+      room.reactivatedBy = null;
+      return this.roomsRepository.save(room);
+    }
+
+    return room;
   }
 
   private async validateRoomPayload(dto: CreateRoomDto): Promise<Facility> {

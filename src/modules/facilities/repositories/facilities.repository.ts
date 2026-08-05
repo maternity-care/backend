@@ -376,8 +376,56 @@ export class FacilitiesRepository implements IFacilitiesRepository {
     return this.repository.save(facility);
   }
 
-  async deActivateFacility(id: string): Promise<Facility> {
-    return this.updateStatus(id, FacilityStatus.INACTIVE);
+  async countSuspendImpact(facilityId: string, from: Date, until?: Date | null) {
+    const fromDate = from.toISOString().slice(0, 10);
+    const untilDate = until ? until.toISOString().slice(0, 10) : null;
+    const activeAppointmentStatuses = [
+      'pending_payment',
+      'booked',
+      'confirmed',
+      'checked_in',
+      'in_progress',
+    ];
+
+    const roomCount = await this.countRowsIfTableExists('rooms', 'facility_id', facilityId);
+
+    const shiftQuery = this.repository.manager
+      .createQueryBuilder()
+      .select('COUNT(*)', 'count')
+      .from('shifts', 'shift')
+      .where('shift.facility_id = :facilityId', { facilityId })
+      .andWhere('shift.deleted_at IS NULL')
+      .andWhere('shift.status IN (:...statuses)', {
+        statuses: [DoctorShiftStatus.AVAILABLE, DoctorShiftStatus.FULL, DoctorShiftStatus.OFF],
+      })
+      .andWhere('shift.shift_date >= :fromDate', { fromDate });
+
+    if (untilDate) {
+      shiftQuery.andWhere('shift.shift_date <= :untilDate', { untilDate });
+    }
+
+    const appointmentQuery = this.repository.manager
+      .createQueryBuilder()
+      .select('COUNT(*)', 'count')
+      .from('appointments', 'appointment')
+      .where('appointment.facility_id = :facilityId', { facilityId })
+      .andWhere('appointment.status IN (:...statuses)', { statuses: activeAppointmentStatuses })
+      .andWhere('appointment.scheduled_start >= :from', { from });
+
+    if (until) {
+      appointmentQuery.andWhere('appointment.scheduled_start <= :until', { until });
+    }
+
+    const [shiftRow, appointmentRow] = await Promise.all([
+      shiftQuery.getRawOne<{ count: string }>(),
+      appointmentQuery.getRawOne<{ count: string }>(),
+    ]);
+
+    return {
+      affectedRooms: roomCount,
+      affectedShifts: Number(shiftRow?.count ?? 0),
+      affectedAppointments: Number(appointmentRow?.count ?? 0),
+    };
   }
 
   private buildDetailsQuery(filters?: Pick<SearchFacilityDto, 'search' | 'city' | 'ownerId' | 'status'>): SelectQueryBuilder<Facility> {
@@ -400,6 +448,12 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       .addSelect('facility.latitude', 'latitude')
       .addSelect('facility.longitude', 'longitude')
       .addSelect('facility.status', 'status')
+      .addSelect('facility.inactiveFrom', 'inactiveFrom')
+      .addSelect('facility.inactiveUntil', 'inactiveUntil')
+      .addSelect('facility.inactiveReason', 'inactiveReason')
+      .addSelect('facility.inactiveBy', 'inactiveBy')
+      .addSelect('facility.reactivatedAt', 'reactivatedAt')
+      .addSelect('facility.reactivatedBy', 'reactivatedBy')
       .addSelect('facility.createdAt', 'createdAt')
       .addSelect('facility.updatedAt', 'updatedAt');
 

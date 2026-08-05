@@ -30,6 +30,12 @@ const createFacility = (overrides: Partial<Facility> = {}): Facility => ({
   latitude: '10.7756000',
   longitude: '106.6871000',
   status: FacilityStatus.ACTIVE,
+  inactiveFrom: null,
+  inactiveUntil: null,
+  inactiveReason: null,
+  inactiveBy: null,
+  reactivatedAt: null,
+  reactivatedBy: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
   deletedAt: null,
@@ -58,9 +64,16 @@ const createRoom = (overrides: Partial<Room> = {}): Room => ({
     deletedAt: null,
     deletedBy: null,
     deleteReason: null,
+    doctors: [],
   },
   floor: '1',
   status: ActiveStatus.ACTIVE,
+  inactiveFrom: null,
+  inactiveUntil: null,
+  inactiveReason: null,
+  inactiveBy: null,
+  reactivatedAt: null,
+  reactivatedBy: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
   deletedAt: null,
@@ -80,6 +93,7 @@ const createRoomType = (overrides: any = {}) => ({
   deletedAt: null,
   deletedBy: null,
   deleteReason: null,
+  doctors: [],
   ...overrides,
 });
 
@@ -110,6 +124,7 @@ describe('RoomsService', () => {
     countRoomTypeDependencies: jest.fn(),
     remove: jest.fn(),
     countDependencies: jest.fn(),
+    countSuspendImpact: jest.fn(),
     softDelete: jest.fn(),
     findByFacilityId: jest.fn(),
     findByFacilityIdPaginated: jest.fn(),
@@ -135,6 +150,7 @@ describe('RoomsService', () => {
     repository.findRoomTypeByName.mockResolvedValue(null);
     repository.findRoomTypeCodesByPrefix.mockResolvedValue([]);
     repository.findRoomTypesByFacilityId.mockResolvedValue([]);
+    repository.countSuspendImpact.mockResolvedValue({ affectedShifts: 3, affectedAppointments: 1 });
     facilitiesService = createFacilitiesService();
     service = new RoomsService(repository as any, facilitiesService as any);
   });
@@ -403,15 +419,15 @@ describe('RoomsService', () => {
     expect(repository.removeRoomType).toHaveBeenCalledWith(roomType);
   });
 
-  // Vai tro: room-type da duoc rooms tham chieu thi chi inactive, khong xoa cung de tranh vo lich su.
-  it('deactivates room type when rooms depend on it', async () => {
+  // Vai tro: room-type da duoc rooms tham chieu thi bao conflict de quan ly doi phong sang loai khac truoc.
+  it('rejects deleting room type when rooms depend on it', async () => {
     const roomType = createRoomType();
     repository.findRoomTypeById.mockResolvedValue(roomType);
     repository.countRoomTypeDependencies.mockResolvedValue(2);
 
-    await expect(service.removeRoomType('type-1')).resolves.toEqual({ action: 'soft_deleted', affectedCount: 2 });
+    await expect(service.removeRoomType('type-1')).rejects.toBeInstanceOf(ConflictException);
     expect(repository.removeRoomType).not.toHaveBeenCalled();
-    expect(repository.saveRoomType).toHaveBeenCalledWith(expect.objectContaining({ status: ActiveStatus.INACTIVE }));
+    expect(repository.saveRoomType).not.toHaveBeenCalled();
   });
 
   // Vai tro: dam bao service lay duoc room co ban va ban detail co join thong tin facility.
@@ -422,6 +438,34 @@ describe('RoomsService', () => {
 
     await expect(service.findById('room-1')).resolves.toBe(room);
     await expect(service.findDetailsById('room-1')).resolves.toMatchObject({ facilityName: 'Main Clinic' });
+  });
+
+  it('suspends and reactivates a room with impact summary', async () => {
+    repository.findById.mockResolvedValue(createRoom());
+    repository.findDetailsById.mockResolvedValue({ ...createRoom({ status: ActiveStatus.INACTIVE }), facilityName: 'Main Clinic' });
+
+    await expect(service.suspend('room-1', {
+      inactiveUntil: '2099-08-20T17:00:00+07:00',
+      reason: 'Bao tri phong',
+    }, 'staff-9')).resolves.toMatchObject({
+      impact: { affectedShifts: 3, affectedAppointments: 1 },
+      room: { status: ActiveStatus.INACTIVE },
+    });
+    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({
+      status: ActiveStatus.INACTIVE,
+      inactiveReason: 'Bao tri phong',
+      inactiveBy: 'staff-9',
+    }));
+
+    repository.findById.mockResolvedValue(createRoom({ status: ActiveStatus.INACTIVE }));
+    repository.findDetailsById.mockResolvedValue({ ...createRoom({ status: ActiveStatus.ACTIVE }), facilityName: 'Main Clinic' });
+    await expect(service.reactivate('room-1', 'staff-9')).resolves.toMatchObject({
+      room: { status: ActiveStatus.ACTIVE },
+    });
+    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({
+      status: ActiveStatus.ACTIVE,
+      reactivatedBy: 'staff-9',
+    }));
   });
 
   // Vai tro: dam bao room/detail khong ton tai se tra 404 ro rang.

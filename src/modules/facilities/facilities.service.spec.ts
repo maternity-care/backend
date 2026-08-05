@@ -28,6 +28,12 @@ const createFacility = (overrides: Partial<Facility> = {}): Facility => ({
   latitude: '10.7756000',
   longitude: '106.6871000',
   status: FacilityStatus.ACTIVE,
+  inactiveFrom: null,
+  inactiveUntil: null,
+  inactiveReason: null,
+  inactiveBy: null,
+  reactivatedAt: null,
+  reactivatedBy: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
   deletedAt: null,
@@ -76,9 +82,9 @@ describe('FacilitiesService', () => {
     lookup: jest.fn(),
     remove: jest.fn(),
     countDependencies: jest.fn(),
+    countSuspendImpact: jest.fn(),
     softDelete: jest.fn(),
     updateStatus: jest.fn(),
-    deActivateFacility: jest.fn(),
   });
 
   let repository: ReturnType<typeof createRepository>;
@@ -99,6 +105,7 @@ describe('FacilitiesService', () => {
     repository.findClosureDayById.mockResolvedValue(null);
     repository.findClosureDayByDate.mockResolvedValue(null);
     repository.existsActiveOwner.mockResolvedValue(true);
+    repository.countSuspendImpact.mockResolvedValue({ affectedRooms: 2, affectedShifts: 3, affectedAppointments: 1 });
     service = new FacilitiesService(repository as any);
   });
 
@@ -601,13 +608,32 @@ describe('FacilitiesService', () => {
     expect(repository.remove).not.toHaveBeenCalled();
   });
 
-  // Vai tro: kiem tra ham deActivateFacility chuyen viec cap nhat trang thai xuong repository.
-  it('delegates facility deactivation to repository', async () => {
-    const inactive = createFacility({ status: FacilityStatus.INACTIVE });
-    repository.deActivateFacility.mockResolvedValue(inactive);
+  it('suspends and reactivates a facility with impact summary', async () => {
+    repository.findById.mockResolvedValue(createFacility());
+    repository.findDetailsById.mockResolvedValue(createFacility({ status: FacilityStatus.INACTIVE }));
 
-    await expect(service.deActivateFacility('fac-1')).resolves.toBe(inactive);
-    expect(repository.deActivateFacility).toHaveBeenCalledWith('fac-1');
+    await expect(service.suspend('fac-1', {
+      inactiveUntil: '2099-08-20T17:00:00+07:00',
+      reason: 'Bao tri',
+    }, 'staff-9')).resolves.toMatchObject({
+      impact: { affectedRooms: 2, affectedShifts: 3, affectedAppointments: 1 },
+      facility: { status: FacilityStatus.INACTIVE },
+    });
+    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({
+      status: FacilityStatus.INACTIVE,
+      inactiveReason: 'Bao tri',
+      inactiveBy: 'staff-9',
+    }));
+
+    repository.findById.mockResolvedValue(createFacility({ status: FacilityStatus.INACTIVE }));
+    repository.findDetailsById.mockResolvedValue(createFacility({ status: FacilityStatus.ACTIVE }));
+    await expect(service.reactivate('fac-1', 'staff-9')).resolves.toMatchObject({
+      facility: { status: FacilityStatus.ACTIVE },
+    });
+    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({
+      status: FacilityStatus.ACTIVE,
+      reactivatedBy: 'staff-9',
+    }));
   });
 
   // Vai tro: cung cap lookup facility cho FE select/autocomplete ma khong can tu ghep API list/filter.
@@ -626,14 +652,6 @@ describe('FacilitiesService', () => {
 
     await expect(service.lookup({ search: 'main' })).resolves.toBe(options);
     expect(repository.lookup).toHaveBeenCalledWith({ search: 'main' });
-  });
-
-  // Vai tro: dam bao loi khi deactivate facility duoc nem ra dung nhu repository/service ben duoi.
-  it('propagates repository errors during deactivation', async () => {
-    const error = new NotFoundException(RESPONSE_MESSAGES.FACILITY_NOT_FOUND);
-    repository.deActivateFacility.mockRejectedValue(error);
-
-    await expect(service.deActivateFacility('missing')).rejects.toBe(error);
   });
 
   // Vai tro: lay danh sach ngay dong cua co filter ngay bat dau/ket thuc/trang thai.
@@ -796,7 +814,6 @@ describe('FacilitiesController', () => {
     lookup: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
-    deActivateFacility: jest.fn(),
   });
 
   // Vai tro: dam bao admin co so chi xem duoc facility dang active cua chinh minh.
@@ -882,19 +899,6 @@ describe('FacilitiesController', () => {
       data: { action: 'soft_deleted', affectedCount: 2 },
     });
     expect(mockService.remove).toHaveBeenCalledWith('fac-1', 'duplicate', 'user-admin');
-  });
-
-  // Vai tro: kiem tra deactivate facility co check quyen va tra wrapper thanh cong dung chuan.
-  it('wraps deactivation response after facility access check', async () => {
-    const mockService = createService();
-    const inactive = createFacility({ status: FacilityStatus.INACTIVE });
-    mockService.deActivateFacility.mockResolvedValue(inactive);
-    const controller = new FacilitiesController(mockService as any);
-
-    await expect(controller.deActivateFacility(facilityAdmin, 'fac-1', {} as any)).resolves.toEqual({
-      message: RESPONSE_MESSAGES.FACILITY_STATUS_UPDATED,
-      data: inactive,
-    });
   });
 
   // Vai tro: dam bao API list closure-days check scope va wrap response dung chuan.

@@ -24,6 +24,24 @@ export class RoomWithDetailsResponseDto {
   @ApiProperty({ enum: ActiveStatus })
   status: ActiveStatus;
 
+  @ApiPropertyOptional({ nullable: true })
+  inactiveFrom?: Date | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  inactiveUntil?: Date | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  inactiveReason?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  inactiveBy?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  reactivatedAt?: Date | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  reactivatedBy?: string | null;
+
   @ApiProperty()
   createdAt: Date;
 

@@ -309,6 +309,53 @@ export class RoomsRepository implements IRoomsRepository {
     return this.repository.save(room);
   }
 
+  async countSuspendImpact(roomId: string, from: Date, until?: Date | null) {
+    const fromDate = from.toISOString().slice(0, 10);
+    const untilDate = until ? until.toISOString().slice(0, 10) : null;
+    const activeAppointmentStatuses = [
+      'pending_payment',
+      'booked',
+      'confirmed',
+      'checked_in',
+      'in_progress',
+    ];
+
+    const shiftQuery = this.repository.manager
+      .createQueryBuilder()
+      .select('COUNT(*)', 'count')
+      .from('shifts', 'shift')
+      .where('shift.room_id = :roomId', { roomId })
+      .andWhere('shift.deleted_at IS NULL')
+      .andWhere('shift.status IN (:...statuses)', { statuses: ['available', 'full'] })
+      .andWhere('shift.shift_date >= :fromDate', { fromDate });
+
+    if (untilDate) {
+      shiftQuery.andWhere('shift.shift_date <= :untilDate', { untilDate });
+    }
+
+    const appointmentQuery = this.repository.manager
+      .createQueryBuilder()
+      .select('COUNT(*)', 'count')
+      .from('appointments', 'appointment')
+      .where('appointment.room_id = :roomId', { roomId })
+      .andWhere('appointment.status IN (:...statuses)', { statuses: activeAppointmentStatuses })
+      .andWhere('appointment.scheduled_start >= :from', { from });
+
+    if (until) {
+      appointmentQuery.andWhere('appointment.scheduled_start <= :until', { until });
+    }
+
+    const [shiftRow, appointmentRow] = await Promise.all([
+      shiftQuery.getRawOne<{ count: string }>(),
+      appointmentQuery.getRawOne<{ count: string }>(),
+    ]);
+
+    return {
+      affectedShifts: Number(shiftRow?.count ?? 0),
+      affectedAppointments: Number(appointmentRow?.count ?? 0),
+    };
+  }
+
   findByFacilityId(facilityId: string, filters?: SearchRooms2Dto): Promise<RoomWithDetails[]> {
     return this.buildDetailsQuery({ ...filters, facilityId })
       .orderBy('room.createdAt', 'DESC')
@@ -343,6 +390,12 @@ export class RoomsRepository implements IRoomsRepository {
       .addSelect('room.name', 'name')
       .addSelect('room.floor', 'floor')
       .addSelect('room.status', 'status')
+      .addSelect('room.inactiveFrom', 'inactiveFrom')
+      .addSelect('room.inactiveUntil', 'inactiveUntil')
+      .addSelect('room.inactiveReason', 'inactiveReason')
+      .addSelect('room.inactiveBy', 'inactiveBy')
+      .addSelect('room.reactivatedAt', 'reactivatedAt')
+      .addSelect('room.reactivatedBy', 'reactivatedBy')
       .addSelect('room.createdAt', 'createdAt')
       .addSelect('room.updatedAt', 'updatedAt')
       .addSelect('facility.code', 'facilityCode')

@@ -89,6 +89,30 @@ export class Facility {
   @Column({ name: 'status', type: 'varchar', length: 50 })
   status: string;
 
+  @ApiPropertyOptional({ type: Date, nullable: true })
+  @Column({ name: 'inactive_from', type: 'timestamp', nullable: true })
+  inactiveFrom: Date | null;
+
+  @ApiPropertyOptional({ type: Date, nullable: true })
+  @Column({ name: 'inactive_until', type: 'timestamp', nullable: true })
+  inactiveUntil: Date | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'inactive_reason', type: 'text', nullable: true })
+  inactiveReason: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'inactive_by', type: 'bigint', nullable: true })
+  inactiveBy: string | null;
+
+  @ApiPropertyOptional({ type: Date, nullable: true })
+  @Column({ name: 'reactivated_at', type: 'timestamp', nullable: true })
+  reactivatedAt: Date | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'reactivated_by', type: 'bigint', nullable: true })
+  reactivatedBy: string | null;
+
   @OneToMany(() => Appointment, (appointment) => appointment.facilityId)
   appointments: Appointment[];
 
