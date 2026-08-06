@@ -68,6 +68,11 @@ export interface IFacilitiesRepository {
     facilityId: string,
     operatingHours: Array<{ dayOfWeek: FacilityDayOfWeek; openTime: string | null; closeTime: string | null; isClosed: boolean }>,
   ): Promise<void>;
+  applyOperatingHours(
+    facilityId: string,
+    operatingHours: Array<{ dayOfWeek: FacilityDayOfWeek; openTime: string | null; closeTime: string | null; isClosed: boolean }>,
+    deactivateShiftSlotIds: string[],
+  ): Promise<number>;
   findOperatingHoursByFacilityId(facilityId: string): Promise<Array<{ dayOfWeek: string; openTime: string | null; closeTime: string | null; isClosed: boolean }>>;
   findActiveShiftsForOperatingHourValidation(facilityId: string, fromDate: string): Promise<FacilityShiftScheduleViolation[]>;
   findActiveShiftSlotsForOperatingHourValidation(facilityId: string): Promise<FacilityShiftSlotScheduleViolation[]>;

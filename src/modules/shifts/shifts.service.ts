@@ -8,7 +8,7 @@ import { CheckShiftConflictDto } from './dto/requests/check-shift-conflict.dto';
 import { CopyWeekDoctorShiftDto } from './dto/requests/copy-week-doctor-shift.dto';
 import { CreateDoctorShiftDto } from './dto/requests/create-doctor-shift.dto';
 import { DoctorAvailabilityQueryDto } from './dto/requests/doctor-availability.dto';
-import { SearchDoctorShiftDto } from './dto/requests/search-doctor-shift.dto';
+import { GroupedDoctorShiftDto, SearchDoctorShiftDto } from './dto/requests/search-doctor-shift.dto';
 import { UpdateDoctorShiftDto } from './dto/requests/update-doctor-shift.dto';
 import {
   addDays,
@@ -119,6 +119,13 @@ export class ShiftsService {
     return shift;
   }
 
+  async findByIdForRemoval(id: string): Promise<DoctorShift> {
+    validateShiftId(id);
+    const shift = await this.repository.findByIdForRemoval(id);
+    if (!shift) throw new NotFoundException(RESPONSE_MESSAGES.SHIFTS.NOT_FOUND);
+    return shift;
+  }
+
   /** Lấy chi tiết ca trực theo id để trả API, có join thông tin cần cho FE hiển thị. */
   async findDetailsById(id: string): Promise<ShiftWithDetails> {
     validateShiftId(id);
@@ -169,11 +176,17 @@ export class ShiftsService {
    * - Có appointment liên quan: chuyển status cancelled, tạo disruption để xử lý bệnh nhân sau.
    */
   async remove(id: string, reason?: string, deletedBy?: string | null): Promise<SafeRemoveResult> {
-    const shift = await this.findById(id);
+    const shift = await this.findByIdForRemoval(id);
     const relatedAppointments = await this.repository.findAppointmentsForShift(shift);
     if (relatedAppointments.length === 0) {
       await this.repository.remove(shift);
       return { action: 'hard_deleted', affectedCount: 0 };
+    }
+
+    if (shift.status === DoctorShiftStatus.CANCELLED) {
+      throw new ConflictException(
+        'Ca truc da huy nhung van co lich hen lien quan, can xu ly lich hen bi anh huong truoc khi xoa cung.',
+      );
     }
 
     const activeAffectedAppointments = await this.repository.findAppointmentsForShift(shift, true);
@@ -307,6 +320,28 @@ export class ShiftsService {
         const date = addDays(start, index);
         return { date, shifts: shifts.filter(shift => shift.shiftDate === date) };
       }),
+    };
+  }
+
+  async getGroupedSchedule(query: GroupedDoctorShiftDto) {
+    validateDateRange(query.dateFrom, query.dateTo);
+    const shifts = await this.repository.findAll({
+      facilityId: query.facilityId,
+      doctorId: query.doctorId,
+      roomId: query.roomId,
+      status: query.status,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+    });
+    const groups = this.groupShiftsByPattern(shifts);
+
+    return {
+      facilityId: query.facilityId,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      totalShifts: shifts.length,
+      totalGroups: groups.length,
+      groups,
     };
   }
 
@@ -686,6 +721,91 @@ export class ShiftsService {
       appointmentStart,
       appointmentEnd,
     );
+  }
+
+  private groupShiftsByPattern(shifts: ShiftWithDetails[]) {
+    const sortedShifts = [...shifts].sort((left, right) => {
+      const dateCompare = String(left.shiftDate).localeCompare(String(right.shiftDate));
+      if (dateCompare !== 0) return dateCompare;
+      return String(left.startTime).localeCompare(String(right.startTime));
+    });
+    const groups = new Map<string, ShiftWithDetails[]>();
+
+    for (const shift of sortedShifts) {
+      const key = this.buildShiftGroupKey(shift);
+      groups.set(key, [...(groups.get(key) ?? []), shift]);
+    }
+
+    return Array.from(groups.values()).map((items, index) => {
+      const first = items[0];
+      const dates = items.map(item => String(item.shiftDate));
+      const workingDays = this.getOrderedWorkingDays(dates);
+
+      return {
+        groupIndex: index,
+        // Mot ca mau day du de FE co the dung cung kieu du lieu voi GET /management/shifts.
+        representativeShift: first,
+        facilityId: first.facilityId,
+        staffId: first.staffId ?? null,
+        doctorId: first.doctorId ?? null,
+        roleId: first.roleId ?? null,
+        roomId: first.roomId ?? null,
+        slotId: first.slotId ?? null,
+        startTime: first.startTime,
+        endTime: first.endTime,
+        maxAppointments: first.maxAppointments ?? null,
+        status: first.status,
+        note: first.note ?? null,
+        staffName: first.staffName ?? null,
+        doctorName: first.doctorName ?? null,
+        doctorTitle: first.doctorTitle ?? null,
+        doctorSpecialty: first.doctorSpecialty ?? null,
+        roleName: first.roleName ?? null,
+        facilityCode: first.facilityCode ?? null,
+        facilityName: first.facilityName ?? null,
+        roomName: first.roomName ?? null,
+        roomType: first.roomType ?? null,
+        roomTypeId: first.roomTypeId ?? null,
+        roomTypeName: first.roomTypeName ?? null,
+        slotCode: first.slotCode ?? null,
+        slotName: first.slotName ?? null,
+        dates,
+        workingDays,
+        shiftIds: items.map(item => item.id),
+        // Giu nguyen toan bo response cua tung ca de man chi tiet/sua/xoa khong phai goi lai list.
+        shifts: items.map(item => ({
+          ...item,
+          workingDay: this.getWorkingDayFromDate(item.shiftDate),
+        })),
+      };
+    });
+  }
+
+  private buildShiftGroupKey(shift: ShiftWithDetails): string {
+    return JSON.stringify({
+      facilityId: shift.facilityId,
+      staffId: shift.staffId ?? null,
+      doctorId: shift.doctorId ?? null,
+      roleId: shift.roleId ?? null,
+      roomId: shift.roomId ?? null,
+      slotId: shift.slotId ?? null,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+      maxAppointments: shift.maxAppointments ?? null,
+      status: shift.status,
+      note: shift.note ?? null,
+    });
+  }
+
+  private getOrderedWorkingDays(dates: string[]): string[] {
+    const order = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+    const uniqueDays = new Set(dates.map(date => this.getWorkingDayFromDate(date)));
+    return order.filter(day => uniqueDays.has(day));
+  }
+
+  private getWorkingDayFromDate(date: string): string {
+    const value = new Date(`${String(date).slice(0, 10)}T00:00:00.000Z`);
+    return ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][value.getUTCDay()];
   }
 
   private toDateOnly(value: string | Date): string {

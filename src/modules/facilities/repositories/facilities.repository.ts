@@ -20,6 +20,7 @@ import { Shift } from '../../shifts/entities/shift.entity';
 import { AppointmentDisruptionItem } from '../../shifts/entities/appointment-disruption-item.entity';
 import { DoctorShiftChangeLog } from '../../shifts/entities/doctor-shift-change-log.entity';
 import { ShiftDisruption } from '../../shifts/entities/shift-disruption.entity';
+import { ShiftSlot } from '../../../database/entities/shift-slot.entity';
 import {
   FacilityAdminOption,
   FacilityShiftScheduleViolation,
@@ -73,6 +74,37 @@ export class FacilitiesRepository implements IFacilitiesRepository {
         FacilityOperatingHour,
         operatingHours.map(item => manager.create(FacilityOperatingHour, { ...item, facilityId })),
       );
+    });
+  }
+
+  async applyOperatingHours(
+    facilityId: string,
+    operatingHours: Array<{ dayOfWeek: FacilityDayOfWeek; openTime: string | null; closeTime: string | null; isClosed: boolean }>,
+    deactivateShiftSlotIds: string[],
+  ): Promise<number> {
+    return this.repository.manager.transaction(async manager => {
+      let deactivatedShiftSlotCount = 0;
+
+      if (deactivateShiftSlotIds.length > 0) {
+        const result = await manager
+          .createQueryBuilder()
+          .update(ShiftSlot)
+          .set({ status: ActiveStatus.INACTIVE })
+          .where('facility_id = :facilityId', { facilityId })
+          .andWhere('id IN (:...slotIds)', { slotIds: deactivateShiftSlotIds })
+          .andWhere('deleted_at IS NULL')
+          .andWhere('status = :status', { status: ActiveStatus.ACTIVE })
+          .execute();
+        deactivatedShiftSlotCount = result.affected ?? 0;
+      }
+
+      await manager.delete(FacilityOperatingHour, { facilityId });
+      await manager.save(
+        FacilityOperatingHour,
+        operatingHours.map(item => manager.create(FacilityOperatingHour, { ...item, facilityId })),
+      );
+
+      return deactivatedShiftSlotCount;
     });
   }
 

@@ -13,6 +13,7 @@ import { FacilitiesService } from './facilities.service';
 import { PublicFacilitiesController } from './public.facilities.controller';
 import { Facility } from './entities/facility.entity';
 import { FacilityClosureDay } from './entities/facility-closure-day.entity';
+import { OperatingHoursSlotStrategy } from './dto/requests/apply-facility-operating-hours.dto';
 
 const createFacility = (overrides: Partial<Facility> = {}): Facility => ({
   id: 'fac-1',
@@ -66,6 +67,7 @@ describe('FacilitiesService', () => {
     findById: jest.fn(),
     findDetailsById: jest.fn(),
     syncOperatingHours: jest.fn(),
+    applyOperatingHours: jest.fn(),
     findOperatingHoursByFacilityId: jest.fn(),
     findActiveShiftsForOperatingHourValidation: jest.fn(),
     findActiveShiftSlotsForOperatingHourValidation: jest.fn(),
@@ -104,6 +106,7 @@ describe('FacilitiesService', () => {
     repository.findByEmail.mockResolvedValue(null);
     repository.findByPhone.mockResolvedValue(null);
     repository.syncOperatingHours.mockResolvedValue(undefined);
+    repository.applyOperatingHours.mockResolvedValue(0);
     repository.findOperatingHoursByFacilityId.mockResolvedValue([]);
     repository.findActiveShiftsForOperatingHourValidation.mockResolvedValue([]);
     repository.findActiveShiftSlotsForOperatingHourValidation.mockResolvedValue([]);
@@ -483,6 +486,102 @@ describe('FacilitiesService', () => {
         }),
       ],
     });
+  });
+
+  // Vai tro: strict apply giong update thuong, gap slot mau bi lech gio thi chan luu de FE hien canh bao.
+  it('rejects operating hour apply in strict mode when active shift slots become invalid', async () => {
+    repository.findById.mockResolvedValue(createFacility());
+    repository.findOperatingHoursByFacilityId.mockResolvedValue([]);
+    repository.findActiveShiftSlotsForOperatingHourValidation.mockResolvedValue([
+      {
+        id: 'slot-1',
+        name: 'Ca sang som',
+        code: 'CA_SANG_SOM',
+        startTime: '07:55:00',
+        endTime: '09:00:00',
+        status: 'active',
+      },
+    ]);
+
+    await expect(service.applyOperatingHours('fac-1', {
+      slotStrategy: OperatingHoursSlotStrategy.STRICT,
+      schedules: [
+        { days: ['MON', 'TUE', 'WED', 'THU', 'FRI'] as any, openTime: '07:00:00', closeTime: '17:00:00', isClosed: false },
+        { days: ['SAT'] as any, openTime: '08:00:00', closeTime: '17:00:00', isClosed: false },
+      ],
+    })).rejects.toBeInstanceOf(ConflictException);
+
+    expect(repository.applyOperatingHours).not.toHaveBeenCalled();
+    expect(repository.syncOperatingHours).not.toHaveBeenCalled();
+  });
+
+  // Vai tro: neu chi co slot mau bi lech gio, manager co the chon inactive slot do va luu gio moi trong mot luong.
+  it('applies operating hours and deactivates invalid active shift slots when strategy allows it', async () => {
+    repository.findById.mockResolvedValue(createFacility());
+    repository.findOperatingHoursByFacilityId
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { dayOfWeek: 'MON', openTime: '07:00:00', closeTime: '17:00:00', isClosed: false },
+        { dayOfWeek: 'SAT', openTime: '08:00:00', closeTime: '17:00:00', isClosed: false },
+      ]);
+    repository.findActiveShiftSlotsForOperatingHourValidation.mockResolvedValue([
+      {
+        id: 'slot-1',
+        name: 'Ca sang som',
+        code: 'CA_SANG_SOM',
+        startTime: '07:55:00',
+        endTime: '09:00:00',
+        status: 'active',
+      },
+    ]);
+    repository.applyOperatingHours.mockResolvedValue(1);
+
+    await expect(service.applyOperatingHours('fac-1', {
+      slotStrategy: OperatingHoursSlotStrategy.DEACTIVATE_INVALID_SLOTS,
+      schedules: [
+        { days: ['MON'] as any, openTime: '07:00:00', closeTime: '17:00:00', isClosed: false },
+        { days: ['SAT'] as any, openTime: '08:00:00', closeTime: '17:00:00', isClosed: false },
+      ],
+    })).resolves.toMatchObject({
+      slotStrategy: OperatingHoursSlotStrategy.DEACTIVATE_INVALID_SLOTS,
+      summary: {
+        impactedShiftCount: 0,
+        impactedShiftSlotCount: 1,
+        deactivatedShiftSlotCount: 1,
+      },
+      impactedShiftSlots: [
+        expect.objectContaining({ id: 'slot-1' }),
+      ],
+    });
+
+    expect(repository.applyOperatingHours).toHaveBeenCalledWith('fac-1', expect.any(Array), ['slot-1']);
+    expect(repository.syncOperatingHours).not.toHaveBeenCalled();
+  });
+
+  // Vai tro: du co chon inactive slot mau, ca truc that bi anh huong van phai chan vi co the da gan appointment.
+  it('rejects operating hour apply with real impacted shifts even when slot strategy deactivates slots', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-24T03:00:00.000Z'));
+    repository.findById.mockResolvedValue(createFacility());
+    repository.findOperatingHoursByFacilityId.mockResolvedValue([]);
+    repository.findActiveShiftsForOperatingHourValidation.mockResolvedValue([
+      {
+        id: 'shift-1',
+        shiftDate: '2026-07-27',
+        startTime: '07:00:00',
+        endTime: '12:00:00',
+        status: 'available',
+      },
+    ]);
+
+    await expect(service.applyOperatingHours('fac-1', {
+      slotStrategy: OperatingHoursSlotStrategy.DEACTIVATE_INVALID_SLOTS,
+      schedules: [
+        { days: ['MON'] as any, openTime: '08:00:00', closeTime: '17:00:00', isClosed: false },
+      ],
+    })).rejects.toBeInstanceOf(ConflictException);
+
+    expect(repository.applyOperatingHours).not.toHaveBeenCalled();
+    expect(repository.syncOperatingHours).not.toHaveBeenCalled();
   });
 
   // Vai tro: mo rong gio hoat dong khong lam shift cu bi sai nen van cho cap nhat.
@@ -870,6 +969,7 @@ describe('FacilitiesController', () => {
     getOperatingHours: jest.fn(),
     previewOperatingHours: jest.fn(),
     updateOperatingHours: jest.fn(),
+    applyOperatingHours: jest.fn(),
     getClosureDays: jest.fn(),
     createClosureDay: jest.fn(),
     updateClosureDay: jest.fn(),
@@ -1005,6 +1105,29 @@ describe('FacilitiesController', () => {
       data: preview,
     });
     expect(mockService.previewOperatingHours).toHaveBeenCalledWith('fac-1', dto);
+  });
+
+  // Vai tro: API apply cho phep FE gui strategy xu ly slot mau khi luu gio hoat dong.
+  it('wraps operating hour apply response after facility access check', async () => {
+    const mockService = createService();
+    const result = {
+      slotStrategy: OperatingHoursSlotStrategy.DEACTIVATE_INVALID_SLOTS,
+      summary: { impactedShiftCount: 0, impactedShiftSlotCount: 1, deactivatedShiftSlotCount: 1 },
+    };
+    mockService.applyOperatingHours.mockResolvedValue(result);
+    const controller = new FacilitiesController(mockService as any);
+    const dto = {
+      slotStrategy: OperatingHoursSlotStrategy.DEACTIVATE_INVALID_SLOTS,
+      schedules: [
+        { days: ['SAT'] as any, openTime: '08:00:00', closeTime: '17:00:00', isClosed: false },
+      ],
+    };
+
+    await expect(controller.applyOperatingHours(facilityAdmin, 'fac-1', dto)).resolves.toEqual({
+      message: RESPONSE_MESSAGES.FACILITIES.OPERATING_HOURS_UPDATED,
+      data: result,
+    });
+    expect(mockService.applyOperatingHours).toHaveBeenCalledWith('fac-1', dto);
   });
 
   // Vai tro: dam bao API tao closure-day khong cho admin co so nay tao ngay nghi cho co so khac.
