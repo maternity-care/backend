@@ -2,7 +2,7 @@ import { UserAuth } from './../auth/entities/user-auth.entity';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { MailModule } from '../mail/mail.module';
+import { JobsModule } from '../jobs/jobs.module';
 import { User } from './entities/user.entity';
 import { USERS_REPOSITORY } from './interfaces/users-repository.interface';
 import { USERS_SERVICE } from './interfaces/users-service.interface';
@@ -13,7 +13,7 @@ import { ManagementSystemUsersController } from './management-system-users.contr
 import { Appointment } from '../appointments/entities/appointment.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Appointment, UserAuth]), MailModule, ConfigModule],
+  imports: [TypeOrmModule.forFeature([User, Appointment, UserAuth]), JobsModule, ConfigModule],
   controllers: [UsersController, ManagementSystemUsersController],
   providers: [
     UsersService,
