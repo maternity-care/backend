@@ -6,7 +6,7 @@ import {
 import { RoleEnum } from './../../common/constants/role.enum';
 import { RESPONSE_MESSAGES } from './../../common/constants/response-message.constant';
 import { CurrentUser } from './../../common/decorators/current-user.decorator';
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CreatePregnancyProfileDto } from './dto/request/create-pregnancy-profile.dto';
 import { UpdatePregnancyProfileDto } from './dto/request/update-pregnancy-profile.dto';
 import { PregnancyProfile } from './entities/pregnancy-profile.entity';
@@ -16,16 +16,17 @@ import {
 } from './interfaces/pregnancy-profile-repository.interface';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { SearchProfileQueryDto } from './dto/request/search-pregnancy-profiles.dto';
-import { IMailService, MAIL_SERVICE } from '../mail/interfaces/mail-service.interface';
 import { NotificationsService } from '../notifications/notifications.service';
+import { JobsService } from '../jobs/jobs.service';
 
 @Injectable()
 export class PregnancyProfileService {
+  private readonly logger = new Logger(PregnancyProfileService.name);
+
   constructor(
     @Inject(PREGNANCY_PROFILE_REPOSITORY)
     private readonly pregnancyProfileRepository: IPregnancyProfileRepository,
-    @Inject(MAIL_SERVICE)
-    private readonly mailService: IMailService,
+    private readonly jobsService: JobsService,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -130,14 +131,22 @@ export class PregnancyProfileService {
     if (!profile) {
       throw new NotFoundException(RESPONSE_MESSAGES.PREGNANCY_PROFILES.NOT_FOUND);
     }
-    await this.mailService.sendSoftDeleteRequestEmail({
-      to: profile.user.email,
-      name: profile.user.name,
-      doctorName: user.name,
-      profileCode: profile.code,
-      reason: reason,
-      actionUrl: process.env.FRONTEND_URL,
-    });
+    try {
+      await this.jobsService.enqueueSoftDeleteRequestEmail({
+        to: profile.user.email,
+        name: profile.user.name,
+        doctorName: user.name,
+        profileCode: profile.code,
+        reason: reason,
+        actionUrl: process.env.FRONTEND_URL,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Could not enqueue soft-delete request email for pregnancy profile ${profile.id}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
     await this.notificationsService.create({
       userId: profile.user.id,
       type: NotificationType.PREGNANCY_PROFILE,

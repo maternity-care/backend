@@ -8,7 +8,6 @@ import {
   ConflictException,
   Inject,
   Injectable,
-  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -17,7 +16,6 @@ import * as bcrypt from 'bcrypt';
 import { randomBytes, createHash, randomInt } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
-import { IMailService, MAIL_SERVICE } from '../mail/interfaces/mail-service.interface';
 import { USERS_REPOSITORY, IUsersRepository } from '../users/interfaces/users-repository.interface';
 import { User } from '../users/entities/user.entity';
 import { LoginDto } from './dto/request/login.dto';
@@ -40,6 +38,7 @@ import {
   IUserAuthRepository,
   USER_AUTH_REPOSITORY,
 } from './interfaces/user-auth-repository.interface';
+import { JobsService } from '../jobs/jobs.service';
 
 const PASSWORD_RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
 const PASSWORD_RESET_TOKEN_TTL_MINUTES = 30;
@@ -50,8 +49,7 @@ export class AuthService {
   constructor(
     @Inject(USERS_REPOSITORY)
     private readonly usersRepository: IUsersRepository,
-    @Inject(MAIL_SERVICE)
-    private readonly mailService: IMailService,
+    private readonly jobsService: JobsService,
     @Inject(STAFF_PROFILE_REPOSITORY)
     private readonly staffRepository: IStaffProfileRepository,
     @InjectRepository(RefreshToken)
@@ -85,20 +83,16 @@ export class AuthService {
   async register(dto: RegisterDto): Promise<{ message: string }> {
     // Validate email trước rồi mới làm tiếp
     const otp = randomInt(0, 1000000).toString().padStart(6, '0');
-    const sendMail = this.mailService.sendOTPEmail({
+    const otpCacheKey = `verifyOtp:${dto.email}`;
+    const registerCacheKey = `register:${dto.email}`;
+    await this.cacheService.set(otpCacheKey, otp, OTP_TTL * 60 + 60);
+    await this.cacheService.set(registerCacheKey, dto, OTP_TTL * 3 * 60);
+    await this.jobsService.enqueueOtpEmail({
       to: dto.email,
       name: dto.name,
       otp,
       expiresInMinutes: OTP_TTL,
     });
-
-    if (!sendMail) {
-      throw new ServiceUnavailableException('Send mail fail');
-    }
-    const otpCacheKey = `verifyOtp:${dto.email}`;
-    const registerCacheKey = `register:${dto.email}`;
-    await this.cacheService.set(otpCacheKey, otp, OTP_TTL * 60 + 60);
-    await this.cacheService.set(registerCacheKey, dto, OTP_TTL * 3 * 60);
     return {
       message: 'Send email successfully. Please check your email to verify your account.',
     };
@@ -114,17 +108,14 @@ export class AuthService {
       };
     }
     const otp = randomInt(0, 1000000).toString().padStart(6, '0');
-    const sendMail = this.mailService.sendOTPEmail({
+    const cacheKey = `verifyOtp:${email}`;
+    await this.cacheService.set(cacheKey, otp, OTP_TTL * 60 + 60);
+    await this.jobsService.enqueueOtpEmail({
       to: email,
       name: searchInCache.name,
       otp,
       expiresInMinutes: OTP_TTL,
     });
-    if (!sendMail) {
-      throw new ServiceUnavailableException('Send mail fail');
-    }
-    const cacheKey = `verifyOtp:${email}`;
-    await this.cacheService.set(cacheKey, otp, OTP_TTL * 60 + 60);
     return {
       message: 'Send email successfully. Please check your email to verify your account.',
     };
@@ -277,7 +268,7 @@ export class AuthService {
     const frontendUrl =
       this.configService.get<string>('app.frontendUrl') ?? 'http://localhost:3000';
     const resetUrl = `${frontendUrl.replace(/\/$/, '')}/management/reset-password?token=${resetToken}`;
-    await this.mailService.sendPasswordResetEmail({
+    await this.jobsService.enqueuePasswordResetEmail({
       to: staff.email,
       name: staff.name,
       resetUrl,
@@ -360,7 +351,7 @@ export class AuthService {
       this.configService.get<string>('app.frontendUrl') ?? 'http://localhost:3000';
     const resetUrl = `${frontendUrl.replace(/\/$/, '')}/reset-password?token=${resetToken}`;
 
-    await this.mailService.sendPasswordResetEmail({
+    await this.jobsService.enqueuePasswordResetEmail({
       to: user.email,
       name: user.name,
       resetUrl,

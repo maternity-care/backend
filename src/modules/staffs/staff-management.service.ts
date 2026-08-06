@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -18,7 +19,7 @@ import { parseSearch } from '../../common/helpers/search-builder';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { Doctor } from '../doctors/entities/doctor.entity';
 import { Facility } from '../facilities/entities/facility.entity';
-import { IMailService, MAIL_SERVICE } from '../mail/interfaces/mail-service.interface';
+import { JobsService } from '../jobs/jobs.service';
 import {
   IPermissionsService,
   PERMISSIONS_SERVICE,
@@ -44,6 +45,8 @@ import { Staff } from './entities/staff.entity';
 
 @Injectable()
 export class StaffManagementService {
+  private readonly logger = new Logger(StaffManagementService.name);
+
   constructor(
     @Inject(STAFF_PROFILE_REPOSITORY)
     private readonly staffProfileRepository: IStaffProfileRepository,
@@ -51,8 +54,7 @@ export class StaffManagementService {
     private readonly rolesService: IRolesService,
     @Inject(PERMISSIONS_SERVICE)
     private readonly permissionsService: IPermissionsService,
-    @Inject(MAIL_SERVICE)
-    private readonly mailService: IMailService,
+    private readonly jobsService: JobsService,
     private readonly configService: ConfigService,
     @InjectRepository(Facility)
     private readonly facilityRepository: Repository<Facility>,
@@ -178,12 +180,20 @@ export class StaffManagementService {
     if (hasDoctorRole) {
       await this.syncDoctorProfile(staff.id, dto);
     }
-    await this.mailService.sendCreatedAccountEmail({
-      to: dto.personalEmail,
-      name: dto.name,
-      email,
-      password,
-    });
+    try {
+      await this.jobsService.enqueueCreatedAccountEmail({
+        to: dto.personalEmail,
+        name: dto.name,
+        email,
+        password,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Could not enqueue created account email for staff ${staff.id}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
 
     const freshStaff = await this.staffProfileRepository.findById(staff.id);
     return this.toManagementStaff(freshStaff ?? staff, actor);

@@ -6,11 +6,11 @@ import { ManagementPregnancyProfileController } from './management-pregnancy-pro
 import { PregnancyProfileService } from './pregnancy-profile.service';
 import { PREGNANCY_PROFILE_REPOSITORY } from './interfaces/pregnancy-profile-repository.interface';
 import { PregnancyProfileRepository } from './repositories/pregnancy-profile.repository';
-import { MailModule } from '../mail/mail.module';
+import { JobsModule } from '../jobs/jobs.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PregnancyProfile]), MailModule, NotificationsModule],
+  imports: [TypeOrmModule.forFeature([PregnancyProfile]), JobsModule, NotificationsModule],
   controllers: [PregnancyProfileController, ManagementPregnancyProfileController],
   providers: [
     PregnancyProfileService,

@@ -19,12 +19,12 @@ import { IUsersService } from './interfaces/users-service.interface';
 import { UserStatusEnum } from './users.enum';
 import { SearchUserDto } from './dto/request/search-user.dto';
 import { SearchUserResponseDto } from './dto/response/search-user-response.dto';
-import { IMailService, MAIL_SERVICE } from '../mail/interfaces/mail-service.interface';
 import { AccountStatus } from '../../common/constants/status.enum';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { getActiveFacilityId, isSuperAdmin } from '../../common/helpers/facility-scope.helper';
 import { UserAuthRepository } from '../auth/repositories/user-auth.repository';
 import { UpdatePregnantUserDto } from './dto/request/update-pregnant-user.dto';
+import { JobsService } from '../jobs/jobs.service';
 
 @Injectable()
 export class UsersService implements IUsersService {
@@ -36,8 +36,7 @@ export class UsersService implements IUsersService {
     @Inject(REDIS_CACHE_SERVICE)
     private readonly cacheService: IRedisCacheService,
     private readonly configService: ConfigService,
-    @Inject(MAIL_SERVICE)
-    private readonly mailService: IMailService,
+    private readonly jobsService: JobsService,
     @InjectRepository(UserAuth)
     private readonly userAuthRepository: UserAuthRepository,
   ) {}
@@ -172,20 +171,20 @@ export class UsersService implements IUsersService {
           }`,
         );
       }
-      try {
-        await this.mailService.sendLockAccountEmail({
+      await this.clearUsersCache(id);
+      void this.jobsService
+        .enqueueLockAccountEmail({
           to: user.email,
           name: user.name,
           reason: reason,
+        })
+        .catch((error) => {
+          this.logger.warn(
+            `Could not enqueue lock account email for user ${user.id}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
         });
-      } catch (error) {
-        this.logger.warn(
-          `Could not send lock account email for user ${user.id}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-      }
-      await this.clearUsersCache(id);
       return;
     }
 
