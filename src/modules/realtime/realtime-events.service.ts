@@ -16,6 +16,8 @@ export interface RealtimeForumEmitOptions {
   public?: boolean;
 }
 
+export type RealtimeNotificationRecipient = 'user' | 'staff';
+
 @Injectable()
 export class RealtimeEventsService {
   private readonly logger = new Logger(RealtimeEventsService.name);
@@ -51,5 +53,20 @@ export class RealtimeEventsService {
     if (shouldEmitPostRoom && postId) {
       this.server.to(`forum:post:${postId}`).emit(event, payload);
     }
+  }
+
+  emitNotification(
+    recipientType: RealtimeNotificationRecipient,
+    recipientId: string,
+    payload: Record<string, unknown>,
+  ): void {
+    if (!this.server) {
+      this.logger.debug('Realtime server is not ready for notification:new');
+      return;
+    }
+
+    this.server
+      .to(`notifications:${recipientType}:${recipientId}`)
+      .emit('notification:new', payload);
   }
 }
