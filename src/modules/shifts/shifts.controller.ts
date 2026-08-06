@@ -25,9 +25,13 @@ import { CheckShiftConflictDto } from './dto/requests/check-shift-conflict.dto';
 import { CopyWeekDoctorShiftDto } from './dto/requests/copy-week-doctor-shift.dto';
 import { CreateDoctorShiftDto } from './dto/requests/create-doctor-shift.dto';
 import { DoctorAvailabilityQueryDto } from './dto/requests/doctor-availability.dto';
-import { SearchDoctorShiftDto, WeeklyDoctorShiftDto } from './dto/requests/search-doctor-shift.dto';
+import { GroupedDoctorShiftDto, SearchDoctorShiftDto, WeeklyDoctorShiftDto } from './dto/requests/search-doctor-shift.dto';
 import { UpdateDoctorShiftDto } from './dto/requests/update-doctor-shift.dto';
-import { DoctorShiftPaginatedResponseDto, DoctorShiftResponseDto } from './dto/responses/doctor-shift-response.dto';
+import {
+  DoctorShiftPaginatedResponseDto,
+  DoctorShiftResponseDto,
+  GroupedDoctorShiftResponseDto,
+} from './dto/responses/doctor-shift-response.dto';
 import {
   AutoGenerateConfirmApiResponse,
   AutoGeneratePreviewApiResponse,
@@ -240,6 +244,24 @@ export class ShiftsController {
     };
   }
 
+  @Get('grouped')
+  // @Permissions(PermissionEnum.SHIFT_VIEW)
+  @ApiOperation({ summary: 'Group shifts in a date range by same schedule pattern' })
+  @ApiResponse({ status: 200, type: GroupedDoctorShiftResponseDto })
+  async getGrouped(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: GroupedDoctorShiftDto,
+  ) {
+    const facilityId = getActiveFacilityId(user) ?? query.facilityId;
+    if (!facilityId) throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.FACILITY_ID_REQUIRED);
+    assertFacilityAccess(user, facilityId);
+    query.facilityId = facilityId;
+    return {
+      message: RESPONSE_MESSAGES.SHIFTS.FOUND,
+      data: await this.service.getGroupedSchedule(query),
+    };
+  }
+
   @Get(':id')
   // @Permissions(PermissionEnum.SHIFT_VIEW)
   @ApiOperation({ summary: 'Get shift details' })
@@ -287,7 +309,7 @@ export class ShiftsController {
     @Param('id') id: string,
     @Query('reason') reason?: string,
   ) {
-    const existing = await this.service.findById(id);
+    const existing = await this.service.findByIdForRemoval(id);
     if (user) assertFacilityAccess(user, existing.facilityId);
     const data = await this.service.remove(id, reason, user?.id ?? null);
     return { message: RESPONSE_MESSAGES.SHIFTS.DELETED, data };

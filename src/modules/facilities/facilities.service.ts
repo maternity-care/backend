@@ -5,6 +5,7 @@ import { LookupFacilityDto, SearchFacilityDto } from './dto/requests/search-faci
 import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
 import { FacilityOperatingHourGroupDto } from './dto/requests/facility-schedule.dto';
 import { UpdateFacilityOperatingHoursDto } from './dto/requests/update-facility-operating-hours.dto';
+import { ApplyFacilityOperatingHoursDto, OperatingHoursSlotStrategy } from './dto/requests/apply-facility-operating-hours.dto';
 import {
   CreateFacilityClosureDayDto,
   SearchFacilityClosureDayDto,
@@ -17,6 +18,7 @@ import { FacilityDayOfWeek } from './entities/facility-operating-hour.entity';
 import {
   FACILITIES_REPOSITORY,
   FacilityShiftScheduleViolation,
+  FacilityShiftSlotScheduleViolation,
   FacilitySuspendImpact,
   FacilityLookup,
   FacilityWithDetails,
@@ -206,16 +208,21 @@ export class FacilitiesService {
   async previewOperatingHours(id: string, dto: UpdateFacilityOperatingHoursDto) {
     const facility = await this.findById(id);
     const operatingHours = await this.buildOperatingHoursFromGroupedInput(facility, dto);
-    const impactedShifts = await this.findOperatingHourImpactedShifts(facility.id, operatingHours);
+    const [impactedShifts, impactedShiftSlots] = await Promise.all([
+      this.findOperatingHourImpactedShifts(facility.id, operatingHours),
+      this.findOperatingHourImpactedShiftSlots(facility.id, operatingHours),
+    ]);
 
     return {
-      canUpdate: impactedShifts.length === 0,
+      canUpdate: impactedShifts.length === 0 && impactedShiftSlots.length === 0,
       summary: {
         impactedShiftCount: impactedShifts.length,
+        impactedShiftSlotCount: impactedShiftSlots.length,
       },
       operatingHours,
       operatingHourGroups: this.groupOperatingHoursForDisplay(operatingHours),
       impactedShifts,
+      impactedShiftSlots,
     };
   }
 
@@ -226,6 +233,46 @@ export class FacilitiesService {
     await this.ensureOperatingHoursCompatibleWithUpcomingShifts(facility.id, operatingHours);
     await this.facilitiesRepository.syncOperatingHours(facility.id, operatingHours);
     return this.getOperatingHours(facility.id);
+  }
+
+  async applyOperatingHours(id: string, dto: ApplyFacilityOperatingHoursDto) {
+    const facility = await this.findById(id);
+    const operatingHours = await this.buildOperatingHoursFromGroupedInput(facility, dto);
+    const slotStrategy = dto.slotStrategy ?? OperatingHoursSlotStrategy.STRICT;
+    const [impactedShifts, impactedShiftSlots] = await Promise.all([
+      this.findOperatingHourImpactedShifts(facility.id, operatingHours),
+      this.findOperatingHourImpactedShiftSlots(facility.id, operatingHours),
+    ]);
+
+    if (impactedShifts.length > 0) {
+      this.throwOperatingHoursImpactConflict(impactedShifts, impactedShiftSlots);
+    }
+
+    if (impactedShiftSlots.length > 0 && slotStrategy === OperatingHoursSlotStrategy.STRICT) {
+      this.throwOperatingHoursImpactConflict(impactedShifts, impactedShiftSlots);
+    }
+
+    const deactivateShiftSlotIds = slotStrategy === OperatingHoursSlotStrategy.DEACTIVATE_INVALID_SLOTS
+      ? impactedShiftSlots.map(slot => slot.id)
+      : [];
+    const deactivatedShiftSlotCount = await this.facilitiesRepository.applyOperatingHours(
+      facility.id,
+      operatingHours,
+      deactivateShiftSlotIds,
+    );
+    const savedOperatingHours = await this.getOperatingHours(facility.id);
+
+    return {
+      ...savedOperatingHours,
+      slotStrategy,
+      summary: {
+        impactedShiftCount: impactedShifts.length,
+        impactedShiftSlotCount: impactedShiftSlots.length,
+        deactivatedShiftSlotCount,
+      },
+      impactedShifts,
+      impactedShiftSlots,
+    };
   }
 
   // Lay danh sach ngay dong cua/dong cua dac biet cua mot co so.
@@ -571,14 +618,25 @@ export class FacilitiesService {
     facilityId: string,
     operatingHours: Array<{ dayOfWeek: string; openTime: string | null; closeTime: string | null; isClosed: boolean }>,
   ): Promise<void> {
-    const impactedShifts = await this.findOperatingHourImpactedShifts(facilityId, operatingHours);
-    if (impactedShifts.length === 0) return;
+    const [impactedShifts, impactedShiftSlots] = await Promise.all([
+      this.findOperatingHourImpactedShifts(facilityId, operatingHours),
+      this.findOperatingHourImpactedShiftSlots(facilityId, operatingHours),
+    ]);
+    if (impactedShifts.length === 0 && impactedShiftSlots.length === 0) return;
 
+    this.throwOperatingHoursImpactConflict(impactedShifts, impactedShiftSlots);
+  }
+
+  private throwOperatingHoursImpactConflict(
+    impactedShifts: ReturnType<typeof this.toImpactedShiftData>[],
+    impactedShiftSlots: ReturnType<typeof this.toImpactedShiftSlotData>[],
+  ): never {
     throw new ConflictException({
       message: RESPONSE_MESSAGES.FACILITIES.OPERATING_HOURS_HAS_IMPACTED_SHIFTS,
       data: {
         duplicatedField: 'operatingHours',
         impactedShifts,
+        impactedShiftSlots,
       },
     });
   }
@@ -662,6 +720,76 @@ export class FacilitiesService {
     return impactedShifts;
   }
 
+  private async findOperatingHourImpactedShiftSlots(
+    facilityId: string,
+    operatingHours: Array<{ dayOfWeek: string; openTime: string | null; closeTime: string | null; isClosed: boolean }>,
+  ) {
+    const slots = await this.facilitiesRepository.findActiveShiftSlotsForOperatingHourValidation(facilityId);
+    if (slots.length === 0) return [];
+
+    const openOperatingHours = operatingHours.filter(item =>
+      !item.isClosed && item.openTime && item.closeTime,
+    );
+    if (openOperatingHours.length === 0) {
+      return slots.map(slot => this.toImpactedShiftSlotData(
+        slot,
+        'Co so khong con ngay mo cua nao cho khung ca active',
+      ));
+    }
+
+    return slots
+      .map(slot => {
+        const invalidDays = this.findInvalidOperatingDaysForShiftSlot(slot, operatingHours);
+        if (invalidDays.length === 0) return null;
+        return this.toImpactedShiftSlotData(
+          slot,
+          `Khung ca khong nam trong gio mo cua moi cua: ${invalidDays.join(', ')}`,
+        );
+      })
+      .filter((item): item is ReturnType<typeof this.toImpactedShiftSlotData> => Boolean(item));
+  }
+
+  private findInvalidOperatingDaysForShiftSlot(
+    slot: FacilityShiftSlotScheduleViolation,
+    operatingHours: Array<{ dayOfWeek: string; openTime: string | null; closeTime: string | null; isClosed: boolean }>,
+  ): string[] {
+    const invalidDays: string[] = [];
+    const normalizedStart = this.normalizeTime(slot.startTime);
+    const normalizedEnd = this.normalizeTime(slot.endTime);
+    const isOvernight = isOvernightRange(normalizedStart, normalizedEnd);
+
+    for (let index = 0; index < operatingHours.length; index += 1) {
+      const operatingHour = operatingHours[index];
+      if (operatingHour.isClosed || !operatingHour.openTime || !operatingHour.closeTime) continue;
+
+      const normalizedOpen = this.normalizeTime(String(operatingHour.openTime));
+      const normalizedClose = this.normalizeTime(String(operatingHour.closeTime));
+      if (!isOvernight) {
+        if (normalizedStart < normalizedOpen || normalizedEnd > normalizedClose) {
+          invalidDays.push(this.getVietnameseDayLabel(operatingHour.dayOfWeek));
+        }
+        continue;
+      }
+
+      const nextOperatingHour = operatingHours[(index + 1) % operatingHours.length];
+      const nextOpen = nextOperatingHour?.openTime ? this.normalizeTime(String(nextOperatingHour.openTime)) : null;
+      const nextClose = nextOperatingHour?.closeTime ? this.normalizeTime(String(nextOperatingHour.closeTime)) : null;
+      const currentDayInvalid = normalizedStart < normalizedOpen || normalizedClose < '23:59:00';
+      const nextDayInvalid = !nextOperatingHour
+        || nextOperatingHour.isClosed
+        || !nextOpen
+        || !nextClose
+        || nextOpen > '00:00:00'
+        || normalizedEnd > nextClose;
+
+      if (currentDayInvalid || nextDayInvalid) {
+        invalidDays.push(this.getVietnameseDayLabel(operatingHour.dayOfWeek));
+      }
+    }
+
+    return invalidDays;
+  }
+
   private toImpactedShiftData(shift: FacilityShiftScheduleViolation, reason?: string) {
     return {
       id: shift.id,
@@ -672,6 +800,18 @@ export class FacilitiesService {
       doctorName: shift.doctorName ?? null,
       roomName: shift.roomName ?? null,
       slotName: shift.slotName ?? null,
+      reason,
+    };
+  }
+
+  private toImpactedShiftSlotData(slot: FacilityShiftSlotScheduleViolation, reason?: string) {
+    return {
+      id: slot.id,
+      name: slot.name,
+      code: slot.code,
+      startTime: this.normalizeTime(slot.startTime),
+      endTime: this.normalizeTime(slot.endTime),
+      status: slot.status,
       reason,
     };
   }

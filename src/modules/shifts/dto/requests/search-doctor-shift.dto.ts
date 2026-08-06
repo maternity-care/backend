@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsDateString, IsEnum, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 import { DoctorShiftStatus } from '../../../../common/constants/status.enum';
 import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
@@ -71,4 +71,37 @@ export class WeeklyDoctorShiftDto {
   @IsOptional()
   @IsDateString({ strict: true })
   weekStart?: string;
+}
+
+export class GroupedDoctorShiftDto {
+  @ApiPropertyOptional({ description: 'Facility bat buoc voi super admin' })
+  @IsOptional()
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  facilityId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  doctorId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  roomId?: string;
+
+  @ApiProperty({ example: '2026-08-10' })
+  @IsDateString({ strict: true })
+  dateFrom: string;
+
+  @ApiProperty({ example: '2026-08-17' })
+  @IsDateString({ strict: true })
+  dateTo: string;
+
+  @ApiPropertyOptional({ enum: DoctorShiftStatus })
+  @IsOptional()
+  @IsEnum(DoctorShiftStatus)
+  status?: DoctorShiftStatus;
 }

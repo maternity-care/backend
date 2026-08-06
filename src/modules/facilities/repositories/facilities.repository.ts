@@ -20,9 +20,11 @@ import { Shift } from '../../shifts/entities/shift.entity';
 import { AppointmentDisruptionItem } from '../../shifts/entities/appointment-disruption-item.entity';
 import { DoctorShiftChangeLog } from '../../shifts/entities/doctor-shift-change-log.entity';
 import { ShiftDisruption } from '../../shifts/entities/shift-disruption.entity';
+import { ShiftSlot } from '../../../database/entities/shift-slot.entity';
 import {
   FacilityAdminOption,
   FacilityShiftScheduleViolation,
+  FacilityShiftSlotScheduleViolation,
   FacilityLookup,
   FacilityWithDetails,
   IFacilitiesRepository,
@@ -75,6 +77,37 @@ export class FacilitiesRepository implements IFacilitiesRepository {
     });
   }
 
+  async applyOperatingHours(
+    facilityId: string,
+    operatingHours: Array<{ dayOfWeek: FacilityDayOfWeek; openTime: string | null; closeTime: string | null; isClosed: boolean }>,
+    deactivateShiftSlotIds: string[],
+  ): Promise<number> {
+    return this.repository.manager.transaction(async manager => {
+      let deactivatedShiftSlotCount = 0;
+
+      if (deactivateShiftSlotIds.length > 0) {
+        const result = await manager
+          .createQueryBuilder()
+          .update(ShiftSlot)
+          .set({ status: ActiveStatus.INACTIVE })
+          .where('facility_id = :facilityId', { facilityId })
+          .andWhere('id IN (:...slotIds)', { slotIds: deactivateShiftSlotIds })
+          .andWhere('deleted_at IS NULL')
+          .andWhere('status = :status', { status: ActiveStatus.ACTIVE })
+          .execute();
+        deactivatedShiftSlotCount = result.affected ?? 0;
+      }
+
+      await manager.delete(FacilityOperatingHour, { facilityId });
+      await manager.save(
+        FacilityOperatingHour,
+        operatingHours.map(item => manager.create(FacilityOperatingHour, { ...item, facilityId })),
+      );
+
+      return deactivatedShiftSlotCount;
+    });
+  }
+
   async findOperatingHoursByFacilityId(facilityId: string): Promise<Array<{ dayOfWeek: string; openTime: string | null; closeTime: string | null; isClosed: boolean }>> {
     return this.operatingHourRepository
       .createQueryBuilder('operatingHour')
@@ -116,6 +149,26 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       .orderBy('shift.shift_date', 'ASC')
       .addOrderBy('shift.start_time', 'ASC')
       .getRawMany<FacilityShiftScheduleViolation>();
+  }
+
+  async findActiveShiftSlotsForOperatingHourValidation(
+    facilityId: string,
+  ): Promise<FacilityShiftSlotScheduleViolation[]> {
+    return this.repository.manager
+      .createQueryBuilder()
+      .select('slot.id', 'id')
+      .addSelect('slot.name', 'name')
+      .addSelect('slot.code', 'code')
+      .addSelect('slot.start_time', 'startTime')
+      .addSelect('slot.end_time', 'endTime')
+      .addSelect('slot.status', 'status')
+      .from('shift_slots', 'slot')
+      .where('slot.facility_id = :facilityId', { facilityId })
+      .andWhere('slot.deleted_at IS NULL')
+      .andWhere('slot.status = :status', { status: ActiveStatus.ACTIVE })
+      .orderBy('slot.start_time', 'ASC')
+      .addOrderBy('slot.end_time', 'ASC')
+      .getRawMany<FacilityShiftSlotScheduleViolation>();
   }
 
   createClosureDay(data: DeepPartial<FacilityClosureDay>): FacilityClosureDay {

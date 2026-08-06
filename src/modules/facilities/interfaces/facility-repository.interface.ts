@@ -40,6 +40,15 @@ export interface FacilityShiftScheduleViolation {
   slotName?: string | null;
 }
 
+export interface FacilityShiftSlotScheduleViolation {
+  id: string;
+  name: string;
+  code: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+}
+
 export interface FacilitySuspendImpact {
   affectedRooms: number;
   affectedShifts: number;
@@ -59,8 +68,14 @@ export interface IFacilitiesRepository {
     facilityId: string,
     operatingHours: Array<{ dayOfWeek: FacilityDayOfWeek; openTime: string | null; closeTime: string | null; isClosed: boolean }>,
   ): Promise<void>;
+  applyOperatingHours(
+    facilityId: string,
+    operatingHours: Array<{ dayOfWeek: FacilityDayOfWeek; openTime: string | null; closeTime: string | null; isClosed: boolean }>,
+    deactivateShiftSlotIds: string[],
+  ): Promise<number>;
   findOperatingHoursByFacilityId(facilityId: string): Promise<Array<{ dayOfWeek: string; openTime: string | null; closeTime: string | null; isClosed: boolean }>>;
   findActiveShiftsForOperatingHourValidation(facilityId: string, fromDate: string): Promise<FacilityShiftScheduleViolation[]>;
+  findActiveShiftSlotsForOperatingHourValidation(facilityId: string): Promise<FacilityShiftSlotScheduleViolation[]>;
   createClosureDay(data: DeepPartial<FacilityClosureDay>): FacilityClosureDay;
   saveClosureDay(closureDay: FacilityClosureDay): Promise<FacilityClosureDay>;
   removeClosureDay(closureDay: FacilityClosureDay): Promise<void>;

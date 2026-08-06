@@ -4,6 +4,7 @@ import { FacilitiesService } from './facilities.service';
 import { CreateFacilityDto } from './dto/requests/create-facility.dto';
 import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
 import { UpdateFacilityOperatingHoursDto } from './dto/requests/update-facility-operating-hours.dto';
+import { ApplyFacilityOperatingHoursDto } from './dto/requests/apply-facility-operating-hours.dto';
 import {
   CreateFacilityClosureDayDto,
   SearchFacilityClosureDayDto,
@@ -267,6 +268,25 @@ export class FacilitiesController {
       return {
         message: RESPONSE_MESSAGES.FACILITIES.OPERATING_HOURS_UPDATED,
         data: await this.facilitiesService.updateOperatingHours(id, dto),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Patch(':id/operating-hours/apply')
+  // @Permissions(PermissionEnum.FACILITY_UPDATE)
+  @ApiOperation({ summary: 'Apply facility operating hour changes with slot handling strategy' })
+  async applyOperatingHours(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: ApplyFacilityOperatingHoursDto,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITIES.OPERATING_HOURS_UPDATED,
+        data: await this.facilitiesService.applyOperatingHours(id, dto),
       };
     } catch (error) {
       this.handleError(error);

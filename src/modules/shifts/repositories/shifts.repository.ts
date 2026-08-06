@@ -57,7 +57,36 @@ export class ShiftsRepository implements IShiftsRepository {
 
   // Hard delete khỏi DB; service chỉ nên gọi khi đã chắc chắn ca chưa có appointment liên quan.
   async remove(shift: DoctorShift): Promise<void> {
-    await this.repository.remove(shift);
+    await this.repository.manager.transaction(async manager => {
+      await manager
+        .createQueryBuilder()
+        .delete()
+        .from(AppointmentDisruptionItem)
+        .where(`
+          disruption_id IN (
+            SELECT disruption.id
+            FROM shift_disruptions disruption
+            WHERE disruption.shift_id = :shiftId
+              OR disruption.doctor_shift_id = :shiftId
+              OR (disruption.source_type = :sourceType AND disruption.source_id = :shiftId)
+          )
+        `)
+        .setParameters({ shiftId: shift.id, sourceType: 'shift' })
+        .execute();
+
+      await manager.delete(ShiftDisruption, [
+        { shiftId: shift.id },
+        { doctorShiftId: shift.id },
+        { sourceType: 'shift', sourceId: shift.id },
+      ]);
+      await manager
+        .createQueryBuilder()
+        .delete()
+        .from('shift_change_logs')
+        .where('shift_id = :shiftId', { shiftId: shift.id })
+        .execute();
+      await manager.delete(DoctorShift, { id: shift.id });
+    });
   }
 
   // Tìm ca theo id và loại các ca đã soft-delete/cancel bằng deletedAt.
@@ -66,6 +95,15 @@ export class ShiftsRepository implements IShiftsRepository {
       .createQueryBuilder('shift')
       .where('shift.id = :id', { id })
       .andWhere('shift.deletedAt IS NULL')
+      .getOne();
+  }
+
+  // Dung rieng cho DELETE de xu ly duoc cac ca cancelled cu da lo bi gan deletedAt.
+  findByIdForRemoval(id: string): Promise<DoctorShift | null> {
+    return this.repository
+      .createQueryBuilder('shift')
+      .withDeleted()
+      .where('shift.id = :id', { id })
       .getOne();
   }
 
@@ -317,9 +355,6 @@ export class ShiftsRepository implements IShiftsRepository {
       // Soft-cancel ca trực: không hard delete vì đã có lịch sử/appointment liên quan.
       await manager.update(DoctorShift, shift.id, {
         status: DoctorShiftStatus.CANCELLED,
-        deletedAt: new Date(),
-        deletedBy: changedBy ?? null,
-        deletedReason: reason ?? null,
       });
 
       //log 2
