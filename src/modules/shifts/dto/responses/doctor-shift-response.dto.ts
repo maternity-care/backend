@@ -6,22 +6,22 @@ export class DoctorShiftResponseDto {
   @ApiProperty()
   id: string;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   doctorId?: string | null;
 
   @ApiPropertyOptional()
   staffId?: string;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   roleId?: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   slotId?: string | null;
 
   @ApiProperty()
   facilityId: string;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   roomId: string | null;
 
   @ApiProperty()
@@ -33,13 +33,13 @@ export class DoctorShiftResponseDto {
   @ApiProperty()
   endTime: string;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: Number, nullable: true })
   maxAppointments: number | null;
 
   @ApiProperty({ enum: DoctorShiftStatus })
   status: DoctorShiftStatus;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   note?: string | null;
 
   @ApiProperty()
@@ -69,22 +69,22 @@ export class DoctorShiftResponseDto {
   @ApiPropertyOptional()
   facilityName?: string;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   roomName?: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   roomType?: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   roomTypeId?: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   roomTypeName?: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   slotCode?: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   slotName?: string | null;
 }
 
@@ -97,89 +97,8 @@ export class DoctorShiftGroupResponseDto {
   @ApiProperty()
   groupIndex: number;
 
-  @ApiProperty({ type: DoctorShiftResponseDto })
-  representativeShift: DoctorShiftResponseDto;
-
-  @ApiProperty()
-  facilityId: string;
-
-  @ApiPropertyOptional({ nullable: true })
-  staffId?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  doctorId?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  roleId?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  roomId?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  slotId?: string | null;
-
-  @ApiProperty()
-  startTime: string;
-
-  @ApiProperty()
-  endTime: string;
-
-  @ApiPropertyOptional({ nullable: true })
-  maxAppointments?: number | null;
-
-  @ApiProperty({ enum: DoctorShiftStatus })
-  status: DoctorShiftStatus;
-
-  @ApiPropertyOptional({ nullable: true })
-  note?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  staffName?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  doctorName?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  doctorTitle?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  doctorSpecialty?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  roleName?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  facilityCode?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  facilityName?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  roomName?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  roomType?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  roomTypeId?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  roomTypeName?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  slotCode?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  slotName?: string | null;
-
-  @ApiProperty({ type: [String], example: ['2026-08-10', '2026-08-12'] })
-  dates: string[];
-
   @ApiProperty({ type: [String], example: ['MON', 'WED'] })
   workingDays: string[];
-
-  @ApiProperty({ type: [String] })
-  shiftIds: string[];
 
   @ApiProperty({ type: [GroupedShiftItemResponseDto] })
   shifts: GroupedShiftItemResponseDto[];

@@ -1280,28 +1280,9 @@ describe('ShiftsService business validation', () => {
       totalShifts: 3,
       totalGroups: 2,
       groups: [
-        expect.objectContaining({
-          slotId: '1',
-          slotName: 'Ca sang',
-          doctorId: '1',
-          roomId: '2',
-          doctorTitle: 'Bac si chuyen khoa I',
-          doctorSpecialty: 'San phu khoa',
-          facilityCode: 'FAC-01',
-          facilityName: 'Co so 1',
-          roomType: 'EXAM',
-          roomTypeId: '20',
-          roomTypeName: 'Phong kham',
-          dates: ['2099-07-06', '2099-07-08'],
+        {
+          groupIndex: 0,
           workingDays: ['MON', 'WED'],
-          shiftIds: ['mon', 'wed'],
-          representativeShift: expect.objectContaining({
-            id: 'mon',
-            shiftDate: '2099-07-06',
-            facilityName: 'Co so 1',
-            doctorTitle: 'Bac si chuyen khoa I',
-            roomTypeName: 'Phong kham',
-          }),
           shifts: [
             expect.objectContaining({
               id: 'mon',
@@ -1317,12 +1298,19 @@ describe('ShiftsService business validation', () => {
               roomTypeName: 'Phong kham',
             }),
           ],
-        }),
-        expect.objectContaining({
-          slotId: '2',
+        },
+        {
+          groupIndex: 1,
           workingDays: ['THU'],
-          shiftIds: ['thu'],
-        }),
+          shifts: [
+            expect.objectContaining({
+              id: 'thu',
+              shiftDate: '2099-07-09',
+              workingDay: 'THU',
+              slotId: '2',
+            }),
+          ],
+        },
       ],
     });
     expect(repo.findAll).toHaveBeenCalledWith({

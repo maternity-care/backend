@@ -737,42 +737,14 @@ export class ShiftsService {
     }
 
     return Array.from(groups.values()).map((items, index) => {
-      const first = items[0];
       const dates = items.map(item => String(item.shiftDate));
       const workingDays = this.getOrderedWorkingDays(dates);
 
       return {
         groupIndex: index,
-        // Mot ca mau day du de FE co the dung cung kieu du lieu voi GET /management/shifts.
-        representativeShift: first,
-        facilityId: first.facilityId,
-        staffId: first.staffId ?? null,
-        doctorId: first.doctorId ?? null,
-        roleId: first.roleId ?? null,
-        roomId: first.roomId ?? null,
-        slotId: first.slotId ?? null,
-        startTime: first.startTime,
-        endTime: first.endTime,
-        maxAppointments: first.maxAppointments ?? null,
-        status: first.status,
-        note: first.note ?? null,
-        staffName: first.staffName ?? null,
-        doctorName: first.doctorName ?? null,
-        doctorTitle: first.doctorTitle ?? null,
-        doctorSpecialty: first.doctorSpecialty ?? null,
-        roleName: first.roleName ?? null,
-        facilityCode: first.facilityCode ?? null,
-        facilityName: first.facilityName ?? null,
-        roomName: first.roomName ?? null,
-        roomType: first.roomType ?? null,
-        roomTypeId: first.roomTypeId ?? null,
-        roomTypeName: first.roomTypeName ?? null,
-        slotCode: first.slotCode ?? null,
-        slotName: first.slotName ?? null,
-        dates,
         workingDays,
-        shiftIds: items.map(item => item.id),
-        // Giu nguyen toan bo response cua tung ca de man chi tiet/sua/xoa khong phai goi lai list.
+        // Mỗi ca giữ nguyên toàn bộ field của GET /management/shifts.
+        // FE dùng shifts[0] làm mẫu của nhóm và workingDays để tạo lịch tuần kế tiếp.
         shifts: items.map(item => ({
           ...item,
           workingDay: this.getWorkingDayFromDate(item.shiftDate),
