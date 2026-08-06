@@ -6,11 +6,11 @@ import { ManagementDoctorsController } from './management-doctors.controller';
 import { DoctorsService } from './doctors.service';
 import { DOCTORS_REPOSITORY } from './interfaces/doctors-repository.interface';
 import { DoctorsRepository } from './repositories/doctors.repository';
-import { UsersModule } from '../users/users.module';
+import { StaffsModule } from '../staffs/staffs.module';
 import { LandingPageDoctorController } from './landing-page-doctor.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Doctor]), UsersModule],
+  imports: [TypeOrmModule.forFeature([Doctor]), StaffsModule],
   controllers: [DoctorsController, ManagementDoctorsController, LandingPageDoctorController],
   providers: [DoctorsService, { provide: DOCTORS_REPOSITORY, useClass: DoctorsRepository }],
   exports: [DoctorsService],
