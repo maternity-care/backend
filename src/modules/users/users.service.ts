@@ -1,79 +1,45 @@
 import { UserAuth } from './../auth/entities/user-auth.entity';
-import { Staff } from './../staffs/entities/staff.entity';
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
-import { In, Repository } from 'typeorm';
 import { IRedisCacheService, REDIS_CACHE_SERVICE } from '../../common/cache/redis-cache.interface';
-import {
-  PERMISSIONS_SERVICE,
-  IPermissionsService,
-} from '../permissions/interfaces/permissions-service.interface';
 import { CreateUserDto } from './dto/request/create-user.dto';
 import { UpdateProfileDto } from './dto/request/update-profile.dto';
-import { UpdateUserDto } from './dto/request/update-user.dto';
-import { UserPermissionOverrideDto } from './dto/request/user-permission-override.dto';
 import { User } from './entities/user.entity';
 import { IUsersRepository, USERS_REPOSITORY } from './interfaces/users-repository.interface';
 import { IUsersService } from './interfaces/users-service.interface';
-import { IRolesService, ROLES_SERVICE } from '../roles/interfaces/roles-service.interface';
 import { UserStatusEnum } from './users.enum';
-import { IAdminManageService } from './interfaces/admin-manage-service.interface';
-import { RoleEnum } from '../../common/constants/role.enum';
-import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
-import {
-  IStaffProfileRepository,
-  STAFF_PROFILE_REPOSITORY,
-} from '../staffs/interfaces/staff-profile-repository.interface';
-import { AdminCreateUserDto } from './dto/request/admin-create-user.dto';
 import { SearchUserDto } from './dto/request/search-user.dto';
 import { SearchUserResponseDto } from './dto/response/search-user-response.dto';
 import { IMailService, MAIL_SERVICE } from '../mail/interfaces/mail-service.interface';
-import { Facility } from '../facilities/entities/facility.entity';
-import { Doctor } from '../doctors/entities/doctor.entity';
-import { FacilityStaffAssignmentDto } from './dto/request/facility-staff-assignment.dto';
-import { AccountStatus, ActiveStatus, FacilityStatus } from '../../common/constants/status.enum';
+import { AccountStatus } from '../../common/constants/status.enum';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { getActiveFacilityId, isSuperAdmin } from '../../common/helpers/facility-scope.helper';
 import { UserAuthRepository } from '../auth/repositories/user-auth.repository';
 import { UpdatePregnantUserDto } from './dto/request/update-pregnant-user.dto';
-import {
-  StaffPermission,
-  StaffPermissionEffectEnum,
-} from '../permissions/entities/staff-permission.entity';
 
 @Injectable()
-export class UsersService implements IUsersService, IAdminManageService {
+export class UsersService implements IUsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     @Inject(USERS_REPOSITORY)
     private readonly usersRepository: IUsersRepository,
-    @Inject(ROLES_SERVICE)
-    private readonly rolesService: IRolesService,
-    @Inject(PERMISSIONS_SERVICE)
-    private readonly permissionsService: IPermissionsService,
     @Inject(REDIS_CACHE_SERVICE)
     private readonly cacheService: IRedisCacheService,
     private readonly configService: ConfigService,
-    @Inject(STAFF_PROFILE_REPOSITORY)
-    private readonly staffProfileRepository: IStaffProfileRepository,
     @Inject(MAIL_SERVICE)
     private readonly mailService: IMailService,
-    @InjectRepository(Facility)
-    private readonly facilityRepository: Repository<Facility>,
-    @InjectRepository(Doctor)
-    private readonly doctorRepository: Repository<Doctor>,
     @InjectRepository(UserAuth)
     private readonly userAuthRepository: UserAuthRepository,
-    @InjectRepository(StaffPermission)
-    private readonly staffPermissionRepository: Repository<StaffPermission>,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
@@ -191,18 +157,34 @@ export class UsersService implements IUsersService, IAdminManageService {
       throw new NotFoundException('Không tìm thấy thông tin người dùng.');
     }
 
-    if (status === UserStatusEnum.INACTIVE) {
+    if (status === UserStatusEnum.INACTIVE || status === UserStatusEnum.LOCKED) {
       if (!reason) {
         throw new BadRequestException('Vui lý nhập lý do khóa tài khoản.');
       }
 
       await this.usersRepository.updateStatus(id, status, reason);
-      await this.mailService.sendLockAccountEmail({
-        to: user.email,
-        name: user.name,
-        reason: reason,
-      });
-      await this.userAuthRepository.updateStatus(user.id, status);
+      try {
+        await this.userAuthRepository.updateStatus(user.id, status);
+      } catch (error) {
+        this.logger.warn(
+          `Could not sync auth status for user ${user.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+      try {
+        await this.mailService.sendLockAccountEmail({
+          to: user.email,
+          name: user.name,
+          reason: reason,
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Could not send lock account email for user ${user.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
       await this.clearUsersCache(id);
       return;
     }
@@ -219,185 +201,6 @@ export class UsersService implements IUsersService, IAdminManageService {
     }
   }
 
-  private async syncPermissionOverrides(
-    userId: string,
-    overrides?: UserPermissionOverrideDto[],
-  ): Promise<void> {
-    if (overrides === undefined) {
-      return;
-    }
-
-    const uniqueOverrides = Array.from(
-      new Map(overrides.map((override) => [override.permissionId, override])).values(),
-    );
-    const permissions = await this.permissionsService.findByIds(
-      uniqueOverrides.map((override) => override.permissionId),
-    );
-
-    if (permissions.length !== uniqueOverrides.length) {
-      throw new NotFoundException('One or more permissions were not found');
-    }
-
-    if (uniqueOverrides.length === 0) {
-      await this.staffPermissionRepository.delete({ staffId: userId });
-      return;
-    }
-
-    await this.staffPermissionRepository.delete({ staffId: userId });
-    await this.staffPermissionRepository.save(
-      uniqueOverrides.map((override) =>
-        this.staffPermissionRepository.create({
-          staffId: userId,
-          permissionId: override.permissionId,
-          effect: override.effect as StaffPermissionEffectEnum,
-        }),
-      ),
-    );
-  }
-
-  async findUserById(id: string, actor?: AuthenticatedUser): Promise<User | null> {
-    await this.assertStaffAccess(id, actor);
-    const staff = await this.staffProfileRepository.findById(id);
-    return staff ? ((await this.toManagementStaff(staff, actor)) as unknown as User) : null;
-  }
-
-  async findUserByEmail(email: string): Promise<User | null> {
-    return this.staffProfileRepository.findByEmail(email) as unknown as Promise<User | null>;
-  }
-
-  async createUser(dto: AdminCreateUserDto, actor?: AuthenticatedUser): Promise<User> {
-    const facilityAssignments = this.getScopedAssignments(dto.facilityAssignments, actor);
-    const assignments = await this.resolveFacilityAssignments(facilityAssignments);
-    const hasDoctorRole = facilityAssignments.some((assignment) =>
-      assignment.roles.includes(RoleEnum.DOCTOR),
-    );
-    if (hasDoctorRole) {
-      if (!dto.licenseNo || !dto.title || !dto.specialty || dto.yearsOfExperience === undefined) {
-        throw new BadRequestException('Nhân viên có chức vụ bác sĩ phải có đầy đủ hồ sơ bác sĩ.');
-      }
-      const existingDoctor = await this.doctorRepository.findOne({
-        where: { licenseNo: dto.licenseNo },
-      });
-      if (existingDoctor) {
-        throw new ConflictException('Số giấy phép hành nghề đã tồn tại.');
-      }
-    }
-    // check personal email của nhân viên đã tồn tại trong hệ thống chưa
-    const isPersonalEmailExists = await this.staffProfileRepository.checkPersonalEmailExists(
-      dto.personalEmail,
-    );
-    if (isPersonalEmailExists) {
-      throw new ConflictException(
-        'Email cá nhân đã tồn tại trong hệ thống. Vui lòng sử dụng email khác.',
-      );
-    }
-
-    const email = await this.staffProfileRepository.generateStaffEmailFromName(dto.name);
-    const password = this.staffProfileRepository.generateStaffPassword();
-    const employeeCode = await this.staffProfileRepository.generateStaffEmployeeCode();
-    const staff = await this.staffProfileRepository.create({
-      name: dto.name,
-      email,
-      phone: dto.phone,
-      password: await bcrypt.hash(
-        password,
-        this.configService.getOrThrow<number>('bcrypt.saltRounds'),
-      ),
-      personalEmail: dto.personalEmail,
-      employeeCode: `${this.getPositionCodePrefix(facilityAssignments)}${employeeCode}`,
-      status: UserStatusEnum.ACTIVE,
-      roles: [],
-    });
-    await this.syncFacilityAssignments(staff.id, assignments);
-    await this.syncPermissionOverrides(staff.id, dto.permissionOverrides);
-    if (hasDoctorRole) {
-      await this.doctorRepository.save(
-        this.doctorRepository.create({
-          staffId: staff.id,
-          licenseNo: dto.licenseNo!,
-          title: dto.title!,
-          specialty: dto.specialty!,
-          yearsOfExperience: dto.yearsOfExperience!,
-          workingRoomTypeId: dto.workingRoomTypeId,
-          bio: dto.bio,
-          status: ActiveStatus.ACTIVE,
-        }),
-      );
-    }
-    await this.mailService.sendCreatedAccountEmail({
-      to: dto.personalEmail,
-      name: dto.name,
-      email: email,
-      password: password,
-    });
-    return {
-      ...((await this.toManagementStaff(staff, actor)) as unknown as User),
-    };
-  }
-
-  async updateUser(id: string, dto: UpdateUserDto, actor?: AuthenticatedUser): Promise<User> {
-    await this.assertStaffAccess(id, actor);
-    const facilityAssignments = dto.facilityAssignments
-      ? this.getScopedAssignments(dto.facilityAssignments, actor)
-      : null;
-    const assignments = facilityAssignments
-      ? await this.resolveFacilityAssignments(facilityAssignments)
-      : null;
-    const staff = await this.staffProfileRepository.findById(id);
-    if (!staff) throw new NotFoundException('Không tìm thấy nhân viên.');
-    staff.name = dto.name ?? staff.name;
-    staff.phone = dto.phone ?? staff.phone;
-    staff.status = dto.status ?? staff.status;
-    const updatedStaff = await this.staffProfileRepository.save(staff);
-    await this.syncPermissionOverrides(staff.id, dto.permissionOverrides);
-    if (assignments) {
-      await this.syncFacilityAssignments(
-        staff.id,
-        assignments,
-        actor ? getActiveFacilityId(actor) : null,
-      );
-      const hasDoctorRole = facilityAssignments!.some((assignment) =>
-        assignment.roles.includes(RoleEnum.DOCTOR),
-      );
-      if (hasDoctorRole) {
-        const doctor = await this.doctorRepository.findOne({
-          where: { staffId: staff.id },
-        });
-        if (
-          !doctor &&
-          (!dto.licenseNo || !dto.title || !dto.specialty || dto.yearsOfExperience === undefined)
-        ) {
-          throw new BadRequestException('Nhân viên có chức vụ bác sĩ phải có đầy đủ hồ sơ bác sĩ.');
-        }
-        await this.doctorRepository.save(
-          this.doctorRepository.create({
-            ...doctor,
-            staffId: staff.id,
-            licenseNo: dto.licenseNo ?? doctor!.licenseNo,
-            title: dto.title ?? doctor!.title,
-            specialty: dto.specialty ?? doctor!.specialty,
-            yearsOfExperience: dto.yearsOfExperience ?? doctor!.yearsOfExperience,
-            bio: dto.bio ?? doctor?.bio,
-            status: doctor?.status ?? ActiveStatus.ACTIVE,
-          }),
-        );
-      }
-    }
-    return (await this.toManagementStaff(updatedStaff, actor)) as unknown as User;
-  }
-
-  async updateUserStatus(
-    id: string,
-    status: AccountStatus,
-    actor?: AuthenticatedUser,
-  ): Promise<void> {
-    await this.assertStaffAccess(id, actor);
-    const staff = await this.staffProfileRepository.findById(id);
-    if (!staff) throw new NotFoundException('Không tìm thấy nhân viên.');
-    staff.status = status;
-    await this.staffProfileRepository.save(staff);
-  }
-
   async searchUsers(
     query: SearchUserDto,
     actor?: AuthenticatedUser,
@@ -410,161 +213,4 @@ export class UsersService implements IUsersService, IAdminManageService {
     }
     return this.usersRepository.searchUsers(query);
   }
-
-  private async syncFacilityAssignments(
-    staffId: string,
-    assignments: ResolvedFacilityAssignment[],
-    facilityScopeId: string | null = null,
-  ): Promise<void> {}
-
-  private getScopedAssignments(
-    assignments: FacilityStaffAssignmentDto[],
-    actor?: AuthenticatedUser,
-  ): FacilityStaffAssignmentDto[] {
-    if (!actor || isSuperAdmin(actor)) return assignments;
-    const activeFacilityId = getActiveFacilityId(actor);
-    if (
-      !activeFacilityId ||
-      assignments.length !== 1 ||
-      String(assignments[0].facilityId) !== String(activeFacilityId)
-    ) {
-      throw new ForbiddenException('Admin chỉ được phân công nhân viên tại cơ sở đang làm việc.');
-    }
-    return assignments;
-  }
-
-  private async assertStaffAccess(staffId: string, actor?: AuthenticatedUser): Promise<void> {
-    if (!actor || isSuperAdmin(actor)) return;
-    const activeFacilityId = getActiveFacilityId(actor);
-    if (!activeFacilityId) {
-      throw new ForbiddenException(RESPONSE_MESSAGES.FACILITY_SELECTION_REQUIRED);
-    }
-  }
-
-  private async resolveFacilityAssignments(
-    assignments: FacilityStaffAssignmentDto[],
-  ): Promise<ResolvedFacilityAssignment[]> {
-    if (assignments.length === 0) {
-      throw new ConflictException('Nhân viên phải thuộc ít nhất một cơ sở.');
-    }
-    const uniqueAssignments = new Map<string, FacilityStaffAssignmentDto>();
-    for (const assignment of assignments) {
-      const facilityId = String(assignment.facilityId);
-      if (uniqueAssignments.has(facilityId)) {
-        throw new ConflictException('Mỗi cơ sở chỉ được gán một chức vụ cho nhân viên.');
-      }
-      uniqueAssignments.set(facilityId, {
-        ...assignment,
-        facilityId,
-        roles: [...new Set(assignment.roles)],
-      });
-    }
-    const facilityIds = [...uniqueAssignments.keys()];
-
-    const count = await this.facilityRepository.count({
-      where: {
-        id: In(facilityIds),
-        status: In([FacilityStatus.ACTIVE]),
-      },
-    });
-    if (count !== facilityIds.length) {
-      throw new NotFoundException('Một hoặc nhiều cơ sở không tồn tại hoặc đã ngừng hoạt động.');
-    }
-
-    const resolved = await Promise.all(
-      [...uniqueAssignments.values()].flatMap(({ facilityId, roles }) =>
-        roles.map(async (role) => {
-          const roleEntity = await this.rolesService.findByName(role);
-          if (!roleEntity) {
-            throw new NotFoundException(`Không tìm thấy role ${role}.`);
-          }
-          return { facilityId, roleId: roleEntity.id };
-        }),
-      ),
-    );
-    return resolved;
-  }
-
-  private async toManagementStaff(
-    profile: Staff,
-    actor?: AuthenticatedUser,
-  ): Promise<Record<string, unknown>> {
-    const staffProfile = await this.getStaffProfileSummary(profile.id, actor);
-    return {
-      ...profile,
-      permissionOverrides: (profile.permissions ?? []).map((override) => ({
-        permission: override.permission,
-        effect: override.effect,
-      })),
-      staffProfile,
-    };
-  }
-
-  private async getStaffProfileSummary(
-    staffId: string,
-    actor?: AuthenticatedUser,
-  ): Promise<StaffProfileSummary | null> {
-    const profile = await this.staffProfileRepository.findById(staffId);
-    if (!profile) return null;
-    const doctor = await this.doctorRepository.findOne({ where: { staffId } });
-    return {
-      id: profile.id,
-      staffId: profile.id,
-      personalEmail: profile.personalEmail,
-      employeeCode: profile.employeeCode,
-      status: profile.status,
-      facilityAssignments: profile.facilityId
-        ? [
-            {
-              facilityId: String(profile.facilityId),
-              roles: (profile.roles ?? []).map((role) => role.name),
-            },
-          ]
-        : [],
-      doctor: doctor
-        ? {
-            id: doctor.id,
-            licenseNo: doctor.licenseNo,
-            title: doctor.title,
-            specialty: doctor.specialty,
-            yearsOfExperience: doctor.yearsOfExperience,
-            bio: doctor.bio,
-            status: doctor.status,
-          }
-        : null,
-    };
-  }
-
-  private getPositionCodePrefix(assignments: FacilityStaffAssignmentDto[]): string {
-    const roles = new Set(assignments.flatMap((assignment) => assignment.roles));
-    if (roles.has(RoleEnum.ADMIN)) return 'AD';
-    if (roles.has(RoleEnum.DOCTOR)) return 'DR';
-    if (roles.has(RoleEnum.NURSE)) return 'NU';
-    return 'ST';
-  }
-}
-
-export interface StaffProfileSummary {
-  id: string;
-  staffId: string;
-  personalEmail: string;
-  employeeCode: string;
-  status: AccountStatus;
-  facilityAssignments: Array<{ facilityId: string; roles: string[] }>;
-  doctor: DoctorSummary | null;
-}
-
-interface DoctorSummary {
-  id: string;
-  licenseNo: string;
-  title: string;
-  specialty: string;
-  yearsOfExperience: number;
-  bio: string;
-  status: ActiveStatus;
-}
-
-interface ResolvedFacilityAssignment {
-  facilityId: string;
-  roleId: string;
 }
