@@ -14,12 +14,22 @@ import { Room } from '../../rooms/entities/room.entity';
 import { Service } from '../../services/entities/service.entity';
 import { Staff } from '../../staffs/entities/staff.entity';
 import { User } from '../../users/entities/user.entity';
+import { DoctorShift } from '../../shifts/entities/shift.entity';
 
 @Entity('appointments')
 export class Appointment {
   @ApiProperty({ type: String, example: '1' })
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: string;
+
+  @ApiPropertyOptional({ type: () => DoctorShift, nullable: true, required: false })
+  @ManyToOne(() => DoctorShift, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'shift_id' })
+  shift: DoctorShift | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'shift_id', type: 'bigint', nullable: true })
+  shiftId: string | null;
 
   @ApiProperty({ type: () => User })
   @ManyToOne(() => User, { onDelete: 'RESTRICT', nullable: false })

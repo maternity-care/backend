@@ -31,6 +31,7 @@ import { AppointmentsModule } from './modules/appointments/appointments.module';
 import { SchedulesModule } from './modules/schedules/schedules.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { ForumsModule } from './modules/forums/forums.module';
+import { AppointmentDisruptionsModule } from './modules/appointment-disruptions/appointment-disruptions.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -78,6 +79,7 @@ import { ForumsModule } from './modules/forums/forums.module';
     ChatbotModule,
     SchedulesModule,
     AppointmentsModule,
+    AppointmentDisruptionsModule,
   ],
 })
 export class AppModule {}

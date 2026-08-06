@@ -5,6 +5,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   BulkCreateRoomsDto,
@@ -44,6 +45,7 @@ import { RESPONSE_MESSAGES } from '../../common/constants/response-message.const
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
 import { ActiveStatus, FacilityStatus, InactiveSource } from '../../common/constants/status.enum';
 import { SuspendResourceDto } from '../../common/dto/suspend-resource.dto';
+import { AppointmentDisruptionsService } from '../appointment-disruptions/appointment-disruptions.service';
 
 @Injectable()
 export class RoomsService {
@@ -51,6 +53,7 @@ export class RoomsService {
     @Inject(ROOMS_REPOSITORY)
     private readonly roomsRepository: IRoomsRepository,
     private readonly facilitiesService: FacilitiesService,
+    @Optional() private readonly appointmentDisruptions?: AppointmentDisruptionsService,
   ) {}
 
   async create(dto: CreateRoomDto): Promise<RoomWithDetails> {
@@ -257,6 +260,7 @@ export class RoomsService {
       dto.reason ?? null,
       actorId ?? null,
     );
+    await this.appointmentDisruptions?.dispatchBySource('room', room.id);
 
     return {
       room: await this.findDetailsById(room.id),

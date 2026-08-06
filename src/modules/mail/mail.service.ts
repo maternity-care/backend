@@ -6,12 +6,14 @@ import {
   RequestSoftDeleteEmailInput,
   SendOTPEmailInput,
   SendPasswordResetEmailInput,
+  SendAppointmentDisruptionEmailInput,
 } from './interfaces/mail-service.interface';
 import { passwordResetTemplate } from './templates/password-reset.template';
 import { createdAccountTemplate } from './templates/created-account.template';
 import { CreatedAccountInterface } from './interfaces/created-account.interface';
 import { createRequestSoftDeletePregnancyProfileTemplate } from './templates/request-soft-delete-pregnancy-profile.template';
 import { sendOTPEmailTemplate } from './templates/send-otp-email.template';
+import { appointmentDisruptionTemplate } from './templates/appointment-disruption.template';
 
 interface MailPayload {
   to: string;
@@ -107,6 +109,16 @@ export class MailService implements IMailService {
   async sendOTPEmail(input: SendOTPEmailInput): Promise<void> {
     const template = sendOTPEmailTemplate(input);
 
+    await this.sendMail({
+      to: input.to,
+      subject: template.subject,
+      text: template.text,
+      html: template.html,
+    });
+  }
+
+  async sendAppointmentDisruptionEmail(input: SendAppointmentDisruptionEmailInput): Promise<void> {
+    const template = appointmentDisruptionTemplate(input);
     await this.sendMail({
       to: input.to,
       subject: template.subject,

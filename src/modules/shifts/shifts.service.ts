@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { DoctorShiftStatus } from '../../common/constants/status.enum';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
@@ -40,6 +40,7 @@ import {
   AutoGenerateValidItem,
 } from './interfaces/auto-generate-shifts.interface';
 import { ShiftsValidator, PreparedDoctorShiftInput } from './validators/shifts.validator';
+import { AppointmentDisruptionsService } from '../appointment-disruptions/appointment-disruptions.service';
 
 /**
  * Service chính của ca trực bác sĩ.
@@ -51,6 +52,7 @@ export class ShiftsService {
     @Inject(SHIFTS_REPOSITORY)
     private readonly repository: IShiftsRepository,
     private readonly validator: ShiftsValidator,
+    @Optional() private readonly appointmentDisruptions?: AppointmentDisruptionsService,
   ) {}
 
   /** Tạo 1 ca trực bác sĩ; API nhận doctorId nhưng DB lưu staffId để sau này mở rộng cho role khác. */
@@ -196,6 +198,9 @@ export class ShiftsService {
       reason,
       deletedBy,
     );
+    if (result.disruptionId) {
+      await this.appointmentDisruptions?.dispatchDisruption(result.disruptionId);
+    }
     return {
       action: 'cancelled',
       affectedCount: activeAffectedAppointments.length,

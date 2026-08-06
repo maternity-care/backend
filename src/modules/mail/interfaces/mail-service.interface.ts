@@ -25,9 +25,22 @@ export interface SendOTPEmailInput {
   expiresInMinutes: number;
 }
 
+export interface SendAppointmentDisruptionEmailInput {
+  to: string;
+  patientName: string;
+  appointmentId: string;
+  facilityName: string;
+  doctorName: string;
+  scheduledStart: Date;
+  scheduledEnd: Date;
+  reason: string;
+  actionUrl: string;
+}
+
 export interface IMailService {
   sendPasswordResetEmail(input: SendPasswordResetEmailInput): Promise<void>;
   sendCreatedAccountEmail(input: CreatedAccountInterface): Promise<void>;
   sendSoftDeleteRequestEmail(input: RequestSoftDeleteEmailInput): Promise<void>;
   sendOTPEmail(input: SendOTPEmailInput): Promise<void>;
+  sendAppointmentDisruptionEmail(input: SendAppointmentDisruptionEmailInput): Promise<void>;
 }
