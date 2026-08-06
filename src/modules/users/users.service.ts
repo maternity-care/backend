@@ -172,20 +172,20 @@ export class UsersService implements IUsersService {
           }`,
         );
       }
-      try {
-        await this.mailService.sendLockAccountEmail({
+      await this.clearUsersCache(id);
+      void this.mailService
+        .sendLockAccountEmail({
           to: user.email,
           name: user.name,
           reason: reason,
+        })
+        .catch((error) => {
+          this.logger.warn(
+            `Could not send lock account email for user ${user.id}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
         });
-      } catch (error) {
-        this.logger.warn(
-          `Could not send lock account email for user ${user.id}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-      }
-      await this.clearUsersCache(id);
       return;
     }
 
