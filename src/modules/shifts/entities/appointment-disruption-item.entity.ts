@@ -9,6 +9,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { ShiftDisruption } from './shift-disruption.entity';
+import { Appointment } from '../../appointments/entities/appointment.entity';
 
 @Entity('appointment_disruption_items')
 export class AppointmentDisruptionItem {
@@ -28,6 +29,10 @@ export class AppointmentDisruptionItem {
   @ApiProperty({ type: String })
   @Column({ name: 'appointment_id', type: 'bigint' })
   appointmentId: string;
+
+  @ManyToOne(() => Appointment, { onDelete: 'RESTRICT', nullable: false })
+  @JoinColumn({ name: 'appointment_id' })
+  appointment: Appointment;
 
   @ApiPropertyOptional({ type: String, nullable: true, required: false })
   @Column({ name: 'old_staff_id', type: 'bigint', nullable: true })
@@ -61,12 +66,44 @@ export class AppointmentDisruptionItem {
   selectedOption: string | null;
 
   @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'new_shift_id', type: 'bigint', nullable: true })
+  newShiftId: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'new_staff_id', type: 'bigint', nullable: true })
+  newStaffId: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'new_room_id', type: 'bigint', nullable: true })
+  newRoomId: string | null;
+
+  @ApiPropertyOptional({ type: Date, nullable: true, required: false })
+  @Column({ name: 'new_scheduled_start', type: 'timestamp', nullable: true })
+  newScheduledStart: Date | null;
+
+  @ApiPropertyOptional({ type: Date, nullable: true, required: false })
+  @Column({ name: 'new_scheduled_end', type: 'timestamp', nullable: true })
+  newScheduledEnd: Date | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'resolution_note', type: 'text', nullable: true })
+  resolutionNote: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
   @Column({ name: 'resolved_by', type: 'bigint', nullable: true })
   resolvedBy: string | null;
 
   @ApiPropertyOptional({ type: Date, nullable: true, required: false })
   @Column({ name: 'resolved_at', type: 'timestamp', nullable: true })
   resolvedAt: Date | null;
+
+  @ApiPropertyOptional({ type: Date, nullable: true, required: false })
+  @Column({ name: 'notified_at', type: 'timestamp', nullable: true })
+  notifiedAt: Date | null;
+
+  @ApiPropertyOptional({ type: Date, nullable: true, required: false })
+  @Column({ name: 'email_sent_at', type: 'timestamp', nullable: true })
+  emailSentAt: Date | null;
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })

@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { CreateFacilityDto } from './dto/requests/create-facility.dto';
 import { SearchFacilityAdminOptionsDto } from './dto/requests/search-facility-admin-options.dto';
 import { LookupFacilityDto, SearchFacilityDto } from './dto/requests/search-facility.dto';
@@ -28,12 +28,14 @@ import { RESPONSE_MESSAGES } from '../../common/constants/response-message.const
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
 import { ActiveStatus, FacilityOperatingStatus, FacilityStatus, InactiveSource } from '../../common/constants/status.enum';
 import { addDays, isOvernightRange } from '../shifts/helpers/shifts.helper';
+import { AppointmentDisruptionsService } from '../appointment-disruptions/appointment-disruptions.service';
 
 @Injectable()
 export class FacilitiesService {
   constructor(
     @Inject(FACILITIES_REPOSITORY)
     private readonly facilitiesRepository: IFacilitiesRepository,
+    @Optional() private readonly appointmentDisruptions?: AppointmentDisruptionsService,
   ) {}
 
   async create(dto: CreateFacilityDto): Promise<FacilityWithDetails> {
@@ -164,6 +166,7 @@ export class FacilitiesService {
       dto.reason ?? null,
       actorId ?? null,
     );
+    await this.appointmentDisruptions?.dispatchBySource('facility', facility.id);
 
     return {
       facility: await this.findDetailsById(facility.id),

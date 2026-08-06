@@ -58,6 +58,6 @@ import { UserAuth } from './entities/user-auth.entity';
       useExisting: UserAuthRepository,
     },
   ],
-  exports: [AuthService],
+  exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

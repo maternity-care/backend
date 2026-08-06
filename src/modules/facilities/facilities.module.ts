@@ -8,8 +8,9 @@ import { FacilitiesService } from './facilities.service';
 import { FacilitiesRepository } from './repositories/facilities.repository';
 import { FACILITIES_REPOSITORY } from './interfaces/facility-repository.interface';
 import { PublicFacilitiesController } from './public.facilities.controller';
+import { AppointmentDisruptionsModule } from '../appointment-disruptions/appointment-disruptions.module';
 @Module({
-  imports: [TypeOrmModule.forFeature([Facility, FacilityOperatingHour, FacilityClosureDay])],
+  imports: [TypeOrmModule.forFeature([Facility, FacilityOperatingHour, FacilityClosureDay]), AppointmentDisruptionsModule],
   controllers: [FacilitiesController, PublicFacilitiesController],
   providers: [
     FacilitiesService,

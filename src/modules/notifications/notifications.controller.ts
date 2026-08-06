@@ -1,46 +1,43 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { CreateNotificationDto } from './dto/create-notification.dto';
-import { UpdateNotificationDto } from './dto/update-notification.dto';
+import { Controller, Delete, Get, Param, ParseIntPipe, Patch, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { NotificationsService } from './notifications.service';
 
-@ApiTags('User - Notifications')
+@ApiTags('Notifications')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('notifications')
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
-  @Post()
-  @ApiOperation({ summary: 'Create a notification' })
-  @ApiResponse({ status: 201 })
-  create(@Body() dto: CreateNotificationDto) {
-    return this.notificationsService.create(dto);
-  }
-
   @Get()
-  @ApiOperation({ summary: 'List notifications for a user' })
-  @ApiResponse({ status: 200 })
-  findAll(@Query('userId') userId?: string) {
-    return this.notificationsService.findAll(userId);
+  @ApiOperation({ summary: 'List notifications of the authenticated account' })
+  async findMine(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ) {
+    return { data: await this.notificationsService.findMine(user, limit) };
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get notification by id' })
-  @ApiResponse({ status: 200 })
-  findOne(@Param('id') id: string) {
-    return this.notificationsService.findOne(id);
+  @Get('unread-count')
+  async unreadCount(@CurrentUser() user: AuthenticatedUser) {
+    return { data: { count: await this.notificationsService.countUnreadMine(user) } };
   }
 
-  @Patch(':id')
-  @ApiOperation({ summary: 'Update a notification' })
-  @ApiResponse({ status: 200 })
-  update(@Param('id') id: string, @Body() dto: UpdateNotificationDto) {
-    return this.notificationsService.update(id, dto);
+  @Patch('read-all')
+  async markAllRead(@CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.notificationsService.markAllReadMine(user) };
+  }
+
+  @Patch(':id/read')
+  async markRead(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return { data: await this.notificationsService.markReadMine(id, user) };
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Soft delete a notification' })
-  @ApiResponse({ status: 200 })
-  remove(@Param('id') id: string) {
-    return this.notificationsService.remove(id);
+  async remove(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return { data: await this.notificationsService.removeMine(id, user) };
   }
 }
