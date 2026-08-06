@@ -172,19 +172,19 @@ export class UsersService implements IUsersService {
         );
       }
       await this.clearUsersCache(id);
-      try {
-        await this.jobsService.enqueueLockAccountEmail({
+      void this.jobsService
+        .enqueueLockAccountEmail({
           to: user.email,
           name: user.name,
           reason: reason,
+        })
+        .catch((error) => {
+          this.logger.warn(
+            `Could not enqueue lock account email for user ${user.id}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
         });
-      } catch (error) {
-        this.logger.warn(
-          `Could not enqueue lock account email for user ${user.id}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-      }
       return;
     }
 
