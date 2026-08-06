@@ -1,4 +1,5 @@
 import { User } from './../../users/entities/user.entity';
+import { Staff } from './../../staffs/entities/staff.entity';
 import {
   NotificationType,
   NotificationReferenceType,
@@ -25,16 +26,24 @@ export class Notification {
   @Column({ name: 'reference', type: 'varchar', length: 255 })
   reference: string;
 
-  @ApiProperty({ type: String })
-  @Column({ name: 'user_id', type: 'bigint' })
-  userId: string;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @Column({ name: 'user_id', type: 'bigint', nullable: true })
+  userId: string | null;
 
   @ManyToOne(() => User, (user) => user.notifications, {
-    nullable: false,
-    onDelete: 'CASCADE',
+    nullable: true,
+    onDelete: 'SET NULL',
   })
   @JoinColumn({ name: 'user_id' })
-  user: User;
+  user: User | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @Column({ name: 'staff_id', type: 'bigint', nullable: true })
+  staffId: string | null;
+
+  @ManyToOne(() => Staff, { nullable: true, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'staff_id' })
+  staff: Staff | null;
 
   @ApiProperty({ enum: NotificationType, enumName: 'NotificationType' })
   @Column({ name: 'type', type: 'enum', enum: NotificationType })

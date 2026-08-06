@@ -12,5 +12,6 @@ import { Appointment } from './entities/appointment.entity';
   imports: [TypeOrmModule.forFeature([Appointment, FacilityService, DoctorShift]), SchedulesModule],
   controllers: [AppointmentsController, ManagementAppointmentsController],
   providers: [AppointmentsService],
+  exports: [AppointmentsService],
 })
 export class AppointmentsModule {}
