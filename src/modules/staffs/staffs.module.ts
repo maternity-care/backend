@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Doctor } from '../doctors/entities/doctor.entity';
 import { Facility } from '../facilities/entities/facility.entity';
-import { MailModule } from '../mail/mail.module';
+import { JobsModule } from '../jobs/jobs.module';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { StaffPermission } from '../permissions/entities/staff-permission.entity';
 import { Role } from '../roles/entities/role.entity';
@@ -19,7 +19,7 @@ import { StaffManagementService } from './staff-management.service';
     TypeOrmModule.forFeature([Staff, Facility, Doctor, StaffPermission, Role]),
     RolesModule,
     PermissionsModule,
-    MailModule,
+    JobsModule,
     ConfigModule,
   ],
   controllers: [ManagementStaffsController],
