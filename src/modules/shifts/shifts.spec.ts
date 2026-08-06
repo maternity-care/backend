@@ -1876,7 +1876,7 @@ describe('ShiftSlotsService business validation', () => {
     await expect(service.create({
       facilityId: '1',
       name: 'Ca sang',
-      startTime: '07:00',
+      startTime: '08:00',
       endTime: '12:00',
     })).resolves.toMatchObject({
       id: '1',

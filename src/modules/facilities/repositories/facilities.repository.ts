@@ -23,6 +23,7 @@ import { ShiftDisruption } from '../../shifts/entities/shift-disruption.entity';
 import {
   FacilityAdminOption,
   FacilityShiftScheduleViolation,
+  FacilityShiftSlotScheduleViolation,
   FacilityLookup,
   FacilityWithDetails,
   IFacilitiesRepository,
@@ -116,6 +117,26 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       .orderBy('shift.shift_date', 'ASC')
       .addOrderBy('shift.start_time', 'ASC')
       .getRawMany<FacilityShiftScheduleViolation>();
+  }
+
+  async findActiveShiftSlotsForOperatingHourValidation(
+    facilityId: string,
+  ): Promise<FacilityShiftSlotScheduleViolation[]> {
+    return this.repository.manager
+      .createQueryBuilder()
+      .select('slot.id', 'id')
+      .addSelect('slot.name', 'name')
+      .addSelect('slot.code', 'code')
+      .addSelect('slot.start_time', 'startTime')
+      .addSelect('slot.end_time', 'endTime')
+      .addSelect('slot.status', 'status')
+      .from('shift_slots', 'slot')
+      .where('slot.facility_id = :facilityId', { facilityId })
+      .andWhere('slot.deleted_at IS NULL')
+      .andWhere('slot.status = :status', { status: ActiveStatus.ACTIVE })
+      .orderBy('slot.start_time', 'ASC')
+      .addOrderBy('slot.end_time', 'ASC')
+      .getRawMany<FacilityShiftSlotScheduleViolation>();
   }
 
   createClosureDay(data: DeepPartial<FacilityClosureDay>): FacilityClosureDay {

@@ -68,6 +68,7 @@ describe('FacilitiesService', () => {
     syncOperatingHours: jest.fn(),
     findOperatingHoursByFacilityId: jest.fn(),
     findActiveShiftsForOperatingHourValidation: jest.fn(),
+    findActiveShiftSlotsForOperatingHourValidation: jest.fn(),
     createClosureDay: jest.fn((dto) => createClosureDay(dto)),
     saveClosureDay: jest.fn(async (closureDay) => closureDay),
     removeClosureDay: jest.fn(async () => undefined),
@@ -105,6 +106,7 @@ describe('FacilitiesService', () => {
     repository.syncOperatingHours.mockResolvedValue(undefined);
     repository.findOperatingHoursByFacilityId.mockResolvedValue([]);
     repository.findActiveShiftsForOperatingHourValidation.mockResolvedValue([]);
+    repository.findActiveShiftSlotsForOperatingHourValidation.mockResolvedValue([]);
     repository.findClosureDaysByFacilityId.mockResolvedValue([]);
     repository.findClosureDayById.mockResolvedValue(null);
     repository.findClosureDayByDate.mockResolvedValue(null);
@@ -444,6 +446,43 @@ describe('FacilitiesService', () => {
       ],
     });
     expect(repository.syncOperatingHours).not.toHaveBeenCalled();
+  });
+
+  // Vai tro: neu gio hoat dong moi lam khung ca active khong dung duoc o mot ngay mo cua thi phai bao ngay khi preview/update.
+  it('previews active shift slot impacts when operating hours change', async () => {
+    repository.findById.mockResolvedValue(createFacility());
+    repository.findOperatingHoursByFacilityId.mockResolvedValue([]);
+    repository.findActiveShiftSlotsForOperatingHourValidation.mockResolvedValue([
+      {
+        id: 'slot-1',
+        name: 'Ca sang som',
+        code: 'CA_SANG_SOM',
+        startTime: '07:55:00',
+        endTime: '09:00:00',
+        status: 'active',
+      },
+    ]);
+
+    await expect(service.previewOperatingHours('fac-1', {
+      schedules: [
+        { days: ['MON', 'TUE', 'WED', 'THU', 'FRI'] as any, openTime: '07:00:00', closeTime: '17:00:00', isClosed: false },
+        { days: ['SAT'] as any, openTime: '08:00:00', closeTime: '17:00:00', isClosed: false },
+        { days: ['SUN'] as any, isClosed: true },
+      ],
+    })).resolves.toMatchObject({
+      canUpdate: false,
+      summary: {
+        impactedShiftCount: 0,
+        impactedShiftSlotCount: 1,
+      },
+      impactedShiftSlots: [
+        expect.objectContaining({
+          id: 'slot-1',
+          startTime: '07:55:00',
+          endTime: '09:00:00',
+        }),
+      ],
+    });
   });
 
   // Vai tro: mo rong gio hoat dong khong lam shift cu bi sai nen van cho cap nhat.
