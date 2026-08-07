@@ -11,6 +11,7 @@ import { JwtPayload } from '../interfaces/jwt-payload.interface';
 import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 import { Facility } from '../../facilities/entities/facility.entity';
 import { AccountStatus } from '../../../common/constants/status.enum';
+import { RoleEnum } from '../../../common/constants/role.enum';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -69,6 +70,26 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Invalid or inactive staff');
     }
 
+    const roles = staff.roles.map((role) => ({
+      id: role.id,
+      name: role.name,
+      permissions: role.permissions.map((permission) => permission),
+    }));
+    const isSuperAdmin = roles.some((role) => role.name === RoleEnum.SUPER_ADMIN);
+    const facilities =
+      staff.facility && !isSuperAdmin
+        ? [
+            {
+              id: staff.facility.id,
+              name: staff.facility.name,
+              code: staff.facility.code,
+              status: staff.facility.status,
+              role: roles[0],
+              roles,
+            },
+          ]
+        : [];
+
     return {
       id: staff.id,
       name: staff.name,
@@ -77,36 +98,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       personalEmail: staff.personalEmail,
       employeeCode: staff.employeeCode,
       status: staff.status,
-      roles: staff.roles.map((role) => ({
-        id: role.id,
-        name: role.name,
-        permissions: role.permissions.map((permission) => permission),
-      })),
+      roles,
       permissionOverrides: (staff.permissions ?? []).map((override) => ({
         permission: override.permission,
         effect: override.effect,
       })),
-      facilities: [
-        {
-          id: staff.facility.id,
-          name: staff.facility.name,
-          code: staff.facility.code,
-          status: staff.facility.status,
-          role: {
-            id: staff.roles[0].id,
-            name: staff.roles[0].name,
-            permissions: staff.roles[0].permissions.map((permission) => permission),
-          },
-          roles: staff.roles.map((role) => ({
-            id: role.id,
-            name: role.name,
-            permissions: role.permissions.map((permission) => permission),
-          })),
-        },
-      ],
+      facilities,
       facilityRole: null,
       facilityRoles: [],
-      activeFacilityId: staff.facilityId,
+      activeFacilityId: isSuperAdmin ? null : staff.facilityId,
     };
   }
 }

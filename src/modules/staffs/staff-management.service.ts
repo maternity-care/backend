@@ -424,8 +424,9 @@ export class StaffManagementService {
     actor?: AuthenticatedUser,
   ): Promise<Record<string, unknown>> {
     const staffProfile = await this.getStaffProfileSummary(staff.id, actor);
+    const { password: _password, ...safeStaff } = staff;
     return {
-      ...staff,
+      ...safeStaff,
       permissionOverrides: (staff.permissions ?? []).map((override) => ({
         permission: override.permission,
         effect: override.effect,
