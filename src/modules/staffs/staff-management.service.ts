@@ -71,7 +71,8 @@ export class StaffManagementService {
     const searchValue = (field: string) =>
       searchFilters.find((filter) => filter.field === field)?.values[0]?.trim();
 
-    const keyword = searchValue('keyword') || query.name || query.email || query.phone || query.cccd;
+    const keyword =
+      searchValue('keyword') || query.name || query.email || query.phone || query.cccd;
     const role = searchValue('role');
     const roleId = searchValue('roleId') || query.roleId;
     const facilityId = searchValue('facilityId') || query.facilityId;
@@ -163,6 +164,7 @@ export class StaffManagementService {
       name: dto.name,
       email,
       phone: dto.phone,
+      avatar: dto?.avatar,
       password: await bcrypt.hash(
         password,
         this.configService.getOrThrow<number>('bcrypt.saltRounds'),
@@ -213,6 +215,7 @@ export class StaffManagementService {
     staff.name = dto.name ?? staff.name;
     staff.phone = dto.phone ?? staff.phone;
     staff.status = dto.status ?? staff.status;
+    staff.avatar = dto.avatar ?? staff.avatar;
     await this.staffProfileRepository.save(staff);
     await this.syncPermissionOverrides(staff.id, dto.permissionOverrides);
 
@@ -285,7 +288,9 @@ export class StaffManagementService {
     if (!staff) throw new NotFoundException('Không tìm thấy nhân viên.');
 
     const scopedAssignments = facilityScopeId
-      ? assignments.filter((assignment) => String(assignment.facilityId) === String(facilityScopeId))
+      ? assignments.filter(
+          (assignment) => String(assignment.facilityId) === String(facilityScopeId),
+        )
       : assignments;
     const roleIds = [...new Set(scopedAssignments.map((assignment) => assignment.roleId))];
     const roles = roleIds.length > 0 ? await this.roleRepository.findBy({ id: In(roleIds) }) : [];

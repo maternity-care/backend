@@ -25,6 +25,11 @@ export class AdminCreateUserDto {
   @IsNotEmpty()
   personalEmail: string;
 
+  @ApiPropertyOptional({ description: 'avatar url' })
+  @IsString()
+  @IsOptional()
+  avatar?: string;
+
   @ApiProperty()
   @IsString()
   @Matches(/^(?:\+84|0)[35789]\d{8}$/, {

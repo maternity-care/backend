@@ -87,4 +87,22 @@ export class RealtimeEventsService {
       .to(`notifications:${recipientType}:${recipientId}`)
       .emit('notification:new', payload);
   }
+
+  serverEmit = (payload: SocketEmit) => {
+    if (!this.server) {
+      this.logger.debug(`Realtime server is not ready for event ${payload.event}`);
+      return;
+    }
+    if (payload?.room) {
+      this.server.to(payload.room).emit(payload.event, payload.data);
+    } else {
+      this.server.emit(payload.event, payload.data);
+    }
+  };
+}
+
+export interface SocketEmit {
+  room?: string;
+  event: string;
+  data: Record<string, string | number> | string | number | boolean | null;
 }

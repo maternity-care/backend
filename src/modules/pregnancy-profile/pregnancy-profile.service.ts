@@ -45,22 +45,36 @@ export class PregnancyProfileService {
       throw new NotFoundException(RESPONSE_MESSAGES.NOT_FOUND_CURRENT_USER);
     }
 
+    if (dto.lastMenstrualPeriod) {
+      const lastMenstrualPeriod = new Date(dto.lastMenstrualPeriod);
+      if (lastMenstrualPeriod > new Date()) {
+        throw new ConflictException(RESPONSE_MESSAGES.PREGNANCY_PROFILES.LAST_MENSTRUAL_PERIOD);
+      }
+      if (dto.expectedDueDate) {
+        const expectedDueDate = new Date(dto.expectedDueDate);
+        if (expectedDueDate <= lastMenstrualPeriod) {
+          throw new ConflictException(RESPONSE_MESSAGES.PREGNANCY_PROFILES.EXPECTED_DUE_DATE);
+        }
+      }
+    }
+
     const code = await this.pregnancyProfileRepository.generatePregnancyCode();
 
     const profile = this.pregnancyProfileRepository.create({
       patientId: patientId,
       code: code,
       lastMenstrualPeriod: dto.lastMenstrualPeriod,
-      expectedDueDate: dto.expectedDueDate,
+      expectedDueDate:
+        dto.expectedDueDate ?? new Date(new Date().getTime() + 280 * 24 * 60 * 60 * 1000),
       fetalCount: dto.fetalCount ?? 1,
       gravida: dto.gravida,
       paraFullTerm: dto.paraFullTerm ?? 0,
       paraPremature: dto.paraPremature ?? 0,
       paraAbortion: dto.paraAbortion ?? 0,
       paraLivingChildren: dto.paraLivingChildren ?? 0,
-      riskLevel: dto.riskLevel as RiskLevel,
-      status: dto.status as PregnancyProfileStatus,
-      notes: dto.notes,
+      riskLevel: (dto.riskLevel as RiskLevel) ?? RiskLevel.LOW,
+      status: (dto.status as PregnancyProfileStatus) ?? PregnancyProfileStatus.ACTIVE,
+      notes: dto.notes ?? '',
       createdBy: actor.id ?? patientId, // admin hoặc thai phụ tạo
     });
 

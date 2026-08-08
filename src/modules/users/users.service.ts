@@ -189,7 +189,7 @@ export class UsersService implements IUsersService {
     }
 
     await this.usersRepository.updateStatus(id, status);
-    await this.clearUsersCache(id);
+    return;
   }
 
   private async clearUsersCache(userId?: string): Promise<void> {

@@ -7,6 +7,7 @@ import {
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
+  WsException,
 } from '@nestjs/websockets';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -28,7 +29,6 @@ import { RealtimeEventsService } from './realtime-events.service';
   namespace: '/realtime',
   cors: { origin: '*' },
 })
-
 export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   private server: Server;
@@ -192,5 +192,35 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     return staff.roles.some((role) =>
       (role.permissions ?? []).some((permission) => acceptedPermissions.has(permission.name)),
     );
+  }
+
+  @SubscribeMessage('order:join')
+  joinOrderRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { code?: string },
+  ): { joined: string } {
+    const orderId = String(payload?.code ?? '').trim();
+    if (!orderId) {
+      throw new WsException('orderId is required');
+    }
+
+    const room = `order:payment:${orderId}`;
+    client.join(room);
+    return { joined: room };
+  }
+
+  @SubscribeMessage('order:leave')
+  leaveOrderRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { orderId?: string },
+  ): { left: string } {
+    const orderId = String(payload?.orderId ?? '').trim();
+    if (!orderId) {
+      throw new WsException('orderId is required');
+    }
+
+    const room = `order:payment:${orderId}`;
+    client.leave(room);
+    return { left: room };
   }
 }

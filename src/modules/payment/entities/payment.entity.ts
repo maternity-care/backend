@@ -1,4 +1,4 @@
-import { PaymentStatus } from './../../common/constants/status.enum';
+import { PaymentStatus } from '../../../common/constants/status.enum';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   Column,
@@ -10,6 +10,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Order } from './order.entity';
+import { SepayPayload } from '../interfaces/sepay-payload.inteface';
 
 @Entity('payments')
 export class Payment {
@@ -18,7 +19,7 @@ export class Payment {
   id: string;
 
   @ApiProperty({ type: () => Order })
-  @ManyToOne(() => Order, { onDelete: 'RESTRICT', nullable: false })
+  @ManyToOne(() => Order, (order) => order.payments, { onDelete: 'RESTRICT', nullable: false })
   @JoinColumn({ name: 'order_id' })
   order: Order;
 
@@ -52,7 +53,7 @@ export class Payment {
 
   @ApiProperty({ type: Object })
   @Column({ name: 'raw_response', type: 'json' })
-  rawResponse: Record<string, unknown> | null;
+  rawResponse: SepayPayload | null;
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })

@@ -1,6 +1,6 @@
-import { OrderStatus } from './../../common/constants/status.enum';
-import { Facility } from './../../modules/facilities/entities/facility.entity';
-import { User } from './../../modules/users/entities/user.entity';
+import { OrderStatus } from '../../../common/constants/status.enum';
+import { Facility } from '../../facilities/entities/facility.entity';
+import { User } from '../../users/entities/user.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -8,9 +8,19 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Payment } from './payment.entity';
+import { Invoice } from './invoice.entity';
+import { OrderItem } from './order-item.entity';
+
+export enum OrderType {
+  NORMAL_SERVICE = 'normal_service', // dịch vụ bán lẻ: khám, siêu âm, xét nghiệm
+  MATERNITY_PACKAGE = 'maternity_package', // mua gói dịch vụ
+  MIXED = 'mixed', // mix nhiều loại dịch vụ
+}
 
 @Entity('orders')
 export class Order {
@@ -27,6 +37,18 @@ export class Order {
   @ManyToOne(() => Facility, { onDelete: 'RESTRICT', nullable: false })
   @JoinColumn({ name: 'facility_id' })
   facility: Facility;
+
+  @ApiProperty({ type: () => Payment, isArray: true })
+  @OneToMany(() => Payment, (payment) => payment.order)
+  payments: Payment[];
+
+  @ApiProperty({ type: () => Invoice })
+  @OneToMany(() => Invoice, (invoice) => invoice.order)
+  invoices: Invoice[];
+
+  @ApiProperty({ type: OrderItem, isArray: true })
+  @OneToMany(() => OrderItem, (orderItem) => orderItem.order)
+  orderItems: OrderItem[];
 
   @ApiProperty({ type: String })
   @Column({ name: 'code', type: 'varchar', length: 50 })
@@ -45,8 +67,8 @@ export class Order {
   facilityId: string;
 
   @ApiProperty({ type: String })
-  @Column({ name: 'order_type', type: 'varchar', length: 255, nullable: true })
-  orderType: string | null;
+  @Column({ name: 'order_type', type: 'enum', enum: OrderType, default: OrderType.NORMAL_SERVICE })
+  orderType: OrderType;
 
   @ApiProperty({ type: Number })
   @Column({ name: 'subtotal_amount', type: 'decimal', precision: 15, scale: 2, default: 0 })

@@ -1,4 +1,4 @@
-import { InvoiceStatus } from './../../common/constants/status.enum';
+import { InvoiceStatus } from '../../../common/constants/status.enum';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,

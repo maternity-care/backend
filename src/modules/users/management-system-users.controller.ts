@@ -24,6 +24,7 @@ import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/request/create-user.dto';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import { LockUserDto } from './dto/request/admin-lock-user.dto';
 
 @ApiTags('Management - Users')
 @ApiBearerAuth()
@@ -63,8 +64,8 @@ export class ManagementSystemUsersController {
 
   @Delete(':id')
   @Permissions(PermissionEnum.USER_DELETE)
-  async remove(@Param('id') id: string, @Body('reason') reason: string) {
-    await this.usersService.updateStatus(id, UserStatusEnum.LOCKED, reason);
+  async remove(@Param('id') id: string, @Body() dto: LockUserDto) {
+    await this.usersService.updateStatus(id, UserStatusEnum.INACTIVE, dto.reason);
     return { data: null, success: true, message: 'Đã khóa tài khoản người dùng.' };
   }
 }

@@ -31,6 +31,7 @@ import { AppointmentsModule } from './modules/appointments/appointments.module';
 import { SchedulesModule } from './modules/schedules/schedules.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { ForumsModule } from './modules/forums/forums.module';
+import { PaymentModule } from './modules/payment/payment.module';
 import { AppointmentDisruptionsModule } from './modules/appointment-disruptions/appointment-disruptions.module';
 @Module({
   imports: [
@@ -79,6 +80,7 @@ import { AppointmentDisruptionsModule } from './modules/appointment-disruptions/
     ChatbotModule,
     SchedulesModule,
     AppointmentsModule,
+    PaymentModule,
     AppointmentDisruptionsModule,
   ],
 })
