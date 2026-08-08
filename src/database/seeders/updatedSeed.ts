@@ -55,6 +55,8 @@ import { ForumAuthorRole, ForumCategory } from '../../common/constants/forum.enu
 import { NotificationReferenceType, NotificationType } from '../../common/constants/notification.enum';
 import { PackageServiceFacility } from '../../modules/package-services/entities/package-service-facility.entity';
 import { PackageStage } from '../../modules/maternity-packages/entities/package-stage.entity';
+import { OrderType } from '../../modules/payment/entities/order.entity';
+import { OrderItemType } from '../../modules/payment/entities/order-item.entity';
 import { ServiceType } from '../../modules/service-types/entities/service-type.entity';
 import { Setting } from '../../modules/settings/entities/setting.entity';
 import { Notification } from '../../modules/notifications/entities/notification.entity';
@@ -2239,7 +2241,7 @@ async function insertCareFlowData(): Promise<void> {
       customerId: user.id,
       pregnancyProfileId: profile?.id ?? profiles[0].id,
       facilityId: pkg.facilityId,
-      orderType: 'package',
+      orderType: OrderType.MATERNITY_PACKAGE,
       subtotalAmount: Number(pkg.price),
       discountAmount: 0,
       totalAmount: Number(pkg.price),
@@ -2248,15 +2250,15 @@ async function insertCareFlowData(): Promise<void> {
 
     await orderItemRepository.save({
       orderId: order.id,
-      item: 'maternity_package',
-      itemType: 'package',
+      item: 'maternity_package' as never,
+      itemType: OrderItemType.PACKAGE,
       itemId: pkg.id,
       name: pkg.name,
       quantity: 1,
       unitPrice: pkg.price,
       totalPrice: pkg.price,
       metadata: { source: 'seed' },
-    });
+    } as never);
 
     await paymentRepository.save({
       orderId: order.id,
@@ -2266,7 +2268,7 @@ async function insertCareFlowData(): Promise<void> {
       amount: Number(pkg.price),
       status: PaymentStatus.SUCCESS,
       paidAt: new Date(),
-      rawResponse: { source: 'seed' },
+      rawResponse: null,
     });
   }
 

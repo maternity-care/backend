@@ -22,6 +22,7 @@ import { RefreshToken } from '../modules/auth/entities/refresh-token.entity';
         synchronize: false,
         migrationsRun: false,
         logging: configService.get<string>('app.nodeEnv') === 'development',
+        dateStrings: ['DATE'],
         entities: [
           User,
           Role,
