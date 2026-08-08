@@ -46,6 +46,10 @@ export class Staff {
   name: string;
 
   @ApiProperty({ type: String })
+  @Column({ name: 'avatar', type: 'varchar', length: 255, nullable: true })
+  avatar: string | null;
+
+  @ApiProperty({ type: String })
   @Column({ name: 'personal_email', type: 'varchar', length: 191, unique: true })
   personalEmail: string;
 

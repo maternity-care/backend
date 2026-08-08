@@ -191,18 +191,20 @@ export class UsersService implements IUsersService, IAdminManageService {
       }
 
       await this.usersRepository.updateStatus(id, status, reason);
-      await this.mailService.sendLockAccountEmail({
-        to: user.email,
-        name: user.name,
-        reason: reason,
-      });
-      await this.userAuthRepository.updateStatus(user.id, status);
-      await this.clearUsersCache(id);
+      try {
+        await this.mailService.sendLockAccountEmail({
+          to: user.email,
+          name: user.name,
+          reason: reason,
+        });
+      } catch (error) {
+        console.log('Gửi email lỗi', error);
+      }
       return;
     }
 
     await this.usersRepository.updateStatus(id, status);
-    await this.clearUsersCache(id);
+    return;
   }
 
   private async clearUsersCache(userId?: string): Promise<void> {
@@ -285,6 +287,7 @@ export class UsersService implements IUsersService, IAdminManageService {
         password,
         this.configService.getOrThrow<number>('bcrypt.saltRounds'),
       ),
+      avatar: dto.avatar ?? '',
       personalEmail: dto.personalEmail,
       employeeCode: `${this.getPositionCodePrefix(facilityAssignments)}${employeeCode}`,
       status: UserStatusEnum.ACTIVE,
@@ -329,6 +332,7 @@ export class UsersService implements IUsersService, IAdminManageService {
     staff.name = dto.name ?? staff.name;
     staff.phone = dto.phone ?? staff.phone;
     staff.status = dto.status ?? staff.status;
+    staff.avatar = dto.avatar ?? staff.avatar;
     const updatedStaff = await this.staffProfileRepository.save(staff);
     if (assignments) {
       await this.syncFacilityAssignments(

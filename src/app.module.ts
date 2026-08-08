@@ -31,6 +31,7 @@ import { AppointmentsModule } from './modules/appointments/appointments.module';
 import { SchedulesModule } from './modules/schedules/schedules.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { ForumsModule } from './modules/forums/forums.module';
+import { PaymentModule } from './modules/payment/payment.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -78,6 +79,7 @@ import { ForumsModule } from './modules/forums/forums.module';
     ChatbotModule,
     SchedulesModule,
     AppointmentsModule,
+    PaymentModule,
   ],
 })
 export class AppModule {}

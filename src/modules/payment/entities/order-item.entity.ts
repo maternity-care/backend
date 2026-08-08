@@ -1,3 +1,5 @@
+import { MaternityPackage } from './../../maternity-packages/entities/maternity-package.entity';
+import { FacilityService } from './../../facility-services/entities/facility-service.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -9,6 +11,11 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Order } from './order.entity';
+
+export enum OrderItemType {
+  NORMAL_SERVICE = 'normalService',
+  PACKAGE = 'package',
+}
 
 @Entity('order_items')
 export class OrderItem {
@@ -23,14 +30,19 @@ export class OrderItem {
 
   @ApiProperty({ type: String })
   @Column({ name: 'item', type: 'varchar', length: 255 })
-  item: string;
+  item: FacilityService | MaternityPackage;
 
   @ApiProperty({ type: String })
   @Column({ name: 'order_id', type: 'bigint' })
   orderId: string;
 
-  @ApiProperty({ type: String, description: 'type: normalService, extraService, package' })
-  @Column({ name: 'item_type', type: 'varchar', length: 255 })
+  @ApiProperty({ type: String, description: 'type: normalService, package' })
+  @Column({
+    name: 'item_type',
+    type: 'enum',
+    enum: OrderItemType,
+    default: OrderItemType.NORMAL_SERVICE,
+  })
   itemType: string;
 
   @ApiProperty({ type: String })
@@ -47,11 +59,11 @@ export class OrderItem {
 
   @ApiProperty({ type: String })
   @Column({ name: 'unit_price', type: 'decimal', precision: 15, scale: 2, default: 0 })
-  unitPrice: string;
+  unitPrice: number;
 
   @ApiProperty({ type: String })
   @Column({ name: 'total_price', type: 'decimal', precision: 15, scale: 2, default: 0 })
-  totalPrice: string;
+  totalPrice: number;
 
   @ApiProperty({ type: Object })
   @Column({ name: 'metadata', type: 'json', nullable: true })

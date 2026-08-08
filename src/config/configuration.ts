@@ -19,4 +19,8 @@ export default () => ({
   bcrypt: {
     saltRounds: Number(process.env.BCRYPT_SALT_ROUNDS ?? 10),
   },
+  sepay: {
+    baseQrUrl: process.env.BASE_QR_URL,
+    secret: process.env.SEPAY_WEBHOOK_SECRET,
+  },
 });

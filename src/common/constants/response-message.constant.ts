@@ -89,6 +89,8 @@ export const RESPONSE_MESSAGES = {
       'Tổng số lần sinh con đủ tháng, sinh non và sảy thai không thể ít hơn số lần mang thai',
     NOT_IS_STAFF:
       'Chỉ nhân viên (bác sĩ, điều dưỡng hoặc nhân viên) mới có thể yêu cầu xóa tạm thời hồ sơ mang thai',
+    LAST_MENSTRUAL_PERIOD: 'Ngày kỳ kinh cuối phải nhỏ hơn ngày tạo hồ sơ.',
+    EXPECTED_DUE_DATE: 'Ngày dự sinh phải lớn hơn ngày kỳ kinh cuối.',
   },
   NOT_FOUND_CURRENT_USER: 'Người dùng hiện tại không tồn tại',
   INTERNAL_SERVER_ERROR: 'Lỗi máy chủ nội bộ',

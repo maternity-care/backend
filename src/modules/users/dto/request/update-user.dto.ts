@@ -27,6 +27,11 @@ export class UpdateUserDto {
   email?: string;
 
   @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  avatar?: string;
+
+  @ApiPropertyOptional()
   @Matches(/^(?:\+84|0)[35789]\d{8}$/, {
     message: 'phone phải là số điện thoại di động Việt Nam hợp lệ.',
   })

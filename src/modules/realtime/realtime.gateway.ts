@@ -7,6 +7,7 @@ import {
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
+  WsException,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { RealtimeEventsService } from './realtime-events.service';
@@ -55,6 +56,36 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     if (!postId) return { left: 'forum:public' };
 
     const room = `forum:post:${postId}`;
+    client.leave(room);
+    return { left: room };
+  }
+
+  @SubscribeMessage('order:join')
+  joinOrderRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { code?: string },
+  ): { joined: string } {
+    const orderId = String(payload?.code ?? '').trim();
+    if (!orderId) {
+      throw new WsException('orderId is required');
+    }
+
+    const room = `order:payment:${orderId}`;
+    client.join(room);
+    return { joined: room };
+  }
+
+  @SubscribeMessage('order:leave')
+  leaveOrderRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { orderId?: string },
+  ): { left: string } {
+    const orderId = String(payload?.orderId ?? '').trim();
+    if (!orderId) {
+      throw new WsException('orderId is required');
+    }
+
+    const room = `order:payment:${orderId}`;
     client.leave(room);
     return { left: room };
   }
