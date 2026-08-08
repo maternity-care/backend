@@ -47,6 +47,7 @@ export class FacilityServicesService {
     };
   }
 
+  
   async bulkCreate(dto: BulkCreateFacilityServicesDto) {
     const facility = await this.facilitiesService.findById(dto.facilityId);
     if (facility.status !== FacilityStatus.ACTIVE) {
@@ -59,6 +60,7 @@ export class FacilityServicesService {
       reason: string;
       duplicatedData?: FacilityService;
     }> = [];
+
     const entities: FacilityService[] = [];
     const seenServiceIds = new Set<string>();
 

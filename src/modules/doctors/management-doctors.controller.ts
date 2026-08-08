@@ -20,10 +20,10 @@ import { RoleEnum } from '../../common/constants/role.enum';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionEnum } from '../../common/constants/permission.enum';
 import { UpdateDoctorDto } from './dto/requests/update-doctor.dto';
+import { CreateDoctorDto } from './dto/requests/create-doctor.dto';
 import { DoctorResponseDto } from './dto/response/doctor-response.dto';
 import { DoctorsService } from './doctors.service';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
-import { AdminCreateUserDto } from '../users/dto/request/admin-create-user.dto';
 import { SearchDoctorDto } from './dto/requests/search-doctor.dto';
 import { Doctor } from './entities/doctor.entity';
 
@@ -82,8 +82,8 @@ export class ManagementDoctorsController {
   @Permissions(PermissionEnum.DOCTOR_CREATE)
   @ApiOperation({ summary: 'Create doctor' })
   @ApiResponse({ status: 201, type: DoctorResponseDto })
-  async create(@Body() dto: AdminCreateUserDto, @CurrentUser() user: AuthenticatedUser) {
-    const doctor = await this.doctorsService.create(dto, user);
+  async create(@Body() dto: CreateDoctorDto) {
+    const doctor = await this.doctorsService.create(dto);
     return {
       message: 'Tạo hồ sơ bác sĩ thành công',
       data: plainToInstance(DoctorResponseDto, doctor),

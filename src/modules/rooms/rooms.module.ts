@@ -9,9 +9,10 @@ import { RoomsFacilityController } from './rooms-facility.controller';
 import { FacilityRoomTypesController } from './facility-room-types.controller';
 import { FacilitiesModule } from '../facilities/facilities.module';
 import { RoomType } from '../../database/entities/room-type.entity';
+import { AppointmentDisruptionsModule } from '../appointment-disruptions/appointment-disruptions.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Room, RoomType]), FacilitiesModule],
+  imports: [TypeOrmModule.forFeature([Room, RoomType]), FacilitiesModule, AppointmentDisruptionsModule],
   controllers: [RoomsController, RoomsFacilityController, FacilityRoomTypesController],
   providers: [
     RoomsService,

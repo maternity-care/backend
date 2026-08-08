@@ -4,6 +4,7 @@ import { FacilitiesService } from './facilities.service';
 import { CreateFacilityDto } from './dto/requests/create-facility.dto';
 import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
 import { UpdateFacilityOperatingHoursDto } from './dto/requests/update-facility-operating-hours.dto';
+import { ApplyFacilityOperatingHoursDto } from './dto/requests/apply-facility-operating-hours.dto';
 import {
   CreateFacilityClosureDayDto,
   SearchFacilityClosureDayDto,
@@ -30,6 +31,7 @@ import { PermissionEnum } from '../../common/constants/permission.enum';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { SuspendResourceDto } from '../../common/dto/suspend-resource.dto';
 
 @ApiTags('Management - Facilities')
 // @ApiBearerAuth()
@@ -90,40 +92,40 @@ export class FacilitiesController {
     }
   }
 
-  // @Get('lookup')
-  // @ApiOperation({ summary: 'Lookup facilities for select/autocomplete' })
-  // @ApiResponse({ status: 200, type: [FacilityLookupResponseDto] })
-  // async lookup(
-  //   @CurrentUser() user: AuthenticatedUser,
-  //   @Query() query: LookupFacilityDto,
-  // ) {
-  //   try {
-  //     const activeFacilityId = getActiveFacilityId(user);
-  //     if (activeFacilityId) {
-  //       const facility = await this.facilitiesService.findDetailsById(activeFacilityId);
-  //       return {
-  //         message: RESPONSE_MESSAGES.FACILITIES.LOOKUP_SUCCESS,
-  //         data: [{
-  //           id: facility.id,
-  //           name: facility.name,
-  //           code: facility.code,
-  //           address: facility.address,
-  //           province: facility.province,
-  //           ward: facility.ward,
-  //           status: facility.status,
-  //           ownerName: facility.ownerName,
-  //         }],
-  //       };
-  //     }
+  @Get('lookup')
+  @ApiOperation({ summary: 'Lookup facilities for select/autocomplete' })
+  @ApiResponse({ status: 200, type: [FacilityLookupResponseDto] })
+  async lookup(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: LookupFacilityDto,
+  ) {
+    try {
+      const activeFacilityId = getActiveFacilityId(user);
+      if (activeFacilityId) {
+        const facility = await this.facilitiesService.findDetailsById(activeFacilityId);
+        return {
+          message: RESPONSE_MESSAGES.FACILITIES.LOOKUP_SUCCESS,
+          data: [{
+            id: facility.id,
+            name: facility.name,
+            code: facility.code,
+            address: facility.address,
+            province: facility.province,
+            ward: facility.ward,
+            status: facility.status,
+            ownerName: facility.ownerName,
+          }],
+        };
+      }
 
-  //     return {
-  //       message: RESPONSE_MESSAGES.FACILITIES.LOOKUP_SUCCESS,
-  //       data: await this.facilitiesService.lookup(query),
-  //     };
-  //   } catch (error) {
-  //     this.handleError(error);
-  //   }
-  // }
+      return {
+        message: RESPONSE_MESSAGES.FACILITIES.LOOKUP_SUCCESS,
+        data: await this.facilitiesService.lookup(query),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
 
   @Get('admin-options')
   // @Permissions(PermissionEnum.FACILITY_VIEW)
@@ -272,6 +274,25 @@ export class FacilitiesController {
     }
   }
 
+  @Patch(':id/operating-hours/apply')
+  // @Permissions(PermissionEnum.FACILITY_UPDATE)
+  @ApiOperation({ summary: 'Apply facility operating hour changes with slot handling strategy' })
+  async applyOperatingHours(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: ApplyFacilityOperatingHoursDto,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITIES.OPERATING_HOURS_UPDATED,
+        data: await this.facilitiesService.applyOperatingHours(id, dto),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
   @Patch(':id/closure-days/:closureDayId')
   // @Permissions(PermissionEnum.FACILITY_UPDATE)
   @ApiOperation({ summary: 'Update a facility closure day' })
@@ -308,6 +329,45 @@ export class FacilitiesController {
       return {
         message: RESPONSE_MESSAGES.FACILITIES.UPDATED,
         data: data,
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Patch(':id/suspend')
+  // @Permissions(PermissionEnum.FACILITY_UPDATE)
+  @ApiOperation({ summary: 'Suspend facility for a period or indefinitely' })
+  @ApiResponse({ status: 200 })
+  async suspend(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: SuspendResourceDto,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITIES.STATUS_UPDATED,
+        data: await this.facilitiesService.suspend(id, dto, user?.id ?? null),
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Patch(':id/reactivate')
+  // @Permissions(PermissionEnum.FACILITY_UPDATE)
+  @ApiOperation({ summary: 'Reactivate suspended facility' })
+  @ApiResponse({ status: 200 })
+  async reactivate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    try {
+      assertFacilityAccess(user, id);
+      return {
+        message: RESPONSE_MESSAGES.FACILITIES.STATUS_UPDATED,
+        data: await this.facilitiesService.reactivate(id, user?.id ?? null),
       };
     } catch (error) {
       this.handleError(error);
@@ -354,26 +414,4 @@ export class FacilitiesController {
     }
   }
 
-  @Patch(':id/deactivate')
-  // @Permissions(PermissionEnum.FACILITY_UPDATE)
-  @ApiOperation({ summary: 'Update facility' })
-  @ApiResponse({ status: 200, type: FacilityResponseDto })
-  async deActivateFacility(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-    @Body() dto: UpdateFacilityDto,
-  ) {
-    try {
-      assertFacilityAccess(user, id);
-      const data = await this.facilitiesService.deActivateFacility(id);
-      return {
-        message: RESPONSE_MESSAGES.FACILITIES.STATUS_UPDATED,
-        data: data,
-      };
-    } catch (error) {
-      this.handleError(error);
-    }
-  }
-
-  
 }

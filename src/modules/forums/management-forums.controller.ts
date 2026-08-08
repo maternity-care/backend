@@ -18,6 +18,7 @@ import {
 } from './dto/requests/moderate-forum-content.dto';
 import { UpdateForumTopicDto } from './dto/requests/update-forum-topic.dto';
 import { UpdateForumCommentDto } from './dto/requests/update-forum-comment.dto';
+import { ForumReportsService } from './forum-reports.service';
 import { ForumsService } from './forums.service';
 
 @ApiTags('Management - Forums')
@@ -25,7 +26,10 @@ import { ForumsService } from './forums.service';
 @UseGuards(JwtAuthGuard)
 @Controller('management/forums')
 export class ManagementForumsController {
-  constructor(private readonly forumsService: ForumsService) {}
+  constructor(
+    private readonly forumsService: ForumsService,
+    private readonly forumReportsService: ForumReportsService,
+  ) {}
 
   @Get('topics')
   // @Permissions(PermissionEnum.FORUM_VIEW)
@@ -145,7 +149,7 @@ export class ManagementForumsController {
   // @Permissions(PermissionEnum.FORUM_REPORT_VIEW)
   @ApiOperation({ summary: 'List content reports' })
   async getReports(@Query() query: ForumReportQueryDto) {
-    return { message: 'Thành công', data: await this.forumsService.findReports(query) };
+    return { message: 'Thành công', data: await this.forumReportsService.findReports(query) };
   }
 
   @Patch('reports/:id/resolve')
@@ -156,6 +160,6 @@ export class ManagementForumsController {
     @Param('id') id: string,
     @Body() dto: ResolveContentReportDto,
   ) {
-    return { message: 'Đã xử lý báo cáo', data: await this.forumsService.resolveReport(id, dto, user) };
+    return { message: 'Đã xử lý báo cáo', data: await this.forumReportsService.resolveReport(id, dto, user) };
   }
 }

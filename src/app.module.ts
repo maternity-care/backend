@@ -32,6 +32,7 @@ import { SchedulesModule } from './modules/schedules/schedules.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { ForumsModule } from './modules/forums/forums.module';
 import { PaymentModule } from './modules/payment/payment.module';
+import { AppointmentDisruptionsModule } from './modules/appointment-disruptions/appointment-disruptions.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -80,6 +81,7 @@ import { PaymentModule } from './modules/payment/payment.module';
     SchedulesModule,
     AppointmentsModule,
     PaymentModule,
+    AppointmentDisruptionsModule,
   ],
 })
 export class AppModule {}

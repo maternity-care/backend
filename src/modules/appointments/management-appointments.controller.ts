@@ -33,16 +33,6 @@ export class ManagementAppointmentsController {
     };
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get appointment detail for management' })
-  async findManagementById(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    const scopedFacilityId = getActiveFacilityId(user);
-    return {
-      message: RESPONSE_MESSAGES.APPOINTMENTS.GET_SUCCESS,
-      data: await this.appointmentsService.findManagementById(id, scopedFacilityId),
-    };
-  }
-
   @Get('pregnancy-profile/:id')
   @Permissions(PermissionEnum.PREGNANCY_VIEW)
   @ApiOperation({ summary: 'Get appointment of doctor with pregnancy profile' })
@@ -54,6 +44,16 @@ export class ManagementAppointmentsController {
     return {
       message: RESPONSE_MESSAGES.APPOINTMENTS.GET_LIST_SUCCESS,
       data: await this.appointmentsService.getAppointmentOfDoctorAndPregnancyProfile(doctorId, id),
+    };
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get appointment detail for management' })
+  async findManagementById(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    const scopedFacilityId = getActiveFacilityId(user);
+    return {
+      message: RESPONSE_MESSAGES.APPOINTMENTS.GET_SUCCESS,
+      data: await this.appointmentsService.findManagementById(id, scopedFacilityId),
     };
   }
 

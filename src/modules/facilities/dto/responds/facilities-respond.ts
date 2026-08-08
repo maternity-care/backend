@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { AccountStatus, FacilityOperatingStatus, FacilityStatus } from '../../../../common/constants/status.enum';
+import { AccountStatus, FacilityOperatingStatus, FacilityStatus, InactiveSource } from '../../../../common/constants/status.enum';
 import { PaginationMetaResponseDto } from '../../../../common/dto/pagination-response.dto';
 
 export class FacilityOperatingHourResponseDto {
@@ -98,6 +98,27 @@ export class FacilityResponseDto {
 
   @ApiProperty({ enum: FacilityStatus })
   status: FacilityStatus;
+
+  @ApiPropertyOptional({ nullable: true })
+  inactiveFrom?: Date | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  inactiveUntil?: Date | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  inactiveReason?: string | null;
+
+  @ApiPropertyOptional({ enum: InactiveSource, nullable: true })
+  inactiveSource?: InactiveSource | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  inactiveBy?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  reactivatedAt?: Date | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  reactivatedBy?: string | null;
 
   @ApiPropertyOptional({ enum: FacilityOperatingStatus })
   operatingStatus?: FacilityOperatingStatus;

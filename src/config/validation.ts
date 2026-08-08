@@ -195,6 +195,10 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   GEMINI_MODEL?: string;
+
+  @IsString()
+  @IsOptional()
+  HELPER_UPLOAD_SECRET?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

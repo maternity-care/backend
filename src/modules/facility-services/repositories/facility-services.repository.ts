@@ -65,6 +65,7 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
   async findDetailsById(id: string): Promise<FacilityServiceWithDetails | null> {
     const row = await this.buildDetailsQuery()
       .where('facilityService.id = :id', { id })
+      // Chỉ lấy 1 row duy nhất, không cần paginate.
       .getRawOne<Record<string, unknown>>();
     return row ? this.mapRowToResponse(row) : null;
   }
@@ -76,7 +77,9 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
 
   // Danh sách management: filter theo facility/service/status/serviceTypeId/search.
   async findAll(filters?: SearchFacilityServiceDto): Promise<FacilityServiceWithDetails[]> {
-    const rows = await this.buildListQuery(filters).getRawMany<Record<string, unknown>>();
+    const rows = await this.buildListQuery(filters)
+    //lấy tất cả row, Record<string, unknown> là kiểu dữ liệu tạm thời để map sang FacilityServiceWithDetails
+    .getRawMany<Record<string, unknown>>();
     return rows.map(row => this.mapRowToResponse(row));
   }
 
@@ -94,6 +97,7 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
     filters?: SearchFacilityServiceDto,
   ): Promise<FacilityServiceWithDetails[]> {
     const query = this.buildDetailsQuery()
+    //
       .where('facilityService.facilityId = :facilityId', { facilityId })
       .andWhere('facilityService.status = :facilityServiceActive', { facilityServiceActive: ActiveStatus.ACTIVE })
       .andWhere('service.status = :active', { active: ActiveStatus.ACTIVE })
@@ -168,6 +172,7 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
     return query;
   }
 
+  //trả về query builder để lấy chi tiết mapping facility-service, bao gồm thông tin của facility và service.
   private buildDetailsQuery(): SelectQueryBuilder<FacilityService> {
     return this.repository
       .createQueryBuilder('facilityService')

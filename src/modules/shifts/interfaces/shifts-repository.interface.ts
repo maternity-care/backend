@@ -28,6 +28,7 @@ export interface IShiftsRepository {
   save(shift: Shift): Promise<Shift>;
   remove(shift: Shift): Promise<void>;
   findById(id: string): Promise<Shift | null>;
+  findByIdForRemoval(id: string): Promise<Shift | null>;
   findDetailsById(id: string): Promise<ShiftWithDetails | null>;
   findAll(filters?: SearchDoctorShiftDto): Promise<ShiftWithDetails[]>;
   findAllPaginated(filters?: SearchDoctorShiftDto): Promise<PaginationResult<ShiftWithDetails>>;

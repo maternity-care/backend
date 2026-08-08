@@ -154,6 +154,7 @@ export class AppointmentsService {
 
       const appointment = manager.getRepository(Appointment).create({
         patientId,
+        shiftId: shift.id,
         pregnancyProfileId: null,
         facilityId: dto.facilityId,
         serviceId: dto.serviceId,
@@ -330,10 +331,19 @@ export class AppointmentsService {
       if (isPastDateTime(dto.date, startTime)) {
         throw new BadRequestException(RESPONSE_MESSAGES.APPOINTMENTS.PAST_SLOT_INVALID);
       }
-      const shift = await this.findShiftForDoctor(manager, dto.doctorId, appointment.facilityId, dto.date, startTime, endTime);
+      const shift = await this.findShiftForDoctor(
+        manager,
+        dto.doctorId,
+        appointment.facilityId,
+        dto.date,
+        startTime,
+        endTime,
+        dto.shiftId,
+      );
       await this.ensureSlotFree(manager, appointment.facilityId, shift.staffId, dto.date, startTime, endTime, id);
 
       appointment.doctorId = shift.staffId;
+      appointment.shiftId = shift.id;
       appointment.roomId = shift.roomId ?? appointment.roomId;
       appointment.scheduledStart = formatDateTime(dto.date, startTime);
       appointment.scheduledEnd = formatDateTime(dto.date, endTime);
@@ -443,8 +453,9 @@ export class AppointmentsService {
     date: string,
     startTime: string,
     endTime: string,
+    shiftId?: string,
   ) {
-    const shift = await manager
+    const query = manager
       .createQueryBuilder()
       .select('shift.id', 'id')
       .addSelect('shift.staff_id', 'staffId')
@@ -456,8 +467,11 @@ export class AppointmentsService {
       .andWhere('shift.shift_date = :date', { date })
       .andWhere('shift.status = :status', { status: DoctorShiftStatus.AVAILABLE })
       .andWhere('shift.start_time <= :startTime', { startTime })
-      .andWhere('shift.end_time >= :endTime', { endTime })
-      .getRawOne<{ id: string; staffId: string; roomId: string | null }>();
+      .andWhere('shift.end_time >= :endTime', { endTime });
+    if (shiftId) {
+      query.andWhere('shift.id = :shiftId', { shiftId });
+    }
+    const shift = await query.getRawOne<{ id: string; staffId: string; roomId: string | null }>();
     if (!shift) throw new BadRequestException(RESPONSE_MESSAGES.APPOINTMENTS.DOCTOR_SHIFT_NOT_AVAILABLE);
     return shift;
   }
@@ -503,6 +517,7 @@ export class AppointmentsService {
       SET
         schedule.schedule_date = DATE(appointment.scheduled_start),
         schedule.schedule_time = TIME(appointment.scheduled_start),
+        schedule.status = 'upcoming',
         schedule.location = COALESCE(facility.name, facility.address, schedule.location),
         schedule.doctor = NULLIF(TRIM(CONCAT_WS(' ', doctor.title, staff.name)), ''),
         schedule.updated_at = CURRENT_TIMESTAMP

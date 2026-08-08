@@ -49,6 +49,6 @@ export class SearchProfileQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(50)
+  @Max(500)
   limit?: number;
 }

@@ -12,14 +12,14 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { AuthenticatedUser } from './interfaces/authenticated-user.interface';
 import { UpdateManagementProfileDto } from './dto/request/update-management-profile.dto';
 import { ChangeManagementPasswordDto } from './dto/request/change-management-password.dto';
-import { UsersService } from '../users/users.service';
+import { StaffManagementService } from '../staffs/staff-management.service';
 
 @ApiTags('Management - Auth')
 @Controller('management/auth')
 export class ManagementAuthController {
   constructor(
     private readonly authService: AuthService,
-    private readonly usersService: UsersService,
+    private readonly staffManagementService: StaffManagementService,
   ) {}
 
   @Post('login')
@@ -57,7 +57,7 @@ export class ManagementAuthController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   async me(@CurrentUser() staff: AuthenticatedUser) {
-    const data = await this.usersService.findUserById(staff.id, staff);
+    const data = await this.staffManagementService.findById(staff.id, staff);
     return { message: RESPONSE_MESSAGES.AUTH_PROFILE_RETRIEVED, data };
   }
 

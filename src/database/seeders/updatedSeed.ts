@@ -8,9 +8,16 @@ import {
   AccountStatus,
   ActiveStatus,
   ArticleStatus,
+  AppointmentStatus,
+  DoctorShiftStatus,
   FaqStatusEnum,
+  ForumContentStatus,
+  MaternityPackageStatus,
+  OrderStatus,
+  PaymentStatus,
   PregnancyProfileStatus,
   RiskLevel,
+  ReminderStatus,
 } from './../../common/constants/status.enum';
 import { Staff } from './../../modules/staffs/entities/staff.entity';
 import { RoleEnum } from './../../common/constants/role.enum';
@@ -19,21 +26,45 @@ import { PermissionEnum } from './../../common/constants/permission.enum';
 import { Role } from './../../modules/roles/entities/role.entity';
 import dataSource from '../typeorm.config';
 import {
+  Appointment,
+  AppointmentReminder,
   Doctor,
   Faq,
+  FacilityService,
+  ForumCategoryMetadata,
+  ForumComment,
+  ForumPost,
+  HealthMetric,
+  MaternityPackage,
+  MedicalRecord,
+  Order,
+  OrderItem,
+  PackageItem,
+  PatientPackageBenefit,
+  Payment,
   PregnancyProfile,
-  RolePermission,
+  Service,
   Shift,
   ShiftSlot,
   UserAuth,
 } from '../entities';
+import { MaternityPackageStageType, MaternityPackageType } from '../../modules/maternity-packages/dto/requests/create-maternity-package.dto';
+import { PackageServiceFacilityScope } from '../../modules/package-services/dto/requests/create-package-service.dto';
+import { ServiceSaleMode } from '../../modules/services/dto/requests/create-service.dto';
+import { ForumAuthorRole, ForumCategory } from '../../common/constants/forum.enum';
+import { NotificationReferenceType, NotificationType } from '../../common/constants/notification.enum';
+import { PackageServiceFacility } from '../../modules/package-services/entities/package-service-facility.entity';
+import { PackageStage } from '../../modules/maternity-packages/entities/package-stage.entity';
+import { ServiceType } from '../../modules/service-types/entities/service-type.entity';
+import { Setting } from '../../modules/settings/entities/setting.entity';
+import { Notification } from '../../modules/notifications/entities/notification.entity';
+import { UserSchedule } from '../../modules/schedules/entities/user-schedule.entity';
 import * as bcrypt from 'bcrypt';
 import { Not, In } from 'typeorm';
 
 // khởi tạo global repository
 const roleRepository = dataSource.getRepository(Role);
 const permissionRepository = dataSource.getRepository(Permission);
-const rolePermissionRepository = dataSource.getRepository(RolePermission);
 const staffRepository = dataSource.getRepository(Staff);
 const doctorRepository = dataSource.getRepository(Doctor);
 const faqRepository = dataSource.getRepository(Faq);
@@ -46,8 +77,131 @@ const pregnancyProfileRepository = dataSource.getRepository(PregnancyProfile);
 const userAuthRepository = dataSource.getRepository(UserAuth);
 const shiftSlotRepository = dataSource.getRepository(ShiftSlot);
 const shiftRepository = dataSource.getRepository(Shift);
+const serviceTypeRepository = dataSource.getRepository(ServiceType);
+const serviceRepository = dataSource.getRepository(Service);
+const facilityServiceRepository = dataSource.getRepository(FacilityService);
+const maternityPackageRepository = dataSource.getRepository(MaternityPackage);
+const packageStageRepository = dataSource.getRepository(PackageStage);
+const packageItemRepository = dataSource.getRepository(PackageItem);
+const packageServiceFacilityRepository = dataSource.getRepository(PackageServiceFacility);
+const appointmentRepository = dataSource.getRepository(Appointment);
+const appointmentReminderRepository = dataSource.getRepository(AppointmentReminder);
+const orderRepository = dataSource.getRepository(Order);
+const orderItemRepository = dataSource.getRepository(OrderItem);
+const paymentRepository = dataSource.getRepository(Payment);
+const patientPackageBenefitRepository = dataSource.getRepository(PatientPackageBenefit);
+const healthMetricRepository = dataSource.getRepository(HealthMetric);
+const medicalRecordRepository = dataSource.getRepository(MedicalRecord);
+const forumCategoryRepository = dataSource.getRepository(ForumCategoryMetadata);
+const forumPostRepository = dataSource.getRepository(ForumPost);
+const forumCommentRepository = dataSource.getRepository(ForumComment);
+const settingRepository = dataSource.getRepository(Setting);
+const scheduleRepository = dataSource.getRepository(UserSchedule);
+const notificationRepository = dataSource.getRepository(Notification);
 
 //---------------------------------
+
+const shouldFreshSeed = process.argv.includes('--fresh') || process.env.SEED_FRESH === 'true';
+
+const toLoginEmailLocalPart = (value: string): string => {
+  return String(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+};
+
+const seedTables = [
+  'appointment_disruption_items',
+  'shift_disruptions',
+  'shift_change_logs',
+  'appointment_reminders',
+  'appointment_statu_logs',
+  'medical_files',
+  'medical_records',
+  'health_metrics',
+  'pregnancy_history_events',
+  'payments',
+  'invoices',
+  'order_items',
+  'orders',
+  'patient_package_benefits',
+  'appointments',
+  'package_service_facilities',
+  'package_items',
+  'package_stages',
+  'maternity_packages',
+  'facility_services',
+  'services',
+  'service_types',
+  'shifts',
+  'shift_slots',
+  'rooms',
+  'room_types',
+  'facility_closure_days',
+  'facility_operating_hours',
+  'facility_staff',
+  'facilities',
+  'doctors',
+  'articles',
+  'faqs',
+  'forum_moderation_logs',
+  'content_reports',
+  'forum_comments',
+  'forum_posts',
+  'forum_categories',
+  'forum_topics',
+  'chat_messages',
+  'chat_conversations',
+  'notifications',
+  'user_schedules',
+  'user_auths',
+  'refresh_tokens',
+  'password_reset_tokens',
+  'staff_refresh_tokens',
+  'staff_password_reset_tokens',
+  'staff_permissions',
+  'staff_roles',
+  'staffs',
+  'pregnancy_profiles',
+  'users',
+  'role_permissions',
+  'permissions',
+  'roles',
+  'settings',
+];
+
+async function tableExists(tableName: string): Promise<boolean> {
+  const rows = await dataSource.query(
+    `
+    SELECT COUNT(*) AS count
+    FROM information_schema.tables
+    WHERE table_schema = DATABASE()
+      AND table_name = ?
+    `,
+    [tableName],
+  );
+
+  return Number(rows[0]?.count ?? 0) > 0;
+}
+
+async function clearSeedData(): Promise<void> {
+  console.log('Đang clear dữ liệu seed...');
+  await dataSource.query('SET FOREIGN_KEY_CHECKS = 0');
+
+  try {
+    for (const tableName of seedTables) {
+      if (await tableExists(tableName)) {
+        await dataSource.query(`TRUNCATE TABLE \`${tableName}\``);
+      }
+    }
+  } finally {
+    await dataSource.query('SET FOREIGN_KEY_CHECKS = 1');
+  }
+}
 
 // Hàm insert data cho các bảng
 async function insertPermission() {
@@ -81,6 +235,7 @@ async function insertRolePermission() {
       PermissionEnum.MEMBER_VIEW,
       PermissionEnum.MEMBER_MEDICAL_VIEW,
       PermissionEnum.PREGNANCY_VIEW,
+      PermissionEnum.PREGNANCY_CREATE,
       PermissionEnum.PREGNANCY_UPDATE,
       PermissionEnum.HEALTH_METRIC_VIEW,
       PermissionEnum.HEALTH_METRIC_CREATE,
@@ -109,6 +264,7 @@ async function insertRolePermission() {
     [RoleEnum.NURSE]: [
       PermissionEnum.MEMBER_VIEW,
       PermissionEnum.PREGNANCY_VIEW,
+      PermissionEnum.PREGNANCY_CREATE,
       PermissionEnum.HEALTH_METRIC_VIEW,
       PermissionEnum.HEALTH_METRIC_CREATE,
       PermissionEnum.HEALTH_METRIC_UPDATE,
@@ -133,6 +289,8 @@ async function insertRolePermission() {
     ],
     [RoleEnum.STAFF]: [
       PermissionEnum.MEMBER_VIEW,
+      PermissionEnum.PREGNANCY_VIEW,
+      PermissionEnum.PREGNANCY_CREATE,
       PermissionEnum.APPOINTMENT_VIEW,
       PermissionEnum.APPOINTMENT_CREATE,
       PermissionEnum.APPOINTMENT_UPDATE,
@@ -210,7 +368,21 @@ async function insertRolePermission() {
     })
     .flat();
 
-  await rolePermissionRepository.save(data);
+  if (data.length > 0) {
+    await dataSource
+      .createQueryBuilder()
+      .insert()
+      .into('role_permissions')
+      .values(
+        data
+          .filter((item) => item.permissionId)
+          .map((item) => ({
+            role_id: item.roleId,
+            permission_id: item.permissionId,
+          })),
+      )
+      .execute();
+  }
 }
 
 async function insertStaffs() {
@@ -468,21 +640,27 @@ async function insertStaffs() {
     return `${lastName}${initials}${String(index + 1).padStart(3, '0')}@gmail.com`;
   };
 
-  const roles = roleQuantities.flatMap(({ role, quantity }) =>
-    Array<RoleEnum>(quantity).fill(role),
-  );
+  const roles = roleQuantities.flatMap(({ role, quantity }) => Array<RoleEnum>(quantity).fill(role));
+  const roleCounters = new Map<RoleEnum, number>();
 
-  const baseData = names.map((name, index) => ({
-    name,
-    personalEmail: generateEmail(name, index),
-    // Tạo các số điện thoại mẫu từ 0985000001 đến 0985000110
-    phoneNumber: `0985${String(index + 1).padStart(5, '0')}`,
-    address: addresses[index % addresses.length],
-    role: dbRoles.filter((role) => role.name === roles[index]) || [dbRoles[dbRoles.length - 1]],
-  }));
+  const baseData = names.map((name, index) => {
+    const roleName = roles[index];
+    const roleSequence = (roleCounters.get(roleName) ?? 0) + 1;
+    roleCounters.set(roleName, roleSequence);
+
+    return {
+      name: roleName === RoleEnum.SUPER_ADMIN && roleSequence === 1 ? 'Super Admin' : name,
+      personalEmail: generateEmail(name, index),
+      loginEmail: roleName === RoleEnum.SUPER_ADMIN && roleSequence === 1 ? `superadmin@${EMAIL_DOMAIN}` : undefined,
+      // Tạo các số điện thoại mẫu từ 0985000001 đến 0985000110
+      phoneNumber: `0985${String(index + 1).padStart(5, '0')}`,
+      address: addresses[index % addresses.length],
+      role: dbRoles.filter((role) => role.name === roleName) || [dbRoles[dbRoles.length - 1]],
+    };
+  });
 
   for (const staff of baseData) {
-    const email = await companyEmail(staff.name);
+    const email = staff.loginEmail ?? (await companyEmail(staff.name));
     const employeeCode = `${getPositionCodePrefix(staff.role[0].name as RoleEnum)}${await generateStaffEmployeeCode()}`;
     const data = {
       name: staff.name,
@@ -876,6 +1054,13 @@ async function insertFacility() {
     },
   ];
   const facilities: Facility[] = [];
+  const buildFacilityStaffEmail = (staff: Staff, facility: Facility) => {
+    const currentLocalPart = String(staff.email).split('@')[0] || toLoginEmailLocalPart(staff.name);
+    const baseLocalPart = currentLocalPart.replace(/\.cs-[a-z0-9-]+$/i, '');
+    const facilityLocalPart = toLoginEmailLocalPart(facility.code);
+
+    return `${baseLocalPart}.${facilityLocalPart}@${EMAIL_DOMAIN}`;
+  };
 
   for (let i = 0; i < baseFacilities.length; i++) {
     const item = {
@@ -891,9 +1076,9 @@ async function insertFacility() {
   }
 
   admins.forEach((admin, index) => {
-    admin.facilityId =
-      facilities.find((f) => f.ownerId === admin.id)?.id ||
-      facilities[index % facilities.length].id;
+    const facility = facilities.find((f) => f.ownerId === admin.id) || facilities[index % facilities.length];
+    admin.facilityId = facility.id;
+    admin.email = buildFacilityStaffEmail(admin, facility);
   });
   await staffRepository.save(admins);
   const staffs = await staffRepository.find({
@@ -902,7 +1087,9 @@ async function insertFacility() {
   });
 
   staffs.forEach((staff, index) => {
-    staff.facilityId = facilities[index % facilities.length].id;
+    const facility = facilities[index % facilities.length];
+    staff.facilityId = facility.id;
+    staff.email = buildFacilityStaffEmail(staff, facility);
   });
   await staffRepository.save(staffs);
 }
@@ -1648,6 +1835,7 @@ async function insertPregnancyProfiles() {
       paraAbortion: paraAbortion,
       paraLivingChildren: paraFullTerm + paraPremature,
       riskLevel: Math.floor(Math.random() * 100 + 1) > 10 ? RiskLevel.LOW : RiskLevel.HIGH,
+      notes: '',
       createdAt: new Date(user.createdAt),
       updatedAt: new Date(user.createdAt),
       createdBy: staffs[Math.floor(Math.random() * staffs.length)].id,
@@ -1679,6 +1867,7 @@ async function insertPregnancyProfiles() {
         paraAbortion: paraAbortion,
         paraLivingChildren: paraFullTerm + paraPremature + fetalCount,
         riskLevel: Math.floor(Math.random() * 100 + 1) > 10 ? RiskLevel.LOW : RiskLevel.HIGH,
+        notes: '',
         createdAt: new Date(user.createdAt),
         updatedAt: new Date(user.createdAt),
         createdBy: staffs[Math.floor(Math.random() * staffs.length)].id,
@@ -1760,22 +1949,201 @@ async function insertShiftSlots(): Promise<void> {
   }
 }
 
-async function insertShifts() {
-  const staffs = await staffRepository.find();
-  const shiftSlots = await shiftSlotRepository.find();
-  const rooms = await roomRepository.find({
-    relations: { facility: true },
-  });
+async function insertSettings(): Promise<void> {
+  await settingRepository.save([
+    { key: 'site.name', value: 'Maternity Care System', group: 'general', isPublic: 1 },
+    { key: 'site.description', value: 'Hệ thống quản lý chăm sóc thai sản', group: 'general', isPublic: 1 },
+    { key: 'contact.email', value: 'support@mcs.com.vn', group: 'contact', isPublic: 1 },
+    { key: 'contact.phone', value: '02473010000', group: 'contact', isPublic: 1 },
+    { key: 'appointment.reminder_hours', value: 24, group: 'appointment', isPublic: 0 },
+    { key: 'upload.max_file_size_mb', value: 10, group: 'upload', isPublic: 0 },
+  ]);
+}
 
-  for (const staff of staffs) {
-    for (const room of rooms) {
-      for (const shiftSlot of shiftSlots) {
+async function insertServiceCatalog(): Promise<void> {
+  const serviceTypes = await serviceTypeRepository.save([
+    { code: 'CONSULT', name: 'Khám và tư vấn', description: 'Các dịch vụ khám, tư vấn thai sản', status: ActiveStatus.ACTIVE },
+    { code: 'ULTRASOUND', name: 'Siêu âm', description: 'Siêu âm thai theo từng mốc thai kỳ', status: ActiveStatus.ACTIVE },
+    { code: 'TEST', name: 'Xét nghiệm', description: 'Xét nghiệm máu, nước tiểu và tầm soát', status: ActiveStatus.ACTIVE },
+    { code: 'CARE', name: 'Chăm sóc sau sinh', description: 'Theo dõi và tư vấn sau sinh', status: ActiveStatus.ACTIVE },
+  ]);
+
+  const typeByCode = new Map(serviceTypes.map((type) => [type.code, type]));
+  const services = await serviceRepository.save([
+    {
+      code: 'CONSULT-OB-001',
+      name: 'Khám thai định kỳ',
+      description: 'Khám thai, đo chỉ số cơ bản và tư vấn theo tuần thai.',
+      serviceTypeId: typeByCode.get('CONSULT')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '250000',
+      requiresDoctorWarning: true,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      code: 'US-2D-001',
+      name: 'Siêu âm thai 2D',
+      description: 'Siêu âm kiểm tra sự phát triển của thai nhi.',
+      serviceTypeId: typeByCode.get('ULTRASOUND')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 20,
+      basePrice: '300000',
+      requiresDoctorWarning: true,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      code: 'US-4D-001',
+      name: 'Siêu âm thai 4D',
+      description: 'Siêu âm hình thái thai nhi theo mốc thai kỳ.',
+      serviceTypeId: typeByCode.get('ULTRASOUND')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '650000',
+      requiresDoctorWarning: true,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      code: 'TEST-BLOOD-001',
+      name: 'Xét nghiệm máu thai kỳ',
+      description: 'Xét nghiệm các chỉ số máu thường quy cho mẹ bầu.',
+      serviceTypeId: typeByCode.get('TEST')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 15,
+      basePrice: '450000',
+      requiresDoctorWarning: false,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      code: 'CARE-POST-001',
+      name: 'Tư vấn chăm sóc sau sinh',
+      description: 'Tư vấn phục hồi sau sinh và chăm sóc em bé.',
+      serviceTypeId: typeByCode.get('CARE')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '350000',
+      requiresDoctorWarning: false,
+      status: ActiveStatus.ACTIVE,
+    },
+  ]);
+
+  const facilities = await facilityRepository.find();
+  const facilityServices = facilities.flatMap((facility, facilityIndex) =>
+    services.map((service, serviceIndex) => ({
+      facilityId: facility.id,
+      serviceId: service.id,
+      price: String(Number(service.basePrice) + facilityIndex * 25000 + serviceIndex * 10000),
+      durationMinutes: service.defaultDurationMinutes,
+      status: ActiveStatus.ACTIVE,
+    })),
+  );
+
+  await facilityServiceRepository.save(facilityServices);
+}
+
+async function insertMaternityPackages(): Promise<void> {
+  const facilities = await facilityRepository.find();
+  const facilityServices = await facilityServiceRepository.find();
+
+  for (const facility of facilities) {
+    const servicesForFacility = facilityServices.filter((item) => String(item.facilityId) === String(facility.id));
+    const pkg = await maternityPackageRepository.save({
+      facilityId: facility.id,
+      code: `PKG-${facility.code.replace(/^CS-/, '')}-BASIC`,
+      name: `Gói thai sản cơ bản - ${facility.name}`,
+      description: 'Gói theo dõi thai kỳ gồm khám, siêu âm và xét nghiệm cơ bản.',
+      packageType: MaternityPackageType.SCHEDULE,
+      price: '3500000',
+      durationDays: 280,
+      priorityLevel: 1,
+      status: MaternityPackageStatus.ACTIVE,
+    });
+
+    const stages = await packageStageRepository.save([
+      {
+        packageId: pkg.id,
+        name: 'Tam cá nguyệt 1',
+        stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+        weekFrom: 6,
+        weekTo: 13,
+        goal: 'Xác nhận thai, đánh giá sức khỏe ban đầu và tư vấn chăm sóc.',
+        sortOrder: 1,
+      },
+      {
+        packageId: pkg.id,
+        name: 'Tam cá nguyệt 2',
+        stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+        weekFrom: 14,
+        weekTo: 27,
+        goal: 'Theo dõi phát triển thai nhi và tầm soát các chỉ số quan trọng.',
+        sortOrder: 2,
+      },
+      {
+        packageId: pkg.id,
+        name: 'Tam cá nguyệt 3',
+        stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+        weekFrom: 28,
+        weekTo: 40,
+        goal: 'Chuẩn bị sinh, theo dõi sát sức khỏe mẹ và bé.',
+        sortOrder: 3,
+      },
+    ]);
+
+    const savedItems = [];
+    for (let index = 0; index < servicesForFacility.slice(0, 4).length; index++) {
+      const facilityService = servicesForFacility[index];
+      const item = await packageItemRepository.save({
+        packageId: pkg.id,
+        facilityServiceId: facilityService.id,
+        packageStageId: stages[index % stages.length].id,
+        includedQuantity: index === 0 ? 6 : 2,
+        isRequired: true,
+        isOptional: false,
+        allowedFacilityScope: PackageServiceFacilityScope.SELECTED,
+        sortOrder: index + 1,
+      });
+      savedItems.push(item);
+    }
+
+    await packageServiceFacilityRepository.save(
+      savedItems.map((item) => ({ packageItemId: item.id, facilityId: facility.id })),
+    );
+  }
+}
+
+async function insertShifts() {
+  const staffs = await staffRepository.find({
+    relations: { roles: true },
+    where: { roles: { name: In([RoleEnum.DOCTOR, RoleEnum.NURSE, RoleEnum.STAFF]) } },
+  });
+  const shiftSlots = await shiftSlotRepository.find();
+  const rooms = await roomRepository.find();
+  const today = new Date();
+
+  for (let dayOffset = 1; dayOffset <= 14; dayOffset++) {
+    const shiftDate = new Date(today.getTime() + dayOffset * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
+    for (let staffIndex = 0; staffIndex < staffs.length; staffIndex++) {
+      const staff = staffs[staffIndex];
+      const staffSlots = shiftSlots.filter((slot) => String(slot.facilityId) === String(staff.facilityId));
+      const slot = staffSlots[(dayOffset + staffIndex) % staffSlots.length];
+      const room = rooms.find((item) => String(item.facilityId) === String(staff.facilityId));
+
+      if (slot) {
         const newShift = {
           staffId: staff.id,
-          roomId: room.id,
-          shiftSlotId: shiftSlot.id,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          roleId: staff.roles[0]?.id ?? null,
+          facilityId: staff.facilityId!,
+          roomId: room?.id ?? null,
+          slotId: slot.id,
+          shiftDate,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          maxAppointments: 8,
+          status: DoctorShiftStatus.AVAILABLE,
+          note: 'Ca làm việc seed demo',
         };
         await shiftRepository.save(newShift);
       }
@@ -1783,26 +2151,334 @@ async function insertShifts() {
   }
 }
 
+async function insertCareFlowData(): Promise<void> {
+  const toMysqlDateTime = (date: Date) => date.toISOString().slice(0, 19).replace('T', ' ');
+  const users = await userRepository.find();
+  const profiles = await pregnancyProfileRepository.find();
+  const doctors = await staffRepository.find({ relations: { roles: true }, where: { roles: { name: RoleEnum.DOCTOR } } });
+  const services = await serviceRepository.find();
+  const rooms = await roomRepository.find();
+  const shifts = await shiftRepository.find();
+  const packages = await maternityPackageRepository.find();
+
+  const appointments: Array<Partial<Appointment>> = [];
+  for (let index = 0; index < Math.min(users.length, 30); index++) {
+    const profile = profiles.find((item) => String(item.patientId) === String(users[index].id));
+    const shift = shifts[index % shifts.length];
+    const room = rooms.find((item) => String(item.facilityId) === String(shift.facilityId)) ?? rooms[index % rooms.length];
+    const service = services[index % services.length];
+    const doctor = doctors[index % doctors.length];
+    const scheduledStart = new Date(`${shift.shiftDate}T${shift.startTime}`);
+    const scheduledEnd = new Date(scheduledStart.getTime() + service.defaultDurationMinutes * 60 * 1000);
+
+    appointments.push({
+      shiftId: shift.id,
+      patientId: users[index].id,
+      pregnancyProfileId: profile?.id ?? null,
+      roomId: room.id,
+      facilityId: shift.facilityId,
+      doctorId: doctor.id,
+      serviceId: service.id,
+      scheduledStart: toMysqlDateTime(scheduledStart),
+      scheduledEnd: toMysqlDateTime(scheduledEnd),
+      checkedInAt: index % 5 === 0 ? scheduledStart : null,
+      status: index % 5 === 0 ? AppointmentStatus.COMPLETED : AppointmentStatus.CONFIRMED,
+      createdBy: doctor.id,
+    });
+  }
+
+  const savedAppointments = await appointmentRepository.save(appointments);
+  await appointmentReminderRepository.save(
+    savedAppointments.map((appointment) => ({
+      appointmentId: appointment.id,
+      channel: 'email',
+      scheduledAt: new Date(new Date(appointment.scheduledStart ?? new Date()).getTime() - 24 * 60 * 60 * 1000),
+      sentAt: null,
+      status: ReminderStatus.PENDING,
+      errorMessage: null,
+    })),
+  );
+
+  for (let index = 0; index < Math.min(profiles.length, 25); index++) {
+    const profile = profiles[index];
+    const recorder = doctors[index % doctors.length];
+    await healthMetricRepository.save({
+      pregnancyProfileId: profile.id,
+      recordedBy: recorder.id,
+      gestationalAgeWeeks: 8 + (index % 28),
+      weightKg: 52 + (index % 12),
+      bloodPressureSystolic: 105 + (index % 18),
+      bloodPressureDiastolic: 65 + (index % 12),
+      heartRate: 72 + (index % 10),
+      bloodSugar: 4.8 + (index % 4) * 0.2,
+      fetalHeartRate: 130 + (index % 18),
+      metadata: { source: 'seed' },
+      notes: 'Chỉ số seed demo trong giới hạn theo dõi.',
+    });
+  }
+
+  const completedAppointments = savedAppointments.filter((item) => item.status === AppointmentStatus.COMPLETED);
+  await medicalRecordRepository.save(
+    completedAppointments.map((appointment) => ({
+      appointmentId: appointment.id,
+      pregnancyProfileId: appointment.pregnancyProfileId!,
+      doctorId: appointment.doctorId,
+      diagnosis: 'Thai kỳ tiến triển ổn định.',
+      conclusion: 'Không ghi nhận bất thường trong lần khám.',
+      recommendation: 'Tiếp tục theo dõi, ăn uống đủ chất và tái khám đúng hẹn.',
+      nextAppointmentSuggestedAt: new Date(new Date(appointment.scheduledEnd ?? new Date()).getTime() + 28 * 24 * 60 * 60 * 1000),
+    })),
+  );
+
+  for (let index = 0; index < Math.min(users.length, packages.length); index++) {
+    const user = users[index];
+    const profile = profiles.find((item) => String(item.patientId) === String(user.id));
+    const pkg = packages[index % packages.length];
+    const order = await orderRepository.save({
+      code: `ORD-SEED-${String(index + 1).padStart(4, '0')}`,
+      customerId: user.id,
+      pregnancyProfileId: profile?.id ?? profiles[0].id,
+      facilityId: pkg.facilityId,
+      orderType: 'package',
+      subtotalAmount: Number(pkg.price),
+      discountAmount: 0,
+      totalAmount: Number(pkg.price),
+      status: OrderStatus.PAID,
+    });
+
+    await orderItemRepository.save({
+      orderId: order.id,
+      item: 'maternity_package',
+      itemType: 'package',
+      itemId: pkg.id,
+      name: pkg.name,
+      quantity: 1,
+      unitPrice: pkg.price,
+      totalPrice: pkg.price,
+      metadata: { source: 'seed' },
+    });
+
+    await paymentRepository.save({
+      orderId: order.id,
+      paymentMethod: 'cash',
+      provider: 'seed',
+      providerTransactionId: `PAY-SEED-${String(index + 1).padStart(4, '0')}`,
+      amount: Number(pkg.price),
+      status: PaymentStatus.SUCCESS,
+      paidAt: new Date(),
+      rawResponse: { source: 'seed' },
+    });
+  }
+
+  const packageItems = await packageItemRepository.find({ relations: { facilityService: true } });
+  await patientPackageBenefitRepository.save(
+    users.slice(0, 10).flatMap((user, userIndex) =>
+      packageItems.slice(0, 3).map((item) => ({
+        userId: user.id,
+        serviceId: item.facilityService.serviceId,
+        totalQuantity: item.includedQuantity,
+        usedQuantity: userIndex % 2,
+        remainingQuantity: Math.max(item.includedQuantity - (userIndex % 2), 0),
+      })),
+    ),
+  );
+
+  await scheduleRepository.save(
+    savedAppointments.slice(0, 20).map((appointment) => ({
+      userId: appointment.patientId,
+      title: 'Lịch khám thai',
+      type: 'appointment',
+      scheduleDate: new Date(appointment.scheduledStart ?? new Date()).toISOString().slice(0, 10),
+      scheduleTime: new Date(appointment.scheduledStart ?? new Date()).toTimeString().slice(0, 8),
+      status: 'upcoming',
+      location: 'Maternity Care System',
+      doctor: doctors.find((doctor) => String(doctor.id) === String(appointment.doctorId))?.name ?? null,
+      note: 'Lịch được tạo từ seed demo.',
+      source: 'appointment',
+      appointmentId: appointment.id,
+    })),
+  );
+}
+
+async function insertForumData(): Promise<void> {
+  const users = await userRepository.find();
+  const doctors = await staffRepository.find({ relations: { roles: true }, where: { roles: { name: RoleEnum.DOCTOR } } });
+  const admins = await staffRepository.find({ relations: { roles: true }, where: { roles: { name: RoleEnum.ADMIN } } });
+
+  await forumCategoryRepository.save([
+    { code: ForumCategory.PREGNANCY, name: 'Thai kỳ', description: 'Trao đổi về quá trình mang thai', sortOrder: 1, status: ActiveStatus.ACTIVE },
+    { code: ForumCategory.NUTRITION, name: 'Dinh dưỡng', description: 'Chế độ ăn uống cho mẹ và bé', sortOrder: 2, status: ActiveStatus.ACTIVE },
+    { code: ForumCategory.ASK_DOCTOR, name: 'Hỏi bác sĩ', description: 'Câu hỏi cần bác sĩ tư vấn', sortOrder: 3, status: ActiveStatus.ACTIVE },
+  ]);
+
+  await dataSource.query(
+    `
+    INSERT INTO forum_topics (author_id, title, slug, category, description, status, created_at, updated_at)
+    VALUES
+      (?, 'Theo dõi thai kỳ', 'theo-doi-thai-ky', ?, 'Kinh nghiệm theo dõi các mốc khám quan trọng', 'active', NOW(), NOW()),
+      (?, 'Dinh dưỡng cho mẹ bầu', 'dinh-duong-cho-me-bau', ?, 'Chia sẻ thực đơn và lưu ý dinh dưỡng', 'active', NOW(), NOW())
+    `,
+    [admins[0].id, ForumCategory.PREGNANCY, admins[0].id, ForumCategory.NUTRITION],
+  );
+  const topics = await dataSource.query('SELECT id, category FROM forum_topics ORDER BY id ASC');
+
+  const posts = await forumPostRepository.save([
+    {
+      forumTopicId: topics[0].id,
+      author: users[0].name,
+      authorId: users[0].id,
+      authorRole: ForumAuthorRole.USER,
+      title: 'Mốc khám thai đầu tiên nên chuẩn bị gì?',
+      slug: 'moc-kham-thai-dau-tien-seed',
+      category: ForumCategory.PREGNANCY,
+      content: 'Mình mới có hồ sơ thai kỳ, muốn hỏi lần khám đầu tiên nên chuẩn bị những giấy tờ gì?',
+      coverImageUrl: null,
+      commentable: true,
+      isPinned: true,
+      isFeatured: true,
+      status: ForumContentStatus.PUBLISHED,
+      approvedBy: admins[0].id,
+      approvedAt: new Date(),
+      moderatedBy: null,
+      moderatedAt: null,
+      moderationReason: null,
+    },
+    {
+      forumTopicId: topics[1].id,
+      author: users[1].name,
+      authorId: users[1].id,
+      authorRole: ForumAuthorRole.USER,
+      title: 'Thực đơn nhẹ cho tam cá nguyệt đầu',
+      slug: 'thuc-don-nhe-tam-ca-nguyet-dau-seed',
+      category: ForumCategory.NUTRITION,
+      content: 'Mọi người thường ăn gì khi bị nghén nhưng vẫn cần đủ năng lượng?',
+      coverImageUrl: null,
+      commentable: true,
+      isPinned: false,
+      isFeatured: true,
+      status: ForumContentStatus.PUBLISHED,
+      approvedBy: admins[0].id,
+      approvedAt: new Date(),
+      moderatedBy: null,
+      moderatedAt: null,
+      moderationReason: null,
+    },
+  ]);
+
+  await forumCommentRepository.save(
+    posts.map((post, index) => ({
+      postId: post.id,
+      author: doctors[index % doctors.length].name,
+      authorId: doctors[index % doctors.length].id,
+      authorRole: ForumAuthorRole.DOCTOR,
+      parentId: null,
+      messageType: 'text',
+      content: 'Bạn nên mang giấy tờ tùy thân, lịch sử khám nếu có và đặt câu hỏi cần tư vấn trước buổi khám.',
+      isDoctorAnswer: true,
+      status: ForumContentStatus.PUBLISHED,
+      moderatedBy: null,
+      moderatedAt: null,
+      moderationReason: null,
+    })),
+  );
+}
+
+async function insertNotifications(): Promise<void> {
+  const users = await userRepository.find();
+  const staffs = await staffRepository.find();
+  const appointments = await appointmentRepository.find();
+
+  await notificationRepository.save([
+    ...appointments.slice(0, 10).map((appointment) => ({
+      reference: `appointment:${appointment.id}`,
+      userId: appointment.patientId,
+      staffId: appointment.doctorId,
+      type: NotificationType.APPOINTMENT,
+      title: 'Nhắc lịch khám',
+      content: 'Bạn có lịch khám thai sắp tới. Vui lòng đến trước 15 phút.',
+      isRead: false,
+      referenceType: NotificationReferenceType.APPOINTMENT,
+      referenceId: appointment.id,
+    })),
+    ...users.slice(0, 5).map((user, index) => ({
+      reference: `system:user:${user.id}`,
+      userId: user.id,
+      staffId: staffs[index % staffs.length].id,
+      type: NotificationType.SYSTEM,
+      title: 'Chào mừng bạn đến với Maternity Care',
+      content: 'Tài khoản demo đã sẵn sàng để bạn trải nghiệm hệ thống.',
+      isRead: index % 2 === 0,
+      referenceType: NotificationReferenceType.PREGNANCY_PROFILE,
+      referenceId: user.id,
+    })),
+  ]);
+}
+
+async function printSeedSummary(): Promise<void> {
+  const tables = [
+    'roles',
+    'permissions',
+    'staffs',
+    'doctors',
+    'facilities',
+    'rooms',
+    'users',
+    'pregnancy_profiles',
+    'service_types',
+    'services',
+    'facility_services',
+    'maternity_packages',
+    'package_items',
+    'shifts',
+    'appointments',
+    'orders',
+    'payments',
+    'forum_posts',
+    'notifications',
+    'settings',
+  ];
+
+  console.log('Seed summary:');
+  for (const tableName of tables) {
+    if (await tableExists(tableName)) {
+      const rows = await dataSource.query(`SELECT COUNT(*) AS count FROM \`${tableName}\``);
+      console.log(`- ${tableName}: ${rows[0]?.count ?? 0}`);
+    }
+  }
+}
+
 async function seedCustomData(): Promise<void> {
   try {
+    dataSource.setOptions({ logging: false });
     await dataSource.initialize();
     console.log('Kết nối với database thành công.');
 
-    // Gọi các hàm chèn dữ liệu
-    // await insertPermission();
-    // await insertRoles();
-    // await insertRolePermission();
-    // await insertStaffs();
-    // await insertDoctor();
-    // await insertFaqs();
-    // await insertArticles();
-    // await insertFacility();
-    // await insertRoomTypes();
-    // await insertRooms();
-    // await insertUsers();
-    // await insertPregnancyProfiles();
-    // await insertUserAuths();
-    // await insertShiftSlots();
+    if (shouldFreshSeed) {
+      await clearSeedData();
+    }
+
+    await insertPermission();
+    await insertRoles();
+    await insertRolePermission();
+    await insertStaffs();
+    await insertDoctor();
+    await insertFacility();
+    await insertRoomTypes();
+    await insertRooms();
+    await insertSettings();
+    await insertServiceCatalog();
+    await insertMaternityPackages();
+    await insertFaqs();
+    await insertArticles();
+    await insertUsers();
+    await insertPregnancyProfiles();
+    await insertUserAuths();
+    await insertShiftSlots();
+    await insertShifts();
+    await insertCareFlowData();
+    await insertForumData();
+    await insertNotifications();
+    await printSeedSummary();
 
     console.log('Tất cả dữ liệu đã được chèn thành công!');
   } catch (error: unknown) {

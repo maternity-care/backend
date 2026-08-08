@@ -6,22 +6,22 @@ export class DoctorShiftResponseDto {
   @ApiProperty()
   id: string;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   doctorId?: string | null;
 
   @ApiPropertyOptional()
   staffId?: string;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   roleId?: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   slotId?: string | null;
 
   @ApiProperty()
   facilityId: string;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   roomId: string | null;
 
   @ApiProperty()
@@ -33,11 +33,14 @@ export class DoctorShiftResponseDto {
   @ApiProperty()
   endTime: string;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: Number, nullable: true })
   maxAppointments: number | null;
 
   @ApiProperty({ enum: DoctorShiftStatus })
   status: DoctorShiftStatus;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  note?: string | null;
 
   @ApiProperty()
   createdAt: Date;
@@ -66,23 +69,59 @@ export class DoctorShiftResponseDto {
   @ApiPropertyOptional()
   facilityName?: string;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   roomName?: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   roomType?: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   roomTypeId?: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   roomTypeName?: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   slotCode?: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   slotName?: string | null;
+}
+
+export class GroupedShiftItemResponseDto extends DoctorShiftResponseDto {
+  @ApiProperty({ example: 'MON' })
+  workingDay: string;
+}
+
+export class DoctorShiftGroupResponseDto {
+  @ApiProperty()
+  groupIndex: number;
+
+  @ApiProperty({ type: [String], example: ['MON', 'WED'] })
+  workingDays: string[];
+
+  @ApiProperty({ type: [GroupedShiftItemResponseDto] })
+  shifts: GroupedShiftItemResponseDto[];
+}
+
+export class GroupedDoctorShiftResponseDto {
+  @ApiProperty()
+  facilityId: string;
+
+  @ApiProperty()
+  dateFrom: string;
+
+  @ApiProperty()
+  dateTo: string;
+
+  @ApiProperty()
+  totalShifts: number;
+
+  @ApiProperty()
+  totalGroups: number;
+
+  @ApiProperty({ type: [DoctorShiftGroupResponseDto] })
+  groups: DoctorShiftGroupResponseDto[];
 }
 
 export class DoctorShiftPaginatedResponseDto extends PaginationMetaResponseDto {

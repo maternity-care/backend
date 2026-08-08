@@ -9,12 +9,16 @@ import { CreateForumPostDto } from './dto/requests/create-forum-post.dto';
 import { ForumPostQueryDto } from './dto/requests/forum-query.dto';
 import { UpdateForumCommentDto } from './dto/requests/update-forum-comment.dto';
 import { UpdateForumPostDto } from './dto/requests/update-forum-post.dto';
+import { ForumReportsService } from './forum-reports.service';
 import { ForumsService } from './forums.service';
 
 @ApiTags('Public - Forums')
 @Controller('forums')
 export class PublicForumsController {
-  constructor(private readonly forumsService: ForumsService) {}
+  constructor(
+    private readonly forumsService: ForumsService,
+    private readonly forumReportsService: ForumReportsService,
+  ) {}
 
   @Get('disclaimer')
   @ApiOperation({ summary: 'Get medical content disclaimer' })
@@ -101,6 +105,6 @@ export class PublicForumsController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateContentReportDto,
   ) {
-    return { message: 'Đã ghi nhận báo cáo', data: await this.forumsService.createReport(dto, user) };
+    return { message: 'Đã ghi nhận báo cáo', data: await this.forumReportsService.createReport(dto, user) };
   }
 }

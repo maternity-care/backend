@@ -29,6 +29,7 @@
     "migrate:fresh": "npm run migration:fresh",
     "migrate:fresh:seed": "npm run migration:fresh:seed",
     "seed": "ts-node -r tsconfig-paths/register src/database/seeders/updatedSeed.ts",
+    "seed:fresh": "npm run seed -- --fresh",
     "storage:public-read": "ts-node -r tsconfig-paths/register src/scripts/make-bucket-public-read.ts",
     "mail:test": "RUN_SMTP_INTEGRATION=true jest src/modules/mail/mail.service.spec.ts --runInBand --testNamePattern \"sends a real test email\"",
     "migration:run:prod": "typeorm migration:run -d dist/database/typeorm.config.js",

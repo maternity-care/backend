@@ -1,5 +1,5 @@
 import { RoomType } from './../../../database/entities/room-type.entity';
-import { ActiveStatus } from './../../../common/constants/status.enum';
+import { ActiveStatus, InactiveSource } from './../../../common/constants/status.enum';
 import { Facility } from './../../facilities/entities/facility.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
@@ -58,6 +58,34 @@ export class Room {
   @ApiProperty({ enum: ActiveStatus, enumName: 'RoomStatusEnum' })
   @Column({ name: 'status', type: 'enum', enum: ActiveStatus, default: ActiveStatus.ACTIVE })
   status: ActiveStatus;
+
+  @ApiPropertyOptional({ type: Date, nullable: true })
+  @Column({ name: 'inactive_from', type: 'timestamp', nullable: true })
+  inactiveFrom: Date | null;
+
+  @ApiPropertyOptional({ type: Date, nullable: true })
+  @Column({ name: 'inactive_until', type: 'timestamp', nullable: true })
+  inactiveUntil: Date | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'inactive_reason', type: 'text', nullable: true })
+  inactiveReason: string | null;
+
+  @ApiPropertyOptional({ enum: InactiveSource, nullable: true, required: false })
+  @Column({ name: 'inactive_source', type: 'varchar', length: 50, nullable: true })
+  inactiveSource: InactiveSource | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'inactive_by', type: 'varchar', length: 255, nullable: true })
+  inactiveBy: string | null;
+
+  @ApiPropertyOptional({ type: Date, nullable: true })
+  @Column({ name: 'reactivated_at', type: 'timestamp', nullable: true })
+  reactivatedAt: Date | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, required: false })
+  @Column({ name: 'reactivated_by', type: 'varchar', length: 255, nullable: true })
+  reactivatedBy: string | null;
 
   @ApiProperty({ type: Date })
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })

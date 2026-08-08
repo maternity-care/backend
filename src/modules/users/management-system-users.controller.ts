@@ -35,7 +35,7 @@ export class ManagementSystemUsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
-  @Permissions(PermissionEnum.USER_VIEW)
+  @Roles(RoleEnum.SUPER_ADMIN, RoleEnum.ADMIN, RoleEnum.DOCTOR)
   async findAll(@Query() query: SearchUserDto, @CurrentUser() currentUser: AuthenticatedUser) {
     const data = await this.usersService.searchUsers(query, currentUser);
     return { data, success: true, message: 'Lấy danh sách người dùng thành công.' };

@@ -91,6 +91,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current user' })
   @ApiResponse({ status: 200 })
   async me(@CurrentUser() user: AuthenticatedUser) {
+    console.log(user);
     return { message: RESPONSE_MESSAGES.AUTH_PROFILE_RETRIEVED, data: user };
   }
 }

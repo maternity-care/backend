@@ -13,11 +13,15 @@ export type RealtimeForumEvent =
   | 'forum:report.created'
   | 'forum:report.resolved';
 
+export type RealtimeMedicalRecordEvent = 'medical-record:file.pending';
+
 export interface RealtimeForumEmitOptions {
   management?: boolean;
   postRoom?: boolean;
   public?: boolean;
 }
+
+export type RealtimeNotificationRecipient = 'user' | 'staff';
 
 @Injectable()
 export class RealtimeEventsService {
@@ -54,6 +58,34 @@ export class RealtimeEventsService {
     if (shouldEmitPostRoom && postId) {
       this.server.to(`forum:post:${postId}`).emit(event, payload);
     }
+  }
+
+  emitAppointmentEvent(
+    event: RealtimeMedicalRecordEvent,
+    appointmentId: string,
+    payload: Record<string, unknown>,
+  ): void {
+    if (!this.server) {
+      this.logger.debug(`Realtime server is not ready for event ${event}`);
+      return;
+    }
+
+    this.server.to(`appointment:${appointmentId}`).emit(event, payload);
+  }
+
+  emitNotification(
+    recipientType: RealtimeNotificationRecipient,
+    recipientId: string,
+    payload: Record<string, unknown>,
+  ): void {
+    if (!this.server) {
+      this.logger.debug('Realtime server is not ready for notification:new');
+      return;
+    }
+
+    this.server
+      .to(`notifications:${recipientType}:${recipientId}`)
+      .emit('notification:new', payload);
   }
 
   serverEmit = (payload: SocketEmit) => {

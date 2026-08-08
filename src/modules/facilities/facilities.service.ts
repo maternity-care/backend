@@ -1,47 +1,56 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { CreateFacilityDto } from './dto/requests/create-facility.dto';
 import { SearchFacilityAdminOptionsDto } from './dto/requests/search-facility-admin-options.dto';
 import { LookupFacilityDto, SearchFacilityDto } from './dto/requests/search-facility.dto';
 import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
 import { FacilityOperatingHourGroupDto } from './dto/requests/facility-schedule.dto';
 import { UpdateFacilityOperatingHoursDto } from './dto/requests/update-facility-operating-hours.dto';
+import { ApplyFacilityOperatingHoursDto, OperatingHoursSlotStrategy } from './dto/requests/apply-facility-operating-hours.dto';
 import {
   CreateFacilityClosureDayDto,
   SearchFacilityClosureDayDto,
   UpdateFacilityClosureDayDto,
 } from './dto/requests/facility-closure-day.dto';
+import { SuspendResourceDto } from '../../common/dto/suspend-resource.dto';
 import { Facility } from './entities/facility.entity';
 import { FacilityClosureDay } from './entities/facility-closure-day.entity';
 import { FacilityDayOfWeek } from './entities/facility-operating-hour.entity';
 import {
   FACILITIES_REPOSITORY,
-  FacilityShiftScheduleViolation,
+  FacilitySuspendImpact,
   FacilityLookup,
   FacilityWithDetails,
   IFacilitiesRepository,
 } from './interfaces/facility-repository.interface';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
-import { ActiveStatus, FacilityOperatingStatus, FacilityStatus } from '../../common/constants/status.enum';
-import { addDays, isOvernightRange } from '../shifts/helpers/shifts.helper';
+import { ActiveStatus, FacilityStatus, InactiveSource } from '../../common/constants/status.enum';
+import { AppointmentDisruptionsService } from '../appointment-disruptions/appointment-disruptions.service';
+import { FacilityImpactRepository } from './repositories/facility-impact.repository';
+import { FacilityOperatingHoursService } from './facility-operating-hours.service';
+import { FacilityClosureDaysService } from './facility-closure-days.service';
 
 @Injectable()
 export class FacilitiesService {
   constructor(
     @Inject(FACILITIES_REPOSITORY)
     private readonly facilitiesRepository: IFacilitiesRepository,
+    private readonly facilityImpactRepository: FacilityImpactRepository,
+    private readonly facilityOperatingHoursService: FacilityOperatingHoursService,
+    private readonly facilityClosureDaysService: FacilityClosureDaysService,
+    @Optional() private readonly appointmentDisruptions?: AppointmentDisruptionsService,
   ) {}
 
   async create(dto: CreateFacilityDto): Promise<FacilityWithDetails> {
     await this.ensureOwnerCanManageFacility(dto.ownerId);
     await this.ensureUniqueFacilityIdentity(dto);
     const code = await this.generateFacilityCode(dto.province);
-    const operatingHours = this.buildOperatingHoursForCreate(dto);
+    const operatingHours = this.facilityOperatingHoursService.buildOperatingHoursForCreate(dto.schedules);
 
     const { id: _ignoredId, schedules: _ignoredSchedules, ...createPayload } = dto as CreateFacilityDto & { id?: string };
     const facility = this.facilitiesRepository.create({ ...createPayload, code });
     const saved = await this.facilitiesRepository.save(facility);
-    await this.facilitiesRepository.syncOperatingHours(saved.id, operatingHours);
+    await this.facilityOperatingHoursService.updateOperatingHours(saved.id, { schedules: dto.schedules ?? [] });
     return this.findDetailsById(saved.id);
   }
 
@@ -50,7 +59,7 @@ export class FacilitiesService {
     if (!facilities || facilities.length === 0) {
       throw new NotFoundException(RESPONSE_MESSAGES.FACILITIES.NOT_FOUND);
     }
-    return Promise.all(facilities.map(facility => this.attachFacilitySchedule(facility)));
+    return Promise.all(facilities.map(facility => this.facilityOperatingHoursService.attachFacilitySchedule(facility)));
   }
 
   async findAllPaginated(query?: SearchFacilityDto) {
@@ -60,7 +69,7 @@ export class FacilitiesService {
     }
     return {
       ...result,
-      items: await Promise.all(result.items.map(facility => this.attachFacilitySchedule(facility))),
+      items: await Promise.all(result.items.map(facility => this.facilityOperatingHoursService.attachFacilitySchedule(facility))),
     };
   }
 
@@ -70,16 +79,17 @@ export class FacilitiesService {
       throw new NotFoundException(RESPONSE_MESSAGES.FACILITIES.NOT_FOUND);
     }
 
-    return facility;
+    return this.reactivateExpiredFacilityIfNeeded(facility);
   }
 
   async findDetailsById(id: string): Promise<FacilityWithDetails> {
+    await this.reactivateExpiredFacilityById(id);
     const facility = await this.facilitiesRepository.findDetailsById(id);
     if (!facility) {
       throw new NotFoundException(RESPONSE_MESSAGES.FACILITIES.NOT_FOUND);
     }
 
-    return this.attachFacilitySchedule(facility);
+    return this.facilityOperatingHoursService.attachFacilitySchedule(facility);
   }
 
   findByCode(code: string): Promise<Facility | null> {
@@ -91,6 +101,7 @@ export class FacilitiesService {
   }
 
   async update(id: string, dto: UpdateFacilityDto): Promise<FacilityWithDetails> {
+    this.ensureStatusIsNotUpdated(dto);
     const facility = await this.findById(id);
     const updatableDto = this.removeReadonlyCode(dto);
 
@@ -125,102 +136,95 @@ export class FacilitiesService {
     return { action: 'soft_deleted', affectedCount: dependencyCount };
   }
 
-  async deActivateFacility(id: string): Promise<Facility> {
-    const facility = await this.facilitiesRepository.deActivateFacility(id);
-    return facility;
+  async suspend(
+    id: string,
+    dto: SuspendResourceDto,
+    actorId?: string | null,
+  ): Promise<{ facility: FacilityWithDetails; impact: FacilitySuspendImpact }> {
+    const facility = await this.findById(id);
+    const now = new Date();
+    const inactiveUntil = this.parseInactiveUntil(dto.inactiveUntil, 'inactiveUntil phai lon hon thoi diem hien tai');
+    const impact = await this.facilityImpactRepository.countSuspendImpact(facility.id, now, inactiveUntil);
+
+    facility.status = FacilityStatus.INACTIVE;
+    facility.inactiveFrom = now;
+    facility.inactiveUntil = inactiveUntil;
+    facility.inactiveReason = dto.reason ?? null;
+    facility.inactiveSource = InactiveSource.MANUAL;
+    facility.inactiveBy = actorId ?? null;
+    facility.reactivatedAt = null;
+    facility.reactivatedBy = null;
+    await this.facilitiesRepository.save(facility);
+    const suspendedRooms = await this.facilityImpactRepository.suspendActiveRoomsForFacility(
+      facility.id,
+      now,
+      inactiveUntil,
+      dto.reason ?? null,
+      actorId ?? null,
+    );
+    const cancelledShifts = await this.facilityImpactRepository.cancelFutureShiftsForFacility(
+      facility.id,
+      now,
+      inactiveUntil,
+      dto.reason ?? null,
+      actorId ?? null,
+    );
+    await this.appointmentDisruptions?.dispatchBySource('facility', facility.id);
+
+    return {
+      facility: await this.findDetailsById(facility.id),
+      impact: { ...impact, suspendedRooms, cancelledShifts },
+    };
+  }
+
+  async reactivate(
+    id: string,
+    actorId?: string | null,
+  ): Promise<{ facility: FacilityWithDetails; impact: Pick<FacilitySuspendImpact, 'reactivatedRooms'> }> {
+    const facility = await this.findById(id);
+    facility.status = FacilityStatus.ACTIVE;
+    facility.inactiveSource = null;
+    facility.reactivatedAt = new Date();
+    facility.reactivatedBy = actorId ?? null;
+    await this.facilitiesRepository.save(facility);
+    const reactivatedRooms = await this.facilityImpactRepository.reactivateRoomsSuspendedByFacility(facility.id, actorId ?? null);
+
+    return {
+      facility: await this.findDetailsById(facility.id),
+      impact: { reactivatedRooms },
+    };
   }
 
   async getOperatingHours(id: string) {
-    const facility = await this.findById(id);
-    const operatingHours = await this.getOperatingHoursOrDefault(facility);
-
-    return {
-      operatingHours,
-      operatingHourGroups: this.groupOperatingHoursForDisplay(operatingHours),
-    };
+    return this.facilityOperatingHoursService.getOperatingHours(id);
   }
 
-  /**
-   * Preview thay doi gio hoat dong truoc khi luu:
-   * - Build lich gio moi tu payload.
-   * - Kiem tra cac shift sap toi con active/full co bi nam ngoai khung gio moi khong.
-   * - Khong sync DB, chi tra canUpdate + impactedShifts de FE hien thi confirm/canh bao.
-   */
   async previewOperatingHours(id: string, dto: UpdateFacilityOperatingHoursDto) {
-    const facility = await this.findById(id);
-    const operatingHours = await this.buildOperatingHoursFromGroupedInput(facility, dto);
-    const impactedShifts = await this.findOperatingHourImpactedShifts(facility.id, operatingHours);
-
-    return {
-      canUpdate: impactedShifts.length === 0,
-      summary: {
-        impactedShiftCount: impactedShifts.length,
-      },
-      operatingHours,
-      operatingHourGroups: this.groupOperatingHoursForDisplay(operatingHours),
-      impactedShifts,
-    };
+    return this.facilityOperatingHoursService.previewOperatingHours(id, dto);
   }
 
   async updateOperatingHours(id: string, dto: UpdateFacilityOperatingHoursDto) {
-    const facility = await this.findById(id);
-    const operatingHours = await this.buildOperatingHoursFromGroupedInput(facility, dto);
-
-    await this.ensureOperatingHoursCompatibleWithUpcomingShifts(facility.id, operatingHours);
-    await this.facilitiesRepository.syncOperatingHours(facility.id, operatingHours);
-    return this.getOperatingHours(facility.id);
+    return this.facilityOperatingHoursService.updateOperatingHours(id, dto);
   }
 
-  // Lay danh sach ngay dong cua/dong cua dac biet cua mot co so.
+  async applyOperatingHours(id: string, dto: ApplyFacilityOperatingHoursDto) {
+    return this.facilityOperatingHoursService.applyOperatingHours(id, dto);
+  }
+
   async getClosureDays(id: string, query?: SearchFacilityClosureDayDto) {
-    await this.findById(id);
-    this.ensureValidClosureDateRange(query);
-    return this.facilitiesRepository.findClosureDaysByFacilityId(id, query);
+    return this.facilityClosureDaysService.getClosureDays(id, query);
   }
 
-  // Them mot ngay co so khong hoat dong, vi du 2026-09-02.
   async createClosureDay(id: string, dto: CreateFacilityClosureDayDto) {
-    await this.findById(id);
-    await this.ensureUniqueClosureDate(id, dto.closureDate);
-
-    const closureDay = this.facilitiesRepository.createClosureDay({
-      facilityId: id,
-      closureDate: dto.closureDate,
-      reason: dto.reason ?? null,
-      status: dto.status ?? ActiveStatus.ACTIVE,
-    });
-    const saved = await this.facilitiesRepository.saveClosureDay(closureDay);
-    return this.toClosureDayResponse(saved);
+    return this.facilityClosureDaysService.createClosureDay(id, dto);
   }
 
-  // Cap nhat ngay dong cua: doi ngay, ly do hoac trang thai active/inactive.
   async updateClosureDay(id: string, closureDayId: string, dto: UpdateFacilityClosureDayDto) {
-    await this.findById(id);
-    const closureDay = await this.findClosureDayOrFail(id, closureDayId);
-
-    if (dto.closureDate && dto.closureDate !== closureDay.closureDate) {
-      await this.ensureUniqueClosureDate(id, dto.closureDate, closureDay.id);
-      closureDay.closureDate = dto.closureDate;
-    }
-
-    if (dto.reason !== undefined) {
-      closureDay.reason = dto.reason ?? null;
-    }
-
-    if (dto.status !== undefined) {
-      closureDay.status = dto.status;
-    }
-
-    const saved = await this.facilitiesRepository.saveClosureDay(closureDay);
-    return this.toClosureDayResponse(saved);
+    return this.facilityClosureDaysService.updateClosureDay(id, closureDayId, dto);
   }
 
-  // Xoa han record ngay dong cua neu admin nhap nham.
   async removeClosureDay(id: string, closureDayId: string) {
-    await this.findById(id);
-    const closureDay = await this.findClosureDayOrFail(id, closureDayId);
-    await this.facilitiesRepository.removeClosureDay(closureDay);
-    return this.toClosureDayResponse(closureDay);
+    return this.facilityClosureDaysService.removeClosureDay(id, closureDayId);
   }
 
   private async ensureOwnerCanManageFacility(ownerId?: string): Promise<void> {
@@ -257,47 +261,43 @@ export class FacilitiesService {
     }
   }
 
-  private ensureValidClosureDateRange(query?: SearchFacilityClosureDayDto): void {
-    if (!query?.fromDate || !query?.toDate) return;
+  private parseInactiveUntil(value: string | null | undefined, errorMessage: string): Date | null {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime()) || parsed <= new Date()) {
+      throw new BadRequestException(errorMessage);
+    }
+    return parsed;
+  }
 
-    if (query.fromDate > query.toDate) {
-      throw new BadRequestException(RESPONSE_MESSAGES.FACILITIES.DATE_RANGE_INVALID);
+  private ensureStatusIsNotUpdated(dto: UpdateFacilityDto): void {
+    if (Object.prototype.hasOwnProperty.call(dto, 'status')) {
+      throw new BadRequestException('Khong doi status bang API update thong tin. Hay dung /suspend hoac /reactivate.');
     }
   }
 
-  private async ensureUniqueClosureDate(
-    facilityId: string,
-    closureDate: string,
-    excludeId?: string,
-  ): Promise<void> {
-    const existing = await this.facilitiesRepository.findClosureDayByDate(facilityId, closureDate);
-    if (existing && existing.id !== excludeId) {
-      throw new ConflictException({
-        message: RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.ALREADY_EXISTS,
-        data: {
-          duplicatedField: 'closureDate',
-          duplicatedData: this.toClosureDayResponse(existing),
-        },
-      });
-    }
+  private async reactivateExpiredFacilityById(id: string): Promise<void> {
+    const facility = await this.facilitiesRepository.findById(id);
+    if (!facility) return;
+    await this.reactivateExpiredFacilityIfNeeded(facility);
   }
 
-  private async findClosureDayOrFail(facilityId: string, closureDayId: string): Promise<FacilityClosureDay> {
-    const closureDay = await this.facilitiesRepository.findClosureDayById(facilityId, closureDayId);
-    if (!closureDay) {
-      throw new NotFoundException(RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.NOT_FOUND);
+  private async reactivateExpiredFacilityIfNeeded(facility: Facility): Promise<Facility> {
+    if (
+      facility.status === FacilityStatus.INACTIVE &&
+      facility.inactiveUntil &&
+      facility.inactiveUntil <= new Date()
+    ) {
+      facility.status = FacilityStatus.ACTIVE;
+      facility.inactiveSource = null;
+      facility.reactivatedAt = new Date();
+      facility.reactivatedBy = null;
+      const saved = await this.facilitiesRepository.save(facility);
+      await this.facilityImpactRepository.reactivateRoomsSuspendedByFacility(facility.id, null);
+      return saved;
     }
-    return closureDay;
-  }
 
-  private toClosureDayResponse(closureDay: FacilityClosureDay) {
-    return {
-      id: closureDay.id,
-      facilityId: closureDay.facilityId,
-      closureDate: closureDay.closureDate,
-      reason: closureDay.reason,
-      status: closureDay.status,
-    };
+    return facility;
   }
 
   private throwDuplicateFacilityException(field: 'code' | 'name' | 'email' | 'phone', facility: Facility): never {
@@ -366,419 +366,4 @@ export class FacilitiesService {
     const { code: _readonlyCode, ...updatableDto } = dto as UpdateFacilityDto & { code?: string };
     return updatableDto;
   }
-
-  private async attachFacilitySchedule(facility: FacilityWithDetails): Promise<FacilityWithDetails> {
-    const [operatingHours, closureDays] = await Promise.all([
-      this.getOperatingHoursOrDefault(facility),
-      this.facilitiesRepository.findClosureDaysByFacilityId(facility.id),
-    ]);
-    const operatingState = this.buildCurrentOperatingState(facility, operatingHours, closureDays);
-
-    return {
-      ...facility,
-      ...operatingState,
-      operatingHours,
-      operatingHourGroups: this.groupOperatingHoursForDisplay(operatingHours),
-      closureDays,
-    };
-  }
-
-  private async getOperatingHoursOrDefault(
-    facility: Pick<Facility, 'id'>,
-  ) {
-    const operatingHours = await this.facilitiesRepository.findOperatingHoursByFacilityId(facility.id);
-    if (operatingHours.length > 0) {
-      return operatingHours.map(item => ({
-        ...item,
-        isClosed: Boolean(item.isClosed),
-      }));
-    }
-
-    return this.buildDefaultOperatingHours();
-  }
-
-  private buildOperatingHoursForCreate(dto: CreateFacilityDto) {
-    if (dto.schedules?.length) {
-      return this.buildOperatingHoursFromGroupedSchedules(dto.schedules);
-    }
-
-    return this.buildDefaultOperatingHours();
-  }
-
-  private async buildOperatingHoursFromGroupedInput(
-    _facility: Pick<Facility, 'id'>,
-    dto: UpdateFacilityOperatingHoursDto,
-  ) {
-    return this.buildOperatingHoursFromGroupedSchedules(dto.schedules);
-  }
-
-  private buildDefaultOperatingHours() {
-    return this.getOrderedDays().map(dayOfWeek => {
-      const isSunday = dayOfWeek === FacilityDayOfWeek.SUN;
-      return {
-        dayOfWeek,
-        openTime: isSunday ? null : '07:00:00',
-        closeTime: isSunday ? null : '17:00:00',
-        isClosed: isSunday,
-      };
-    });
-  }
-
-  private buildOperatingHoursFromGroupedSchedules(
-    schedules: FacilityOperatingHourGroupDto[],
-    baseOperatingHours?: Array<{ dayOfWeek: string; openTime: string | null; closeTime: string | null; isClosed: boolean }>,
-  ) {
-    const baseHours = baseOperatingHours ?? this.getOrderedDays().map(dayOfWeek => ({
-      dayOfWeek,
-      openTime: null,
-      closeTime: null,
-      isClosed: true,
-    }));
-    const byDay = new Map(baseHours.map(item => [item.dayOfWeek, item]));
-    const seenDays = new Set<string>();
-
-    for (const schedule of schedules) {
-      for (const day of schedule.days) {
-        if (seenDays.has(day)) {
-          throw new BadRequestException({
-            message: RESPONSE_MESSAGES.FACILITIES.SCHEDULE_DAY_DUPLICATED,
-            data: {
-              duplicatedField: 'days',
-              duplicatedData: { dayOfWeek: day },
-            },
-          });
-        }
-        seenDays.add(day);
-
-        const isClosed = schedule.isClosed === true;
-        byDay.set(day, {
-          dayOfWeek: day,
-          openTime: isClosed ? null : (schedule.openTime ?? null),
-          closeTime: isClosed ? null : (schedule.closeTime ?? null),
-          isClosed,
-        });
-      }
-    }
-
-    return this.getOrderedDays().map(dayOfWeek => {
-      const current = byDay.get(dayOfWeek);
-      return {
-        dayOfWeek,
-        openTime: current?.openTime ?? null,
-        closeTime: current?.closeTime ?? null,
-        isClosed: current?.isClosed ?? true,
-      };
-    });
-  }
-
-  private async ensureOperatingHoursCompatibleWithUpcomingShifts(
-    facilityId: string,
-    operatingHours: Array<{ dayOfWeek: string; openTime: string | null; closeTime: string | null; isClosed: boolean }>,
-  ): Promise<void> {
-    const impactedShifts = await this.findOperatingHourImpactedShifts(facilityId, operatingHours);
-    if (impactedShifts.length === 0) return;
-
-    throw new ConflictException({
-      message: RESPONSE_MESSAGES.FACILITIES.OPERATING_HOURS_HAS_IMPACTED_SHIFTS,
-      data: {
-        duplicatedField: 'operatingHours',
-        impactedShifts,
-      },
-    });
-  }
-
-  private async findOperatingHourImpactedShifts(
-    facilityId: string,
-    operatingHours: Array<{ dayOfWeek: string; openTime: string | null; closeTime: string | null; isClosed: boolean }>,
-  ) {
-    const shifts = await this.facilitiesRepository.findActiveShiftsForOperatingHourValidation(
-      facilityId,
-      this.todayInVietnam(),
-    );
-    if (shifts.length === 0) return [];
-
-    const operatingHoursByDay = new Map(operatingHours.map(item => [item.dayOfWeek, item]));
-    const impactedShifts = [];
-    for (const shift of shifts) {
-      const dayOfWeek = this.getDayOfWeekFromDate(shift.shiftDate);
-      const operatingHour = operatingHoursByDay.get(dayOfWeek);
-      if (!operatingHour || operatingHour.isClosed || !operatingHour.openTime || !operatingHour.closeTime) {
-        impactedShifts.push(this.toImpactedShiftData(
-          shift,
-          'Ngay nay dang bi cau hinh dong cua trong gio hoat dong moi',
-        ));
-        continue;
-      }
-
-      const normalizedStart = this.normalizeTime(shift.startTime);
-      const normalizedEnd = this.normalizeTime(shift.endTime);
-      const normalizedOpen = this.normalizeTime(String(operatingHour.openTime));
-      const normalizedClose = this.normalizeTime(String(operatingHour.closeTime));
-
-      if (isOvernightRange(normalizedStart, normalizedEnd)) {
-        const nextDate = addDays(this.formatDateOnly(shift.shiftDate), 1);
-        const nextDayOfWeek = this.getDayOfWeekFromDate(nextDate);
-        const nextOperatingHour = operatingHoursByDay.get(nextDayOfWeek);
-
-        if (normalizedStart < normalizedOpen || normalizedClose < '23:59:00') {
-          impactedShifts.push(this.toImpactedShiftData(
-            shift,
-            `Ca dem can ngay bat dau mo den 23:59, hien tai ${normalizedOpen} - ${normalizedClose}`,
-          ));
-          continue;
-        }
-
-        if (!nextOperatingHour || nextOperatingHour.isClosed || !nextOperatingHour.openTime || !nextOperatingHour.closeTime) {
-          impactedShifts.push(this.toImpactedShiftData(
-            shift,
-            'Ca dem ket thuc vao ngay ke tiep nhung ngay ke tiep dang dong cua',
-          ));
-          continue;
-        }
-
-        const nextOpen = this.normalizeTime(String(nextOperatingHour.openTime));
-        const nextClose = this.normalizeTime(String(nextOperatingHour.closeTime));
-        if (nextOpen > '00:00:00' || normalizedEnd > nextClose) {
-          impactedShifts.push(this.toImpactedShiftData(
-            shift,
-            `Ca dem can ngay ke tiep mo tu 00:00 den sau ${normalizedEnd}, hien tai ${nextOpen} - ${nextClose}`,
-          ));
-        }
-        continue;
-      }
-
-      if (normalizedStart < normalizedOpen) {
-        impactedShifts.push(this.toImpactedShiftData(
-          shift,
-          `Ca bat dau truoc gio mo cua moi ${normalizedOpen}`,
-        ));
-        continue;
-      }
-
-      if (normalizedEnd > normalizedClose) {
-        impactedShifts.push(this.toImpactedShiftData(
-          shift,
-          `Ca ket thuc sau gio dong cua moi ${normalizedClose}`,
-        ));
-      }
-    }
-
-    return impactedShifts;
-  }
-
-  private toImpactedShiftData(shift: FacilityShiftScheduleViolation, reason?: string) {
-    return {
-      id: shift.id,
-      shiftDate: this.formatDateOnly(shift.shiftDate),
-      startTime: this.normalizeTime(shift.startTime),
-      endTime: this.normalizeTime(shift.endTime),
-      status: shift.status,
-      doctorName: shift.doctorName ?? null,
-      roomName: shift.roomName ?? null,
-      slotName: shift.slotName ?? null,
-      reason,
-    };
-  }
-
-  private groupOperatingHoursForDisplay(
-    operatingHours: Array<{ dayOfWeek: string; openTime: string | null; closeTime: string | null; isClosed: boolean }>,
-  ) {
-    const orderedHours = this.getOrderedDays()
-      .map(day => operatingHours.find(item => item.dayOfWeek === day))
-      .filter((item): item is { dayOfWeek: string; openTime: string | null; closeTime: string | null; isClosed: boolean } => Boolean(item))
-      .map(item => ({ ...item, isClosed: Boolean(item.isClosed) }));
-
-    const groups: Array<{
-      days: string[];
-      dayLabel: string;
-      openTime: string | null;
-      closeTime: string | null;
-      isClosed: boolean;
-      displayTime: string;
-    }> = [];
-
-    for (const hour of orderedHours) {
-      const lastGroup = groups[groups.length - 1];
-      const hasSameTime = lastGroup
-        && lastGroup.isClosed === hour.isClosed
-        && lastGroup.openTime === hour.openTime
-        && lastGroup.closeTime === hour.closeTime;
-
-      if (hasSameTime) {
-        lastGroup.days.push(hour.dayOfWeek);
-        lastGroup.dayLabel = this.buildDayRangeLabel(lastGroup.days);
-        continue;
-      }
-
-      groups.push({
-        days: [hour.dayOfWeek],
-        dayLabel: this.buildDayRangeLabel([hour.dayOfWeek]),
-        openTime: hour.openTime,
-        closeTime: hour.closeTime,
-        isClosed: hour.isClosed,
-        displayTime: hour.isClosed ? 'Đóng cửa' : `${this.formatDisplayTime(hour.openTime)} - ${this.formatDisplayTime(hour.closeTime)}`,
-      });
-    }
-
-    return groups;
-  }
-
-  private buildDayRangeLabel(days: string[]): string {
-    if (days.length === 1) {
-      return this.getVietnameseDayLabel(days[0]);
-    }
-
-    return `${this.getVietnameseDayLabel(days[0])} - ${this.getVietnameseDayLabel(days[days.length - 1])}`;
-  }
-
-  private getVietnameseDayLabel(day: string): string {
-    const labels: Record<string, string> = {
-      MON: 'Thứ 2',
-      TUE: 'Thứ 3',
-      WED: 'Thứ 4',
-      THU: 'Thứ 5',
-      FRI: 'Thứ 6',
-      SAT: 'Thứ 7',
-      SUN: 'Chủ nhật',
-    };
-
-    return labels[day] ?? day;
-  }
-
-  private formatDisplayTime(time: string | null): string {
-    return time ? time.slice(0, 5) : '';
-  }
-
-  private buildCurrentOperatingState(
-    facility: Pick<FacilityWithDetails, 'status'>,
-    operatingHours: Array<{ dayOfWeek: string; openTime: string | null; closeTime: string | null; isClosed: boolean }>,
-    closureDays: Array<{ closureDate: string; status: string }>,
-  ) {
-    const vietnamNow = this.getVietnamNowParts();
-    const todayOperatingHour = operatingHours.find(item => item.dayOfWeek === vietnamNow.dayOfWeek) ?? null;
-    const isClosedByClosureDay = closureDays.some(item =>
-      this.formatDateOnly(item.closureDate) === vietnamNow.date
-      && item.status === ActiveStatus.ACTIVE,
-    );
-
-    if (facility.status !== FacilityStatus.ACTIVE) {
-      return this.toOperatingState(FacilityOperatingStatus.INACTIVE, todayOperatingHour);
-    }
-
-    if (isClosedByClosureDay || !todayOperatingHour || todayOperatingHour.isClosed) {
-      return this.toOperatingState(FacilityOperatingStatus.CLOSED_TODAY, todayOperatingHour);
-    }
-
-    const openSeconds = this.timeToSeconds(todayOperatingHour.openTime);
-    const closeSeconds = this.timeToSeconds(todayOperatingHour.closeTime);
-    if (openSeconds === null || closeSeconds === null) {
-      return this.toOperatingState(FacilityOperatingStatus.CLOSED_TODAY, todayOperatingHour);
-    }
-
-    const isOpenNow = vietnamNow.seconds >= openSeconds && vietnamNow.seconds < closeSeconds;
-    return this.toOperatingState(
-      isOpenNow ? FacilityOperatingStatus.OPEN : FacilityOperatingStatus.CLOSED,
-      todayOperatingHour,
-    );
-  }
-
-  private toOperatingState(
-    operatingStatus: FacilityOperatingStatus,
-    todayOperatingHour: { dayOfWeek: string; openTime: string | null; closeTime: string | null; isClosed: boolean } | null,
-  ) {
-    return {
-      operatingStatus,
-      operatingStatusLabel: this.getOperatingStatusLabel(operatingStatus),
-      isOpenNow: operatingStatus === FacilityOperatingStatus.OPEN,
-      todayOperatingHour,
-    };
-  }
-
-  private getOperatingStatusLabel(status: FacilityOperatingStatus): string {
-    const labels: Record<FacilityOperatingStatus, string> = {
-      [FacilityOperatingStatus.OPEN]: RESPONSE_MESSAGES.FACILITIES.OPERATING_STATUS_OPEN,
-      [FacilityOperatingStatus.CLOSED]: RESPONSE_MESSAGES.FACILITIES.OPERATING_STATUS_CLOSED,
-      [FacilityOperatingStatus.CLOSED_TODAY]: RESPONSE_MESSAGES.FACILITIES.OPERATING_STATUS_CLOSED_TODAY,
-      [FacilityOperatingStatus.INACTIVE]: RESPONSE_MESSAGES.FACILITIES.OPERATING_STATUS_INACTIVE,
-    };
-
-    return labels[status];
-  }
-
-  private getVietnamNowParts(date = new Date()): {
-    date: string;
-    dayOfWeek: FacilityDayOfWeek;
-    seconds: number;
-  } {
-    const vietnamDate = new Date(date.getTime() + 7 * 60 * 60 * 1000);
-    const year = vietnamDate.getUTCFullYear();
-    const month = String(vietnamDate.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(vietnamDate.getUTCDate()).padStart(2, '0');
-    const hour = vietnamDate.getUTCHours();
-    const minute = vietnamDate.getUTCMinutes();
-    const second = vietnamDate.getUTCSeconds();
-
-    return {
-      date: `${year}-${month}-${day}`,
-      dayOfWeek: this.getDayOfWeekFromUtcDay(vietnamDate.getUTCDay()),
-      seconds: hour * 3600 + minute * 60 + second,
-    };
-  }
-
-  private getDayOfWeekFromUtcDay(day: number): FacilityDayOfWeek {
-    const days: Record<number, FacilityDayOfWeek> = {
-      0: FacilityDayOfWeek.SUN,
-      1: FacilityDayOfWeek.MON,
-      2: FacilityDayOfWeek.TUE,
-      3: FacilityDayOfWeek.WED,
-      4: FacilityDayOfWeek.THU,
-      5: FacilityDayOfWeek.FRI,
-      6: FacilityDayOfWeek.SAT,
-    };
-
-    return days[day];
-  }
-
-  private timeToSeconds(time: string | null): number | null {
-    if (!time) return null;
-
-    const [hour = '0', minute = '0', second = '0'] = time.split(':');
-    return Number(hour) * 3600 + Number(minute) * 60 + Number(second);
-  }
-
-  private formatDateOnly(value: string | Date): string {
-    if (value instanceof Date) {
-      return value.toISOString().slice(0, 10);
-    }
-    return String(value).slice(0, 10);
-  }
-
-  private todayInVietnam(): string {
-    return this.getVietnamNowParts().date;
-  }
-
-  private normalizeTime(value: string): string {
-    return value.length === 5 ? `${value}:00` : value;
-  }
-
-  private getDayOfWeekFromDate(value: string | Date): FacilityDayOfWeek {
-    const dateOnly = this.formatDateOnly(value);
-    const day = new Date(`${dateOnly}T00:00:00Z`).getUTCDay();
-    return this.getDayOfWeekFromUtcDay(day);
-  }
-
-  private getOrderedDays(): FacilityDayOfWeek[] {
-    return [
-      FacilityDayOfWeek.MON,
-      FacilityDayOfWeek.TUE,
-      FacilityDayOfWeek.WED,
-      FacilityDayOfWeek.THU,
-      FacilityDayOfWeek.FRI,
-      FacilityDayOfWeek.SAT,
-      FacilityDayOfWeek.SUN,
-    ];
-  }
-
-
-  
 }

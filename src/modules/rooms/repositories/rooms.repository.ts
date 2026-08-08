@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
+import { DeepPartial, EntityManager, Repository, SelectQueryBuilder } from 'typeorm';
 import { Room } from '../entities/room.entity';
 import {
   FacilityRoomType,
@@ -17,9 +17,29 @@ import {
   SearchRoomTypesDto,
 } from '../dto/requests/search-rooms.dto';
 import { SearchRooms2Dto } from '../dto/requests/search-room-2';
-import { ActiveStatus } from '../../../common/constants/status.enum';
+import {
+  ActiveStatus,
+  AppointmentDisruptionResolutionStatus,
+  AppointmentStatus,
+  DoctorShiftStatus,
+  ShiftDisruptionStatus,
+} from '../../../common/constants/status.enum';
 import { PaginationResult } from '../../../common/helpers/pagination';
 import { RoomType } from '../../../database/entities/room-type.entity';
+import { Shift } from '../../shifts/entities/shift.entity';
+import { AppointmentDisruptionItem } from '../../shifts/entities/appointment-disruption-item.entity';
+import { DoctorShiftChangeLog } from '../../shifts/entities/doctor-shift-change-log.entity';
+import { ShiftDisruption } from '../../shifts/entities/shift-disruption.entity';
+import { addDays, dateTimeToTime, shiftIntervalsOverlap } from '../../shifts/helpers/shifts.helper';
+
+interface AffectedAppointmentBlock {
+  id: string;
+  doctorId: string;
+  roomId: string | null;
+  scheduledStart: Date | string;
+  scheduledEnd: Date | string;
+  status: string;
+}
 
 @Injectable()
 export class RoomsRepository implements IRoomsRepository {
@@ -309,6 +329,238 @@ export class RoomsRepository implements IRoomsRepository {
     return this.repository.save(room);
   }
 
+  async countSuspendImpact(roomId: string, from: Date, until?: Date | null) {
+    const fromDate = from.toISOString().slice(0, 10);
+    const untilDate = until ? until.toISOString().slice(0, 10) : null;
+    const activeAppointmentStatuses = [
+      'pending_payment',
+      'booked',
+      'confirmed',
+      'checked_in',
+      'in_progress',
+    ];
+
+    const shiftQuery = this.repository.manager
+      .createQueryBuilder()
+      .select('COUNT(*)', 'count')
+      .from('shifts', 'shift')
+      .where('shift.room_id = :roomId', { roomId })
+      .andWhere('shift.deleted_at IS NULL')
+      .andWhere('shift.status IN (:...statuses)', { statuses: ['available', 'full'] })
+      .andWhere('shift.shift_date >= :fromDate', { fromDate });
+
+    if (untilDate) {
+      shiftQuery.andWhere('shift.shift_date <= :untilDate', { untilDate });
+    }
+
+    const appointmentQuery = this.repository.manager
+      .createQueryBuilder()
+      .select('COUNT(*)', 'count')
+      .from('appointments', 'appointment')
+      .where('appointment.room_id = :roomId', { roomId })
+      .andWhere('appointment.status IN (:...statuses)', { statuses: activeAppointmentStatuses })
+      .andWhere('appointment.scheduled_start >= :from', { from });
+
+    if (until) {
+      appointmentQuery.andWhere('appointment.scheduled_start <= :until', { until });
+    }
+
+    const [shiftRow, appointmentRow] = await Promise.all([
+      shiftQuery.getRawOne<{ count: string }>(),
+      appointmentQuery.getRawOne<{ count: string }>(),
+    ]);
+
+    return {
+      affectedShifts: Number(shiftRow?.count ?? 0),
+      affectedAppointments: Number(appointmentRow?.count ?? 0),
+    };
+  }
+
+  async cancelFutureShiftsForRoom(
+    roomId: string,
+    from: Date,
+    until?: Date | null,
+    reason?: string | null,
+    actorId?: string | null,
+  ): Promise<number> {
+    return this.repository.manager.transaction(async manager => {
+      const shifts = await this.findSuspendAffectedShifts(manager, roomId, from, until);
+
+      for (const shift of shifts) {
+        const affectedAppointments = await this.findActiveAppointmentsForShift(manager, shift);
+
+        await manager.update(Shift, shift.id, {
+          status: DoctorShiftStatus.CANCELLED,
+        });
+
+        await this.insertShiftChangeLog(
+          manager,
+          shift,
+          'room_suspended',
+          reason,
+          actorId,
+        );
+
+        if (affectedAppointments.length > 0) {
+          await this.insertShiftDisruption(
+            manager,
+            shift,
+            affectedAppointments,
+            {
+              type: 'room_suspended',
+              sourceType: 'room',
+              sourceId: roomId,
+              reason,
+              actorId,
+            },
+          );
+        }
+      }
+
+      return shifts.length;
+    });
+  }
+
+  private findSuspendAffectedShifts(
+    manager: EntityManager,
+    roomId: string,
+    from: Date,
+    until?: Date | null,
+  ): Promise<Shift[]> {
+    const query = manager
+      .getRepository(Shift)
+      .createQueryBuilder('shift')
+      .setLock('pessimistic_write')
+      .where('shift.roomId = :roomId', { roomId })
+      .andWhere('shift.deletedAt IS NULL')
+      .andWhere('shift.status IN (:...statuses)', {
+        statuses: [DoctorShiftStatus.AVAILABLE, DoctorShiftStatus.FULL, DoctorShiftStatus.OFF],
+      })
+      .andWhere('shift.shiftDate >= :fromDate', { fromDate: from.toISOString().slice(0, 10) })
+      .orderBy('shift.shiftDate', 'ASC')
+      .addOrderBy('shift.startTime', 'ASC');
+
+    if (until) {
+      query.andWhere('shift.shiftDate <= :untilDate', { untilDate: until.toISOString().slice(0, 10) });
+    }
+
+    return query.getMany();
+  }
+
+  private async findActiveAppointmentsForShift(
+    manager: EntityManager,
+    shift: Shift,
+  ): Promise<AffectedAppointmentBlock[]> {
+    const shiftDate = this.formatDateOnly(shift.shiftDate);
+    const nextDate = addDays(shiftDate, 1);
+    const appointments = await manager
+      .createQueryBuilder()
+      .select('appointment.id', 'id')
+      .addSelect('appointment.doctor_id', 'doctorId')
+      .addSelect('appointment.room_id', 'roomId')
+      .addSelect('appointment.scheduled_start', 'scheduledStart')
+      .addSelect('appointment.scheduled_end', 'scheduledEnd')
+      .addSelect('appointment.status', 'status')
+      .from('appointments', 'appointment')
+      .where('appointment.facility_id = :facilityId', { facilityId: shift.facilityId })
+      .andWhere('appointment.doctor_id = :staffId', { staffId: shift.staffId })
+      .andWhere('appointment.room_id = :roomId', { roomId: shift.roomId })
+      .andWhere('DATE(appointment.scheduled_start) BETWEEN :shiftDate AND :nextDate', { shiftDate, nextDate })
+      .andWhere('appointment.status IN (:...statuses)', {
+        statuses: [
+          AppointmentStatus.PENDING_PAYMENT,
+          AppointmentStatus.BOOKED,
+          AppointmentStatus.CONFIRMED,
+          AppointmentStatus.CHECKED_IN,
+          AppointmentStatus.IN_PROGRESS,
+        ],
+      })
+      .orderBy('appointment.scheduled_start', 'ASC')
+      .getRawMany<AffectedAppointmentBlock>();
+
+    return appointments.filter(appointment =>
+      shiftIntervalsOverlap(
+        shiftDate,
+        shift.startTime,
+        shift.endTime,
+        this.formatDateOnly(appointment.scheduledStart),
+        dateTimeToTime(appointment.scheduledStart),
+        dateTimeToTime(appointment.scheduledEnd),
+      ),
+    );
+  }
+
+  private async insertShiftChangeLog(
+    manager: EntityManager,
+    shift: Shift,
+    action: string,
+    reason?: string | null,
+    actorId?: string | null,
+  ): Promise<void> {
+    await manager.createQueryBuilder().insert().into(DoctorShiftChangeLog).values({
+      shiftId: shift.id,
+      action,
+      oldStatus: shift.status,
+      newStatus: DoctorShiftStatus.CANCELLED,
+      oldStaffId: shift.staffId,
+      newStaffId: shift.staffId,
+      oldRoomId: shift.roomId,
+      newRoomId: shift.roomId,
+      oldStartTime: shift.startTime,
+      newStartTime: shift.startTime,
+      oldEndTime: shift.endTime,
+      newEndTime: shift.endTime,
+      reason: reason ?? null,
+      changedBy: actorId ?? null,
+    }).execute();
+  }
+
+  private async insertShiftDisruption(
+    manager: EntityManager,
+    shift: Shift,
+    affectedAppointments: AffectedAppointmentBlock[],
+    options: {
+      type: string;
+      sourceType: string;
+      sourceId: string;
+      reason?: string | null;
+      actorId?: string | null;
+    },
+  ): Promise<void> {
+    const result = await manager.createQueryBuilder().insert().into(ShiftDisruption).values({
+      type: options.type,
+      sourceType: options.sourceType,
+      sourceId: options.sourceId,
+      facilityId: shift.facilityId,
+      shiftId: shift.id,
+      staffId: shift.staffId,
+      doctorShiftId: shift.id,
+      roomId: shift.roomId ?? null,
+      reason: options.reason ?? null,
+      status: ShiftDisruptionStatus.OPEN,
+      createdBy: options.actorId ?? null,
+    }).execute();
+    const disruptionId = String(result.identifiers[0]?.id);
+
+    await manager.createQueryBuilder().insert().into(AppointmentDisruptionItem).values(
+      affectedAppointments.map(appointment => ({
+        disruptionId,
+        appointmentId: appointment.id,
+        oldStaffId: shift.staffId,
+        oldDoctorId: shift.staffId,
+        oldRoomId: shift.roomId ?? null,
+        oldScheduledStart: appointment.scheduledStart as Date,
+        oldScheduledEnd: appointment.scheduledEnd as Date,
+        resolutionStatus: AppointmentDisruptionResolutionStatus.PENDING,
+      })),
+    ).execute();
+  }
+
+  private formatDateOnly(value: string | Date): string {
+    if (value instanceof Date) return value.toISOString().slice(0, 10);
+    return String(value).slice(0, 10);
+  }
+
   findByFacilityId(facilityId: string, filters?: SearchRooms2Dto): Promise<RoomWithDetails[]> {
     return this.buildDetailsQuery({ ...filters, facilityId })
       .orderBy('room.createdAt', 'DESC')
@@ -343,6 +595,13 @@ export class RoomsRepository implements IRoomsRepository {
       .addSelect('room.name', 'name')
       .addSelect('room.floor', 'floor')
       .addSelect('room.status', 'status')
+      .addSelect('room.inactiveFrom', 'inactiveFrom')
+      .addSelect('room.inactiveUntil', 'inactiveUntil')
+      .addSelect('room.inactiveReason', 'inactiveReason')
+      .addSelect('room.inactiveSource', 'inactiveSource')
+      .addSelect('room.inactiveBy', 'inactiveBy')
+      .addSelect('room.reactivatedAt', 'reactivatedAt')
+      .addSelect('room.reactivatedBy', 'reactivatedBy')
       .addSelect('room.createdAt', 'createdAt')
       .addSelect('room.updatedAt', 'updatedAt')
       .addSelect('facility.code', 'facilityCode')

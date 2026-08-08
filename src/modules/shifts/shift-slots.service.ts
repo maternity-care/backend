@@ -261,7 +261,14 @@ export class ShiftSlotsService {
     const normalizedEnd = normalizeTime(endTime);
     const schedule = await this.facilitiesService.getOperatingHours(facilityId);
     const operatingHours = schedule.operatingHours;
-    const fitsAtLeastOneOpenDay = operatingHours.some((item, index) => {
+    const openOperatingHours = operatingHours.filter(item =>
+      !item.isClosed && item.openTime && item.closeTime,
+    );
+    if (openOperatingHours.length === 0) {
+      throw new BadRequestException(RESPONSE_MESSAGES.SHIFT_SLOTS.OUTSIDE_FACILITY_HOURS);
+    }
+
+    const fitsEveryOpenDay = openOperatingHours.every((item, index) => {
       if (item.isClosed || !item.openTime || !item.closeTime) return false;
       const openTime = normalizeTime(String(item.openTime));
       const closeTime = normalizeTime(String(item.closeTime));
@@ -269,7 +276,7 @@ export class ShiftSlotsService {
         return normalizedStart >= openTime && normalizedEnd <= closeTime;
       }
 
-      const nextItem = operatingHours[(index + 1) % operatingHours.length];
+      const nextItem = operatingHours[(operatingHours.indexOf(item) + 1) % operatingHours.length];
       if (!nextItem || nextItem.isClosed || !nextItem.openTime || !nextItem.closeTime) return false;
       return normalizedStart >= openTime
         && '23:59:00' <= closeTime
@@ -277,7 +284,7 @@ export class ShiftSlotsService {
         && normalizedEnd <= normalizeTime(String(nextItem.closeTime));
     });
 
-    if (!fitsAtLeastOneOpenDay) {
+    if (!fitsEveryOpenDay) {
       throw new BadRequestException(RESPONSE_MESSAGES.SHIFT_SLOTS.OUTSIDE_FACILITY_HOURS);
     }
   }

@@ -13,6 +13,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateMedicalRecordDto } from './dto/requests/create-medical-record.dto';
+import { ListPendingMedicalFilesDto } from './dto/requests/pending-medical-file.dto';
 import { SearchMedicalRecordDto } from './dto/requests/search-medical-record.dto';
 import { UpdateMedicalRecordDto } from './dto/requests/update-medical-record.dto';
 import { MEDICAL_RECORD_MESSAGES } from './medical-record.constant';
@@ -33,6 +34,15 @@ export class MedicalRecordsController {
       ? await this.service.findAllPaginated(query)
       : await this.service.findAll(query);
     return { message: MEDICAL_RECORD_MESSAGES.FOUND, data };
+  }
+
+  @Get('pending-files')
+  @ApiOperation({ summary: 'List helper-uploaded pending files for an appointment' })
+  async listPendingFiles(@Query() query: ListPendingMedicalFilesDto) {
+    return {
+      message: MEDICAL_RECORD_MESSAGES.FOUND,
+      data: await this.service.listPendingFiles(query.appointmentId),
+    };
   }
 
   @Get(':id')

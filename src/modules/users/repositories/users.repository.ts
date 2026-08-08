@@ -97,6 +97,13 @@ export class UsersRepository implements IUsersRepository {
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.pregnancyProfiles', 'pregnancyProfile');
 
+    if (query.search) {
+      qb.andWhere(
+        '(user.name LIKE :search OR user.email LIKE :search OR user.phone LIKE :search OR user.cccd LIKE :search)',
+        { search: `%${query.search}%` },
+      );
+    }
+
     if (query.name) {
       qb.andWhere('user.name LIKE :name', {
         name: `%${query.name}%`,

@@ -1,33 +1,53 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
+import { DeepPartial, EntityManager, Repository, SelectQueryBuilder } from 'typeorm';
 import { Facility } from '../entities/facility.entity';
 import { FacilityClosureDay } from '../entities/facility-closure-day.entity';
 import { FacilityDayOfWeek, FacilityOperatingHour } from '../entities/facility-operating-hour.entity';
-import { AccountStatus, DoctorShiftStatus, FacilityStatus } from '../../../common/constants/status.enum';
+import {
+  AccountStatus,
+  ActiveStatus,
+  AppointmentDisruptionResolutionStatus,
+  AppointmentStatus,
+  DoctorShiftStatus,
+  FacilityStatus,
+  InactiveSource,
+  ShiftDisruptionStatus,
+} from '../../../common/constants/status.enum';
 import { RoleEnum } from '../../../common/constants/role.enum';
+import { Room } from '../../rooms/entities/room.entity';
+import { Shift } from '../../shifts/entities/shift.entity';
+import { AppointmentDisruptionItem } from '../../shifts/entities/appointment-disruption-item.entity';
+import { DoctorShiftChangeLog } from '../../shifts/entities/doctor-shift-change-log.entity';
+import { ShiftDisruption } from '../../shifts/entities/shift-disruption.entity';
+import { ShiftSlot } from '../../../database/entities/shift-slot.entity';
 import {
   FacilityAdminOption,
-  FacilityShiftScheduleViolation,
   FacilityLookup,
   FacilityWithDetails,
   IFacilitiesRepository,
 } from '../interfaces/facility-repository.interface';
-import { SearchFacilityClosureDayDto } from '../dto/requests/facility-closure-day.dto';
+
 import { SearchFacilityAdminOptionsDto } from '../dto/requests/search-facility-admin-options.dto';
 import { LookupFacilityDto, SearchFacilityDto } from '../dto/requests/search-facility.dto';
 import { PaginationResult } from '../../../common/helpers/pagination';
 import { RESPONSE_MESSAGES } from '../../../common/constants/response-message.constant';
+import { addDays, dateTimeToTime, shiftIntervalsOverlap } from '../../shifts/helpers/shifts.helper';
+
+interface AffectedAppointmentBlock {
+  id: string;
+  doctorId: string;
+  roomId: string | null;
+  scheduledStart: Date | string;
+  scheduledEnd: Date | string;
+  status: string;
+}
 
 @Injectable()
 export class FacilitiesRepository implements IFacilitiesRepository {
   constructor(
     @InjectRepository(Facility)
     private readonly repository: Repository<Facility>,
-    @InjectRepository(FacilityOperatingHour)
-    private readonly operatingHourRepository: Repository<FacilityOperatingHour>,
-    @InjectRepository(FacilityClosureDay)
-    private readonly closureDayRepository: Repository<FacilityClosureDay>,
   ) {}
 
   create(data: DeepPartial<Facility>): Facility {
@@ -36,120 +56,6 @@ export class FacilitiesRepository implements IFacilitiesRepository {
 
   save(facility: Facility): Promise<Facility> {
     return this.repository.save(facility);
-  }
-
-  async syncOperatingHours(
-    facilityId: string,
-    operatingHours: Array<{ dayOfWeek: FacilityDayOfWeek; openTime: string | null; closeTime: string | null; isClosed: boolean }>,
-  ): Promise<void> {
-    await this.repository.manager.transaction(async manager => {
-      await manager.delete(FacilityOperatingHour, { facilityId });
-      await manager.save(
-        FacilityOperatingHour,
-        operatingHours.map(item => manager.create(FacilityOperatingHour, { ...item, facilityId })),
-      );
-    });
-  }
-
-  async findOperatingHoursByFacilityId(facilityId: string): Promise<Array<{ dayOfWeek: string; openTime: string | null; closeTime: string | null; isClosed: boolean }>> {
-    return this.operatingHourRepository
-      .createQueryBuilder('operatingHour')
-      .select('operatingHour.dayOfWeek', 'dayOfWeek')
-      .addSelect('operatingHour.openTime', 'openTime')
-      .addSelect('operatingHour.closeTime', 'closeTime')
-      .addSelect('operatingHour.isClosed', 'isClosed')
-      .where('operatingHour.facilityId = :facilityId', { facilityId })
-      .orderBy(`FIELD(operatingHour.dayOfWeek, 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN')`)
-      .getRawMany();
-  }
-
-  async findActiveShiftsForOperatingHourValidation(
-    facilityId: string,
-    fromDate: string,
-  ): Promise<FacilityShiftScheduleViolation[]> {
-    return this.repository.manager
-      .createQueryBuilder()
-      .select('shift.id', 'id')
-      // DATE column khi đi qua MySQL driver đôi lúc bị ép thành Date object rồi lệch ngày khi toISOString().
-      // Format thẳng ở DB để validate operating-hours luôn dùng đúng ngày YYYY-MM-DD như dữ liệu trong MySQL.
-      .addSelect("DATE_FORMAT(shift.shift_date, '%Y-%m-%d')", 'shiftDate')
-      .addSelect('shift.start_time', 'startTime')
-      .addSelect('shift.end_time', 'endTime')
-      .addSelect('shift.status', 'status')
-      .addSelect('staff.name', 'doctorName')
-      .addSelect('room.name', 'roomName')
-      .addSelect('slot.name', 'slotName')
-      .from('shifts', 'shift')
-      .leftJoin('staffs', 'staff', 'staff.id = shift.staff_id')
-      .leftJoin('rooms', 'room', 'room.id = shift.room_id')
-      .leftJoin('shift_slots', 'slot', 'slot.id = shift.slot_id')
-      .where('shift.facility_id = :facilityId', { facilityId })
-      .andWhere('shift.deleted_at IS NULL')
-      .andWhere('shift.shift_date >= :fromDate', { fromDate })
-      .andWhere('shift.status IN (:...statuses)', {
-        statuses: [DoctorShiftStatus.AVAILABLE, DoctorShiftStatus.FULL],
-      })
-      .orderBy('shift.shift_date', 'ASC')
-      .addOrderBy('shift.start_time', 'ASC')
-      .getRawMany<FacilityShiftScheduleViolation>();
-  }
-
-  createClosureDay(data: DeepPartial<FacilityClosureDay>): FacilityClosureDay {
-    return this.closureDayRepository.create(data);
-  }
-
-  saveClosureDay(closureDay: FacilityClosureDay): Promise<FacilityClosureDay> {
-    return this.closureDayRepository.save(closureDay);
-  }
-
-  async removeClosureDay(closureDay: FacilityClosureDay): Promise<void> {
-    await this.closureDayRepository.remove(closureDay);
-  }
-
-  async findClosureDaysByFacilityId(
-    facilityId: string,
-    filters?: SearchFacilityClosureDayDto,
-  ): Promise<Array<{ id: string; facilityId: string; closureDate: string; reason: string | null; status: string }>> {
-    const query = this.closureDayRepository
-      .createQueryBuilder('closureDay')
-      .select('closureDay.id', 'id')
-      .addSelect('closureDay.facilityId', 'facilityId')
-      .addSelect('closureDay.closureDate', 'closureDate')
-      .addSelect('closureDay.reason', 'reason')
-      .addSelect('closureDay.status', 'status')
-      .where('closureDay.facilityId = :facilityId', { facilityId });
-
-    if (filters?.fromDate) {
-      query.andWhere('closureDay.closureDate >= :fromDate', { fromDate: filters.fromDate });
-    }
-
-    if (filters?.toDate) {
-      query.andWhere('closureDay.closureDate <= :toDate', { toDate: filters.toDate });
-    }
-
-    if (filters?.status) {
-      query.andWhere('closureDay.status = :status', { status: filters.status });
-    }
-
-    return query.orderBy('closureDay.closureDate', 'ASC').getRawMany();
-  }
-
-  findClosureDayById(facilityId: string, closureDayId: string): Promise<FacilityClosureDay | null> {
-    return this.closureDayRepository.findOne({
-      where: {
-        id: closureDayId,
-        facilityId,
-      },
-    });
-  }
-
-  findClosureDayByDate(facilityId: string, closureDate: string): Promise<FacilityClosureDay | null> {
-    return this.closureDayRepository.findOne({
-      where: {
-        facilityId,
-        closureDate,
-      },
-    });
   }
 
   findAll(filters?: SearchFacilityDto): Promise<FacilityWithDetails[]> {
@@ -376,8 +282,9 @@ export class FacilitiesRepository implements IFacilitiesRepository {
     return this.repository.save(facility);
   }
 
-  async deActivateFacility(id: string): Promise<Facility> {
-    return this.updateStatus(id, FacilityStatus.INACTIVE);
+  private formatDateOnly(value: string | Date): string {
+    if (value instanceof Date) return value.toISOString().slice(0, 10);
+    return String(value).slice(0, 10);
   }
 
   private buildDetailsQuery(filters?: Pick<SearchFacilityDto, 'search' | 'city' | 'ownerId' | 'status'>): SelectQueryBuilder<Facility> {
@@ -400,6 +307,13 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       .addSelect('facility.latitude', 'latitude')
       .addSelect('facility.longitude', 'longitude')
       .addSelect('facility.status', 'status')
+      .addSelect('facility.inactiveFrom', 'inactiveFrom')
+      .addSelect('facility.inactiveUntil', 'inactiveUntil')
+      .addSelect('facility.inactiveReason', 'inactiveReason')
+      .addSelect('facility.inactiveSource', 'inactiveSource')
+      .addSelect('facility.inactiveBy', 'inactiveBy')
+      .addSelect('facility.reactivatedAt', 'reactivatedAt')
+      .addSelect('facility.reactivatedBy', 'reactivatedBy')
       .addSelect('facility.createdAt', 'createdAt')
       .addSelect('facility.updatedAt', 'updatedAt');
 

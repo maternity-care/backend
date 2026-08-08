@@ -5,7 +5,8 @@ import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RolesModule } from '../roles/roles.module';
 import { UsersModule } from '../users/users.module';
-import { MailModule } from '../mail/mail.module';
+import { StaffsModule } from '../staffs/staffs.module';
+import { JobsModule } from '../jobs/jobs.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
@@ -23,8 +24,9 @@ import { UserAuth } from './entities/user-auth.entity';
 @Module({
   imports: [
     UsersModule,
+    StaffsModule,
     RolesModule,
-    MailModule,
+    JobsModule,
     PassportModule,
     TypeOrmModule.forFeature([
       RefreshToken,
@@ -56,6 +58,6 @@ import { UserAuth } from './entities/user-auth.entity';
       useExisting: UserAuthRepository,
     },
   ],
-  exports: [AuthService],
+  exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

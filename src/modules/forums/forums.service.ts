@@ -14,34 +14,32 @@ import {
 import { RoleEnum } from '../../common/constants/role.enum';
 import {
   ActiveStatus,
-  ContentReportStatus,
   ForumContentStatus,
 } from '../../common/constants/status.enum';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { getUserRoles } from '../../common/helpers/auth.helper';
-import { ContentReport, ReportRole } from '../../database/entities/content-report.entity';
+import { ContentReport } from '../../database/entities/content-report.entity';
 import { ForumCategoryMetadata } from '../../database/entities/forum-category-metadata.entity';
 import { ForumComment } from '../../database/entities/forum-comment.entity';
 import { ForumModerationLog } from '../../database/entities/forum-moderation-log.entity';
 import { ForumPost } from '../../database/entities/forum-post.entity';
 import { ForumTopic } from '../../database/entities/forum-topic.entity';
 import { RealtimeEventsService } from '../realtime/realtime-events.service';
-import { CreateContentReportDto } from './dto/requests/create-content-report.dto';
 import { CreateForumCommentDto } from './dto/requests/create-forum-comment.dto';
 import { CreateForumPostDto } from './dto/requests/create-forum-post.dto';
 import { CreateForumTopicDto } from './dto/requests/create-forum-topic.dto';
-import { ForumPostQueryDto, ForumReportQueryDto } from './dto/requests/forum-query.dto';
+import { ForumPostQueryDto } from './dto/requests/forum-query.dto';
 import {
   CreateManagementForumPostDto,
   UpdateManagementForumPostDto,
 } from './dto/requests/management-forum-post.dto';
 import {
   ModerateForumContentDto,
-  ResolveContentReportDto,
 } from './dto/requests/moderate-forum-content.dto';
 import { UpdateForumCommentDto } from './dto/requests/update-forum-comment.dto';
 import { UpdateForumPostDto } from './dto/requests/update-forum-post.dto';
 import { UpdateForumTopicDto } from './dto/requests/update-forum-topic.dto';
+import { ForumNotificationsService } from './forum-notifications.service';
 
 const MEDICAL_DISCLAIMER = 'Thông tin tham khảo, không thay thế tư vấn bác sĩ.';
 
@@ -61,6 +59,7 @@ export class ForumsService {
     @InjectRepository(ForumModerationLog)
     private readonly moderationLogRepository: Repository<ForumModerationLog>,
     private readonly realtimeEvents: RealtimeEventsService,
+    private readonly forumNotifications: ForumNotificationsService,
   ) {}
 
   getDisclaimer() {
@@ -118,9 +117,7 @@ export class ForumsService {
     if (!post) throw new NotFoundException('Không tìm thấy bài viết');
 
     const comments = await this.commentRepository.find({
-      where: management
-        ? { postId: id }
-        : { postId: id, status: ForumContentStatus.PUBLISHED },
+      where: management ? { postId: id } : { postId: id, status: ForumContentStatus.PUBLISHED },
       order: { isDoctorAnswer: 'DESC', createdAt: 'ASC' },
     });
 
@@ -176,7 +173,7 @@ export class ForumsService {
     });
 
     const saved = await this.postRepository.save(post);
-    await this.writeModerationLog({
+    const moderationLog = await this.writeModerationLog({
       targetType: ForumTargetType.POST,
       targetId: saved.id,
       action: status === ForumContentStatus.PUBLISHED
@@ -186,16 +183,23 @@ export class ForumsService {
       reason: 'Bài viết mới đang chờ duyệt thủ công',
       metadata: { mode: status === ForumContentStatus.PUBLISHED ? 'auto_publish' : 'manual_review' },
     });
-    this.realtimeEvents.emitForumEvent('forum:post.created', {
-      id: saved.id,
-      postId: saved.id,
-      status: saved.status,
-      topicId: saved.forumTopicId,
-    }, {
-      management: true,
-      public: saved.status === ForumContentStatus.PUBLISHED,
-      postRoom: saved.status === ForumContentStatus.PUBLISHED,
-    });
+    if (saved.status === ForumContentStatus.PENDING) {
+      await this.forumNotifications.notifyPostSubmitted(saved, actor);
+    }
+    this.realtimeEvents.emitForumEvent(
+      'forum:post.created',
+      {
+        id: saved.id,
+        postId: saved.id,
+        status: saved.status,
+        topicId: saved.forumTopicId,
+      },
+      {
+        management: true,
+        public: saved.status === ForumContentStatus.PUBLISHED,
+        postRoom: saved.status === ForumContentStatus.PUBLISHED,
+      },
+    );
     return { medicalDisclaimer: MEDICAL_DISCLAIMER, post: saved };
   }
 
@@ -497,6 +501,17 @@ export class ForumsService {
       throw new ForbiddenException('Bài viết này đã khóa bình luận');
     }
 
+    const parentComment = dto.parentId
+      ? await this.commentRepository.findOne({
+          where: { id: dto.parentId, postId, status: ForumContentStatus.PUBLISHED },
+        })
+      : null;
+    if (dto.parentId && !parentComment) {
+      throw new BadRequestException(
+        'Bình luận cha không thuộc bài viết này hoặc không còn hiển thị',
+      );
+    }
+
     const authorRole = this.resolveAuthorRole(actor);
     const comment = this.commentRepository.create({
       postId,
@@ -512,57 +527,22 @@ export class ForumsService {
     });
 
     const saved = await this.commentRepository.save(comment);
-    this.realtimeEvents.emitForumEvent('forum:comment.created', {
-      id: saved.id,
-      postId,
-      status: saved.status,
-      isDoctorAnswer: Boolean(saved.isDoctorAnswer),
-    }, {
-      management: true,
-      public: saved.status === ForumContentStatus.PUBLISHED,
-      postRoom: saved.status === ForumContentStatus.PUBLISHED,
-    });
+    await this.forumNotifications.notifyCommentCreated(post, saved, parentComment, actor);
+    this.realtimeEvents.emitForumEvent(
+      'forum:comment.created',
+      {
+        id: saved.id,
+        postId,
+        status: saved.status,
+        isDoctorAnswer: Boolean(saved.isDoctorAnswer),
+      },
+      {
+        management: true,
+        public: saved.status === ForumContentStatus.PUBLISHED,
+        postRoom: saved.status === ForumContentStatus.PUBLISHED,
+      },
+    );
     return { medicalDisclaimer: MEDICAL_DISCLAIMER, comment: saved };
-  }
-
-  async createReport(dto: CreateContentReportDto, actor: AuthenticatedUser) {
-    await this.ensureReportTargetExists(dto.targetType, dto.targetId);
-    const report = this.reportRepository.create({
-      reporterId: actor.id,
-      reporterRole: this.isStaffActor(actor) ? ReportRole.STAFF : ReportRole.USER,
-      targetType: dto.targetType,
-      targetId: dto.targetId,
-      reason: dto.reason,
-      status: ContentReportStatus.PENDING,
-      handlerId: null,
-      handler: null,
-      resolvedBy: null,
-      resolvedAt: null,
-      resolutionNote: null,
-      resolutionAction: null,
-    });
-    const saved = await this.reportRepository.save(report);
-    this.realtimeEvents.emitForumEvent('forum:report.created', {
-      id: saved.id,
-      targetType: saved.targetType,
-      targetId: saved.targetId,
-    }, {
-      management: true,
-      public: false,
-      postRoom: false,
-    });
-    return saved;
-  }
-
-  async findReports(query: ForumReportQueryDto) {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 10;
-    const [data, total] = await this.reportRepository.findAndCount({
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
-    return { data, total, page, limit };
   }
 
   async moderatePost(id: string, dto: ModerateForumContentDto, actor: AuthenticatedUser) {
@@ -574,23 +554,28 @@ export class ForumsService {
     }
     this.applyPostAction(post, dto.action, actor, dto.reason ?? null);
     const saved = await this.postRepository.save(post);
-    await this.writeModerationLog({
+    const moderationLog = await this.writeModerationLog({
       targetType: ForumTargetType.POST,
       targetId: id,
       action: dto.action,
       actor,
       reason: dto.reason ?? null,
     });
-    this.realtimeEvents.emitForumEvent('forum:post.moderated', {
-      id: saved.id,
-      postId: saved.id,
-      action: dto.action,
-      status: saved.status,
-    }, {
-      management: true,
-      public: this.shouldNotifyPublicModeration(saved.status),
-      postRoom: this.shouldNotifyPublicModeration(saved.status),
-    });
+    await this.forumNotifications.notifyPostModerated(saved, dto.action, actor, moderationLog.id);
+    this.realtimeEvents.emitForumEvent(
+      'forum:post.moderated',
+      {
+        id: saved.id,
+        postId: saved.id,
+        action: dto.action,
+        status: saved.status,
+      },
+      {
+        management: true,
+        public: this.shouldNotifyPublicModeration(saved.status),
+        postRoom: this.shouldNotifyPublicModeration(saved.status),
+      },
+    );
     return saved;
   }
 
@@ -603,63 +588,33 @@ export class ForumsService {
     }
     this.applyCommentAction(comment, dto.action, actor, dto.reason ?? null);
     const saved = await this.commentRepository.save(comment);
-    await this.writeModerationLog({
+    const moderationLog = await this.writeModerationLog({
       targetType: ForumTargetType.COMMENT,
       targetId: id,
       action: dto.action,
       actor,
       reason: dto.reason ?? null,
     });
-    this.realtimeEvents.emitForumEvent('forum:comment.moderated', {
-      id: saved.id,
-      postId: saved.postId,
-      action: dto.action,
-      status: saved.status,
-    }, {
-      management: true,
-      public: this.shouldNotifyPublicModeration(saved.status),
-      postRoom: this.shouldNotifyPublicModeration(saved.status),
-    });
-    return saved;
-  }
-
-  async resolveReport(id: string, dto: ResolveContentReportDto, actor: AuthenticatedUser) {
-    const report = await this.reportRepository.findOne({ where: { id } });
-    if (!report) throw new NotFoundException('Không tìm thấy report');
-
-    if (
-      [ForumModerationAction.APPROVE, ForumModerationAction.HIDE, ForumModerationAction.REJECT, ForumModerationAction.DELETE]
-        .includes(dto.action)
-    ) {
-      await this.applyReportTargetAction(report, dto.action, actor, dto.note ?? null);
-    }
-
-    report.status = ContentReportStatus.RESOLVED;
-    report.handlerId = actor.id;
-    report.resolvedBy = actor.id;
-    report.resolvedAt = new Date();
-    report.resolutionAction = dto.action;
-    report.resolutionNote = dto.note ?? null;
-
-    const saved = await this.reportRepository.save(report);
-    await this.writeModerationLog({
-      targetType: report.targetType,
-      targetId: report.targetId,
-      action: ForumModerationAction.RESOLVE_REPORT,
+    await this.forumNotifications.notifyCommentModerated(
+      saved,
+      dto.action,
       actor,
-      reason: dto.note ?? null,
-      metadata: { reportId: report.id, resolutionAction: dto.action },
-    });
-    this.realtimeEvents.emitForumEvent('forum:report.resolved', {
-      id: saved.id,
-      targetType: saved.targetType,
-      targetId: saved.targetId,
-      action: dto.action,
-    }, {
-      management: true,
-      public: false,
-      postRoom: false,
-    });
+      moderationLog.id,
+    );
+    this.realtimeEvents.emitForumEvent(
+      'forum:comment.moderated',
+      {
+        id: saved.id,
+        postId: saved.postId,
+        action: dto.action,
+        status: saved.status,
+      },
+      {
+        management: true,
+        public: this.shouldNotifyPublicModeration(saved.status),
+        postRoom: this.shouldNotifyPublicModeration(saved.status),
+      },
+    );
     return saved;
   }
 
@@ -683,12 +638,17 @@ export class ForumsService {
     if (query.category) builder.andWhere('post.category = :category', { category: query.category });
     if (query.topicId) builder.andWhere('post.forumTopicId = :topicId', { topicId: query.topicId });
     if (query.authorId) builder.andWhere('post.authorId = :authorId', { authorId: query.authorId });
-    if (query.authorRole) builder.andWhere('post.authorRole = :authorRole', { authorRole: query.authorRole });
+    if (query.authorRole)
+      builder.andWhere('post.authorRole = :authorRole', { authorRole: query.authorRole });
     if (query.search) {
-      builder.andWhere(new Brackets((qb) => {
-        qb.where('post.title LIKE :search', { search: `%${query.search}%` })
-          .orWhere('post.content LIKE :search', { search: `%${query.search}%` });
-      }));
+      builder.andWhere(
+        new Brackets((qb) => {
+          qb.where('post.title LIKE :search', { search: `%${query.search}%` }).orWhere(
+            'post.content LIKE :search',
+            { search: `%${query.search}%` },
+          );
+        }),
+      );
     }
 
     const [data, total] = await builder.getManyAndCount();
@@ -853,26 +813,6 @@ export class ForumsService {
       default:
         throw new BadRequestException('Action không hỗ trợ cho bình luận');
     }
-  }
-
-  private async applyReportTargetAction(
-    report: ContentReport,
-    action: ForumModerationAction,
-    actor: AuthenticatedUser,
-    reason: string | null,
-  ) {
-    if (report.targetType === ForumTargetType.POST) {
-      await this.moderatePost(report.targetId, { action, reason }, actor);
-      return;
-    }
-    await this.moderateComment(report.targetId, { action, reason }, actor);
-  }
-
-  private async ensureReportTargetExists(targetType: ForumTargetType, targetId: string) {
-    const exists = targetType === ForumTargetType.POST
-      ? await this.postRepository.exist({ where: { id: targetId } })
-      : await this.commentRepository.exist({ where: { id: targetId } });
-    if (!exists) throw new NotFoundException('Không tìm thấy nội dung cần report');
   }
 
   private resolveAuthorRole(actor: AuthenticatedUser): ForumAuthorRole {
