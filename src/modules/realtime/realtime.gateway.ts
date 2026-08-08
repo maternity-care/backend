@@ -28,6 +28,7 @@ import { RealtimeEventsService } from './realtime-events.service';
   namespace: '/realtime',
   cors: { origin: '*' },
 })
+
 export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   private server: Server;

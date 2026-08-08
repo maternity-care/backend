@@ -69,6 +69,7 @@ import { AddForumCategories1786200000000 } from './migrations/1786200000000-AddF
 import { AddManagementModulePermissions1786300000000 } from './migrations/1786300000000-AddManagementModulePermissions';
 import {AddFacilityRoomSuspendFields1786400000000} from './migrations/1786400000000-AddFacilityRoomSuspendFields';
 import { AssignDoctorPregnancyCreatePermission1786500000000 } from './migrations/1786500000000-AssignDoctorPregnancyCreatePermission';
+import { AddForumNotifications1786600000000 } from './migrations/1786600000000-AddForumNotifications';
 
 config();
 
@@ -152,6 +153,7 @@ export const typeOrmConfig: DataSourceOptions = {
     AddManagementModulePermissions1786300000000,
     AddFacilityRoomSuspendFields1786400000000,
     AssignDoctorPregnancyCreatePermission1786500000000,
+    AddForumNotifications1786600000000,
   ],
   charset: 'utf8mb4_unicode_ci',
 };
