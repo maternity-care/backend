@@ -113,7 +113,10 @@ export class NotificationsService {
 
   private getRecipientWhere(user: AuthenticatedUser): { userId: string } | { staffId: string } {
     const isStaff = Boolean(
-      user.employeeCode || user.personalEmail || user.roles.length || user.facilities.length,
+      user.employeeCode ||
+        user.personalEmail ||
+        (user.roles ?? []).length ||
+        (user.facilities ?? []).length,
     );
     return isStaff ? { staffId: user.id } : { userId: user.id };
   }

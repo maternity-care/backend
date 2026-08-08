@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Param, ParseIntPipe, Patch, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Delete, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
@@ -16,9 +16,19 @@ export class NotificationsController {
   @ApiOperation({ summary: 'List notifications of the authenticated account' })
   async findMine(
     @CurrentUser() user: AuthenticatedUser,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+    @Query('limit') limit?: string,
   ) {
-    return { data: await this.notificationsService.findMine(user, limit) };
+    const parsedLimit = this.parseOptionalLimit(limit);
+    return { data: await this.notificationsService.findMine(user, parsedLimit) };
+  }
+
+  private parseOptionalLimit(limit?: string): number | undefined {
+    if (limit === undefined || limit === '') return undefined;
+    const parsed = Number(limit);
+    if (!Number.isInteger(parsed)) {
+      throw new BadRequestException('limit must be an integer');
+    }
+    return parsed;
   }
 
   @Get('unread-count')
