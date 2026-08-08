@@ -14,30 +14,27 @@ import {
 import { RoleEnum } from '../../common/constants/role.enum';
 import {
   ActiveStatus,
-  ContentReportStatus,
   ForumContentStatus,
 } from '../../common/constants/status.enum';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { getUserRoles } from '../../common/helpers/auth.helper';
-import { ContentReport, ReportRole } from '../../database/entities/content-report.entity';
+import { ContentReport } from '../../database/entities/content-report.entity';
 import { ForumCategoryMetadata } from '../../database/entities/forum-category-metadata.entity';
 import { ForumComment } from '../../database/entities/forum-comment.entity';
 import { ForumModerationLog } from '../../database/entities/forum-moderation-log.entity';
 import { ForumPost } from '../../database/entities/forum-post.entity';
 import { ForumTopic } from '../../database/entities/forum-topic.entity';
 import { RealtimeEventsService } from '../realtime/realtime-events.service';
-import { CreateContentReportDto } from './dto/requests/create-content-report.dto';
 import { CreateForumCommentDto } from './dto/requests/create-forum-comment.dto';
 import { CreateForumPostDto } from './dto/requests/create-forum-post.dto';
 import { CreateForumTopicDto } from './dto/requests/create-forum-topic.dto';
-import { ForumPostQueryDto, ForumReportQueryDto } from './dto/requests/forum-query.dto';
+import { ForumPostQueryDto } from './dto/requests/forum-query.dto';
 import {
   CreateManagementForumPostDto,
   UpdateManagementForumPostDto,
 } from './dto/requests/management-forum-post.dto';
 import {
   ModerateForumContentDto,
-  ResolveContentReportDto,
 } from './dto/requests/moderate-forum-content.dto';
 import { UpdateForumCommentDto } from './dto/requests/update-forum-comment.dto';
 import { UpdateForumPostDto } from './dto/requests/update-forum-post.dto';
@@ -548,51 +545,6 @@ export class ForumsService {
     return { medicalDisclaimer: MEDICAL_DISCLAIMER, comment: saved };
   }
 
-  async createReport(dto: CreateContentReportDto, actor: AuthenticatedUser) {
-    await this.ensureReportTargetExists(dto.targetType, dto.targetId);
-    const report = this.reportRepository.create({
-      reporterId: actor.id,
-      reporterRole: this.isStaffActor(actor) ? ReportRole.STAFF : ReportRole.USER,
-      targetType: dto.targetType,
-      targetId: dto.targetId,
-      reason: dto.reason,
-      status: ContentReportStatus.PENDING,
-      handlerId: null,
-      handler: null,
-      resolvedBy: null,
-      resolvedAt: null,
-      resolutionNote: null,
-      resolutionAction: null,
-    });
-    const saved = await this.reportRepository.save(report);
-    await this.forumNotifications.notifyReportCreated(saved, actor);
-    this.realtimeEvents.emitForumEvent(
-      'forum:report.created',
-      {
-        id: saved.id,
-        targetType: saved.targetType,
-        targetId: saved.targetId,
-      },
-      {
-        management: true,
-        public: false,
-        postRoom: false,
-      },
-    );
-    return saved;
-  }
-
-  async findReports(query: ForumReportQueryDto) {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 10;
-    const [data, total] = await this.reportRepository.findAndCount({
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
-    return { data, total, page, limit };
-  }
-
   async moderatePost(id: string, dto: ModerateForumContentDto, actor: AuthenticatedUser) {
     const post = await this.postRepository.findOne({ where: { id } });
     if (!post) throw new NotFoundException('Không tìm thấy bài viết');
@@ -661,55 +613,6 @@ export class ForumsService {
         management: true,
         public: this.shouldNotifyPublicModeration(saved.status),
         postRoom: this.shouldNotifyPublicModeration(saved.status),
-      },
-    );
-    return saved;
-  }
-
-  async resolveReport(id: string, dto: ResolveContentReportDto, actor: AuthenticatedUser) {
-    const report = await this.reportRepository.findOne({ where: { id } });
-    if (!report) throw new NotFoundException('Không tìm thấy report');
-
-    if (
-      [
-        ForumModerationAction.APPROVE,
-        ForumModerationAction.HIDE,
-        ForumModerationAction.REJECT,
-        ForumModerationAction.DELETE,
-      ].includes(dto.action)
-    ) {
-      await this.applyReportTargetAction(report, dto.action, actor, dto.note ?? null);
-    }
-
-    report.status = ContentReportStatus.RESOLVED;
-    report.handlerId = actor.id;
-    report.resolvedBy = actor.id;
-    report.resolvedAt = new Date();
-    report.resolutionAction = dto.action;
-    report.resolutionNote = dto.note ?? null;
-
-    const saved = await this.reportRepository.save(report);
-    await this.writeModerationLog({
-      targetType: report.targetType,
-      targetId: report.targetId,
-      action: ForumModerationAction.RESOLVE_REPORT,
-      actor,
-      reason: dto.note ?? null,
-      metadata: { reportId: report.id, resolutionAction: dto.action },
-    });
-    await this.forumNotifications.notifyReportResolved(saved, actor);
-    this.realtimeEvents.emitForumEvent(
-      'forum:report.resolved',
-      {
-        id: saved.id,
-        targetType: saved.targetType,
-        targetId: saved.targetId,
-        action: dto.action,
-      },
-      {
-        management: true,
-        public: false,
-        postRoom: false,
       },
     );
     return saved;
@@ -910,27 +813,6 @@ export class ForumsService {
       default:
         throw new BadRequestException('Action không hỗ trợ cho bình luận');
     }
-  }
-
-  private async applyReportTargetAction(
-    report: ContentReport,
-    action: ForumModerationAction,
-    actor: AuthenticatedUser,
-    reason: string | null,
-  ) {
-    if (report.targetType === ForumTargetType.POST) {
-      await this.moderatePost(report.targetId, { action, reason }, actor);
-      return;
-    }
-    await this.moderateComment(report.targetId, { action, reason }, actor);
-  }
-
-  private async ensureReportTargetExists(targetType: ForumTargetType, targetId: string) {
-    const exists =
-      targetType === ForumTargetType.POST
-        ? await this.postRepository.exist({ where: { id: targetId } })
-        : await this.commentRepository.exist({ where: { id: targetId } });
-    if (!exists) throw new NotFoundException('Không tìm thấy nội dung cần report');
   }
 
   private resolveAuthorRole(actor: AuthenticatedUser): ForumAuthorRole {

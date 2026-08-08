@@ -11,10 +11,13 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { StaffPermission } from '../permissions/entities/staff-permission.entity';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { Staff } from '../staffs/entities/staff.entity';
+import { User } from '../users/entities/user.entity';
+import { ForumReportsService } from './forum-reports.service';
 import { ForumNotificationsService } from './forum-notifications.service';
 import { ForumsService } from './forums.service';
 import { ManagementForumsController } from './management-forums.controller';
 import { PublicForumsController } from './public-forums.controller';
+import { ForumReportsRepository } from './repositories/forum-reports.repository';
 
 @Module({
   imports: [
@@ -26,6 +29,7 @@ import { PublicForumsController } from './public-forums.controller';
       ContentReport,
       ForumModerationLog,
       Staff,
+      User,
       StaffPermission,
     ]),
     AuthModule,
@@ -33,7 +37,7 @@ import { PublicForumsController } from './public-forums.controller';
     RealtimeModule,
   ],
   controllers: [PublicForumsController, ManagementForumsController],
-  providers: [ForumsService, ForumNotificationsService],
+  providers: [ForumsService, ForumReportsService, ForumNotificationsService, ForumReportsRepository],
   exports: [ForumsService],
 })
 export class ForumsModule {}
