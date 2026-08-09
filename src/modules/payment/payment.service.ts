@@ -25,7 +25,7 @@ import {
 } from '../../common/helpers/facility-scope.helper';
 import { PAYMENT_REPOSITORY, IPaymentRepository } from './interfaces/payment-repository.interface';
 import { PAYMENT_CONSTANT } from './payment.constant';
-import { CreateOrderDto } from './dto/requests/create-order.dto';
+import { CreateOrderDto, CreateOrderItemDto } from './dto/requests/create-order.dto';
 import { DataSource, EntityManager } from 'typeorm';
 import { User } from '../users/entities/user.entity';
 import { UserStatusEnum } from '../users/users.enum';
@@ -168,7 +168,7 @@ export class PaymentService {
   }
 
   private async resolveOrderItems(
-    items: ICreateOrderItem[],
+    items: CreateOrderItemDto[],
     facilityId: string,
   ): Promise<ICreateOrderItem[]> {
     const maternityPackageRepository = this.dataSource.getRepository(MaternityPackage);
