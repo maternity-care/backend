@@ -10,10 +10,10 @@ import { ManagementPaymentsController } from './management-payments.controller';
 import { PAYMENT_REPOSITORY } from './interfaces/payment-repository.interface';
 import { PaymentRepository } from './repositories/payment.repository';
 import { SEPayController } from './sepay.controller';
-import { RealtimeEventsService } from '../realtime/realtime-events.service';
+import { RealtimeModule } from '../realtime/realtime.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, OrderItem, Invoice, Payment]), RealtimeEventsService],
+  imports: [TypeOrmModule.forFeature([Order, OrderItem, Invoice, Payment]), RealtimeModule],
   controllers: [ManagementPaymentsController, PaymentsController, SEPayController],
   providers: [PaymentService, { provide: PAYMENT_REPOSITORY, useClass: PaymentRepository }],
   exports: [PaymentService, PAYMENT_REPOSITORY],

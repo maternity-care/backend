@@ -83,6 +83,7 @@ export const typeOrmConfig: DataSourceOptions = {
   synchronize: false,
   migrationsRun: false,
   logging: process.env.NODE_ENV === 'development',
+  dateStrings: ['DATE'],
   entities: [
     User,
     Role,
