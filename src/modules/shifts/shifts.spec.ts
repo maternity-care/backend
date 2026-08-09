@@ -2125,6 +2125,38 @@ describe('ShiftSlotsService business validation', () => {
     expect(repository.save).not.toHaveBeenCalled();
   });
 
+  // Vai tro: cho phep tao slot neu slot dung duoc it nhat mot ngay mo cua;
+  // ngay lech gio se bi chan o buoc tao ca truc theo ngay cu the.
+  it('creates an active shift slot when it fits weekdays even if Saturday opens later', async () => {
+    const { service, repository, facilitiesService } = createService();
+    facilitiesService.getOperatingHours.mockResolvedValueOnce({
+      facilityId: '1',
+      operatingHours: [
+        { dayOfWeek: 'MON', openTime: '06:00:00', closeTime: '17:00:00', isClosed: false },
+        { dayOfWeek: 'TUE', openTime: '06:00:00', closeTime: '17:00:00', isClosed: false },
+        { dayOfWeek: 'WED', openTime: '06:00:00', closeTime: '17:00:00', isClosed: false },
+        { dayOfWeek: 'THU', openTime: '06:00:00', closeTime: '17:00:00', isClosed: false },
+        { dayOfWeek: 'FRI', openTime: '06:00:00', closeTime: '17:00:00', isClosed: false },
+        { dayOfWeek: 'SAT', openTime: '07:30:00', closeTime: '17:00:00', isClosed: false },
+        { dayOfWeek: 'SUN', openTime: null, closeTime: null, isClosed: true },
+      ],
+    });
+
+    await expect(service.create({
+      facilityId: '1',
+      name: 'Ca sang',
+      startTime: '07:00',
+      endTime: '11:00',
+    })).resolves.toMatchObject({
+      id: '1',
+      code: 'CA_SANG',
+      startTime: '07:00:00',
+      endTime: '11:00:00',
+      status: ActiveStatus.ACTIVE,
+    });
+    expect(repository.save).toHaveBeenCalled();
+  });
+
   // Vai tro: dam bao lookup tra cac khung ca active cua facility cho FE chon.
   it('looks up active facility shift slots', async () => {
     const slots = [

@@ -358,7 +358,19 @@ export class RoomsService {
       };
     }
 
-    const facilities = await this.facilitiesService.findAll();
+    const facilities = [];
+    let facilityPage = 1;
+    let totalFacilityPages = 1;
+    do {
+      const facilitiesPaged = await this.facilitiesService.findAllPaginated({
+        page: facilityPage,
+        limit: opts?.facilityLimit ?? 200,
+      } as any);
+      facilities.push(...facilitiesPaged.items);
+      totalFacilityPages = facilitiesPaged.totalPages || Math.ceil(facilitiesPaged.total / facilitiesPaged.limit) || 1;
+      facilityPage += 1;
+    } while (facilityPage <= totalFacilityPages);
+
     if (!facilities || facilities.length === 0) {
       throw new NotFoundException(RESPONSE_MESSAGES.FACILITY_NOT_FOUND);
     }

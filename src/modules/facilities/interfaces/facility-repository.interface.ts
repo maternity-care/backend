@@ -61,8 +61,7 @@ export interface IFacilitiesRepository {
   create(data: DeepPartial<Facility>): Facility;
   //
   save(facility: Facility): Promise<Facility>;
-  findAll(filters?: SearchFacilityDto): Promise<FacilityWithDetails[]>;
-  findAllPaginated?(filters?: SearchFacilityDto): Promise<PaginationResult<FacilityWithDetails>>;
+  findAllPaginated(filters?: SearchFacilityDto): Promise<PaginationResult<FacilityWithDetails>>;
   findById(id: string): Promise<Facility | null>;
   findDetailsById(id: string): Promise<FacilityWithDetails | null>;
   findByCode(code: string): Promise<Facility | null>;

@@ -5,16 +5,9 @@ import { CreateFacilityDto } from './dto/requests/create-facility.dto';
 import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
 import { UpdateFacilityOperatingHoursDto } from './dto/requests/update-facility-operating-hours.dto';
 import { ApplyFacilityOperatingHoursDto } from './dto/requests/apply-facility-operating-hours.dto';
-import {
-  CreateFacilityClosureDayDto,
-  SearchFacilityClosureDayDto,
-  UpdateFacilityClosureDayDto,
-} from './dto/requests/facility-closure-day.dto';
-import { LookupFacilityDto, SearchFacilityDto } from './dto/requests/search-facility.dto';
+import { SearchFacilityDto } from './dto/requests/search-facility.dto';
 import {
   FacilityAdminOptionsPaginatedResponseDto,
-  FacilityClosureDayResponseDto,
-  FacilityLookupResponseDto,
   FacilityPaginatedResponseDto,
   FacilityResponseDto,
 } from './dto/responds/facilities-respond';
@@ -92,41 +85,6 @@ export class FacilitiesController {
     }
   }
 
-  @Get('lookup')
-  @ApiOperation({ summary: 'Lookup facilities for select/autocomplete' })
-  @ApiResponse({ status: 200, type: [FacilityLookupResponseDto] })
-  async lookup(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query() query: LookupFacilityDto,
-  ) {
-    try {
-      const activeFacilityId = getActiveFacilityId(user);
-      if (activeFacilityId) {
-        const facility = await this.facilitiesService.findDetailsById(activeFacilityId);
-        return {
-          message: RESPONSE_MESSAGES.FACILITIES.LOOKUP_SUCCESS,
-          data: [{
-            id: facility.id,
-            name: facility.name,
-            code: facility.code,
-            address: facility.address,
-            province: facility.province,
-            ward: facility.ward,
-            status: facility.status,
-            ownerName: facility.ownerName,
-          }],
-        };
-      }
-
-      return {
-        message: RESPONSE_MESSAGES.FACILITIES.LOOKUP_SUCCESS,
-        data: await this.facilitiesService.lookup(query),
-      };
-    } catch (error) {
-      this.handleError(error);
-    }
-  }
-
   @Get('admin-options')
   // @Permissions(PermissionEnum.FACILITY_VIEW)
   @ApiOperation({ summary: 'List admin accounts for assigning as facility owner/admin' })
@@ -136,44 +94,6 @@ export class FacilitiesController {
       return {
         message: RESPONSE_MESSAGES.FACILITIES.ADMIN_OPTIONS_SUCCESS,
         data: await this.facilitiesService.findAdminOptions(query),
-      };
-    } catch (error) {
-      this.handleError(error);
-    }
-  }
-
-  @Get(':id/operating-hours')
-  // @Permissions(PermissionEnum.FACILITY_VIEW)
-  @ApiOperation({ summary: 'Get facility operating hours grouped for display' })
-  async getOperatingHours(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-  ) {
-    try {
-      assertFacilityAccess(user, id);
-      return {
-        message: RESPONSE_MESSAGES.FACILITIES.OPERATING_HOURS_GET_SUCCESS,
-        data: await this.facilitiesService.getOperatingHours(id),
-      };
-    } catch (error) {
-      this.handleError(error);
-    }
-  }
-
-  @Get(':id/closure-days')
-  // @Permissions(PermissionEnum.FACILITY_VIEW)
-  @ApiOperation({ summary: 'List facility closure days' })
-  @ApiResponse({ status: 200, type: [FacilityClosureDayResponseDto] })
-  async getClosureDays(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-    @Query() query: SearchFacilityClosureDayDto,
-  ) {
-    try {
-      assertFacilityAccess(user, id);
-      return {
-        message: RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.GET_LIST_SUCCESS,
-        data: await this.facilitiesService.getClosureDays(id, query),
       };
     } catch (error) {
       this.handleError(error);
@@ -216,26 +136,6 @@ export class FacilitiesController {
     }
   }
 
-  @Post(':id/closure-days')
-  // @Permissions(PermissionEnum.FACILITY_UPDATE)
-  @ApiOperation({ summary: 'Create a facility closure day' })
-  @ApiResponse({ status: 201, type: FacilityClosureDayResponseDto })
-  async createClosureDay(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-    @Body() dto: CreateFacilityClosureDayDto,
-  ) {
-    try {
-      assertFacilityAccess(user, id);
-      return {
-        message: RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.CREATED,
-        data: await this.facilitiesService.createClosureDay(id, dto),
-      };
-    } catch (error) {
-      this.handleError(error);
-    }
-  }
-
   @Post(':id/operating-hours/preview')
   // @Permissions(PermissionEnum.FACILITY_UPDATE)
   @ApiOperation({ summary: 'Preview facility operating hour changes and impacted upcoming shifts' })
@@ -255,25 +155,6 @@ export class FacilitiesController {
     }
   }
 
-  @Patch(':id/operating-hours')
-  // @Permissions(PermissionEnum.FACILITY_UPDATE)
-  @ApiOperation({ summary: 'Update facility operating hours by day groups' })
-  async updateOperatingHours(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-    @Body() dto: UpdateFacilityOperatingHoursDto,
-  ) {
-    try {
-      assertFacilityAccess(user, id);
-      return {
-        message: RESPONSE_MESSAGES.FACILITIES.OPERATING_HOURS_UPDATED,
-        data: await this.facilitiesService.updateOperatingHours(id, dto),
-      };
-    } catch (error) {
-      this.handleError(error);
-    }
-  }
-
   @Patch(':id/operating-hours/apply')
   // @Permissions(PermissionEnum.FACILITY_UPDATE)
   @ApiOperation({ summary: 'Apply facility operating hour changes with slot handling strategy' })
@@ -287,27 +168,6 @@ export class FacilitiesController {
       return {
         message: RESPONSE_MESSAGES.FACILITIES.OPERATING_HOURS_UPDATED,
         data: await this.facilitiesService.applyOperatingHours(id, dto),
-      };
-    } catch (error) {
-      this.handleError(error);
-    }
-  }
-
-  @Patch(':id/closure-days/:closureDayId')
-  // @Permissions(PermissionEnum.FACILITY_UPDATE)
-  @ApiOperation({ summary: 'Update a facility closure day' })
-  @ApiResponse({ status: 200, type: FacilityClosureDayResponseDto })
-  async updateClosureDay(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-    @Param('closureDayId') closureDayId: string,
-    @Body() dto: UpdateFacilityClosureDayDto,
-  ) {
-    try {
-      assertFacilityAccess(user, id);
-      return {
-        message: RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.UPDATED,
-        data: await this.facilitiesService.updateClosureDay(id, closureDayId, dto),
       };
     } catch (error) {
       this.handleError(error);
@@ -368,27 +228,6 @@ export class FacilitiesController {
       return {
         message: RESPONSE_MESSAGES.FACILITIES.STATUS_UPDATED,
         data: await this.facilitiesService.reactivate(id, user?.id ?? null),
-      };
-    } catch (error) {
-      this.handleError(error);
-    }
-  }
-
-
-  @Delete(':id/closure-days/:closureDayId')
-  // @Permissions(PermissionEnum.FACILITY_UPDATE)
-  @ApiOperation({ summary: 'Delete a facility closure day' })
-  @ApiResponse({ status: 200, type: FacilityClosureDayResponseDto })
-  async removeClosureDay(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-    @Param('closureDayId') closureDayId: string,
-  ) {
-    try {
-      assertFacilityAccess(user, id);
-      return {
-        message: RESPONSE_MESSAGES.FACILITY_CLOSURE_DAYS.DELETED,
-        data: await this.facilitiesService.removeClosureDay(id, closureDayId),
       };
     } catch (error) {
       this.handleError(error);
