@@ -8,7 +8,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   const configService = app.get(ConfigService);
   const nodeEnv = configService.get<string>('app.nodeEnv') ?? 'development';
   const corsOrigins = configService.get<string[]>('app.corsOrigins') ?? [];
@@ -24,6 +24,8 @@ async function bootstrap(): Promise<void> {
       'Authorization',
       'Accept',
       'X-Facility-Id',
+      'X-SePay-Signature',
+      'X-SePay-Timestamp',
     ],
   });
 
