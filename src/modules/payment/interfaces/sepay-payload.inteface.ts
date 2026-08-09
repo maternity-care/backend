@@ -6,6 +6,7 @@ export interface SepayPayload {
   subAccount?: string;
   content: string; // nội dung des => lưu code của order
   code?: string;
+  description: string;
   transferType?: string;
   transferAmount?: number;
   accumulated?: number;

@@ -1,5 +1,3 @@
-import { MaternityPackage } from './../../maternity-packages/entities/maternity-package.entity';
-import { FacilityService } from './../../facility-services/entities/facility-service.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -27,10 +25,6 @@ export class OrderItem {
   @ManyToOne(() => Order, { onDelete: 'RESTRICT', nullable: false })
   @JoinColumn({ name: 'order_id' })
   order: Order;
-
-  @ApiProperty({ type: String })
-  @Column({ name: 'item', type: 'varchar', length: 255 })
-  item: FacilityService | MaternityPackage;
 
   @ApiProperty({ type: String })
   @Column({ name: 'order_id', type: 'bigint' })

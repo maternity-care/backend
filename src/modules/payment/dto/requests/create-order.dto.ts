@@ -1,4 +1,4 @@
-import { IsEnum } from 'class-validator';
+import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsString, ValidateNested } from 'class-validator';
 import { OrderType } from '../../entities/order.entity';
 import { OrderItemType } from './../../entities/order-item.entity';
 import { ApiProperty } from '@nestjs/swagger';
@@ -6,6 +6,8 @@ import { Type } from 'class-transformer';
 
 export class CreateOrderDto {
   @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
   facilityId: string;
 
   @ApiProperty({ enum: OrderType })
@@ -13,11 +15,16 @@ export class CreateOrderDto {
   orderType: OrderType;
 
   @ApiProperty({ type: () => [CreateOrderItemDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateOrderItemDto)
   orderItems: CreateOrderItemDto[];
 }
 
 export class CreateOrderItemDto {
   @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
   itemId: string;
 
   @ApiProperty({ description: 'type: normalService, package' })
@@ -26,5 +33,6 @@ export class CreateOrderItemDto {
 
   @ApiProperty()
   @Type(() => Number)
+  @IsNumber()
   quantity: number;
 }

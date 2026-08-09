@@ -199,12 +199,12 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { code?: string },
   ): { joined: string } {
-    const orderId = String(payload?.code ?? '').trim();
-    if (!orderId) {
-      throw new WsException('orderId is required');
+    const code = String(payload?.code ?? '').trim();
+    if (!code) {
+      throw new WsException('code is required');
     }
 
-    const room = `order:payment:${orderId}`;
+    const room = `order:payment:${code}`;
     client.join(room);
     return { joined: room };
   }
@@ -212,14 +212,14 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   @SubscribeMessage('order:leave')
   leaveOrderRoom(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { orderId?: string },
+    @MessageBody() payload: { code?: string },
   ): { left: string } {
-    const orderId = String(payload?.orderId ?? '').trim();
-    if (!orderId) {
-      throw new WsException('orderId is required');
+    const code = String(payload?.code ?? '').trim();
+    if (!code) {
+      throw new WsException('code is required');
     }
 
-    const room = `order:payment:${orderId}`;
+    const room = `order:payment:${code}`;
     client.leave(room);
     return { left: room };
   }

@@ -253,10 +253,10 @@ export class PaymentService {
       };
     }
 
-    if (!payload.code) {
+    if (!payload.content.split('.')[3] || !payload.description.split('.')[3]) {
       return {
         success: true,
-        message: 'Payment code not found',
+        message: 'Payment description not found',
       };
     }
 
@@ -312,7 +312,7 @@ export class PaymentService {
      */
     const order = await manager.findOne(Order, {
       where: {
-        code: payload.content,
+        code: payload.content.split('.')[3],
       },
       relations: {
         customer: true,
@@ -323,7 +323,7 @@ export class PaymentService {
     });
 
     if (!order) {
-      console.log(`Order not found for payment content ${payload.content}`);
+      console.log(`Order not found for payment code ${payload.content.split('.')[3]}`);
 
       return {
         success: true,
