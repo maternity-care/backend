@@ -12,7 +12,7 @@ export class CreateOrderDto {
   @IsEnum(OrderType)
   orderType: OrderType;
 
-  @ApiProperty()
+  @ApiProperty({ type: () => [CreateOrderItemDto] })
   orderItems: CreateOrderItemDto[];
 }
 
@@ -20,7 +20,7 @@ export class CreateOrderItemDto {
   @ApiProperty()
   itemId: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'type: normalService, package' })
   @IsEnum(OrderItemType)
   itemType: OrderItemType;
 
