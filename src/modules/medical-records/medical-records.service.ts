@@ -145,7 +145,8 @@ export class MedicalRecordsService implements IMedicalRecordService {
       appointmentId: dto.appointmentId,
       pregnancyProfileId: appointment.pregnancyProfileId,
       doctorId: appointment.doctorId,
-      fileType: dto.fileType || (dto.mimeType.startsWith('image/') ? 'clinical_image' : 'clinical_report'),
+      fileType:
+        dto.fileType || (dto.mimeType.startsWith('image/') ? 'clinical_image' : 'clinical_report'),
       fileName: dto.fileName,
       fileUrl: dto.fileUrl,
       mimeType: dto.mimeType,
@@ -156,7 +157,9 @@ export class MedicalRecordsService implements IMedicalRecordService {
     const currentFiles = await this.listPendingFiles(dto.appointmentId);
     const nextFiles = [
       file,
-      ...currentFiles.filter((item) => item.fileUrl !== file.fileUrl && item.fileName !== file.fileName),
+      ...currentFiles.filter(
+        (item) => item.fileUrl !== file.fileUrl && item.fileName !== file.fileName,
+      ),
     ].slice(0, 100);
 
     await this.cacheService.set(
@@ -164,15 +167,21 @@ export class MedicalRecordsService implements IMedicalRecordService {
       nextFiles,
       this.pendingFileTtlSeconds,
     );
-    this.realtimeEvents.emitAppointmentEvent('medical-record:file.pending', dto.appointmentId, file);
+    this.realtimeEvents.emitAppointmentEvent(
+      'medical-record:file.pending',
+      dto.appointmentId,
+      file,
+    );
 
     return file;
   }
 
   async listPendingFiles(appointmentId: string) {
-    return (await this.cacheService.get<Array<Record<string, unknown>>>(
-      this.pendingFilesKey(appointmentId),
-    )) ?? [];
+    return (
+      (await this.cacheService.get<Array<Record<string, unknown>>>(
+        this.pendingFilesKey(appointmentId),
+      )) ?? []
+    );
   }
 
   async clearPendingFiles(appointmentId: string): Promise<void> {

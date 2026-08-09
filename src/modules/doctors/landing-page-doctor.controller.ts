@@ -15,7 +15,7 @@ export class LandingPageDoctorController {
   async getAll() {
     const doctor = await this.doctorsService.findAll({
       page: 1,
-      limit: 10,
+      limit: 9,
       sortYearsOfExperience: 'DESC',
     });
     return {
