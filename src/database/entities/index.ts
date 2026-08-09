@@ -3,7 +3,6 @@ import { Role } from 'src/modules/roles/entities/role.entity';
 export { Doctor } from '../../modules/doctors/entities/doctor.entity';
 export { Staff } from '../../modules/staffs/entities/staff.entity';
 export { Facility } from '../../modules/facilities/entities/facility.entity';
-export { FacilityClosureDay } from '../../modules/facilities/entities/facility-closure-day.entity';
 export { FacilityOperatingHour } from '../../modules/facilities/entities/facility-operating-hour.entity';
 export { Room } from '../../modules/rooms/entities/room.entity';
 export { Shift } from '../../modules/shifts/entities/shift.entity';

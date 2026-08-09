@@ -1,8 +1,12 @@
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayNotEmpty,
+  ArrayUnique,
+  IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -14,6 +18,10 @@ import { RESPONSE_MESSAGES } from '../../../../common/constants/response-message
 import { trimText } from '../../../../common/helpers/dto-transform.helper';
 import { SHIFT_TIME_PATTERN } from './create-doctor-shift.dto';
 import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
+
+export const SHIFT_SLOT_APPLICABLE_DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
+
+export type ShiftSlotApplicableDay = typeof SHIFT_SLOT_APPLICABLE_DAYS[number];
 
 export class CreateShiftSlotDto {
   @ApiProperty({ example: '1', description: 'Co so so huu khung ca nay' })
@@ -43,11 +51,26 @@ export class CreateShiftSlotDto {
   @IsBoolean()
   isOvernight?: boolean = false;
 
+  @ApiPropertyOptional({
+    enum: SHIFT_SLOT_APPLICABLE_DAYS,
+    isArray: true,
+    description: 'Neu khong gui, backend tu tinh cac ngay mo cua phu hop voi khung gio.',
+    example: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') return undefined;
+    const values = Array.isArray(value) ? value : [value];
+    return values.map(item => String(item).trim().toUpperCase());
+  })
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique()
+  @IsIn(SHIFT_SLOT_APPLICABLE_DAYS, { each: true })
+  applicableDays?: ShiftSlotApplicableDay[];
+
   @ApiPropertyOptional({ enum: ActiveStatus, default: ActiveStatus.ACTIVE })
   @IsOptional()
   @IsEnum(ActiveStatus)
   status?: ActiveStatus = ActiveStatus.ACTIVE;
-
-
-
 }

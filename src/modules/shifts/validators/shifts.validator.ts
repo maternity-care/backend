@@ -138,16 +138,6 @@ export class ShiftsValidator {
     return { start, end: addDays(start, 6) };
   }
 
-  /** Lay danh sach ngay dong cua active cua facility trong khoang ngay, dung de auto-generate bo qua ngay nghi. */
-  async getActiveClosureDates(facilityId: string, fromDate: string, toDate: string): Promise<Set<string>> {
-    const closureDays = await this.facilitiesService.getClosureDays(facilityId, {
-      fromDate,
-      toDate,
-      status: ActiveStatus.ACTIVE,
-    });
-    return new Set(closureDays.map(item => this.toDateOnly(item.closureDate)));
-  }
-
   /** Kiểm tra facility, doctor assignment, room; đồng thời trả staffId để lưu vào shifts.staff_id. */
   private async validateReferences(
     input: { doctorId?: string; staffId?: string; roleId?: string | null },
@@ -213,7 +203,7 @@ export class ShiftsValidator {
 
   /** Nếu có slotId thì lấy giờ từ shift_slots; nếu không có slotId thì bắt buộc dùng giờ custom. */
   private async resolveShiftTiming(
-    input: { slotId?: string | null; facilityId: string; startTime?: string; endTime?: string },
+    input: { slotId?: string | null; facilityId: string; shiftDate?: string; startTime?: string; endTime?: string },
     requireTimes = true,
     options?: { slotWasProvided?: boolean; timeWasProvided?: boolean },
   ): Promise<{ slotId: string | null; startTime: string; endTime: string }> {
@@ -231,6 +221,13 @@ export class ShiftsValidator {
       }
       if (slot.facilityId !== input.facilityId) {
         throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.SLOT_NOT_BELONG_TO_FACILITY);
+      }
+      if (input.shiftDate && Array.isArray(slot.applicableDays) && slot.applicableDays.length > 0) {
+        const shiftWorkingDay = workingDayOf(input.shiftDate);
+        const applicableDays = slot.applicableDays.map(day => String(day).trim().toUpperCase());
+        if (!applicableDays.includes(shiftWorkingDay)) {
+          throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.SLOT_NOT_APPLICABLE_TO_DAY);
+        }
       }
       return {
         slotId: input.slotId,
@@ -277,8 +274,4 @@ export class ShiftsValidator {
     return facility;
   }
 
-  private toDateOnly(value: string | Date): string {
-    if (value instanceof Date) return value.toISOString().slice(0, 10);
-    return String(value).slice(0, 10);
-  }
 }

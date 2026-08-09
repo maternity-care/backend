@@ -2,7 +2,6 @@ import { ConflictException, Inject, Injectable, NotFoundException } from '@nestj
 import { ApplyFacilityOperatingHoursDto, OperatingHoursSlotStrategy } from './dto/requests/apply-facility-operating-hours.dto';
 import { FacilityOperatingHourGroupDto } from './dto/requests/facility-schedule.dto';
 import { UpdateFacilityOperatingHoursDto } from './dto/requests/update-facility-operating-hours.dto';
-import { FacilityClosureDaysService } from './facility-closure-days.service';
 import {
   buildCurrentOperatingState,
   buildDefaultOperatingHours,
@@ -30,7 +29,6 @@ export class FacilityOperatingHoursService {
     private readonly operatingHoursRepository: IFacilityOperatingHoursRepository,
     @Inject(FACILITIES_REPOSITORY)
     private readonly facilitiesRepository: IFacilitiesRepository,
-    private readonly closureDaysService: FacilityClosureDaysService,
   ) {}
 
   async getOperatingHours(id: string) {
@@ -114,18 +112,14 @@ export class FacilityOperatingHoursService {
   }
 
   async attachFacilitySchedule(facility: FacilityWithDetails): Promise<FacilityWithDetails> {
-    const [operatingHours, closureDays] = await Promise.all([
-      this.getOperatingHoursOrDefault(facility.id),
-      this.closureDaysService.getClosureDaysInternal(facility.id),
-    ]);
-    const operatingState = buildCurrentOperatingState(facility, operatingHours, closureDays);
+    const operatingHours = await this.getOperatingHoursOrDefault(facility.id);
+    const operatingState = buildCurrentOperatingState(facility, operatingHours);
 
     return {
       ...facility,
       ...operatingState,
       operatingHours,
       operatingHourGroups: groupOperatingHoursForDisplay(operatingHours),
-      closureDays,
     };
   }
 

@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { RESPONSE_MESSAGES } from '../../../common/constants/response-message.constant';
-import { ActiveStatus, FacilityOperatingStatus, FacilityStatus } from '../../../common/constants/status.enum';
+import { FacilityOperatingStatus, FacilityStatus } from '../../../common/constants/status.enum';
 import { FacilityOperatingHourGroupDto } from '../dto/requests/facility-schedule.dto';
 import { FacilityDayOfWeek } from '../entities/facility-operating-hour.entity';
 import { FacilityWithDetails } from '../interfaces/facility-repository.interface';
@@ -129,20 +129,15 @@ export function groupOperatingHoursForDisplay(operatingHours: FacilityOperatingH
 export function buildCurrentOperatingState(
   facility: Pick<FacilityWithDetails, 'status'>,
   operatingHours: FacilityOperatingHourLike[],
-  closureDays: Array<{ closureDate: string; status: string }>,
 ) {
   const vietnamNow = getVietnamNowParts();
   const todayOperatingHour = operatingHours.find(item => item.dayOfWeek === vietnamNow.dayOfWeek) ?? null;
-  const isClosedByClosureDay = closureDays.some(item =>
-    formatDateOnly(item.closureDate) === vietnamNow.date
-    && item.status === ActiveStatus.ACTIVE,
-  );
 
   if (facility.status !== FacilityStatus.ACTIVE) {
     return toOperatingState(FacilityOperatingStatus.INACTIVE, todayOperatingHour);
   }
 
-  if (isClosedByClosureDay || !todayOperatingHour || todayOperatingHour.isClosed) {
+  if (!todayOperatingHour || todayOperatingHour.isClosed) {
     return toOperatingState(FacilityOperatingStatus.CLOSED_TODAY, todayOperatingHour);
   }
 

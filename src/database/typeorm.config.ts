@@ -14,7 +14,6 @@ import { ChatMessage } from '../modules/chatbot/entities/chat-message.entity';
 import { ContentReport } from './entities/content-report.entity';
 import { Doctor } from '../modules/doctors/entities/doctor.entity';
 import { DoctorShiftChangeLog } from '../modules/shifts/entities/doctor-shift-change-log.entity';
-import { FacilityClosureDay } from '../modules/facilities/entities/facility-closure-day.entity';
 import { Facility } from '../modules/facilities/entities/facility.entity';
 import { FacilityOperatingHour } from '../modules/facilities/entities/facility-operating-hour.entity';
 import { FacilityService } from '../modules/facility-services/entities/facility-service.entity';
@@ -70,6 +69,8 @@ import { AddManagementModulePermissions1786300000000 } from './migrations/178630
 import {AddFacilityRoomSuspendFields1786400000000} from './migrations/1786400000000-AddFacilityRoomSuspendFields';
 import { AssignDoctorPregnancyCreatePermission1786500000000 } from './migrations/1786500000000-AssignDoctorPregnancyCreatePermission';
 import { AddForumNotifications1786600000000 } from './migrations/1786600000000-AddForumNotifications';
+import { AddApplicableDaysToShiftSlots1786700000000 } from './migrations/1786700000000-AddApplicableDaysToShiftSlots';
+import { DropFacilityClosureDays1786800000000 } from './migrations/1786800000000-DropFacilityClosureDays';
 
 config();
 
@@ -96,7 +97,6 @@ export const typeOrmConfig: DataSourceOptions = {
     StaffRefreshToken,
     StaffPasswordResetToken,
     Facility,
-    FacilityClosureDay,
     FacilityOperatingHour,
     FacilityService,
     Doctor,
@@ -155,6 +155,8 @@ export const typeOrmConfig: DataSourceOptions = {
     AddFacilityRoomSuspendFields1786400000000,
     AssignDoctorPregnancyCreatePermission1786500000000,
     AddForumNotifications1786600000000,
+    AddApplicableDaysToShiftSlots1786700000000,
+    DropFacilityClosureDays1786800000000,
   ],
   charset: 'utf8mb4_unicode_ci',
 };

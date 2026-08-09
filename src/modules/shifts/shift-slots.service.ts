@@ -6,7 +6,11 @@ import { ActiveStatus, FacilityStatus } from '../../common/constants/status.enum
 import { PaginationResult } from '../../common/helpers/pagination';
 import { ShiftSlot } from '../../database/entities/shift-slot.entity';
 import { FacilitiesService } from '../facilities/facilities.service';
-import { CreateShiftSlotDto } from './dto/requests/create-shift-slot.dto';
+import {
+  CreateShiftSlotDto,
+  SHIFT_SLOT_APPLICABLE_DAYS,
+  ShiftSlotApplicableDay,
+} from './dto/requests/create-shift-slot.dto';
 import { LookupShiftSlotDto, SearchShiftSlotDto } from './dto/requests/search-shift-slot.dto';
 import { UpdateShiftSlotDto } from './dto/requests/update-shift-slot.dto';
 import {
@@ -15,6 +19,13 @@ import {
   normalizeTime,
   timesOverlap,
 } from './helpers/shifts.helper';
+
+type OperatingHourLike = {
+  dayOfWeek: string;
+  openTime?: string | null;
+  closeTime?: string | null;
+  isClosed?: boolean;
+};
 
 @Injectable()
 export class ShiftSlotsService {
@@ -33,9 +44,15 @@ export class ShiftSlotsService {
     const isOvernight = isOvernightRange(dto.startTime, dto.endTime);
     const code = await this.generateUniqueCode(dto.facilityId, dto.name);
     await this.ensureUniqueSlot(dto.facilityId, dto.name);
+    let applicableDays: ShiftSlotApplicableDay[] | null = null;
     if (status === ActiveStatus.ACTIVE) {
-      await this.ensureSlotFitsFacilityOperatingHours(dto.facilityId, dto.startTime, dto.endTime);
-      await this.ensureNoTimeOverlap(dto.facilityId, dto.startTime, dto.endTime);
+      applicableDays = await this.resolveApplicableDays(
+        dto.facilityId,
+        dto.startTime,
+        dto.endTime,
+        dto.applicableDays,
+      );
+      await this.ensureNoTimeOverlap(dto.facilityId, dto.startTime, dto.endTime, applicableDays);
     }
 
     const slot = this.repository.create({
@@ -45,6 +62,7 @@ export class ShiftSlotsService {
       startTime: normalizeTime(dto.startTime),
       endTime: normalizeTime(dto.endTime),
       isOvernight,
+      applicableDays,
       status,
     });
 
@@ -128,10 +146,24 @@ export class ShiftSlotsService {
 
     this.validateSlotTime(targetStartTime, targetEndTime);
     const targetIsOvernight = isOvernightRange(targetStartTime, targetEndTime);
+    let targetApplicableDays = dto.applicableDays !== undefined
+      ? this.normalizeApplicableDays(dto.applicableDays)
+      : this.normalizeStoredApplicableDays(slot.applicableDays);
 
     if (targetStatus === ActiveStatus.ACTIVE) {
-      await this.ensureSlotFitsFacilityOperatingHours(targetFacilityId, targetStartTime, targetEndTime);
-      await this.ensureNoTimeOverlap(targetFacilityId, targetStartTime, targetEndTime, slot.id);
+      targetApplicableDays = await this.resolveApplicableDays(
+        targetFacilityId,
+        targetStartTime,
+        targetEndTime,
+        dto.applicableDays !== undefined ? dto.applicableDays : targetApplicableDays,
+      );
+      await this.ensureNoTimeOverlap(
+        targetFacilityId,
+        targetStartTime,
+        targetEndTime,
+        targetApplicableDays,
+        slot.id,
+      );
     }
 
     if (targetName !== slot.name || targetFacilityId !== slot.facilityId) {
@@ -144,6 +176,9 @@ export class ShiftSlotsService {
     if (dto.startTime !== undefined) slot.startTime = normalizeTime(dto.startTime);
     if (dto.endTime !== undefined) slot.endTime = normalizeTime(dto.endTime);
     slot.isOvernight = targetIsOvernight;
+    if (targetStatus === ActiveStatus.ACTIVE || dto.applicableDays !== undefined) {
+      slot.applicableDays = targetApplicableDays;
+    }
     if (dto.status !== undefined) slot.status = dto.status;
 
     return this.repository.save(slot);
@@ -228,6 +263,7 @@ export class ShiftSlotsService {
     facilityId: string,
     startTime: string,
     endTime: string,
+    applicableDays: ShiftSlotApplicableDay[],
     excludeId?: string,
   ): Promise<void> {
     const query = this.repository
@@ -238,9 +274,11 @@ export class ShiftSlotsService {
 
     if (excludeId) query.andWhere('slot.id != :excludeId', { excludeId });
 
-    const existing = (await query.getMany()).find(slot =>
-      timesOverlap(startTime, endTime, slot.startTime, slot.endTime),
-    );
+    const existing = (await query.getMany()).find((slot) => {
+      const existingDays = this.normalizeStoredApplicableDays(slot.applicableDays);
+      return this.hasAnyApplicableDayOverlap(applicableDays, existingDays)
+        && timesOverlap(startTime, endTime, slot.startTime, slot.endTime);
+    });
     if (existing) {
       throw new ConflictException({
         message: RESPONSE_MESSAGES.SHIFT_SLOTS.TIME_OVERLAP,
@@ -252,41 +290,88 @@ export class ShiftSlotsService {
     }
   }
 
-  private async ensureSlotFitsFacilityOperatingHours(
+  private async resolveApplicableDays(
     facilityId: string,
     startTime: string,
     endTime: string,
-  ): Promise<void> {
+    requestedDays?: ShiftSlotApplicableDay[] | string[] | null,
+  ): Promise<ShiftSlotApplicableDay[]> {
     const normalizedStart = normalizeTime(startTime);
     const normalizedEnd = normalizeTime(endTime);
     const schedule = await this.facilitiesService.getOperatingHours(facilityId);
-    const operatingHours = schedule.operatingHours;
-    const openOperatingHours = operatingHours.filter(item =>
-      !item.isClosed && item.openTime && item.closeTime,
+    const operatingHours = schedule.operatingHours as OperatingHourLike[];
+    const candidateDays = requestedDays === undefined
+      ? [...SHIFT_SLOT_APPLICABLE_DAYS]
+      : this.normalizeApplicableDays(requestedDays);
+    const applicableDays = candidateDays.filter(day =>
+      this.slotFitsFacilityDay(day, operatingHours, normalizedStart, normalizedEnd),
     );
-    if (openOperatingHours.length === 0) {
+
+    if (requestedDays !== undefined && applicableDays.length !== candidateDays.length) {
+      throw new BadRequestException(RESPONSE_MESSAGES.SHIFT_SLOTS.APPLICABLE_DAYS_INVALID);
+    }
+
+    if (applicableDays.length === 0) {
       throw new BadRequestException(RESPONSE_MESSAGES.SHIFT_SLOTS.OUTSIDE_FACILITY_HOURS);
     }
 
-    const fitsAtLeastOneOpenDay = openOperatingHours.some((item) => {
-      if (item.isClosed || !item.openTime || !item.closeTime) return false;
-      const openTime = normalizeTime(String(item.openTime));
-      const closeTime = normalizeTime(String(item.closeTime));
-      if (!isOvernightRange(normalizedStart, normalizedEnd)) {
-        return normalizedStart >= openTime && normalizedEnd <= closeTime;
-      }
+    return applicableDays;
+  }
 
-      const nextItem = operatingHours[(operatingHours.indexOf(item) + 1) % operatingHours.length];
-      if (!nextItem || nextItem.isClosed || !nextItem.openTime || !nextItem.closeTime) return false;
-      return normalizedStart >= openTime
-        && '23:59:00' <= closeTime
-        && '00:00:00' >= normalizeTime(String(nextItem.openTime))
-        && normalizedEnd <= normalizeTime(String(nextItem.closeTime));
-    });
+  private slotFitsFacilityDay(
+    day: ShiftSlotApplicableDay,
+    operatingHours: OperatingHourLike[],
+    normalizedStart: string,
+    normalizedEnd: string,
+  ): boolean {
+    const item = operatingHours.find(hour => hour.dayOfWeek === day);
+    if (!item || item.isClosed || !item.openTime || !item.closeTime) return false;
+    const openTime = normalizeTime(String(item.openTime));
+    const closeTime = normalizeTime(String(item.closeTime));
 
-    if (!fitsAtLeastOneOpenDay) {
-      throw new BadRequestException(RESPONSE_MESSAGES.SHIFT_SLOTS.OUTSIDE_FACILITY_HOURS);
+    if (!isOvernightRange(normalizedStart, normalizedEnd)) {
+      return normalizedStart >= openTime && normalizedEnd <= closeTime;
     }
+
+    const nextDay = this.getNextApplicableDay(day);
+    const nextItem = operatingHours.find(hour => hour.dayOfWeek === nextDay);
+    if (!nextItem || nextItem.isClosed || !nextItem.openTime || !nextItem.closeTime) return false;
+
+    return normalizedStart >= openTime
+      && closeTime >= '23:59:00'
+      && normalizeTime(String(nextItem.openTime)) <= '00:00:00'
+      && normalizedEnd <= normalizeTime(String(nextItem.closeTime));
+  }
+
+  private getNextApplicableDay(day: ShiftSlotApplicableDay): ShiftSlotApplicableDay {
+    const index = SHIFT_SLOT_APPLICABLE_DAYS.indexOf(day);
+    return SHIFT_SLOT_APPLICABLE_DAYS[(index + 1) % SHIFT_SLOT_APPLICABLE_DAYS.length];
+  }
+
+  private normalizeApplicableDays(days: ShiftSlotApplicableDay[] | string[] | null): ShiftSlotApplicableDay[] {
+    const orderedDays = new Set(
+      (days ?? []).map(day => String(day).trim().toUpperCase()),
+    );
+    const normalized = SHIFT_SLOT_APPLICABLE_DAYS.filter(day => orderedDays.has(day));
+    if (normalized.length === 0) {
+      throw new BadRequestException(RESPONSE_MESSAGES.SHIFT_SLOTS.APPLICABLE_DAYS_INVALID);
+    }
+    return normalized;
+  }
+
+  private normalizeStoredApplicableDays(days: unknown): ShiftSlotApplicableDay[] {
+    if (!Array.isArray(days) || days.length === 0) {
+      return [...SHIFT_SLOT_APPLICABLE_DAYS];
+    }
+    return this.normalizeApplicableDays(days.map(String));
+  }
+
+  private hasAnyApplicableDayOverlap(
+    firstDays: ShiftSlotApplicableDay[],
+    secondDays: ShiftSlotApplicableDay[],
+  ): boolean {
+    const secondSet = new Set(secondDays);
+    return firstDays.some(day => secondSet.has(day));
   }
 
   private async generateUniqueCode(facilityId: string, name: string, excludeId?: string): Promise<string> {

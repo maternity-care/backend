@@ -30,6 +30,9 @@ export class ShiftSlotResponseDto {
   @ApiProperty()
   isOvernight: boolean;
 
+  @ApiPropertyOptional({ type: [String], example: ['MON', 'TUE', 'WED', 'THU', 'FRI'] })
+  applicableDays?: string[] | null;
+
   @ApiProperty({ enum: ActiveStatus })
   status: ActiveStatus;
 
@@ -59,6 +62,9 @@ export class ShiftSlotLookupResponseDto {
 
   @ApiProperty()
   endTime: string;
+
+  @ApiPropertyOptional({ type: [String], example: ['MON', 'TUE', 'WED', 'THU', 'FRI'] })
+  applicableDays?: string[] | null;
 
   @ApiProperty({ enum: ActiveStatus })
   status: ActiveStatus;

@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, EntityManager, Repository, SelectQueryBuilder } from 'typeorm';
 import { Facility } from '../entities/facility.entity';
-import { FacilityClosureDay } from '../entities/facility-closure-day.entity';
 import { FacilityDayOfWeek, FacilityOperatingHour } from '../entities/facility-operating-hour.entity';
 import {
   AccountStatus,
@@ -242,7 +241,6 @@ export class FacilitiesRepository implements IFacilitiesRepository {
   async remove(facility: Facility): Promise<void> {
     await this.repository.manager.transaction(async manager => {
       await manager.delete(FacilityOperatingHour, { facilityId: facility.id });
-      await manager.delete(FacilityClosureDay, { facilityId: facility.id });
       await manager.remove(Facility, facility);
     });
   }

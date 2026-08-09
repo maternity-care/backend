@@ -36,23 +36,6 @@ export class FacilityOperatingHourGroupResponseDto {
   displayTime: string;
 }
 
-export class FacilityClosureDayResponseDto {
-  @ApiProperty()
-  id: string;
-
-  @ApiProperty()
-  facilityId: string;
-
-  @ApiProperty()
-  closureDate: string;
-
-  @ApiPropertyOptional()
-  reason: string | null;
-
-  @ApiProperty()
-  status: string;
-}
-
 export class FacilityResponseDto {
   @ApiProperty()
   id: string;
@@ -143,9 +126,6 @@ export class FacilityResponseDto {
 
   @ApiPropertyOptional({ type: [FacilityOperatingHourGroupResponseDto] })
   operatingHourGroups?: FacilityOperatingHourGroupResponseDto[];
-
-  @ApiPropertyOptional({ type: [FacilityClosureDayResponseDto] })
-  closureDays?: FacilityClosureDayResponseDto[];
 }
 
 export class FacilityLookupResponseDto {

@@ -143,7 +143,6 @@ const seedTables = [
   'shift_slots',
   'rooms',
   'room_types',
-  'facility_closure_days',
   'facility_operating_hours',
   'facility_staff',
   'facilities',

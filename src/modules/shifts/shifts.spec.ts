@@ -324,7 +324,6 @@ describe('ShiftsService business validation', () => {
   const facilitiesService = {
     findById: jest.fn().mockResolvedValue(facility),
     getOperatingHours: jest.fn().mockResolvedValue({ facilityId: '1', operatingHours }),
-    getClosureDays: jest.fn().mockResolvedValue([]),
   };
   const roomsService = { findById: jest.fn().mockResolvedValue(room) };
   const createService = (repo = createRepo()) => ({
@@ -704,13 +703,11 @@ describe('ShiftsService business validation', () => {
     })).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  // Vai tro: preview auto-generate phai phan tach ca hop le, ngay dong cua va ca bi conflict thay vi dung o loi dau tien.
+  // Vai tro: preview auto-generate phai phan tach ca hop le va ca bi conflict thay vi dung o loi dau tien.
   it('previews auto-generated shifts with valid, skipped, and conflicted candidates', async () => {
     const { repo, service } = createService();
-    facilitiesService.getClosureDays.mockResolvedValueOnce([
-      { closureDate: '2099-07-08', status: ActiveStatus.ACTIVE },
-    ]);
     repo.findConflicts
+      .mockResolvedValueOnce({ doctorConflicts: [], roomConflicts: [] })
       .mockResolvedValueOnce({ doctorConflicts: [], roomConflicts: [] })
       .mockResolvedValueOnce({ doctorConflicts: [shift], roomConflicts: [] });
 
@@ -728,19 +725,19 @@ describe('ShiftsService business validation', () => {
       saveOnlyValid: true,
     });
 
-    expect(result.summary).toEqual({ totalCandidates: 3, valid: 1, skipped: 1, conflicted: 1 });
-    expect(result.validShifts).toEqual([expect.objectContaining({ shiftDate: '2099-07-06' })]);
-    expect(result.skippedItems).toEqual([expect.objectContaining({ shiftDate: '2099-07-08' })]);
+    expect(result.summary).toEqual({ totalCandidates: 3, valid: 2, skipped: 0, conflicted: 1 });
+    expect(result.validShifts).toEqual([
+      expect.objectContaining({ shiftDate: '2099-07-06' }),
+      expect.objectContaining({ shiftDate: '2099-07-08' }),
+    ]);
+    expect(result.skippedItems).toEqual([]);
     expect(result.conflictItems).toEqual([expect.objectContaining({ shiftDate: '2099-07-10' })]);
     expect(repo.saveMany).not.toHaveBeenCalled();
   });
 
-  // Vai tro: confirm auto-generate chi luu candidate hop le va van tra summary cac ngay bi bo qua.
+  // Vai tro: confirm auto-generate luu tat ca candidate hop le trong khoang ngay da chon.
   it('confirms auto-generated shifts by saving only valid candidates', async () => {
     const { repo, service } = createService();
-    facilitiesService.getClosureDays.mockResolvedValueOnce([
-      { closureDate: '2099-07-08', status: ActiveStatus.ACTIVE },
-    ]);
 
     const result = await service.confirmBulkGenerate({
       doctorId: '1',
@@ -756,11 +753,12 @@ describe('ShiftsService business validation', () => {
       saveOnlyValid: true,
     });
 
-    expect(result.summary).toEqual({ totalCandidates: 2, valid: 1, skipped: 1, conflicted: 0 });
+    expect(result.summary).toEqual({ totalCandidates: 2, valid: 2, skipped: 0, conflicted: 0 });
     expect(repo.saveMany).toHaveBeenCalledWith([
       expect.objectContaining({ shiftDate: '2099-07-06' }),
+      expect.objectContaining({ shiftDate: '2099-07-08' }),
     ]);
-    expect(result.createdShifts).toHaveLength(1);
+    expect(result.createdShifts).toHaveLength(2);
   });
 
   // Vai tro: dam bao copy-week bo qua ca cancelled va reset ca full ve available o tuan moi.
@@ -2152,9 +2150,97 @@ describe('ShiftSlotsService business validation', () => {
       code: 'CA_SANG',
       startTime: '07:00:00',
       endTime: '11:00:00',
+      applicableDays: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
       status: ActiveStatus.ACTIVE,
     });
     expect(repository.save).toHaveBeenCalled();
+  });
+
+  // Vai tro: cho phep khung ca chong gio neu ngay ap dung khong giao nhau.
+  it('allows overlapping shift slot times when applicable days do not overlap', async () => {
+    const { service, repository, facilitiesService } = createService({
+      createQueryBuilder: jest.fn()
+        .mockReturnValueOnce(createQueryBuilder({ rawMany: [] }))
+        .mockReturnValueOnce(createQueryBuilder({ one: null }))
+        .mockReturnValueOnce(createQueryBuilder({
+          many: [{
+            id: '9',
+            facilityId: '1',
+            startTime: '07:30:00',
+            endTime: '11:00:00',
+            status: ActiveStatus.ACTIVE,
+            applicableDays: ['SAT'],
+          }],
+        })),
+    });
+    facilitiesService.getOperatingHours.mockResolvedValueOnce({
+      facilityId: '1',
+      operatingHours: [
+        { dayOfWeek: 'MON', openTime: '06:00:00', closeTime: '17:00:00', isClosed: false },
+        { dayOfWeek: 'TUE', openTime: '06:00:00', closeTime: '17:00:00', isClosed: false },
+        { dayOfWeek: 'WED', openTime: '06:00:00', closeTime: '17:00:00', isClosed: false },
+        { dayOfWeek: 'THU', openTime: '06:00:00', closeTime: '17:00:00', isClosed: false },
+        { dayOfWeek: 'FRI', openTime: '06:00:00', closeTime: '17:00:00', isClosed: false },
+        { dayOfWeek: 'SAT', openTime: '07:30:00', closeTime: '17:00:00', isClosed: false },
+        { dayOfWeek: 'SUN', openTime: null, closeTime: null, isClosed: true },
+      ],
+    });
+
+    await expect(service.create({
+      facilityId: '1',
+      name: 'Ca sang ngay thuong',
+      startTime: '07:00',
+      endTime: '11:00',
+    })).resolves.toMatchObject({
+      applicableDays: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
+    });
+    expect(repository.save).toHaveBeenCalled();
+  });
+
+  // Vai tro: van chan khung ca chong gio neu co it nhat mot ngay ap dung trung nhau.
+  it('rejects overlapping shift slot times when applicable days overlap', async () => {
+    const { service, repository } = createService({
+      createQueryBuilder: jest.fn()
+        .mockReturnValueOnce(createQueryBuilder({ rawMany: [] }))
+        .mockReturnValueOnce(createQueryBuilder({ one: null }))
+        .mockReturnValueOnce(createQueryBuilder({
+          many: [{
+            id: '9',
+            facilityId: '1',
+            startTime: '08:00:00',
+            endTime: '12:00:00',
+            status: ActiveStatus.ACTIVE,
+            applicableDays: ['MON', 'WED'],
+          }],
+        })),
+    });
+
+    await expect(service.create({
+      facilityId: '1',
+      name: 'Ca trung gio',
+      startTime: '07:00',
+      endTime: '11:00',
+      applicableDays: ['MON'],
+    })).rejects.toBeInstanceOf(ConflictException);
+    expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  // Vai tro: neu FE chi dinh ngay ap dung thi ngay do phai nam trong gio mo cua cua facility.
+  it('rejects requested applicable days outside facility operating hours', async () => {
+    const { service, repository } = createService({
+      createQueryBuilder: jest.fn()
+        .mockReturnValueOnce(createQueryBuilder({ rawMany: [] }))
+        .mockReturnValueOnce(createQueryBuilder({ one: null })),
+    });
+
+    await expect(service.create({
+      facilityId: '1',
+      name: 'Ca thu bay qua som',
+      startTime: '07:00',
+      endTime: '11:00',
+      applicableDays: ['SAT'],
+    })).rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.save).not.toHaveBeenCalled();
   });
 
   // Vai tro: dam bao lookup tra cac khung ca active cua facility cho FE chon.

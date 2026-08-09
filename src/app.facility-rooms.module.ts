@@ -7,7 +7,6 @@ import { Permission } from './modules/permissions/entities/permission.entity';
 import { Role } from './modules/roles/entities/role.entity';
 import { Doctor } from './modules/doctors/entities/doctor.entity';
 import { Staff } from './modules/staffs/entities/staff.entity';
-import { FacilityClosureDay } from './modules/facilities/entities/facility-closure-day.entity';
 import { Facility } from './modules/facilities/entities/facility.entity';
 import { FacilityOperatingHour } from './modules/facilities/entities/facility-operating-hour.entity';
 import { Room } from './modules/rooms/entities/room.entity';
@@ -48,7 +47,6 @@ import { ShiftsModule } from './modules/shifts/shifts.module';
           Doctor,
           Staff,
           Facility,
-          FacilityClosureDay,
           FacilityOperatingHour,
           Room,
           RoomType,

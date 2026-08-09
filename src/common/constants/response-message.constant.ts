@@ -130,17 +130,6 @@ export const RESPONSE_MESSAGES = {
     CLOSE_TIME_FORMAT_INVALID: 'closeTime phải có định dạng HH:mm hoặc HH:mm:ss',
     CLOSE_TIME_AFTER_OPEN_TIME: 'closeTime phải muộn hơn openTime',
   },
-  FACILITY_CLOSURE_DAYS: {
-    CREATED: 'Ngày đóng cửa của cơ sở đã được tạo thành công',
-    UPDATED: 'Ngày đóng cửa của cơ sở đã được cập nhật thành công',
-    DELETED: 'Ngày đóng cửa của cơ sở đã được xóa thành công',
-    GET_LIST_SUCCESS: 'Lấy danh sách ngày đóng cửa của cơ sở thành công',
-    NOT_FOUND: 'Ngày đóng cửa của cơ sở không tồn tại',
-    ALREADY_EXISTS: 'Ngày đóng cửa của cơ sở đã tồn tại',
-    DATE_FORMAT_INVALID: 'closureDate phải có định dạng YYYY-MM-DD',
-    FROM_DATE_FORMAT_INVALID: 'fromDate phải có định dạng YYYY-MM-DD',
-    TO_DATE_FORMAT_INVALID: 'toDate phải có định dạng YYYY-MM-DD',
-  },
   ROOMS: {
     CREATED: 'Tạo phòng thành công',
     UPDATED: 'Cập nhật phòng thành công',
@@ -222,7 +211,6 @@ export const RESPONSE_MESSAGES = {
     AUTO_GENERATE_NO_VALID_SHIFT: 'Không có ca trực hợp lệ để tạo',
     AUTO_GENERATE_STRICT_HAS_ISSUES:
       'Còn ca bị bỏ qua hoặc xung đột nên không thể confirm ở chế độ strict',
-    AUTO_GENERATE_CLOSURE_DAY: 'Cơ sở đóng cửa trong ngày này',
     AUTO_GENERATE_CONFLICT: 'Ca trực bị trùng lịch bác sĩ hoặc phòng',
     AUTO_GENERATE_CANDIDATE_FAILED: 'Không thể tạo candidate ca trực',
     SLOT_LOCKED_TIME_CHANGE:
@@ -232,6 +220,7 @@ export const RESPONSE_MESSAGES = {
       'Khi dùng slotId thì không gửi startTime/endTime để tránh lệch dữ liệu khung ca',
     SLOT_INACTIVE_OR_NOT_FOUND: 'Khung ca không tồn tại hoặc đã ngừng hoạt động',
     SLOT_NOT_BELONG_TO_FACILITY: 'Khung ca không thuộc cơ sở đang tạo lịch trực',
+    SLOT_NOT_APPLICABLE_TO_DAY: 'Khung ca không áp dụng cho ngày trực đã chọn',
     TIME_REQUIRED_WITHOUT_SLOT: 'Cần gửi startTime và endTime khi không dùng slotId',
     CREATE_STATUS_INVALID: 'Ca mới chỉ có thể ở trạng thái available hoặc off',
     BULK_STATUS_INVALID: 'Ca tạo hàng loạt chỉ có thể ở trạng thái available hoặc off',
@@ -250,6 +239,7 @@ export const RESPONSE_MESSAGES = {
     END_TIME_AFTER_START_TIME: 'endTime phải muộn hơn startTime',
     TIME_OVERLAP: 'Khung giờ bị chồng lấn với khung ca đang hoạt động trong cùng cơ sở',
     OUTSIDE_FACILITY_HOURS: 'Khung ca không nằm trong bất kỳ ngày mở cửa nào của cơ sở',
+    APPLICABLE_DAYS_INVALID: 'Ngày áp dụng không phù hợp với giờ mở cửa của cơ sở',
     CODE_GENERATE_FAILED: 'Không thể sinh mã khung ca duy nhất',
     ID_INVALID: 'shiftSlotId phải là số nguyên dương',
     FACILITY_ID_INVALID: 'facilityId phải là số nguyên dương',

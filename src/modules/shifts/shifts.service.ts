@@ -361,7 +361,6 @@ export class ShiftsService {
       throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_RANGE_TOO_LONG);
     }
 
-    const closureDates = await this.validator.getActiveClosureDates(dto.facilityId, range.fromDate, range.toDate);
     const validShifts: AutoGenerateValidItem[] = [];
     const skippedItems: AutoGenerateIssueItem[] = [];
     const conflictItems: AutoGenerateIssueItem[] = [];
@@ -371,18 +370,6 @@ export class ShiftsService {
 
     for (const candidateInput of candidateInputs) {
       const { index, slotAssignmentIndex, assignmentIndex, shiftDate, payload } = candidateInput;
-
-      if (closureDates.has(shiftDate)) {
-        skippedItems.push({
-          index,
-          slotAssignmentIndex,
-          assignmentIndex,
-          shiftDate,
-          reason: RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_CLOSURE_DAY,
-          candidate: { ...payload, index, slotAssignmentIndex, assignmentIndex },
-        });
-        continue;
-      }
 
       try {
         const prepared = await this.validator.prepareForCreate(payload);
