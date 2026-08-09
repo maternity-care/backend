@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, EntityManager, Repository, SelectQueryBuilder } from 'typeorm';
 import { Facility } from '../entities/facility.entity';
-import { FacilityClosureDay } from '../entities/facility-closure-day.entity';
 import { FacilityDayOfWeek, FacilityOperatingHour } from '../entities/facility-operating-hour.entity';
 import {
   AccountStatus,
@@ -58,12 +57,6 @@ export class FacilitiesRepository implements IFacilitiesRepository {
     return this.repository.save(facility);
   }
 
-  findAll(filters?: SearchFacilityDto): Promise<FacilityWithDetails[]> {
-    return this.buildDetailsQuery(filters)
-      .orderBy('facility.createdAt', 'DESC')
-      .getRawMany<FacilityWithDetails>();
-  }
-
   async findAllPaginated(filters?: SearchFacilityDto): Promise<PaginationResult<FacilityWithDetails>> {
     const query = this.buildDetailsQuery(filters)
       .orderBy('facility.createdAt', 'DESC');
@@ -74,6 +67,7 @@ export class FacilitiesRepository implements IFacilitiesRepository {
     });
   }
 
+  //tìm theo id
   findById(id: string): Promise<Facility | null> {
     return this.repository
       .createQueryBuilder('facility')
@@ -82,16 +76,20 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       .getOne();
   }
 
+  //tìm theo id và trả về chi tiết
   async findDetailsById(id: string): Promise<FacilityWithDetails | null> {
     return (await this.buildDetailsQuery()
       .andWhere('facility.id = :id', { id })
       .getRawOne<FacilityWithDetails>()) ?? null;
   }
 
+  //
   findByCode(code: string): Promise<Facility | null> {
     return this.repository.findOne({ where: { code } });
   }
 
+  //prefix: là tiền tố của facility code, ví dụ: "FAC"
+  // => tìm tất cả các facility có code bắt đầu bằng "FAC-"
   async findCodesByPrefix(prefix: string): Promise<string[]> {
     const rows = await this.repository
       .createQueryBuilder('facility')
@@ -243,7 +241,6 @@ export class FacilitiesRepository implements IFacilitiesRepository {
   async remove(facility: Facility): Promise<void> {
     await this.repository.manager.transaction(async manager => {
       await manager.delete(FacilityOperatingHour, { facilityId: facility.id });
-      await manager.delete(FacilityClosureDay, { facilityId: facility.id });
       await manager.remove(Facility, facility);
     });
   }

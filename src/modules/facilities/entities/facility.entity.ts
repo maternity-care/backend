@@ -3,7 +3,6 @@ import { FacilityService } from './../../facility-services/entities/facility-ser
 import { Staff } from './../../staffs/entities/staff.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { InactiveSource } from '../../../common/constants/status.enum';
-import { FacilityClosureDay } from './facility-closure-day.entity';
 import { FacilityOperatingHour } from './facility-operating-hour.entity';
 import {
   Column,
@@ -38,10 +37,6 @@ export class Facility {
   @ApiProperty({ type: () => [FacilityOperatingHour] })
   @OneToMany(() => FacilityOperatingHour, (operatingHour) => operatingHour.facility)
   operatingHours?: FacilityOperatingHour[];
-
-  @ApiProperty({ type: () => [FacilityClosureDay] })
-  @OneToMany(() => FacilityClosureDay, (closureDay) => closureDay.facility)
-  closureDays?: FacilityClosureDay[];
 
   @ApiProperty({ type: String })
   @Column({ name: 'name', type: 'varchar', length: 255 })

@@ -3,18 +3,10 @@ import { CreateFacilityDto } from './dto/requests/create-facility.dto';
 import { SearchFacilityAdminOptionsDto } from './dto/requests/search-facility-admin-options.dto';
 import { LookupFacilityDto, SearchFacilityDto } from './dto/requests/search-facility.dto';
 import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
-import { FacilityOperatingHourGroupDto } from './dto/requests/facility-schedule.dto';
 import { UpdateFacilityOperatingHoursDto } from './dto/requests/update-facility-operating-hours.dto';
-import { ApplyFacilityOperatingHoursDto, OperatingHoursSlotStrategy } from './dto/requests/apply-facility-operating-hours.dto';
-import {
-  CreateFacilityClosureDayDto,
-  SearchFacilityClosureDayDto,
-  UpdateFacilityClosureDayDto,
-} from './dto/requests/facility-closure-day.dto';
+import { ApplyFacilityOperatingHoursDto } from './dto/requests/apply-facility-operating-hours.dto';
 import { SuspendResourceDto } from '../../common/dto/suspend-resource.dto';
 import { Facility } from './entities/facility.entity';
-import { FacilityClosureDay } from './entities/facility-closure-day.entity';
-import { FacilityDayOfWeek } from './entities/facility-operating-hour.entity';
 import {
   FACILITIES_REPOSITORY,
   FacilitySuspendImpact,
@@ -24,11 +16,12 @@ import {
 } from './interfaces/facility-repository.interface';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
-import { ActiveStatus, FacilityStatus, InactiveSource } from '../../common/constants/status.enum';
+import { FacilityStatus, InactiveSource } from '../../common/constants/status.enum';
 import { AppointmentDisruptionsService } from '../appointment-disruptions/appointment-disruptions.service';
 import { FacilityImpactRepository } from './repositories/facility-impact.repository';
 import { FacilityOperatingHoursService } from './facility-operating-hours.service';
-import { FacilityClosureDaysService } from './facility-closure-days.service';
+import { buildFacilityCodePrefix, buildNextFacilityCode } from './helpers/facility-code.helper';
+import { parseFutureDateOrNull } from './helpers/facility-suspension.helper';
 
 @Injectable()
 export class FacilitiesService {
@@ -37,7 +30,6 @@ export class FacilitiesService {
     private readonly facilitiesRepository: IFacilitiesRepository,
     private readonly facilityImpactRepository: FacilityImpactRepository,
     private readonly facilityOperatingHoursService: FacilityOperatingHoursService,
-    private readonly facilityClosureDaysService: FacilityClosureDaysService,
     @Optional() private readonly appointmentDisruptions?: AppointmentDisruptionsService,
   ) {}
 
@@ -45,25 +37,16 @@ export class FacilitiesService {
     await this.ensureOwnerCanManageFacility(dto.ownerId);
     await this.ensureUniqueFacilityIdentity(dto);
     const code = await this.generateFacilityCode(dto.province);
-    const operatingHours = this.facilityOperatingHoursService.buildOperatingHoursForCreate(dto.schedules);
 
     const { id: _ignoredId, schedules: _ignoredSchedules, ...createPayload } = dto as CreateFacilityDto & { id?: string };
     const facility = this.facilitiesRepository.create({ ...createPayload, code });
     const saved = await this.facilitiesRepository.save(facility);
-    await this.facilityOperatingHoursService.updateOperatingHours(saved.id, { schedules: dto.schedules ?? [] });
+    await this.facilityOperatingHoursService.initializeOperatingHours(saved.id, dto.schedules);
     return this.findDetailsById(saved.id);
   }
 
-  async findAll(query?: SearchFacilityDto): Promise<FacilityWithDetails[]> {
-    const facilities = await this.facilitiesRepository.findAll(query);
-    if (!facilities || facilities.length === 0) {
-      throw new NotFoundException(RESPONSE_MESSAGES.FACILITIES.NOT_FOUND);
-    }
-    return Promise.all(facilities.map(facility => this.facilityOperatingHoursService.attachFacilitySchedule(facility)));
-  }
-
   async findAllPaginated(query?: SearchFacilityDto) {
-    const result = await this.facilitiesRepository.findAllPaginated!(query);
+    const result = await this.facilitiesRepository.findAllPaginated(query);
     if (!result || !result.items || result.items.length === 0) {
       throw new NotFoundException(RESPONSE_MESSAGES.FACILITIES.NOT_FOUND);
     }
@@ -136,6 +119,8 @@ export class FacilitiesService {
     return { action: 'soft_deleted', affectedCount: dependencyCount };
   }
 
+
+  // Đình chỉ hoạt động của cơ sở y tế và tính toán tác động của việc đình chỉ
   async suspend(
     id: string,
     dto: SuspendResourceDto,
@@ -155,6 +140,7 @@ export class FacilitiesService {
     facility.reactivatedAt = null;
     facility.reactivatedBy = null;
     await this.facilitiesRepository.save(facility);
+    // Gửi thông báo về sự gián đoạn cuộc hẹn do đình chỉ hoạt động của cơ sở y tế
     const suspendedRooms = await this.facilityImpactRepository.suspendActiveRoomsForFacility(
       facility.id,
       now,
@@ -162,6 +148,7 @@ export class FacilitiesService {
       dto.reason ?? null,
       actorId ?? null,
     );
+    // Gửi thông báo về sự gián đoạn cuộc hẹn do đình chỉ hoạt động của cơ sở y tế
     const cancelledShifts = await this.facilityImpactRepository.cancelFutureShiftsForFacility(
       facility.id,
       now,
@@ -195,14 +182,17 @@ export class FacilitiesService {
     };
   }
 
+  // Lấy giờ hoạt động của cơ sở y tế
   async getOperatingHours(id: string) {
     return this.facilityOperatingHoursService.getOperatingHours(id);
   }
 
+  // Xem trước giờ hoạt động của cơ sở y tế dựa trên dữ liệu được cung cấp
   async previewOperatingHours(id: string, dto: UpdateFacilityOperatingHoursDto) {
     return this.facilityOperatingHoursService.previewOperatingHours(id, dto);
   }
 
+  // Cập nhật giờ hoạt động của cơ sở y tế
   async updateOperatingHours(id: string, dto: UpdateFacilityOperatingHoursDto) {
     return this.facilityOperatingHoursService.updateOperatingHours(id, dto);
   }
@@ -211,22 +201,8 @@ export class FacilitiesService {
     return this.facilityOperatingHoursService.applyOperatingHours(id, dto);
   }
 
-  async getClosureDays(id: string, query?: SearchFacilityClosureDayDto) {
-    return this.facilityClosureDaysService.getClosureDays(id, query);
-  }
-
-  async createClosureDay(id: string, dto: CreateFacilityClosureDayDto) {
-    return this.facilityClosureDaysService.createClosureDay(id, dto);
-  }
-
-  async updateClosureDay(id: string, closureDayId: string, dto: UpdateFacilityClosureDayDto) {
-    return this.facilityClosureDaysService.updateClosureDay(id, closureDayId, dto);
-  }
-
-  async removeClosureDay(id: string, closureDayId: string) {
-    return this.facilityClosureDaysService.removeClosureDay(id, closureDayId);
-  }
-
+  // Xóa ngày đóng cửa của cơ sở y tế
+  //kiểm tra chủ cơ sở tồn tại
   private async ensureOwnerCanManageFacility(ownerId?: string): Promise<void> {
     if (!ownerId) return;
 
@@ -262,12 +238,7 @@ export class FacilitiesService {
   }
 
   private parseInactiveUntil(value: string | null | undefined, errorMessage: string): Date | null {
-    if (!value) return null;
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime()) || parsed <= new Date()) {
-      throw new BadRequestException(errorMessage);
-    }
-    return parsed;
+    return parseFutureDateOrNull(value, errorMessage);
   }
 
   private ensureStatusIsNotUpdated(dto: UpdateFacilityDto): void {
@@ -325,41 +296,9 @@ export class FacilitiesService {
   }
 
   private async generateFacilityCode(province?: string | null): Promise<string> {
-    const prefix = `CS-${this.buildProvinceAbbreviation(province)}`;
+    const prefix = buildFacilityCodePrefix(province);
     const existingCodes = await this.facilitiesRepository.findCodesByPrefix(prefix);
-    const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const nextSequence = existingCodes.reduce((maxSequence, code) => {
-      const match = code.match(new RegExp(`^${escapedPrefix}-(\\d+)$`));
-      return match ? Math.max(maxSequence, Number(match[1])) : maxSequence;
-    }, 0) + 1;
-
-    return `${prefix}-${String(nextSequence).padStart(2, '0')}`;
-  }
-
-  private buildProvinceAbbreviation(province?: string | null): string {
-    if (!province || !String(province).trim()) {
-      return 'VN';
-    }
-
-    const normalizedProvince = this.normalizeVietnameseText(province)
-      .replace(/[^\w\s]/g, ' ')
-      .replace(/\b(THANH PHO|TINH|TP)\b/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    const words = normalizedProvince.split(' ').filter(Boolean);
-    if (words.length === 0) return 'VN';
-    return words.map(word => word[0]).join('').toUpperCase();
-  }
-
-  private normalizeVietnameseText(value: string): string {
-    return String(value)
-      .trim()
-      .replace(/đ/g, 'd')
-      .replace(/Đ/g, 'D')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toUpperCase();
+    return buildNextFacilityCode(province, existingCodes);
   }
 
   private removeReadonlyCode(dto: UpdateFacilityDto): UpdateFacilityDto {

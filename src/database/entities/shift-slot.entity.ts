@@ -51,6 +51,14 @@ export class ShiftSlot {
   @Column({ name: 'is_overnight', type: 'tinyint', default: 0 })
   isOvernight: boolean;
 
+  @ApiPropertyOptional({
+    type: [String],
+    example: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
+    description: 'Days of week this slot can be used for.',
+  })
+  @Column({ name: 'applicable_days', type: 'json', nullable: true })
+  applicableDays: string[] | null;
+
   @ApiProperty({ enum: ActiveStatus })
   @Column({ name: 'status', type: 'enum', enum: ActiveStatus, default: ActiveStatus.ACTIVE })
   status: ActiveStatus;

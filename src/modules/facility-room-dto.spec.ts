@@ -84,7 +84,7 @@ describe('Facility CRUD DTO validation', () => {
 
   // Vai tro: dam bao query phan trang facility khong nhan page/limit vuot bien hop le.
   it('limits facility pagination input', async () => {
-    const dto = plainToInstance(SearchFacilityDto, { page: '0', limit: '101' });
+    const dto = plainToInstance(SearchFacilityDto, { page: '0', limit: '201' });
     expect((await validate(dto)).map(error => error.property)).toEqual(
       expect.arrayContaining(['page', 'limit']),
     );
@@ -122,7 +122,7 @@ describe('Room CRUD DTO validation', () => {
 
   // Vai tro: dam bao query tim room bat dung id va tham so phan trang khong hop le.
   it('validates room search IDs and pagination', async () => {
-    const dto = plainToInstance(SearchRoomsDto, { facilityId: '-1', page: '1.5', limit: '101' });
+    const dto = plainToInstance(SearchRoomsDto, { facilityId: '-1', page: '1.5', limit: '201' });
     expect((await validate(dto)).map(error => error.property)).toEqual(
       expect.arrayContaining(['facilityId', 'page', 'limit']),
     );

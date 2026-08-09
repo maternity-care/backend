@@ -33,6 +33,7 @@ export class FacilityImpactRepository {
     private readonly manager: EntityManager,
   ) {}
 
+  // Đếm số lượng phòng, ca làm việc và cuộc hẹn bị ảnh hưởng bởi việc đình chỉ hoạt động của cơ sở y tế
   async countSuspendImpact(facilityId: string, from: Date, until?: Date | null): Promise<FacilitySuspendImpact> {
     const fromDate = from.toISOString().slice(0, 10);
     const untilDate = until ? until.toISOString().slice(0, 10) : null;
@@ -88,6 +89,7 @@ export class FacilityImpactRepository {
     };
   }
 
+  // Đình chỉ các phòng đang hoạt động của cơ sở y tế trong khoảng thời gian xác định
   async suspendActiveRoomsForFacility(
     facilityId: string,
     from: Date,
@@ -115,6 +117,7 @@ export class FacilityImpactRepository {
     return result.affected ?? 0;
   }
 
+  // Kích hoạt lại các phòng bị đình chỉ bởi cơ sở y tế
   async reactivateRoomsSuspendedByFacility(facilityId: string, actorId?: string | null): Promise<number> {
     const result = await this.manager.createQueryBuilder()
       .update(Room)

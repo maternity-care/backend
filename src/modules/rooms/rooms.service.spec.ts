@@ -136,7 +136,6 @@ describe('RoomsService', () => {
 
   const createFacilitiesService = () => ({
     findById: jest.fn(),
-    findAll: jest.fn(),
     findAllPaginated: jest.fn(),
   });
 
@@ -633,7 +632,13 @@ describe('RoomsService', () => {
   // Vai tro: kiem tra man hinh tong hop facility + rooms khi khong can phan trang.
   it('returns facilities with rooms without pagination', async () => {
     const facilities = [createFacility(), createFacility({ id: 'fac-2', code: 'FAC-002' })];
-    facilitiesService.findAll.mockResolvedValue(facilities);
+    facilitiesService.findAllPaginated.mockResolvedValue({
+      items: facilities,
+      total: 2,
+      page: 1,
+      limit: 200,
+      totalPages: 1,
+    });
     repository.findByFacilityId.mockResolvedValueOnce([createRoom()]).mockResolvedValueOnce([]);
 
     await expect(service.findAllWithRooms()).resolves.toEqual([
@@ -645,7 +650,13 @@ describe('RoomsService', () => {
   // Vai tro: dam bao loi load rooms cua mot facility khong lam sap toan bo danh sach facility.
   it('keeps a facility in findAllWithRooms when loading its rooms fails', async () => {
     const facility = createFacility();
-    facilitiesService.findAll.mockResolvedValue([facility]);
+    facilitiesService.findAllPaginated.mockResolvedValue({
+      items: [facility],
+      total: 1,
+      page: 1,
+      limit: 200,
+      totalPages: 1,
+    });
     repository.findByFacilityId.mockRejectedValue(new Error('room query failed'));
 
     await expect(service.findAllWithRooms()).resolves.toEqual([{ facility, rooms: [] }]);
