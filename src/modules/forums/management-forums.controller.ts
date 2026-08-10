@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ForumTargetType } from '../../common/constants/forum.enum';
 import { PermissionEnum } from '../../common/constants/permission.enum';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -150,6 +151,28 @@ export class ManagementForumsController {
   @ApiOperation({ summary: 'List content reports' })
   async getReports(@Query() query: ForumReportQueryDto) {
     return { message: 'Thành công', data: await this.forumReportsService.findReports(query) };
+  }
+
+  @Get('reports/groups')
+  // @Permissions(PermissionEnum.FORUM_REPORT_VIEW)
+  @ApiOperation({ summary: 'List content reports grouped by reported content' })
+  async getReportGroups(@Query() query: ForumReportQueryDto) {
+    return { message: 'Thanh cong', data: await this.forumReportsService.findReportGroups(query) };
+  }
+
+  @Patch('reports/groups/:targetType/:targetId/resolve')
+  // @Permissions(PermissionEnum.FORUM_REPORT_RESOLVE)
+  @ApiOperation({ summary: 'Resolve all reports of the same post/comment' })
+  async resolveReportGroup(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('targetType') targetType: ForumTargetType,
+    @Param('targetId') targetId: string,
+    @Body() dto: ResolveContentReportDto,
+  ) {
+    return {
+      message: 'Da xu ly nhom bao cao',
+      data: await this.forumReportsService.resolveReportGroup(targetType, targetId, dto, user),
+    };
   }
 
   @Patch('reports/:id/resolve')

@@ -47,6 +47,9 @@ export class AppointmentDisruptionsService {
   async findMine(patientId: string) {
     return this.buildListQuery()
       .andWhere('appointment.patient_id = :patientId', { patientId })
+      .andWhere('item.resolution_status IN (:...statuses)', {
+        statuses: UNRESOLVED_STATUSES,
+      })
       .orderBy('item.created_at', 'DESC')
       .getRawMany();
   }
@@ -92,7 +95,7 @@ export class AppointmentDisruptionsService {
         `SELECT scheduled_start AS scheduledStart, scheduled_end AS scheduledEnd
          FROM appointments
          WHERE doctor_id = ? AND DATE(scheduled_start) = ?
-           AND status IN ('pending_payment','booked','confirmed','checked_in','in_progress')
+           AND status IN ('pending_payment','booked','confirmed','rescheduled','checked_in','in_progress')
            AND id <> ?`,
         [
           await this.getShiftStaffId(String(shift.shiftId)),
@@ -184,6 +187,13 @@ export class AppointmentDisruptionsService {
       resolvedAt: new Date(),
     });
     await this.itemRepository.save(item);
+    // Giữ user_schedules nhất quán kể cả khi dữ liệu cũ chưa được đồng bộ.
+    await this.dataSource.query(
+      `UPDATE user_schedules
+       SET status = 'cancelled', note = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE appointment_id = ? AND source = 'appointment'`,
+      [item.resolutionNote || 'Lịch hẹn đã được xử lý hoàn tiền', item.appointmentId],
+    );
     await this.updateDisruptionStatus(item.disruptionId);
     await this.notificationsService.createForUserIfMissing(item.appointment.patientId, {
       reference: `appointment-refund-resolved:${item.id}`,

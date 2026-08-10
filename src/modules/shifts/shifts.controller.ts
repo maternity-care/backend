@@ -298,7 +298,7 @@ export class ShiftsController {
     assertFacilityAccess(user, existing.facilityId);
     const activeFacilityId = getActiveFacilityId(user);
     if (activeFacilityId) dto.facilityId = activeFacilityId;
-    return { message: RESPONSE_MESSAGES.SHIFTS.UPDATED, data: await this.service.update(id, dto) };
+    return { message: RESPONSE_MESSAGES.SHIFTS.UPDATED, data: await this.service.update(id, dto, user?.id ?? null) };
   }
 
   @Delete(':id')
