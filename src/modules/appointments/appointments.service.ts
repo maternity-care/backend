@@ -21,6 +21,8 @@ const ACTIVE_APPOINTMENT_STATUSES = [
   AppointmentStatus.PENDING_PAYMENT,
   AppointmentStatus.BOOKED,
   AppointmentStatus.CONFIRMED,
+  // Lịch đã đổi vẫn đang giữ chỗ ở ca mới.
+  AppointmentStatus.RESCHEDULED,
   AppointmentStatus.CHECKED_IN,
   AppointmentStatus.IN_PROGRESS,
 ];
@@ -381,6 +383,7 @@ export class AppointmentsService {
     appointment.cancelReason = reason?.trim() || appointment.cancelReason;
     Object.assign(appointment, extra);
     await this.dataSource.getRepository(Appointment).save(appointment);
+    await this.syncAppointmentScheduleStatus(this.dataSource.manager, appointment.id, status, reason);
     return this.findManagementById(id, scopedFacilityId);
   }
 
@@ -525,6 +528,32 @@ export class AppointmentsService {
         AND schedule.source = 'appointment'
       `,
       [appointmentId],
+    );
+  }
+
+  private async syncAppointmentScheduleStatus(
+    manager: EntityManager,
+    appointmentId: string,
+    status: AppointmentStatus,
+    reason?: string,
+  ) {
+    const scheduleStatus = status === AppointmentStatus.COMPLETED
+      ? 'done'
+      : status === AppointmentStatus.NO_SHOW
+        ? 'missed'
+        : status === AppointmentStatus.CANCELLED
+          ? 'cancelled'
+          : null;
+
+    if (!scheduleStatus) return;
+
+    await manager.query(
+      `UPDATE user_schedules
+       SET status = ?,
+           note = COALESCE(?, note),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE appointment_id = ? AND source = 'appointment'`,
+      [scheduleStatus, reason?.trim() || null, appointmentId],
     );
   }
 }

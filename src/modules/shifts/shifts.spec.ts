@@ -422,6 +422,15 @@ describe('ShiftsService business validation', () => {
     expect(repo.findConflicts).toHaveBeenCalledWith(expect.objectContaining({ excludeShiftId: '10' }));
   });
 
+  it('rejects updating a shift after its end time', async () => {
+    const { repo, service } = createService();
+    repo.findById.mockResolvedValueOnce({ ...shift, shiftDate: '2000-01-01' });
+
+    await expect(service.update('10', { note: 'late update' } as never))
+      .rejects.toThrow(RESPONSE_MESSAGES.SHIFTS.PAST_DATE_INVALID);
+    expect(repo.save).not.toHaveBeenCalled();
+  });
+
   // Vai tro: dam bao API pre-check conflict tra chi tiet conflict thay vi nem exception.
   it('returns conflict details without throwing from the pre-check API', async () => {
     const { repo, service } = createService();
@@ -1012,6 +1021,15 @@ describe('ShiftsService business validation', () => {
     expect(repo.findAppointmentsForShift).toHaveBeenCalledWith(expect.objectContaining({ id: '10' }));
     expect(repo.remove).toHaveBeenCalledWith(expect.objectContaining({ id: '10' }));
     expect(repo.cancelShiftWithDisruption).not.toHaveBeenCalled();
+  });
+
+  it('rejects deleting a shift after its end time', async () => {
+    const { repo, service } = createService();
+    repo.findByIdForRemoval.mockResolvedValueOnce({ ...shift, shiftDate: '2000-01-01' });
+
+    await expect(service.remove('10', 'cleanup'))
+      .rejects.toThrow(RESPONSE_MESSAGES.SHIFTS.PAST_DATE_INVALID);
+    expect(repo.findAppointmentsForShift).not.toHaveBeenCalled();
   });
 
   // Vai tro: dam bao ca truc co appointment active se cancel/disruption thay vi xoa cung.
@@ -1981,7 +1999,7 @@ describe('ShiftsRepository unit query behavior', () => {
     await repository.findAppointmentsForShift(shift as never, true);
 
     expect(qb.andWhere).toHaveBeenCalledWith('appointment.status IN (:...statuses)', {
-      statuses: ['pending_payment', 'booked', 'confirmed', 'checked_in', 'in_progress'],
+      statuses: ['pending_payment', 'booked', 'confirmed', 'rescheduled', 'checked_in', 'in_progress'],
     });
   });
 

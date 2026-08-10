@@ -320,6 +320,7 @@ export class ShiftsRepository implements IShiftsRepository {
           AppointmentStatus.PENDING_PAYMENT,
           AppointmentStatus.BOOKED,
           AppointmentStatus.CONFIRMED,
+          AppointmentStatus.RESCHEDULED,
           AppointmentStatus.CHECKED_IN,
           AppointmentStatus.IN_PROGRESS,
         ],
