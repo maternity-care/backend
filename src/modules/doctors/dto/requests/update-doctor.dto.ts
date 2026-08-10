@@ -86,12 +86,14 @@ export class UpdateDoctorDto {
   @MaxLength(150)
   specialty: string;
 
-  @ApiPropertyOptional({ description: 'level năm kinh nghiệm' })
+  @ApiPropertyOptional({
+    description: 'level năm kinh nghiệm: level 1-(1-5),2-(6-10),3-(11-20),4-(>20)',
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(0)
-  @Max(80)
+  @Min(1)
+  @Max(4)
   yearsOfExperience: number;
 
   @ApiPropertyOptional({ description: 'loại phòng làm việc' })

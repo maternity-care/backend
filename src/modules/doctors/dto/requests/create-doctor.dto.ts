@@ -48,15 +48,14 @@ export class CreateDoctorDto {
   specialty: string;
 
   @ApiProperty({
-    example: 5,
-    minimum: 0,
-    maximum: 80,
-    description: 'Số năm kinh nghiệm',
+    minimum: 1,
+    maximum: 4,
+    description: 'Bậc level kinh nghiệm: level 1-(1-5),2-(6-10),3-(11-20),4-(>20)',
   })
   @Type(() => Number)
   @IsInt()
-  @Min(0)
-  @Max(80)
+  @Min(1)
+  @Max(4)
   yearsOfExperience: number;
 
   @ApiPropertyOptional({
