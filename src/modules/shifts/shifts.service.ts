@@ -16,6 +16,7 @@ import {
   dateDiffInDays,
   dateTimeToTime,
   getTimeRangeEndMinute,
+  isShiftInPast,
   minutesToTime,
   resolveBulkCreateDateRange,
   shiftIntervalsOverlap,
@@ -137,8 +138,25 @@ export class ShiftsService {
   }
 
   /** Cập nhật ca trực; nếu đổi doctorId thì resolve lại sang staffId trước khi lưu. */
-  async update(id: string, dto: UpdateDoctorShiftDto): Promise<DoctorShift> {
+  async update(id: string, dto: UpdateDoctorShiftDto, changedBy?: string | null): Promise<DoctorShift> {
     const shift = await this.findById(id);
+    if (isShiftInPast(shift.shiftDate, shift.startTime, shift.endTime)) {
+      throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.PAST_DATE_INVALID);
+    }
+    if (dto.status === DoctorShiftStatus.CANCELLED && shift.status !== DoctorShiftStatus.CANCELLED) {
+      const activeAffectedAppointments = await this.repository.findAppointmentsForShift(shift, true);
+      const result = await this.repository.cancelShiftWithDisruption(
+        shift,
+        activeAffectedAppointments,
+        dto.note,
+        changedBy,
+      );
+      if (result.disruptionId) {
+        await this.appointmentDisruptions?.dispatchDisruption(result.disruptionId);
+      }
+      return result.shift;
+    }
+
     const timeWasProvided = Object.prototype.hasOwnProperty.call(dto, 'startTime')
       || Object.prototype.hasOwnProperty.call(dto, 'endTime');
     const slotWasProvided = Object.prototype.hasOwnProperty.call(dto, 'slotId');
@@ -179,6 +197,9 @@ export class ShiftsService {
    */
   async remove(id: string, reason?: string, deletedBy?: string | null): Promise<SafeRemoveResult> {
     const shift = await this.findByIdForRemoval(id);
+    if (isShiftInPast(shift.shiftDate, shift.startTime, shift.endTime)) {
+      throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.PAST_DATE_INVALID);
+    }
     const relatedAppointments = await this.repository.findAppointmentsForShift(shift);
     if (relatedAppointments.length === 0) {
       await this.repository.remove(shift);

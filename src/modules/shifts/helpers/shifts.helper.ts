@@ -29,6 +29,21 @@ export function validateShiftId(id: string): void {
   }
 }
 
+/** Ca đã kết thúc chỉ còn được xem để bảo toàn lịch sử vận hành. */
+export function isShiftInPast(
+  shiftDate: string,
+  startTime: string,
+  endTime: string,
+): boolean {
+  const normalizedStart = normalizeTime(startTime);
+  const normalizedEnd = normalizeTime(endTime);
+  const endDate = isOvernightRange(normalizedStart, normalizedEnd)
+    ? addDays(shiftDate, 1)
+    : shiftDate;
+  const endAt = new Date(`${endDate}T${normalizedEnd}+07:00`);
+  return endAt.getTime() <= Date.now();
+}
+
 /** Kiểm tra thứ tự giờ, độ dài ca và ngày trong quá khứ. */
 export function validateSchedule(
   shiftDate: string,
@@ -65,14 +80,18 @@ export function validateFacilityHours(
   status: DoctorShiftStatus,
   nextOperatingHour?: FacilityOperatingHourLike | null,
 ): void {
+  // kiểm tra status của shift, nếu là OFF hoặc CANCELLED thì không cần kiểm tra giờ mở cửa
   if (status === DoctorShiftStatus.OFF || status === DoctorShiftStatus.CANCELLED) return;
 
+  // kiểm tra operatingHour có tồn tại và không bị đóng cửa
   if (!operatingHour || operatingHour.isClosed) {
     throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.FACILITY_CLOSED_ON_DATE);
   }
 
+
   const openTime = operatingHour.openTime ? normalizeTime(String(operatingHour.openTime)) : null;
   const closeTime = operatingHour.closeTime ? normalizeTime(String(operatingHour.closeTime)) : null;
+  
   if (!openTime || !closeTime) {
     throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.FACILITY_HOURS_NOT_CONFIGURED);
   }
@@ -212,10 +231,12 @@ export function minutesToTime(value: number): string {
   return `${hour}:${minute}:00`;
 }
 
+// Kiểm tra hai khoảng thời gian có overlap nhau hay không, không quan tâm ngày
 export function isOvernightRange(startTime: string, endTime: string): boolean {
   return timeToMinutes(endTime) <= timeToMinutes(startTime);
 }
 
+// lấy khoảng thời gian làm việc bằng phút 
 export function getTimeRangeDurationMinutes(startTime: string, endTime: string): number {
   const start = timeToMinutes(startTime);
   let end = timeToMinutes(endTime);
@@ -230,6 +251,7 @@ export function getTimeRangeEndMinute(startTime: string, endTime: string): numbe
   return end;
 }
 
+// Chuyển đổi khoảng thời gian thành các đoạn thời gian trong ngày
 function toDayTimeSegments(startTime: string, endTime: string): Array<{ start: number; end: number }> {
   const start = timeToMinutes(startTime);
   const end = timeToMinutes(endTime);

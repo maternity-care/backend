@@ -25,6 +25,7 @@ export enum ForumModerationAction {
   HIDE = 'hide',
   REJECT = 'reject',
   DELETE = 'delete',
+  DISMISS = 'dismiss',
   LOCK_COMMENTS = 'lock_comments',
   UNLOCK_COMMENTS = 'unlock_comments',
   PIN = 'pin',
