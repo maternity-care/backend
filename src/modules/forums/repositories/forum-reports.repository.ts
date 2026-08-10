@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Brackets, In, Repository } from 'typeorm';
 import {
   ForumAuthorRole,
   ForumModerationAction,
@@ -82,6 +82,10 @@ export class ForumReportsRepository {
     return this.reportRepository.save(report);
   }
 
+  saveMany(reports: ContentReport[]) {
+    return this.reportRepository.save(reports);
+  }
+
   async findPageWithDetails(query: ForumReportQueryDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
@@ -99,6 +103,91 @@ export class ForumReportsRepository {
     };
   }
 
+  async findGroupedPageWithDetails(query: ForumReportQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const rawGroups = await this.reportRepository
+      .createQueryBuilder('report')
+      .select('report.targetType', 'targetType')
+      .addSelect('report.targetId', 'targetId')
+      .addSelect('COUNT(*)', 'reportCount')
+      .addSelect(`SUM(CASE WHEN report.status = :pending THEN 1 ELSE 0 END)`, 'pendingCount')
+      .addSelect(`SUM(CASE WHEN report.status = :resolved THEN 1 ELSE 0 END)`, 'resolvedCount')
+      .addSelect(`SUM(CASE WHEN report.status = :rejected THEN 1 ELSE 0 END)`, 'rejectedCount')
+      .addSelect('MAX(report.createdAt)', 'latestCreatedAt')
+      .setParameters({
+        pending: ContentReportStatus.PENDING,
+        resolved: ContentReportStatus.RESOLVED,
+        rejected: ContentReportStatus.REJECTED,
+      })
+      .groupBy('report.targetType')
+      .addGroupBy('report.targetId')
+      .orderBy('latestCreatedAt', 'DESC')
+      .getRawMany<{
+        targetType: ForumTargetType;
+        targetId: string;
+        reportCount: string;
+        pendingCount: string;
+        resolvedCount: string;
+        rejectedCount: string;
+        latestCreatedAt: Date;
+      }>();
+
+    const total = rawGroups.length;
+    const pageGroups = rawGroups.slice((page - 1) * limit, page * limit);
+    const reports = await this.findReportsByTargets(
+      pageGroups.map(group => ({
+        targetType: group.targetType,
+        targetId: String(group.targetId),
+      })),
+    );
+    const decoratedReports = await this.decorateReports(reports);
+    const reportsByTarget = new Map<string, Awaited<ReturnType<typeof this.decorateReports>>>();
+
+    for (const report of decoratedReports) {
+      const key = this.buildGroupKey(report.targetType, report.targetId);
+      reportsByTarget.set(key, [...(reportsByTarget.get(key) ?? []), report]);
+    }
+
+    return {
+      data: pageGroups.map(group => {
+        const targetType = group.targetType;
+        const targetId = String(group.targetId);
+        const key = this.buildGroupKey(targetType, targetId);
+        const groupReports = reportsByTarget.get(key) ?? [];
+        const pendingCount = Number(group.pendingCount ?? 0);
+        const resolvedCount = Number(group.resolvedCount ?? 0);
+        const rejectedCount = Number(group.rejectedCount ?? 0);
+
+        return {
+          groupId: key,
+          targetType,
+          targetId,
+          targetContent: groupReports[0]?.targetContent ?? null,
+          reports: groupReports,
+          latestReport: groupReports[0] ?? null,
+          reportCount: Number(group.reportCount ?? groupReports.length),
+          pendingCount,
+          resolvedCount,
+          rejectedCount,
+          status: this.resolveGroupStatus(pendingCount, resolvedCount),
+          createdAt: groupReports[groupReports.length - 1]?.createdAt ?? group.latestCreatedAt,
+          updatedAt: group.latestCreatedAt,
+        };
+      }),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  findReportsByTarget(targetType: ForumTargetType, targetId: string) {
+    return this.reportRepository.find({
+      where: { targetType, targetId },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async createResolutionLog(input: ModerationLogInput) {
     const log = this.moderationLogRepository.create({
       targetType: input.report.targetType,
@@ -114,6 +203,38 @@ export class ForumReportsRepository {
     });
 
     return this.moderationLogRepository.save(log);
+  }
+
+  private async findReportsByTargets(
+    targets: Array<{ targetType: ForumTargetType; targetId: string }>,
+  ) {
+    if (!targets.length) return [];
+
+    return this.reportRepository
+      .createQueryBuilder('report')
+      .where(new Brackets(qb => {
+        targets.forEach((target, index) => {
+          const condition = `(report.targetType = :targetType${index} AND report.targetId = :targetId${index})`;
+          const parameters = {
+            [`targetType${index}`]: target.targetType,
+            [`targetId${index}`]: target.targetId,
+          };
+          if (index === 0) qb.where(condition, parameters);
+          else qb.orWhere(condition, parameters);
+        });
+      }))
+      .orderBy('report.createdAt', 'DESC')
+      .getMany();
+  }
+
+  private buildGroupKey(targetType: ForumTargetType, targetId: string) {
+    return `${targetType}:${targetId}`;
+  }
+
+  private resolveGroupStatus(pendingCount: number, resolvedCount: number) {
+    if (pendingCount > 0) return ContentReportStatus.PENDING;
+    if (resolvedCount > 0) return ContentReportStatus.RESOLVED;
+    return ContentReportStatus.REJECTED;
   }
 
   private async decorateReports(reports: ContentReport[]) {

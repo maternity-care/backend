@@ -58,6 +58,10 @@ export class ForumReportsService {
     return this.forumReportsRepository.findPageWithDetails(query);
   }
 
+  findReportGroups(query: ForumReportQueryDto) {
+    return this.forumReportsRepository.findGroupedPageWithDetails(query);
+  }
+
   async resolveReport(id: string, dto: ResolveContentReportDto, actor: AuthenticatedUser) {
     const report = await this.forumReportsRepository.findById(id);
     if (!report) throw new NotFoundException('Khong tim thay report');
@@ -73,7 +77,7 @@ export class ForumReportsService {
       await this.applyReportTargetAction(report.targetType, report.targetId, dto.action, actor, dto.note ?? null);
     }
 
-    report.status = ContentReportStatus.RESOLVED;
+    report.status = this.resolveReportStatus(dto.action);
     report.handlerId = actor.id;
     report.resolvedBy = actor.id;
     report.resolvedAt = new Date();
@@ -107,6 +111,75 @@ export class ForumReportsService {
     return saved;
   }
 
+  async resolveReportGroup(
+    targetType: ForumTargetType,
+    targetId: string,
+    dto: ResolveContentReportDto,
+    actor: AuthenticatedUser,
+  ) {
+    await this.ensureReportTargetExists(targetType, targetId);
+    const reports = await this.forumReportsRepository.findReportsByTarget(targetType, targetId);
+    if (!reports.length) throw new NotFoundException('Khong tim thay report');
+
+    if (
+      [
+        ForumModerationAction.APPROVE,
+        ForumModerationAction.HIDE,
+        ForumModerationAction.REJECT,
+        ForumModerationAction.DELETE,
+      ].includes(dto.action)
+    ) {
+      await this.applyReportTargetAction(targetType, targetId, dto.action, actor, dto.note ?? null);
+    }
+
+    const now = new Date();
+    const nextStatus = this.resolveReportStatus(dto.action);
+    for (const report of reports) {
+      report.status = nextStatus;
+      report.handlerId = actor.id;
+      report.resolvedBy = actor.id;
+      report.resolvedAt = now;
+      report.resolutionAction = dto.action;
+      report.resolutionNote = dto.note ?? null;
+    }
+
+    const savedReports = await this.forumReportsRepository.saveMany(reports);
+    await Promise.all(savedReports.map(async report => {
+      await this.forumReportsRepository.createResolutionLog({
+        report,
+        action: dto.action,
+        actor,
+        actorRole: this.resolveAuthorRole(actor),
+        reason: dto.note ?? null,
+      });
+      await this.forumNotifications.notifyReportResolved(report, actor);
+    }));
+
+    this.realtimeEvents.emitForumEvent(
+      'forum:report.resolved',
+      {
+        targetType,
+        targetId,
+        action: dto.action,
+        reportCount: savedReports.length,
+      },
+      {
+        management: true,
+        public: false,
+        postRoom: false,
+      },
+    );
+
+    return {
+      targetType,
+      targetId,
+      action: dto.action,
+      status: nextStatus,
+      resolvedCount: savedReports.length,
+      reports: savedReports,
+    };
+  }
+
   private async ensureReportTargetExists(targetType: ForumTargetType, targetId: string) {
     if (!(await this.forumReportsRepository.targetExists(targetType, targetId))) {
       throw new NotFoundException('Khong tim thay noi dung can report');
@@ -126,6 +199,12 @@ export class ForumReportsService {
     }
 
     await this.forumsService.moderateComment(targetId, { action, reason }, actor);
+  }
+
+  private resolveReportStatus(action: ForumModerationAction): ContentReportStatus {
+    return action === ForumModerationAction.DISMISS
+      ? ContentReportStatus.REJECTED
+      : ContentReportStatus.RESOLVED;
   }
 
   private resolveAuthorRole(actor: AuthenticatedUser): ForumAuthorRole {

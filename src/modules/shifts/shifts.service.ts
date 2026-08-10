@@ -137,8 +137,22 @@ export class ShiftsService {
   }
 
   /** Cập nhật ca trực; nếu đổi doctorId thì resolve lại sang staffId trước khi lưu. */
-  async update(id: string, dto: UpdateDoctorShiftDto): Promise<DoctorShift> {
+  async update(id: string, dto: UpdateDoctorShiftDto, changedBy?: string | null): Promise<DoctorShift> {
     const shift = await this.findById(id);
+    if (dto.status === DoctorShiftStatus.CANCELLED && shift.status !== DoctorShiftStatus.CANCELLED) {
+      const activeAffectedAppointments = await this.repository.findAppointmentsForShift(shift, true);
+      const result = await this.repository.cancelShiftWithDisruption(
+        shift,
+        activeAffectedAppointments,
+        dto.note,
+        changedBy,
+      );
+      if (result.disruptionId) {
+        await this.appointmentDisruptions?.dispatchDisruption(result.disruptionId);
+      }
+      return result.shift;
+    }
+
     const timeWasProvided = Object.prototype.hasOwnProperty.call(dto, 'startTime')
       || Object.prototype.hasOwnProperty.call(dto, 'endTime');
     const slotWasProvided = Object.prototype.hasOwnProperty.call(dto, 'slotId');

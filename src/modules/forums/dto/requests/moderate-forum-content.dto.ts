@@ -35,6 +35,7 @@ export class ResolveContentReportDto {
       ForumModerationAction.HIDE,
       ForumModerationAction.REJECT,
       ForumModerationAction.DELETE,
+      ForumModerationAction.DISMISS,
       ForumModerationAction.WARN_USER,
       ForumModerationAction.BAN_USER,
     ],

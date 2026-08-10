@@ -355,6 +355,7 @@ export class ShiftsRepository implements IShiftsRepository {
       // Soft-cancel ca trực: không hard delete vì đã có lịch sử/appointment liên quan.
       await manager.update(DoctorShift, shift.id, {
         status: DoctorShiftStatus.CANCELLED,
+        note: reason ?? shift.note ?? null,
       });
 
       //log 2

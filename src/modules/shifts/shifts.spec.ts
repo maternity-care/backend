@@ -981,10 +981,17 @@ describe('ShiftsService business validation', () => {
   it('TC-UNIT-DSHIFT-025 skips conflict check when updating a shift to cancelled', async () => {
     const { repo, service } = createService();
 
-    await service.update('10', { status: DoctorShiftStatus.CANCELLED });
+    await service.update('10', { status: DoctorShiftStatus.CANCELLED, note: 'doctor unavailable' });
 
     expect(repo.findConflicts).not.toHaveBeenCalled();
-    expect(repo.save).toHaveBeenCalledWith(expect.objectContaining({ status: DoctorShiftStatus.CANCELLED }));
+    expect(repo.save).not.toHaveBeenCalled();
+    expect(repo.findAppointmentsForShift).toHaveBeenCalledWith(expect.objectContaining({ id: '10' }), true);
+    expect(repo.cancelShiftWithDisruption).toHaveBeenCalledWith(
+      expect.objectContaining({ id: '10' }),
+      [],
+      'doctor unavailable',
+      undefined,
+    );
   });
 
   // Vai tro: chan update ca truc sang room inactive.
