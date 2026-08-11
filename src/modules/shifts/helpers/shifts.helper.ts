@@ -286,9 +286,21 @@ export function shiftIntervalsOverlap(
   secondStart: string,
   secondEnd: string,
 ): boolean {
+  //firstDateOffset: số phút từ 1970-01-01 đến firstDate
+  //tại sao lại là 1970: vì 1970 là mốc thời gian chuẩn của Unix,
+  //  và chúng ta cần một mốc thời gian để tính toán số phút từ đó đến ngày hiện tại.
+  //  Việc sử dụng 1970-01-01 giúp đảm bảo rằng các phép tính về thời gian sẽ chính xác
+  //  và không bị ảnh hưởng bởi các yếu tố khác như múi giờ hay ngày tháng.
   const firstDateOffset = dateDiffInDays('1970-01-01', firstDate) * DAY_MINUTES;
+  
   const secondDateOffset = dateDiffInDays('1970-01-01', secondDate) * DAY_MINUTES;
+  //firstStartAbsolute: số phút từ 1970-01-01 đến firstDate + firstStart
+  //overlap là khi firstStartAbsolute < secondEndAbsolute 
+  // và firstEndAbsolute > secondStartAbsolute, 
+  // cụ thể hơn là 
+  //cái này dùng để so sánh với secondStartAbsolute và secondEndAbsolute để xem có overlap hay không
   const firstStartAbsolute = firstDateOffset + timeToMinutes(firstStart);
+
   let firstEndAbsolute = firstDateOffset + timeToMinutes(firstEnd);
   if (firstEndAbsolute <= firstStartAbsolute) firstEndAbsolute += DAY_MINUTES;
 
@@ -296,6 +308,7 @@ export function shiftIntervalsOverlap(
   let secondEndAbsolute = secondDateOffset + timeToMinutes(secondEnd);
   if (secondEndAbsolute <= secondStartAbsolute) secondEndAbsolute += DAY_MINUTES;
 
+  //
   return firstStartAbsolute < secondEndAbsolute && firstEndAbsolute > secondStartAbsolute;
 }
 

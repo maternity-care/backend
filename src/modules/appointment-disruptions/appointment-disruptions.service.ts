@@ -387,8 +387,7 @@ export class AppointmentDisruptionsService {
         LEFT JOIN roles role ON role.id = staffRole.role_id
         LEFT JOIN facilities facility ON facility.id = ?
         WHERE staff.status = 'active'
-          AND (role.name = 'super_admin'
-            OR (staff.facility_id = ? AND role.name = 'admin')
+          AND ((staff.facility_id = ? AND role.name = 'admin')
             OR staff.id = facility.owner_id)
       `,
       [disruption.facilityId, disruption.facilityId],

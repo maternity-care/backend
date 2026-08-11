@@ -33,6 +33,7 @@ import { RealtimeModule } from './modules/realtime/realtime.module';
 import { ForumsModule } from './modules/forums/forums.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { AppointmentDisruptionsModule } from './modules/appointment-disruptions/appointment-disruptions.module';
+import { ShiftRemindersModule } from './modules/shift-reminders/shift-reminders.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -82,6 +83,7 @@ import { AppointmentDisruptionsModule } from './modules/appointment-disruptions/
     AppointmentsModule,
     PaymentModule,
     AppointmentDisruptionsModule,
+    ShiftRemindersModule,
   ],
 })
 export class AppModule {}

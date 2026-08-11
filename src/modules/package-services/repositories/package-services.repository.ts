@@ -29,6 +29,8 @@ export class PackageServicesRepository implements IPackageServicesRepository {
   }
 
   async saveWithFacilities(entity: PackageItem, facilityIds: string[] = []): Promise<PackageItem> {
+    //manager: để thực hiện các thao tác với cơ sở dữ liệu trong một transaction
+
     return this.repository.manager.transaction(async (manager) => {
       const saved = await manager.save(PackageItem, entity);
       await manager.delete(PackageServiceFacility, { packageItemId: saved.id });
@@ -99,9 +101,11 @@ export class PackageServicesRepository implements IPackageServicesRepository {
     });
     return rows.map((row) => row.facilityId);
   }
-
+  
+  
   async countGeneratedBenefits(packageId: string, facilityServiceId: string): Promise<number> {
     try {
+      // Đếm số lượng benefit đã được tạo ra cho một package và facility service cụ thể
       const row = await this.repository.manager
         .createQueryBuilder()
         .select('COUNT(*)', 'count')
@@ -142,7 +146,10 @@ export class PackageServicesRepository implements IPackageServicesRepository {
     };
   }
 
+  // TRẢ LIST
   private buildListQuery(filters?: SearchPackageServiceDto): SelectQueryBuilder<PackageItem> {
+
+    // QUERY packageItem, package, packageStage, facilityService, service, serviceType
     const query = this.buildDetailsQuery()
       .orderBy('packageItem.sortOrder', 'ASC')
       .addOrderBy('packageItem.id', 'ASC');
@@ -184,6 +191,7 @@ export class PackageServicesRepository implements IPackageServicesRepository {
       .innerJoin('facility_services', 'facilityService', 'facilityService.id = packageItem.facilityServiceId')
       .innerJoin('services', 'service', 'service.id = facilityService.service_id')
       .innerJoin('service_types', 'serviceType', 'serviceType.id = service.service_type_id')
+
       .select('packageItem.id', 'id')
       .addSelect('packageItem.packageId', 'packageId')
       .addSelect('packageItem.package_stage_id', 'packageStageId')
@@ -195,16 +203,20 @@ export class PackageServicesRepository implements IPackageServicesRepository {
       .addSelect('packageItem.sortOrder', 'sortOrder')
       .addSelect('packageItem.createdAt', 'createdAt')
       .addSelect('packageItem.updatedAt', 'updatedAt')
+
       .addSelect('pkg.code', 'packageCode')
       .addSelect('pkg.name', 'packageName')
       .addSelect('pkg.price', 'packagePrice')
       .addSelect('pkg.status', 'packageStatus')
+
       .addSelect('packageStage.name', 'stageName')
       .addSelect('packageStage.stage_type', 'stageType')
+
       .addSelect('service.code', 'serviceCode')
       .addSelect('service.name', 'serviceName')
       .addSelect('service.description', 'serviceDescription')
       .addSelect('service.service_type_id', 'serviceTypeId')
+
       .addSelect('serviceType.code', 'serviceTypeCode')
       .addSelect('serviceType.name', 'serviceTypeName')
       .addSelect('serviceType.description', 'serviceTypeDescription')
@@ -218,6 +230,8 @@ export class PackageServicesRepository implements IPackageServicesRepository {
       'facilityIds');
   }
 
+
+  // TRẢ 1 OBJECT
   private mapRow(row: Record<string, unknown>): PackageServiceResponseDto {
     return {
       id: String(row.id),

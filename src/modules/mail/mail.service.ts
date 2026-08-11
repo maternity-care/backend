@@ -7,6 +7,7 @@ import {
   SendOTPEmailInput,
   SendPasswordResetEmailInput,
   SendAppointmentDisruptionEmailInput,
+  SendAppointmentDoctorChangedEmailInput,
 } from './interfaces/mail-service.interface';
 import { passwordResetTemplate } from './templates/password-reset.template';
 import { createdAccountTemplate } from './templates/created-account.template';
@@ -15,6 +16,7 @@ import { createRequestSoftDeletePregnancyProfileTemplate } from './templates/req
 import { sendOTPEmailTemplate } from './templates/send-otp-email.template';
 import { lockAccountTemplate } from './templates/lock-account.template';
 import { appointmentDisruptionTemplate } from './templates/appointment-disruption.template';
+import { appointmentDoctorChangedTemplate } from './templates/appointment-doctor-changed.template';
 
 interface MailPayload {
   to: string;
@@ -131,6 +133,16 @@ export class MailService implements IMailService {
 
   async sendAppointmentDisruptionEmail(input: SendAppointmentDisruptionEmailInput): Promise<void> {
     const template = appointmentDisruptionTemplate(input);
+    await this.sendMail({
+      to: input.to,
+      subject: template.subject,
+      text: template.text,
+      html: template.html,
+    });
+  }
+
+  async sendAppointmentDoctorChangedEmail(input: SendAppointmentDoctorChangedEmailInput): Promise<void> {
+    const template = appointmentDoctorChangedTemplate(input);
     await this.sendMail({
       to: input.to,
       subject: template.subject,
