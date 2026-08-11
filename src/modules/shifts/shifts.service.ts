@@ -1,4 +1,12 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { DoctorShiftStatus } from '../../common/constants/status.enum';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
@@ -533,6 +541,11 @@ export class ShiftsService {
       const { index, slotAssignmentIndex, assignmentIndex, shiftDate, payload } = candidateInput;
       const preparation = preparationResults[candidatePosition];
       if (preparation.status === 'rejected') {
+        if (this.isDatabaseConnectionError(preparation.reason)) {
+          throw new ServiceUnavailableException(
+            'Không thể kết nối cơ sở dữ liệu khi xem trước lịch trực. Vui lòng thử lại sau.',
+          );
+        }
         skippedItems.push({
           index,
           slotAssignmentIndex,
@@ -821,6 +834,26 @@ export class ShiftsService {
     }
 
     return error instanceof Error ? error.message : RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_CANDIDATE_FAILED;
+  }
+
+  /** Loi ket noi DB la loi he thong, khong duoc bien thanh validation error cua mot candidate. */
+  private isDatabaseConnectionError(error: unknown): boolean {
+    const connectionCodes = new Set([
+      'ETIMEDOUT',
+      'ECONNREFUSED',
+      'ECONNRESET',
+      'PROTOCOL_CONNECTION_LOST',
+      'ER_CON_COUNT_ERROR',
+    ]);
+    let current: unknown = error;
+
+    for (let depth = 0; depth < 4 && current && typeof current === 'object'; depth += 1) {
+      const details = current as { code?: unknown; message?: unknown; cause?: unknown; driverError?: unknown };
+      if (connectionCodes.has(String(details.code ?? ''))) return true;
+      if (/\b(ETIMEDOUT|ECONNREFUSED|ECONNRESET)\b/i.test(String(details.message ?? ''))) return true;
+      current = details.driverError ?? details.cause;
+    }
+    return false;
   }
 
   private buildShiftEntity(

@@ -95,7 +95,9 @@ export class ShiftsValidator {
   }
 
   /** Chuan hoa nhieu candidate va tai moi reference chung chi mot lan trong pham vi request. */
-  prepareManyForCreate(dtos: CreateDoctorShiftDto[]): Promise<PromiseSettledResult<PreparedDoctorShiftInput>[]> {
+  async prepareManyForCreate(
+    dtos: CreateDoctorShiftDto[],
+  ): Promise<PromiseSettledResult<PreparedDoctorShiftInput>[]> {
     const cache: BulkValidationCache = {
       facilities: new Map(),
       assignees: new Map(),
@@ -104,7 +106,19 @@ export class ShiftsValidator {
       slots: new Map(),
       operatingHours: new Map(),
     };
-    return Promise.allSettled(dtos.map(dto => this.prepareForCreate(dto, cache)));
+    const results: PromiseSettledResult<PreparedDoctorShiftInput>[] = [];
+
+    // Chay tuan tu de khong day hang loat truy van reference vao pool DB cung luc.
+    // Cache van dam bao moi facility/staff/room/slot chi duoc doc mot lan khi thanh cong.
+    for (const dto of dtos) {
+      try {
+        results.push({ status: 'fulfilled', value: await this.prepareForCreate(dto, cache) });
+      } catch (reason) {
+        results.push({ status: 'rejected', reason });
+      }
+    }
+
+    return results;
   }
 
   /** Validate dữ liệu cập nhật ca, gồm cả trường hợp đổi slotId hoặc đổi giờ thủ công. */
@@ -343,7 +357,11 @@ export class ShiftsValidator {
     if (!cache) return loader();
     const existing = cache.get(key);
     if (existing) return existing;
-    const pending = loader();
+    const pending = loader().catch(error => {
+      // Khong giu mot Promise bi reject trong cache; candidate sau co the thu lai loi ket noi tam thoi.
+      cache.delete(key);
+      throw error;
+    });
     cache.set(key, pending);
     return pending;
   }

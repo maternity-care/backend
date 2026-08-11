@@ -531,6 +531,27 @@ describe('ShiftsService business validation', () => {
     expect(roomsService.findById).toHaveBeenCalledTimes(1);
   });
 
+  // Vai tro: timeout DB la loi he thong, khong duoc tra preview success va danh dau candidate la skipped.
+  it('rejects the whole preview when a database connection times out', async () => {
+    const timeoutError = Object.assign(new Error('connect ETIMEDOUT'), { code: 'ETIMEDOUT' });
+    roomsService.findById.mockRejectedValueOnce(timeoutError);
+    const { service } = createService();
+
+    await expect(service.previewBulkGenerate({
+      doctorId: '1',
+      facilityId: '1',
+      roomId: '2',
+      fromDate: '2099-07-06',
+      toDate: '2099-07-12',
+      workingDays: [ShiftWorkingDay.MON, ShiftWorkingDay.WED],
+      startTime: '08:00',
+      endTime: '12:00',
+      maxAppointments: 8,
+      status: DoctorShiftStatus.AVAILABLE,
+      saveOnlyValid: true,
+    })).rejects.toMatchObject({ status: 503 });
+  });
+
   // Vai tro: production repository co the kiem tra xung dot cua ca bulk bang mot lan doc DB.
   it('uses one batch conflict lookup when repository supports it', async () => {
     const repo = {
