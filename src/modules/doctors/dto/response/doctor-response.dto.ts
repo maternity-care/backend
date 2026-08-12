@@ -18,6 +18,12 @@ export class DoctorResponseDto {
   @ApiProperty()
   specialty: string;
 
+  @ApiPropertyOptional({ nullable: true })
+  avatar?: string;
+
+  @ApiProperty()
+  workingRoomTypeId: string;
+
   @ApiProperty()
   yearsOfExperience: number;
 
