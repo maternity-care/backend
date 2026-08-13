@@ -37,7 +37,7 @@ export class CreateDoctorShiftDto {
   @IsOptional()
   @IsString()
   @Matches(POSITIVE_ID_PATTERN)
-  roomId?: string;
+  roomId?: string | null;
 
   @ApiPropertyOptional({ example: '1', nullable: true, description: 'Khung ca sang/chieu/toi. Neu co slotId thi backend lay startTime/endTime tu slot.' })
   @IsOptional()

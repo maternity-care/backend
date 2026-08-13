@@ -23,6 +23,19 @@ import { PRIMARY_ROOM_ROLE_NAMES, roleOccupiesPrimaryRoom } from '../helpers/shi
 import { Appointment } from '../../appointments/entities/appointment.entity';
 import { UpdateShiftWithAuditInput, UpdateShiftWithAuditResult } from '../interfaces/shift-update.interface';
 
+const SHIFT_BOOKED_APPOINTMENT_STATUSES = [
+  AppointmentStatus.PENDING_PAYMENT,
+  AppointmentStatus.BOOKED,
+  AppointmentStatus.CONFIRMED,
+  AppointmentStatus.RESCHEDULED,
+  AppointmentStatus.CHECKED_IN,
+  AppointmentStatus.IN_PROGRESS,
+];
+
+const SHIFT_BOOKED_APPOINTMENT_STATUS_SQL = SHIFT_BOOKED_APPOINTMENT_STATUSES
+  .map(status => `'${status}'`)
+  .join(', ');
+
 @Injectable()
 export class ShiftsRepository implements IShiftsRepository {
   // Repository này là lớp truy cập dữ liệu của module shifts.
@@ -193,18 +206,11 @@ export class ShiftsRepository implements IShiftsRepository {
       // baseQuery chứa điều kiện chung cho cả conflict theo bác sĩ và conflict theo phòng.
       // statuses giúp tùy biến trạng thái nào được tính là conflict trong từng loại query.
       const query = this.repository
-      // createQueryBuilder: tạo một truy vấn cơ sở dữ liệu để 
-      // tìm kiếm các ca làm việc của bác sĩ
-      // dựa trên các điều kiện được cung cấp trong input.
-      //doctor_shifts: là tên của bảng trong cơ sở dữ liệu mà truy vấn sẽ được thực hiện.
         .createQueryBuilder('doctor_shifts')
         // Alias 'doctor_shifts' là tên tạm trong query builder.
         // Nó không phải biến entity; đặt giống tên bảng để đọc SQL dễ hơn.
         .where('doctor_shifts.shiftDate BETWEEN :fromDate AND :toDate', { fromDate, toDate })
         .andWhere('doctor_shifts.deletedAt IS NULL')
-        // Hai dòng dưới là điều kiện kiểm tra giao nhau giữa 2 khoảng giờ.
-        // IN (:...statuses): là một điều kiện trong truy vấn SQL,
-        // được sử dụng để kiểm tra xem giá trị của một cột có nằm trong một tập hợp các giá trị hay không.
         .andWhere('doctor_shifts.status IN (:...statuses)', { statuses });
       if (input.excludeShiftId) {
         // Khi update, bỏ qua chính ca đang sửa để nó không tự conflict với nó.
@@ -728,6 +734,14 @@ export class ShiftsRepository implements IShiftsRepository {
       .addSelect('shift.startTime', 'startTime')
       .addSelect('shift.endTime', 'endTime')
       .addSelect('shift.maxAppointments', 'maxAppointments')
+      // Dem theo appointments.shift_id de biet chinh xac ca truc nay da co bao nhieu lich dang giu cho.
+      .addSelect(
+        `(SELECT COUNT(appointment.id)
+          FROM appointments appointment
+          WHERE appointment.shift_id = shift.id
+            AND appointment.status IN (${SHIFT_BOOKED_APPOINTMENT_STATUS_SQL}))`,
+        'bookedAppointments',
+      )
       .addSelect('shift.status', 'status')
       .addSelect('shift.note', 'note')
       .addSelect('shift.createdAt', 'createdAt')

@@ -26,6 +26,7 @@ import {
   getTimeRangeEndMinute,
   isShiftInPast,
   minutesToTime,
+  normalizeTime,
   resolveBulkCreateDateRange,
   shiftIntervalsOverlap,
   throwIfConflicted,
@@ -185,6 +186,9 @@ export class ShiftsService {
     }
 
     const { changeReason, doctorId: requestedDoctorId, ...shiftData } = dto;
+    const activeAppointments = await this.repository.findAppointmentsForShift(shift, true);
+    const currentDoctorId = await this.resolveDoctorIdForExistingShift(shift, shift.facilityId);
+    this.assertBookedShiftUpdateAllowed(shift, dto, activeAppointments.length, currentDoctorId);
     const targetFacilityId = dto.facilityId ?? shift.facilityId;
     const doctorId = requestedDoctorId
       ?? await this.resolveDoctorIdForExistingShift(shift, targetFacilityId);
@@ -209,7 +213,6 @@ export class ShiftsService {
     const changes = detectShiftUpdateChanges(before, after);
     if (!hasMeaningfulShiftChanges(changes)) return shift;
 
-    const activeAppointments = await this.repository.findAppointmentsForShift(before, true);
     this.validateUpdateAgainstAppointments(after, changes, activeAppointments.length);
 
     const result = await this.repository.updateWithAudit({
@@ -820,6 +823,65 @@ export class ShiftsService {
       maxAppointments: payload.maxAppointments,
       status: payload.status,
     };
+  }
+
+  /**
+   * Khi ca da co appointment, cac thay doi lam doi trai nghiem kham cua thai phu
+   * phai di qua luong cancel/disruption de tao thong bao, mail va ho so xu ly.
+   */
+  private assertBookedShiftUpdateAllowed(
+    shift: DoctorShift,
+    dto: UpdateDoctorShiftDto,
+    activeAppointmentCount: number,
+    currentDoctorId: string | null,
+  ): void {
+    if (activeAppointmentCount === 0) return;
+
+    if (dto.maxAppointments != null && dto.maxAppointments < activeAppointmentCount) {
+      throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.MAX_APPOINTMENTS_BELOW_BOOKED);
+    }
+
+    if (dto.status === DoctorShiftStatus.OFF) {
+      throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.BOOKED_SHIFT_OFF_INVALID);
+    }
+
+    if (this.hasProtectedBookedShiftChange(shift, dto, currentDoctorId)) {
+      throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.SHIFT_HAS_APPOINTMENTS_PROTECTED_UPDATE);
+    }
+  }
+
+  private hasProtectedBookedShiftChange(
+    shift: DoctorShift,
+    dto: UpdateDoctorShiftDto,
+    currentDoctorId: string | null,
+  ): boolean {
+    const maybeDto = dto as UpdateDoctorShiftDto & { startTime?: string | null; endTime?: string | null };
+    return this.changedId(maybeDto.doctorId, currentDoctorId)
+      || this.changedId(maybeDto.staffId, shift.staffId)
+      || this.changedId(maybeDto.roleId, shift.roleId)
+      || this.changedId(maybeDto.facilityId, shift.facilityId)
+      || this.changedId(maybeDto.slotId, shift.slotId)
+      || this.changedValue(maybeDto.shiftDate, shift.shiftDate)
+      || this.changedTime(maybeDto.startTime, shift.startTime)
+      || this.changedTime(maybeDto.endTime, shift.endTime);
+  }
+
+  private changedId(nextValue: string | null | undefined, currentValue: string | null | undefined): boolean {
+    if (nextValue === undefined) return false;
+    return (nextValue ?? null) !== (currentValue ?? null);
+  }
+
+  private changedValue(nextValue: string | null | undefined, currentValue: string | null | undefined): boolean {
+    if (nextValue === undefined) return false;
+    return (nextValue ?? null) !== (currentValue ?? null);
+  }
+
+  private changedTime(nextValue: string | null | undefined, currentValue: string | null | undefined): boolean {
+    if (nextValue === undefined) return false;
+    if (nextValue === null || currentValue === null || currentValue === undefined) {
+      return (nextValue ?? null) !== (currentValue ?? null);
+    }
+    return normalizeTime(nextValue) !== normalizeTime(currentValue);
   }
 
   /** Lay message ngan gon tu Nest exception hoac Error thuong de dua vao skippedItems. */

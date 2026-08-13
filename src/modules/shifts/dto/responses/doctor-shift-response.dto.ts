@@ -36,6 +36,9 @@ export class DoctorShiftResponseDto {
   @ApiPropertyOptional({ type: Number, nullable: true })
   maxAppointments: number | null;
 
+  @ApiProperty({ type: Number, example: 3 })
+  bookedAppointments: number;
+
   @ApiProperty({ enum: DoctorShiftStatus })
   status: DoctorShiftStatus;
 

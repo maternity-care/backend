@@ -18,6 +18,7 @@ import { ShiftsValidator } from './validators/shifts.validator';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { MailModule } from '../mail/mail.module';
 import { ShiftChangeNotifierService } from './shift-change-notifier.service';
+import { WeeklyShiftUpdateService } from './weekly-shift-update.service';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { ShiftChangeNotifierService } from './shift-change-notifier.service';
     ShiftSlotsService,
     ShiftsValidator,
     ShiftChangeNotifierService,
+    WeeklyShiftUpdateService,
     { provide: SHIFTS_REPOSITORY, useClass: ShiftsRepository },
   ],
   exports: [ShiftsService, ShiftSlotsService, SHIFTS_REPOSITORY],
