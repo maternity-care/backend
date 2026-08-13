@@ -523,6 +523,7 @@ export class AppointmentsService {
         schedule.status = 'upcoming',
         schedule.location = COALESCE(facility.name, facility.address, schedule.location),
         schedule.doctor = NULLIF(TRIM(CONCAT_WS(' ', doctor.title, staff.name)), ''),
+        schedule.note = NULL,
         schedule.updated_at = CURRENT_TIMESTAMP
       WHERE schedule.appointment_id = ?
         AND schedule.source = 'appointment'
