@@ -286,6 +286,10 @@ describe('ShiftsService business validation', () => {
   const createRepo = () => ({
     create: jest.fn(data => ({ ...data })),
     save: jest.fn(async data => ({ ...data, id: data.id ?? '10' })),
+    updateWithAudit: jest.fn(async input => ({
+      shift: { ...input.after },
+      changeLogId: '88',
+    })),
     remove: jest.fn().mockResolvedValue(undefined),
     findById: jest.fn().mockResolvedValue({ ...shift }),
     findByIdForRemoval: jest.fn().mockResolvedValue({ ...shift }),
@@ -299,6 +303,7 @@ describe('ShiftsService business validation', () => {
     findDoctorAppointmentsForDate: jest.fn().mockResolvedValue([]),
     findAppointmentsForShift: jest.fn().mockResolvedValue([]),
     cancelShiftWithDisruption: jest.fn().mockResolvedValue({ shift: { ...shift, status: DoctorShiftStatus.CANCELLED }, disruptionId: '77' }),
+    hasUnresolvedDisruptions: jest.fn().mockResolvedValue(false),
     isDoctorAssignedToFacility: jest.fn().mockResolvedValue(true),
     findShiftSlotById: jest.fn(async (slotId: string) => ({
       id: slotId,
@@ -422,6 +427,39 @@ describe('ShiftsService business validation', () => {
     expect(repo.findConflicts).toHaveBeenCalledWith(expect.objectContaining({ excludeShiftId: '10' }));
   });
 
+  it('updates the room of active appointments in the same audited transaction', async () => {
+    const { repo, service } = createService();
+    repo.findAppointmentsForShift.mockResolvedValueOnce([{ id: '501' }]);
+
+    await service.update('10', { roomId: '3', changeReason: 'Đổi phòng khám' } as never, '99');
+
+    expect(repo.updateWithAudit).toHaveBeenCalledWith(expect.objectContaining({
+      changedBy: '99',
+      reason: 'Đổi phòng khám',
+      affectedAppointments: [{ id: '501' }],
+      changes: expect.objectContaining({ roomChanged: true }),
+    }));
+  });
+
+  it('rejects changing the schedule when the shift already has active appointments', async () => {
+    const { repo, service } = createService();
+    repo.findAppointmentsForShift.mockResolvedValueOnce([{ id: '501' }]);
+
+    await expect(service.update('10', { slotId: '2' } as never)).rejects.toThrow(
+      'phải xử lý lịch hẹn bị ảnh hưởng',
+    );
+    expect(repo.updateWithAudit).not.toHaveBeenCalled();
+  });
+
+  it('rejects lowering capacity below the number of active appointments', async () => {
+    const { repo, service } = createService();
+    repo.findAppointmentsForShift.mockResolvedValueOnce([{ id: '501' }, { id: '502' }]);
+
+    await expect(service.update('10', { maxAppointments: 1 } as never)).rejects.toThrow(
+      'không được nhỏ hơn 2 lịch hẹn',
+    );
+  });
+
   it('rejects updating a shift after its end time', async () => {
     const { repo, service } = createService();
     repo.findById.mockResolvedValueOnce({ ...shift, shiftDate: '2000-01-01' });
@@ -469,6 +507,77 @@ describe('ShiftsService business validation', () => {
       expect.objectContaining({ shiftDate: '2099-07-06' }),
       expect.objectContaining({ shiftDate: '2099-07-08' }),
     ]));
+  });
+
+  // Vai tro: bulk validation khong duoc doc lai cung facility, room va operating hours cho tung ngay.
+  it('reuses shared references while validating a bulk request', async () => {
+    const { service } = createService();
+    await service.confirmBulkGenerate({
+      doctorId: '1',
+      facilityId: '1',
+      roomId: '2',
+      fromDate: '2099-07-06',
+      toDate: '2099-07-12',
+      workingDays: [ShiftWorkingDay.MON, ShiftWorkingDay.WED, ShiftWorkingDay.FRI],
+      startTime: '08:00',
+      endTime: '12:00',
+      maxAppointments: 8,
+      status: DoctorShiftStatus.AVAILABLE,
+      saveOnlyValid: true,
+    });
+
+    expect(facilitiesService.findById).toHaveBeenCalledTimes(1);
+    expect(facilitiesService.getOperatingHours).toHaveBeenCalledTimes(1);
+    expect(roomsService.findById).toHaveBeenCalledTimes(1);
+  });
+
+  // Vai tro: timeout DB la loi he thong, khong duoc tra preview success va danh dau candidate la skipped.
+  it('rejects the whole preview when a database connection times out', async () => {
+    const timeoutError = Object.assign(new Error('connect ETIMEDOUT'), { code: 'ETIMEDOUT' });
+    roomsService.findById.mockRejectedValueOnce(timeoutError);
+    const { service } = createService();
+
+    await expect(service.previewBulkGenerate({
+      doctorId: '1',
+      facilityId: '1',
+      roomId: '2',
+      fromDate: '2099-07-06',
+      toDate: '2099-07-12',
+      workingDays: [ShiftWorkingDay.MON, ShiftWorkingDay.WED],
+      startTime: '08:00',
+      endTime: '12:00',
+      maxAppointments: 8,
+      status: DoctorShiftStatus.AVAILABLE,
+      saveOnlyValid: true,
+    })).rejects.toMatchObject({ status: 503 });
+  });
+
+  // Vai tro: production repository co the kiem tra xung dot cua ca bulk bang mot lan doc DB.
+  it('uses one batch conflict lookup when repository supports it', async () => {
+    const repo = {
+      ...createRepo(),
+      findConflictsForBatch: jest.fn(async (inputs: Array<{ index: number }>) => new Map(
+        inputs.map(input => [input.index, { doctorConflicts: [], roomConflicts: [] }]),
+      )),
+    };
+    const { service } = createService(repo);
+
+    await service.confirmBulkGenerate({
+      doctorId: '1',
+      facilityId: '1',
+      roomId: '2',
+      fromDate: '2099-07-06',
+      toDate: '2099-07-12',
+      workingDays: [ShiftWorkingDay.MON, ShiftWorkingDay.WED],
+      startTime: '08:00',
+      endTime: '12:00',
+      maxAppointments: 8,
+      status: DoctorShiftStatus.AVAILABLE,
+      saveOnlyValid: true,
+    });
+
+    expect(repo.findConflictsForBatch).toHaveBeenCalledTimes(1);
+    expect(repo.findConflicts).not.toHaveBeenCalled();
   });
 
   it('confirms slot-first bulk-generated shifts by staff, role, slot, and working days', async () => {
@@ -1346,12 +1455,15 @@ describe('ShiftsService business validation', () => {
     });
   });
 
-  // Vai tro: dam bao lich tuan khong co ca truc tra 404 thay vi success rong.
-  it('returns not found when weekly schedule has no shifts', async () => {
+  it('returns seven empty days when a weekly schedule has no shifts', async () => {
     const { repo, service } = createService();
     repo.findWeeklyWithDetails.mockResolvedValueOnce([]);
 
-    await expect(service.getWeeklySchedule('1', '2099-07-06')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.getWeeklySchedule('1', '2099-07-06')).resolves.toMatchObject({
+      weekStart: '2099-07-06',
+      weekEnd: '2099-07-12',
+      days: expect.arrayContaining([{ date: '2099-07-06', shifts: [] }]),
+    });
   });
 
   // Vai tro: dam bao bac si khong co ca lam viec trong ngay thi availability tra 404.
@@ -1775,6 +1887,7 @@ describe('ShiftsRepository unit query behavior', () => {
       from: jest.fn().mockReturnThis(),
       innerJoin: jest.fn().mockReturnThis(),
       leftJoin: jest.fn().mockReturnThis(),
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
       insert: jest.fn().mockReturnThis(),
       into: jest.fn().mockReturnThis(),
       values: jest.fn().mockReturnThis(),
@@ -1787,6 +1900,25 @@ describe('ShiftsRepository unit query behavior', () => {
     };
     return qb;
   };
+
+  // Vai tro: saveMany phai phat mot lenh multi-row INSERT thay vi save tung shift.
+  it('inserts all shifts with one query builder execution', async () => {
+    const qb = createQueryBuilder();
+    const entities = [
+      { ...shift, id: undefined, shiftDate: '2099-07-07' },
+      { ...shift, id: undefined, shiftDate: '2099-07-08' },
+    ];
+    const typeormRepository = {
+      create: jest.fn().mockReturnValue(entities),
+      createQueryBuilder: jest.fn().mockReturnValue(qb),
+    };
+    const repository = new ShiftsRepository(typeormRepository as never);
+
+    await expect(repository.saveMany(entities as never)).resolves.toBe(entities);
+    expect(qb.insert).toHaveBeenCalledTimes(1);
+    expect(qb.values).toHaveBeenCalledWith(entities);
+    expect(qb.execute).toHaveBeenCalledTimes(1);
+  });
 
   // Vai tro: hard delete shift phai don cac bang con truoc, neu khong DB se bao foreign-key o shift_change_logs.
   it('hard deletes shift dependencies before deleting the shift row', async () => {

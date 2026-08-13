@@ -41,6 +41,8 @@ export class NotificationsService {
     return this.notificationRepository.save(notification);
   }
 
+
+  // tạo thông báo cho user nếu chưa có thông báo với reference này
   createForUserIfMissing(userId: string, input: InternalNotificationInput) {
     return this.createForRecipientIfMissing({ userId, staffId: null }, input);
   }
@@ -83,6 +85,8 @@ export class NotificationsService {
     return this.notificationRepository.softRemove(notification);
   }
 
+
+  //
   private async createForRecipientIfMissing(
     recipient: { userId: string | null; staffId: string | null },
     input: InternalNotificationInput,

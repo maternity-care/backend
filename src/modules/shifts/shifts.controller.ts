@@ -27,6 +27,7 @@ import { CreateDoctorShiftDto } from './dto/requests/create-doctor-shift.dto';
 import { DoctorAvailabilityQueryDto } from './dto/requests/doctor-availability.dto';
 import { GroupedDoctorShiftDto, SearchDoctorShiftDto, WeeklyDoctorShiftDto } from './dto/requests/search-doctor-shift.dto';
 import { UpdateDoctorShiftDto } from './dto/requests/update-doctor-shift.dto';
+import { RestoreDoctorShiftDto } from './dto/requests/restore-doctor-shift.dto';
 import {
   DoctorShiftPaginatedResponseDto,
   DoctorShiftResponseDto,
@@ -299,6 +300,22 @@ export class ShiftsController {
     const activeFacilityId = getActiveFacilityId(user);
     if (activeFacilityId) dto.facilityId = activeFacilityId;
     return { message: RESPONSE_MESSAGES.SHIFTS.UPDATED, data: await this.service.update(id, dto, user?.id ?? null) };
+  }
+
+  @Post(':id/restore')
+  // @Permissions(PermissionEnum.SHIFT_UPDATE)
+  @ApiOperation({ summary: 'Restore a cancelled future shift' })
+  async restore(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() body: RestoreDoctorShiftDto,
+  ) {
+    const existing = await this.service.findById(id);
+    assertFacilityAccess(user, existing.facilityId);
+    return {
+      message: 'Khôi phục ca trực thành công',
+      data: await this.service.restore(id, body.reason, user?.id ?? null),
+    };
   }
 
   @Delete(':id')

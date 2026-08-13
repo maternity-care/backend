@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
+import { DeepPartial, In, Repository, SelectQueryBuilder } from 'typeorm';
+import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { DoctorShift } from '../entities/shift.entity';
 import { AppointmentDisruptionItem } from '../entities/appointment-disruption-item.entity';
 import { DoctorShiftChangeLog } from '../entities/doctor-shift-change-log.entity';
@@ -8,7 +9,7 @@ import { ShiftDisruption } from '../entities/shift-disruption.entity';
 import { ShiftSlot } from '../../../database/entities/shift-slot.entity';
 import { SearchDoctorShiftDto } from '../dto/requests/search-doctor-shift.dto';
 import { ShiftAssigneeDetails, ShiftWithDetails, IShiftsRepository } from '../interfaces/shifts-repository.interface';
-import { ShiftConflictInput } from '../interfaces/shifts-conflict-input.interface';
+import { BatchShiftConflictInput, ShiftConflictInput } from '../interfaces/shifts-conflict-input.interface';
 import { ShiftConflicts } from '../interfaces/shift-conflicts.interface';
 import { DoctorAppointmentBlock } from '../interfaces/doctor-appointment-block.interface';
 import {
@@ -19,6 +20,8 @@ import {
 } from '../../../common/constants/status.enum';
 import { addDays, isOvernightRange, shiftIntervalsOverlap } from '../helpers/shifts.helper';
 import { PRIMARY_ROOM_ROLE_NAMES, roleOccupiesPrimaryRoom } from '../helpers/shift-role-policy.helper';
+import { Appointment } from '../../appointments/entities/appointment.entity';
+import { UpdateShiftWithAuditInput, UpdateShiftWithAuditResult } from '../interfaces/shift-update.interface';
 
 @Injectable()
 export class ShiftsRepository implements IShiftsRepository {
@@ -50,9 +53,57 @@ export class ShiftsRepository implements IShiftsRepository {
     return this.repository.save(shift);
   }
 
+  /**
+   * Lưu ca, đồng bộ các lịch hẹn bị ảnh hưởng và ghi audit log trong cùng transaction.
+   * Nếu một bước thất bại, toàn bộ thay đổi được rollback để dữ liệu không lệch nhau.
+   */
+  async updateWithAudit(input: UpdateShiftWithAuditInput): Promise<UpdateShiftWithAuditResult> {
+    const { before, after, changes, affectedAppointments, reason, changedBy } = input;
+
+    return this.repository.manager.transaction(async manager => {
+      const updatedShift = await manager.save(DoctorShift, after);
+      const appointmentIds = affectedAppointments.map(appointment => appointment.id);
+
+      if (appointmentIds.length > 0 && (changes.assigneeChanged || changes.roomChanged)) {
+        const appointmentPatch: { doctorId?: string; roomId?: string } = {};
+        if (changes.assigneeChanged) appointmentPatch.doctorId = after.staffId;
+        if (changes.roomChanged && after.roomId) appointmentPatch.roomId = after.roomId;
+        await manager.update(Appointment, { id: In(appointmentIds) }, appointmentPatch);
+      }
+
+      const logResult = await manager.createQueryBuilder().insert().into(DoctorShiftChangeLog).values({
+        shiftId: before.id,
+        action: this.resolveUpdateAction(changes),
+        oldStatus: before.status,
+        newStatus: after.status,
+        oldStaffId: before.staffId,
+        newStaffId: after.staffId,
+        oldRoomId: before.roomId,
+        newRoomId: after.roomId,
+        oldStartTime: before.startTime,
+        newStartTime: after.startTime,
+        oldEndTime: before.endTime,
+        newEndTime: after.endTime,
+        reason: reason ?? null,
+        changedBy: changedBy ?? null,
+      }).execute();
+
+      return {
+        shift: updatedShift,
+        changeLogId: String(logResult.identifiers[0]?.id),
+      };
+    });
+  }
+
   // Lưu nhiều ca trực cùng lúc, dùng cho bulk-create và copy-week.
-  saveMany(shifts: DeepPartial<DoctorShift>[]): Promise<DoctorShift[]> {
-    return this.repository.save(shifts);
+  async saveMany(shifts: DeepPartial<DoctorShift>[]): Promise<DoctorShift[]> {
+    if (shifts.length === 0) return [];
+    const entities = this.repository.create(shifts);
+    await this.repository.createQueryBuilder()
+      .insert()
+      .values(entities as unknown as QueryDeepPartialEntity<DoctorShift>[])
+      .execute();
+    return entities;
   }
 
   // Hard delete khỏi DB; service chỉ nên gọi khi đã chắc chắn ca chưa có appointment liên quan.
@@ -189,6 +240,56 @@ export class ShiftsRepository implements IShiftsRepository {
       doctorConflicts: this.filterOverlappingShifts(input, doctorConflicts),
       roomConflicts: this.filterOverlappingShifts(input, roomConflicts),
     };
+  }
+
+  /** Doc cac ca co kha nang xung dot mot lan, sau do doi chieu tung candidate trong bo nho. */
+  async findConflictsForBatch(inputs: BatchShiftConflictInput[]): Promise<Map<number, ShiftConflicts>> {
+    const result = new Map<number, ShiftConflicts>();
+    if (inputs.length === 0) return result;
+
+    const facilityIds = [...new Set(inputs.map(input => input.facilityId))];
+    const dates = inputs.map(input => input.shiftDate).sort();
+    const existingShifts = await this.repository
+      .createQueryBuilder('shift')
+      .leftJoinAndSelect('shift.role', 'role')
+      .where('shift.facilityId IN (:...facilityIds)', { facilityIds })
+      .andWhere('shift.shiftDate BETWEEN :fromDate AND :toDate', {
+        fromDate: addDays(dates[0], -1),
+        toDate: addDays(dates[dates.length - 1], 1),
+      })
+      .andWhere('shift.deletedAt IS NULL')
+      .andWhere('shift.status IN (:...statuses)', {
+        statuses: [DoctorShiftStatus.AVAILABLE, DoctorShiftStatus.FULL, DoctorShiftStatus.OFF],
+      })
+      .getMany();
+
+    for (const input of inputs) {
+      const overlapping = existingShifts.filter(shift =>
+        shift.facilityId === input.facilityId
+        && shift.id !== input.excludeShiftId
+        && shiftIntervalsOverlap(
+          input.shiftDate,
+          input.startTime,
+          input.endTime,
+          this.toDateOnly(shift.shiftDate),
+          shift.startTime,
+          shift.endTime,
+        ),
+      );
+      const doctorConflicts = overlapping.filter(shift =>
+        shift.staffId === (input.staffId ?? input.doctorId),
+      );
+      const roomConflicts = input.roomId && roleOccupiesPrimaryRoom(input.roleName)
+        ? overlapping.filter(shift =>
+          shift.roomId === input.roomId
+          && shift.status !== DoctorShiftStatus.OFF
+          && (shift.roleId === null || roleOccupiesPrimaryRoom(shift.role?.name)),
+        )
+        : [];
+      result.set(input.index, { doctorConflicts, roomConflicts });
+    }
+
+    return result;
   }
 
   findWeekly(
@@ -422,6 +523,22 @@ export class ShiftsRepository implements IShiftsRepository {
     });
   }
 
+  async hasUnresolvedDisruptions(shiftId: string): Promise<boolean> {
+    const row = await this.repository.manager.createQueryBuilder()
+      .select('COUNT(*)', 'count')
+      .from(AppointmentDisruptionItem, 'item')
+      .innerJoin(ShiftDisruption, 'disruption', 'disruption.id = item.disruption_id')
+      .where('(disruption.shift_id = :shiftId OR disruption.doctor_shift_id = :shiftId)', { shiftId })
+      .andWhere('item.resolution_status IN (:...statuses)', {
+        statuses: [
+          AppointmentDisruptionResolutionStatus.PENDING,
+          AppointmentDisruptionResolutionStatus.REFUND_PENDING,
+        ],
+      })
+      .getRawOne<{ count: string }>();
+    return Number(row?.count ?? 0) > 0;
+  }
+
   // return true nếu bác sĩ được chỉ định cho cơ sở y tế, ngược lại return false.
   async isDoctorAssignedToFacility(doctorId: string, facilityId: string): Promise<boolean> {
     // Bác sĩ không nối trực tiếp với facility.
@@ -547,6 +664,18 @@ export class ShiftsRepository implements IShiftsRepository {
     if (filters?.dateFrom) query.andWhere('shift.shiftDate >= :dateFrom', { dateFrom: filters.dateFrom });
     if (filters?.dateTo) query.andWhere('shift.shiftDate <= :dateTo', { dateTo: filters.dateTo });
     return query;
+  }
+
+  private resolveUpdateAction(input: UpdateShiftWithAuditInput['changes']): string {
+    const actions: string[] = [];
+    if (input.assigneeChanged) actions.push('assignee_changed');
+    if (input.roomChanged) actions.push('room_changed');
+    if (input.scheduleChanged) actions.push('schedule_changed');
+    if (input.roleChanged) actions.push('role_changed');
+    if (input.capacityChanged) actions.push('capacity_changed');
+    if (input.statusChanged) actions.push('status_changed');
+    if (input.noteChanged) actions.push('note_changed');
+    return actions.join(',') || 'updated';
   }
 
   private filterOverlappingShifts(input: ShiftConflictInput, shifts: DoctorShift[]): DoctorShift[] {

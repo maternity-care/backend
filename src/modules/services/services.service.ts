@@ -39,6 +39,7 @@ export class ServicesService {
   ) {}
 
   async create(dto: CreateServiceDto): Promise<Service> {
+    // 
     await this.ensureUniqueName(dto.name);
     await this.serviceTypesService.findActiveById(dto.serviceTypeId);
     const code = await this.generateCode(dto.name);
@@ -154,6 +155,7 @@ export class ServicesService {
     return buildNextCodeFromExisting(prefix, existingCodes);
   }
 
+  // tránh trùng tên dịch vụ
   private async ensureUniqueName(name: string): Promise<void> {
     if (await this.repository.findByName(name)) {
       throw new ConflictException(SERVICE_CONSTANT.NAME_EXISTS);

@@ -661,6 +661,8 @@ export class ForumsService {
     };
   }
 
+  // lấy số lượng comment và report cho mỗi bài viết,
+  // trả về mảng bài viết với các trường commentCount, reportCount, interactionCount
   private async decoratePostsWithMetrics(posts: ForumPost[]) {
     if (posts.length === 0) return [];
     const postIds = posts.map(post => post.id);
