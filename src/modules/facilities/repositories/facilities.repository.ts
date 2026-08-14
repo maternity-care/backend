@@ -22,15 +22,13 @@ import { ShiftDisruption } from '../../shifts/entities/shift-disruption.entity';
 import { ShiftSlot } from '../../../database/entities/shift-slot.entity';
 import {
   FacilityAdminOption,
-  FacilityLookup,
   FacilityWithDetails,
   IFacilitiesRepository,
 } from '../interfaces/facility-repository.interface';
 
 import { SearchFacilityAdminOptionsDto } from '../dto/requests/search-facility-admin-options.dto';
-import { LookupFacilityDto, SearchFacilityDto } from '../dto/requests/search-facility.dto';
+import { SearchFacilityDto } from '../dto/requests/search-facility.dto';
 import { PaginationResult } from '../../../common/helpers/pagination';
-import { RESPONSE_MESSAGES } from '../../../common/constants/response-message.constant';
 import { addDays, dateTimeToTime, shiftIntervalsOverlap } from '../../shifts/helpers/shifts.helper';
 
 interface AffectedAppointmentBlock {
@@ -222,25 +220,6 @@ export class FacilitiesRepository implements IFacilitiesRepository {
     };
   }
 
-  lookup(filters?: LookupFacilityDto): Promise<FacilityLookup[]> {
-    const query = this.buildDetailsQuery({
-      search: filters?.search,
-      status: filters?.status,
-    })
-      .select('facility.id', 'id')
-      .addSelect('facility.name', 'name')
-      .addSelect('facility.code', 'code')
-      .addSelect('facility.address', 'address')
-      .addSelect('facility.province', 'province')
-      .addSelect('facility.ward', 'ward')
-      .addSelect('facility.status', 'status')
-      .addSelect('owner.name', 'ownerName')
-      .orderBy('facility.name', 'ASC')
-      .limit(Math.max(1, Number(filters?.limit) || 20));
-
-    return query.getRawMany<FacilityLookup>();
-  }
-
   async remove(facility: Facility): Promise<void> {
     await this.repository.manager.transaction(async manager => {
       await manager.delete(FacilityOperatingHour, { facilityId: facility.id });
@@ -270,15 +249,6 @@ export class FacilitiesRepository implements IFacilitiesRepository {
     facility.deletedAt = new Date();
     facility.deletedBy = deletedBy ?? null;
     facility.deleteReason = reason ?? null;
-    return this.repository.save(facility);
-  }
-
-  async updateStatus(id: string, status: FacilityStatus): Promise<Facility> {
-    const facility = await this.findById(id);
-    if (!facility) {
-      throw new Error(RESPONSE_MESSAGES.FACILITIES.NOT_FOUND);
-    }
-    facility.status = status;
     return this.repository.save(facility);
   }
 

@@ -1,14 +1,12 @@
 import { DeepPartial } from 'typeorm';
 import { Facility } from '../entities/facility.entity';
-import { FacilityStatus } from '../../../common/constants/status.enum';
-import { LookupFacilityDto, SearchFacilityDto } from '../dto/requests/search-facility.dto';
+import { SearchFacilityDto } from '../dto/requests/search-facility.dto';
 import { SearchFacilityAdminOptionsDto } from '../dto/requests/search-facility-admin-options.dto';
 import {PaginationResult} from '../../../common/helpers/pagination';
-import { FacilityLookupResponseDto, FacilityResponseDto } from '../dto/responds/facilities-respond';
+import { FacilityResponseDto } from '../dto/responds/facilities-respond';
 export const FACILITIES_REPOSITORY = Symbol('FACILITIES_REPOSITORY');
 
 export type FacilityWithDetails = FacilityResponseDto;
-export type FacilityLookup = FacilityLookupResponseDto;
 
 export interface FacilityAdminOption {
   id: string;
@@ -76,9 +74,7 @@ export interface IFacilitiesRepository {
   
   existsActiveOwner(ownerId: string): Promise<boolean>;
   
-  lookup(filters?: LookupFacilityDto): Promise<FacilityLookup[]>;
   remove(facility: Facility): Promise<void>;
   countDependencies(facilityId: string): Promise<number>;
   softDelete(facility: Facility, reason?: string, deletedBy?: string | null): Promise<Facility>;
-  updateStatus(id: string, status: FacilityStatus): Promise<Facility>;
 }

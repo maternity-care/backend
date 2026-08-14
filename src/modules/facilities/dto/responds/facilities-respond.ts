@@ -128,32 +128,6 @@ export class FacilityResponseDto {
   operatingHourGroups?: FacilityOperatingHourGroupResponseDto[];
 }
 
-export class FacilityLookupResponseDto {
-  @ApiProperty()
-  id: string;
-
-  @ApiProperty()
-  name: string;
-
-  @ApiProperty()
-  code: string;
-
-  @ApiProperty()
-  address: string;
-
-  @ApiPropertyOptional({ nullable: true })
-  province: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  ward: string | null;
-
-  @ApiProperty({ enum: FacilityStatus })
-  status: FacilityStatus;
-
-  @ApiPropertyOptional()
-  ownerName?: string;
-}
-
 export class FacilityPaginatedResponseDto extends PaginationMetaResponseDto {
   @ApiProperty({ type: [FacilityResponseDto] })
   items: FacilityResponseDto[];

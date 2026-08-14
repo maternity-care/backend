@@ -62,15 +62,6 @@ export class FacilityOperatingHoursService {
     };
   }
 
-  async updateOperatingHours(id: string, dto: UpdateFacilityOperatingHoursDto) {
-    await this.ensureFacilityExists(id);
-    const operatingHours = this.buildOperatingHoursFromGroupedInput(dto);
-
-    await this.ensureOperatingHoursCompatibleWithUpcomingShifts(id, operatingHours);
-    await this.operatingHoursRepository.syncOperatingHours(id, operatingHours as PersistableOperatingHours);
-    return this.getOperatingHours(id);
-  }
-
   async applyOperatingHours(id: string, dto: ApplyFacilityOperatingHoursDto) {
     await this.ensureFacilityExists(id);
     const operatingHours = this.buildOperatingHoursFromGroupedInput(dto);
