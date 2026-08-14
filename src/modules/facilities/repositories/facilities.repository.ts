@@ -125,6 +125,7 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       .getOne();
   }
 
+  //kiếm tra xem ownerId có phải là admin đang active hay không
   async existsActiveOwner(ownerId: string): Promise<boolean> {
     const count = await this.repository.manager
       .createQueryBuilder()
@@ -140,6 +141,7 @@ export class FacilitiesRepository implements IFacilitiesRepository {
     return Number(count?.count ?? 0) > 0;
   }
 
+  // tìm các tùy chọn admin cho facility
   async findAdminOptions(filters?: SearchFacilityAdminOptionsDto): Promise<PaginationResult<FacilityAdminOption>> {
     const page = Math.max(1, Number(filters?.page) || 1);
     const limit = Math.max(1, Number(filters?.limit) || 20);
@@ -165,6 +167,7 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       .addSelect('homeFacility.code', 'homeFacilityCode')
       .addSelect('role.id', 'roleId')
       .addSelect('role.name', 'roleName')
+      // subquery to count the number of facilities owned by the staff member
       .addSelect((subQuery) => (
         subQuery
           .select('COUNT(1)')
@@ -185,7 +188,7 @@ export class FacilitiesRepository implements IFacilitiesRepository {
         { search: `%${filters.search}%` },
       );
     }
-
+    
     if (filters?.availableOnly === 'true') {
       query.andWhere(`
         NOT EXISTS (
@@ -344,7 +347,6 @@ export class FacilitiesRepository implements IFacilitiesRepository {
     if (filters?.status) {
       query.andWhere('facility.status = :status', { status: filters.status });
     }
-
     return query;
   }
 

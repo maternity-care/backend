@@ -7,7 +7,6 @@ import { AppointmentDisruptionItem } from '../shifts/entities/appointment-disrup
 import { ShiftDisruption } from '../shifts/entities/shift-disruption.entity';
 import { AppointmentDisruptionsController } from './appointment-disruptions.controller';
 import { AppointmentDisruptionsService } from './appointment-disruptions.service';
-import { ManagementAppointmentDisruptionsController } from './management-appointment-disruptions.controller';
 
 @Module({
   imports: [
@@ -16,7 +15,7 @@ import { ManagementAppointmentDisruptionsController } from './management-appoint
     NotificationsModule,
     MailModule,
   ],
-  controllers: [AppointmentDisruptionsController, ManagementAppointmentDisruptionsController],
+  controllers: [AppointmentDisruptionsController],
   providers: [AppointmentDisruptionsService],
   exports: [AppointmentDisruptionsService],
 })
