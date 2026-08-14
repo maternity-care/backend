@@ -26,6 +26,7 @@ const createFacility = (overrides: Partial<Facility> = {}): Facility => ({
   address: '123 Nguyen Trai',
   province: 'Ho Chi Minh',
   ward: 'Ben Nghe',
+  floorCount: 1,
   latitude: '10.7756000',
   longitude: '106.6871000',
   status: FacilityStatus.ACTIVE,
@@ -63,6 +64,7 @@ describe('FacilitiesService', () => {
     findByName: jest.fn(),
     findByEmail: jest.fn(),
     findByPhone: jest.fn(),
+    findHighestRoomFloor: jest.fn(),
     existsActiveOwner: jest.fn(),
     findAdminOptions: jest.fn(),
     remove: jest.fn(),
@@ -88,6 +90,7 @@ describe('FacilitiesService', () => {
     repository.findByName.mockResolvedValue(null);
     repository.findByEmail.mockResolvedValue(null);
     repository.findByPhone.mockResolvedValue(null);
+    repository.findHighestRoomFloor.mockResolvedValue(0);
     repository.syncOperatingHours.mockResolvedValue(undefined);
     repository.applyOperatingHours.mockResolvedValue(0);
     repository.findOperatingHoursByFacilityId.mockResolvedValue([]);
@@ -594,6 +597,16 @@ describe('FacilitiesService', () => {
 
     expect(repository.findByCode).not.toHaveBeenCalled();
     expect(repository.save).toHaveBeenCalledWith(facility);
+  });
+
+  it('rejects reducing floor count below an existing room floor', async () => {
+    repository.findById.mockResolvedValue(createFacility({ floorCount: 5 }));
+    repository.findHighestRoomFloor.mockResolvedValue(4);
+
+    await expect(service.update('fac-1', { floorCount: 3 }))
+      .rejects.toBeInstanceOf(BadRequestException);
+
+    expect(repository.save).not.toHaveBeenCalled();
   });
 
   // Vai tro: code la field readonly, neu client co gui len update thi service cung bo qua.

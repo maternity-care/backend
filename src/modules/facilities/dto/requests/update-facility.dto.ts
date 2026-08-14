@@ -1,14 +1,17 @@
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEmail,
   IsLatitude,
   IsLongitude,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
+  Min,
   MinLength,
   ValidateIf,
 } from 'class-validator';
@@ -70,6 +73,14 @@ export class UpdateFacilityDto {
   @IsString()
   @MaxLength(255)
   ward?: string | null;
+
+  @ApiPropertyOptional({ example: 3, nullable: true, minimum: 1, maximum: 200 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  floorCount?: number | null;
 
   @ApiPropertyOptional()
   @ValidateIf((dto: UpdateFacilityDto) => dto.latitude !== undefined || dto.longitude !== undefined)

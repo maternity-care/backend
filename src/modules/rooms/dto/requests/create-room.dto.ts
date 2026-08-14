@@ -39,11 +39,11 @@ export class CreateRoomDto {
   @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.ROOMS.ROOM_TYPE_ID_INVALID })
   roomTypeId: string;
 
-  @ApiProperty({ example: 'Tang 2' })
+  @ApiProperty({ example: '2', description: 'So tang, tu 1 den floorCount cua co so' })
   @Transform(({ value }) => trimText(value))
   @IsString()
   @IsNotEmpty()
-  @MaxLength(255)
+  @Matches(POSITIVE_ID_PATTERN, { message: 'floor must be a positive integer string' })
   floor: string;
 
   @ApiProperty({ enum: ActiveStatus })

@@ -9,11 +9,14 @@ import {
   IsIn,
   IsLatitude,
   IsLongitude,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
   MaxLength,
+  Max,
+  Min,
   MinLength,
   ValidateNested,
 } from 'class-validator';
@@ -87,6 +90,14 @@ export class CreateFacilityDto {
   @IsString()
   @MaxLength(255)
   ward?: string | null;
+
+  @ApiPropertyOptional({ example: 3, nullable: true, default: 1, minimum: 1, maximum: 200 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  floorCount?: number | null;
 
   @ApiProperty({ example: '21.0285' })
   @Transform(({ value }) => trimValue(value))

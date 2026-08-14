@@ -69,6 +69,7 @@ export interface IFacilitiesRepository {
   findByName(name: string): Promise<Facility | null>;
   findByEmail(email: string): Promise<Facility | null>;
   findByPhone(phone: string): Promise<Facility | null>;
+  findHighestRoomFloor(facilityId: string): Promise<number>;
 
   findAdminOptions(filters?: SearchFacilityAdminOptionsDto): Promise<PaginationResult<FacilityAdminOption>>;
   

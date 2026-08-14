@@ -123,6 +123,19 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       .getOne();
   }
 
+  async findHighestRoomFloor(facilityId: string): Promise<number> {
+    const row = await this.repository.manager
+      .createQueryBuilder()
+      .select('MAX(CAST(room.floor AS UNSIGNED))', 'highestFloor')
+      .from('rooms', 'room')
+      .where('room.facility_id = :facilityId', { facilityId })
+      .andWhere('room.deleted_at IS NULL')
+      .andWhere("room.floor REGEXP '^[1-9][0-9]*$'")
+      .getRawOne<{ highestFloor: string | null }>();
+
+    return Number(row?.highestFloor ?? 0);
+  }
+
   //kiếm tra xem ownerId có phải là admin đang active hay không
   async existsActiveOwner(ownerId: string): Promise<boolean> {
     const count = await this.repository.manager
@@ -274,6 +287,7 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       .addSelect('facility.address', 'address')
       .addSelect('facility.province', 'province')
       .addSelect('facility.ward', 'ward')
+      .addSelect('facility.floorCount', 'floorCount')
       .addSelect('facility.latitude', 'latitude')
       .addSelect('facility.longitude', 'longitude')
       .addSelect('facility.status', 'status')

@@ -83,6 +83,16 @@ export class FacilitiesService {
       await this.ensureOwnerCanManageFacility(updatableDto.ownerId);
     }
 
+    if (updatableDto.floorCount !== undefined) {
+      const nextFloorCount = updatableDto.floorCount ?? 1;
+      const highestRoomFloor = await this.facilitiesRepository.findHighestRoomFloor(facility.id);
+      if (nextFloorCount < highestRoomFloor) {
+        throw new BadRequestException(
+          `So tang khong the nho hon tang ${highestRoomFloor} dang co phong`,
+        );
+      }
+    }
+
     await this.ensureUniqueFacilityIdentity(updatableDto, facility.id);
 
     Object.assign(facility, updatableDto);
@@ -115,7 +125,7 @@ export class FacilitiesService {
   ): Promise<{ facility: FacilityWithDetails; impact: FacilitySuspendImpact }> {
     const facility = await this.findById(id);
     const now = new Date();
-    const inactiveUntil = this.parseInactiveUntil(dto.inactiveUntil, 'inactiveUntil phai lon hon thoi diem hien tai');
+    const inactiveUntil = this.parseInactiveUntil(dto.inactiveUntil, 'thời gian đình chỉ không thể ở quá khứ.');
     const impact = await this.facilityImpactRepository.countSuspendImpact(facility.id, now, inactiveUntil);
 
     facility.status = FacilityStatus.INACTIVE;

@@ -73,6 +73,9 @@ export class FacilityResponseDto {
   @ApiPropertyOptional({ nullable: true })
   ward: string | null;
 
+  @ApiPropertyOptional({ type: Number, nullable: true, default: 1 })
+  floorCount: number | null;
+
   @ApiProperty()
   latitude: string;
 

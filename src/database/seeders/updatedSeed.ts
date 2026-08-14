@@ -1068,6 +1068,7 @@ async function insertFacility() {
       ...baseFacilities[i],
       code: await generateFacilityCode(baseFacilities[i].province),
       ownerId: admins[baseFacilities.indexOf(baseFacilities[i]) % admins.length].id,
+      floorCount: (i % 2) + 4,
       status: ActiveStatus.ACTIVE,
       createdAt: new Date(new Date().getTime() - 180 * 7 * 24 * 60 * 60 * 1000),
       updatedAt: new Date(new Date().getTime() - 180 * 7 * 24 * 60 * 60 * 1000),
@@ -1291,14 +1292,14 @@ async function insertRooms() {
   };
 
   for (let index = 0; index < facilities.length; index++) {
-    const floorCount = (index % 2) + 4;
+    const floorCount = facilities[index].floorCount ?? 1;
     for (let floor = 1; floor <= floorCount; floor++) {
       const roomCount = Math.floor(Math.random() * 5) + 5;
       for (let room = 1; room <= roomCount; room++) {
         const roomType = roomTypes[Math.floor(Math.random() * roomTypes.length)];
         const newRoom = {
           facilityId: facilities[index].id,
-          floor: `Tầng ${floor}`,
+          floor: String(floor),
           roomTypeId: roomType.id,
           code: await generateRoomCode(facilities[index]),
           name: `Phòng ${floor}${String(room).padStart(2, '0')}`,

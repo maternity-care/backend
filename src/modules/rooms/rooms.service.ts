@@ -229,6 +229,11 @@ export class RoomsService {
       await this.ensureRoomNameUnique(room.facilityId, dto.name, room.id);
     }
 
+    if (dto.floor) {
+      const facility = await this.facilitiesService.findById(room.facilityId);
+      this.ensureFloorWithinFacility(dto.floor, facility);
+    }
+
     Object.assign(room, dto);
     const saved = await this.roomsRepository.save(room);
     return this.findDetailsById(saved.id);
@@ -468,12 +473,24 @@ export class RoomsService {
     if (facility.status !== FacilityStatus.ACTIVE) {
       throw new ConflictException(RESPONSE_MESSAGES.ROOMS.FACILITY_INACTIVE);
     }
+    this.ensureFloorWithinFacility(dto.floor, facility);
 
     const [roomType] = await Promise.all([
       this.validateRoomType(dto.roomTypeId),
       this.ensureRoomNameUnique(dto.facilityId, dto.name),
     ]);
     return { facility, roomType };
+  }
+
+  private ensureFloorWithinFacility(floor: string, facility: Facility): void {
+    const floorNumber = Number(floor);
+    const floorCount = facility.floorCount ?? 1;
+
+    if (!Number.isInteger(floorNumber) || floorNumber < 1 || floorNumber > floorCount) {
+      throw new BadRequestException(
+        `Tang phai la so nguyen tu 1 den ${floorCount} cua co so nay`,
+      );
+    }
   }
 
   private async validateRoomType(roomTypeId: string): Promise<RoomType> {

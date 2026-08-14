@@ -71,6 +71,7 @@ import { AssignDoctorPregnancyCreatePermission1786500000000 } from './migrations
 import { AddForumNotifications1786600000000 } from './migrations/1786600000000-AddForumNotifications';
 import { AddApplicableDaysToShiftSlots1786700000000 } from './migrations/1786700000000-AddApplicableDaysToShiftSlots';
 import { DropFacilityClosureDays1786800000000 } from './migrations/1786800000000-DropFacilityClosureDays';
+import { AddFacilityFloorCount1786900000000 } from './migrations/1786900000000-AddFacilityFloorCount';
 
 config();
 
@@ -157,6 +158,7 @@ export const typeOrmConfig: DataSourceOptions = {
     AddForumNotifications1786600000000,
     AddApplicableDaysToShiftSlots1786700000000,
     DropFacilityClosureDays1786800000000,
+    AddFacilityFloorCount1786900000000,
   ],
   charset: 'utf8mb4_unicode_ci',
 };
