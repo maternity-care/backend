@@ -994,6 +994,10 @@ export class ShiftsService {
     );
   }
 
+
+  /// Nhóm các ca trực theo pattern giống nhau 
+  // (cùng bác sĩ, cùng phòng, cùng slot, cùng khung giờ, cùng vai trò, cùng maxAppointments, cùng status)
+  //  để FE render lịch tuần dễ hơn.
   private groupShiftsByPattern(shifts: ShiftWithDetails[]) {
     const sortedShifts = [...shifts].sort((left, right) => {
       const dateCompare = String(left.shiftDate).localeCompare(String(right.shiftDate));
@@ -1024,6 +1028,7 @@ export class ShiftsService {
     });
   }
 
+  
   private buildShiftGroupKey(shift: ShiftWithDetails): string {
     return JSON.stringify({
       facilityId: shift.facilityId,

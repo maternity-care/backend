@@ -64,13 +64,18 @@ export interface IFacilitiesRepository {
   findAllPaginated(filters?: SearchFacilityDto): Promise<PaginationResult<FacilityWithDetails>>;
   findById(id: string): Promise<Facility | null>;
   findDetailsById(id: string): Promise<FacilityWithDetails | null>;
+
   findByCode(code: string): Promise<Facility | null>;
   findCodesByPrefix(prefix: string): Promise<string[]>;
+
   findByName(name: string): Promise<Facility | null>;
   findByEmail(email: string): Promise<Facility | null>;
   findByPhone(phone: string): Promise<Facility | null>;
+
   findAdminOptions(filters?: SearchFacilityAdminOptionsDto): Promise<PaginationResult<FacilityAdminOption>>;
+  
   existsActiveOwner(ownerId: string): Promise<boolean>;
+  
   lookup(filters?: LookupFacilityDto): Promise<FacilityLookup[]>;
   remove(facility: Facility): Promise<void>;
   countDependencies(facilityId: string): Promise<number>;
