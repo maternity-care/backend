@@ -14,7 +14,7 @@ export class ShiftRemindersScheduler implements OnModuleInit {
       {},
       {
         jobId: 'weekly-next-shift-reminder',
-        repeat: { pattern: '0 8 * * 5', tz: 'Asia/Ho_Chi_Minh' },
+        repeat: { pattern: '01 22 * * 5,6,0', tz: 'Asia/Ho_Chi_Minh' },
         removeOnComplete: 20,
         removeOnFail: 100,
       },

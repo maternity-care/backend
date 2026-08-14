@@ -1,6 +1,6 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsEnum, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsEnum, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 import { DoctorShiftStatus } from '../../../../common/constants/status.enum';
 import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
 
@@ -104,4 +104,12 @@ export class GroupedDoctorShiftDto {
   @IsOptional()
   @IsEnum(DoctorShiftStatus)
   status?: DoctorShiftStatus;
+
+  @ApiPropertyOptional({
+    description: 'Lọc nhân sự không hoạt động và để trống phòng không còn hợp lệ khi nạp lịch mẫu.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === undefined ? undefined : value === true || value === 'true')
+  @IsBoolean()
+  forTemplate?: boolean;
 }

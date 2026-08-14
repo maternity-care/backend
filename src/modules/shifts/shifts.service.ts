@@ -33,6 +33,7 @@ import {
   timeToMinutes,
   timesOverlap,
   validateBulkCreateRangeLength,
+  validateBulkCreateWeek,
   validateDateRange,
   validateShiftId,
 } from './helpers/shifts.helper';
@@ -343,7 +344,7 @@ export class ShiftsService {
       sourceEnd,
       dto.doctorId,
     );
-    const copyableShifts = sourceShifts.filter(shift => shift.status !== DoctorShiftStatus.CANCELLED);
+    const copyableShifts = sourceShifts;
     if (copyableShifts.length === 0) return [];
 
     const payloads = copyableShifts.map(sourceShift => ({
@@ -356,7 +357,7 @@ export class ShiftsService {
         startTime: sourceShift.slotId ? undefined : sourceShift.startTime,
         endTime: sourceShift.slotId ? undefined : sourceShift.endTime,
         maxAppointments: sourceShift.maxAppointments,
-        status: sourceShift.status === DoctorShiftStatus.FULL
+        status: [DoctorShiftStatus.FULL, DoctorShiftStatus.CANCELLED].includes(sourceShift.status)
           ? DoctorShiftStatus.AVAILABLE
           : sourceShift.status,
         note: sourceShift.note ?? undefined,
@@ -460,14 +461,20 @@ export class ShiftsService {
 
   async getGroupedSchedule(query: GroupedDoctorShiftDto) {
     validateDateRange(query.dateFrom, query.dateTo);
-    const shifts = await this.repository.findAll({
-      facilityId: query.facilityId,
-      doctorId: query.doctorId,
-      roomId: query.roomId,
-      status: query.status,
-      dateFrom: query.dateFrom,
-      dateTo: query.dateTo,
-    });
+    const shifts = query.forTemplate
+      ? await this.repository.findTemplateWeekWithDetails(
+          query.facilityId as string,
+          query.dateFrom,
+          query.dateTo,
+        )
+      : await this.repository.findAll({
+        facilityId: query.facilityId,
+        doctorId: query.doctorId,
+        roomId: query.roomId,
+        status: query.status,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
+      });
     const groups = this.groupShiftsByPattern(shifts);
 
     return {
@@ -519,6 +526,7 @@ export class ShiftsService {
     const range = resolveBulkCreateDateRange(dto);
     validateDateRange(range.fromDate, range.toDate);
     validateBulkCreateRangeLength(range.fromDate, range.toDate);
+    validateBulkCreateWeek(range.fromDate, range.toDate);
 
     if (dateDiffInDays(range.fromDate, range.toDate) > 92) {
       throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_RANGE_TOO_LONG);

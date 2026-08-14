@@ -50,6 +50,14 @@ export interface SendAppointmentDoctorChangedEmailInput {
   actionUrl: string;
 }
 
+export interface SendMissingNextWeekScheduleEmailInput {
+  to: string;
+  name: string;
+  facilityName: string;
+  weekStart: string;
+  weekEnd: string;
+}
+
 export interface IMailService {
   sendPasswordResetEmail(input: SendPasswordResetEmailInput): Promise<void>;
   sendCreatedAccountEmail(input: CreatedAccountInterface): Promise<void>;
@@ -58,4 +66,5 @@ export interface IMailService {
   sendLockAccountEmail(input: { to: string; name: string; reason: string }): Promise<void>;
   sendAppointmentDisruptionEmail(input: SendAppointmentDisruptionEmailInput): Promise<void>;
   sendAppointmentDoctorChangedEmail(input: SendAppointmentDoctorChangedEmailInput): Promise<void>;
+  sendMissingNextWeekScheduleEmail(input: SendMissingNextWeekScheduleEmailInput): Promise<void>;
 }
