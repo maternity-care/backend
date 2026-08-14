@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { CreateFacilityDto } from './dto/requests/create-facility.dto';
 import { SearchFacilityAdminOptionsDto } from './dto/requests/search-facility-admin-options.dto';
-import { LookupFacilityDto, SearchFacilityDto } from './dto/requests/search-facility.dto';
+import { SearchFacilityDto } from './dto/requests/search-facility.dto';
 import { UpdateFacilityDto } from './dto/requests/update-facility.dto';
 import { UpdateFacilityOperatingHoursDto } from './dto/requests/update-facility-operating-hours.dto';
 import { ApplyFacilityOperatingHoursDto } from './dto/requests/apply-facility-operating-hours.dto';
@@ -10,7 +10,6 @@ import { Facility } from './entities/facility.entity';
 import {
   FACILITIES_REPOSITORY,
   FacilitySuspendImpact,
-  FacilityLookup,
   FacilityWithDetails,
   IFacilitiesRepository,
 } from './interfaces/facility-repository.interface';
@@ -75,14 +74,6 @@ export class FacilitiesService {
     return this.facilityOperatingHoursService.attachFacilitySchedule(facility);
   }
 
-  findByCode(code: string): Promise<Facility | null> {
-    return this.facilitiesRepository.findByCode(code);
-  }
-
-  async findByName(name: string): Promise<Facility | null> {
-    return this.facilitiesRepository.findByName(name);
-  }
-
   async update(id: string, dto: UpdateFacilityDto): Promise<FacilityWithDetails> {
     this.ensureStatusIsNotUpdated(dto);
     const facility = await this.findById(id);
@@ -92,15 +83,21 @@ export class FacilitiesService {
       await this.ensureOwnerCanManageFacility(updatableDto.ownerId);
     }
 
+    if (updatableDto.floorCount !== undefined) {
+      const nextFloorCount = updatableDto.floorCount ?? 1;
+      const highestRoomFloor = await this.facilitiesRepository.findHighestRoomFloor(facility.id);
+      if (nextFloorCount < highestRoomFloor) {
+        throw new BadRequestException(
+          `So tang khong the nho hon tang ${highestRoomFloor} dang co phong`,
+        );
+      }
+    }
+
     await this.ensureUniqueFacilityIdentity(updatableDto, facility.id);
 
     Object.assign(facility, updatableDto);
     const saved = await this.facilitiesRepository.save(facility);
     return this.findDetailsById(saved.id);
-  }
-
-  async lookup(query?: LookupFacilityDto): Promise<FacilityLookup[]> {
-    return this.facilitiesRepository.lookup(query);
   }
 
   async findAdminOptions(query?: SearchFacilityAdminOptionsDto) {
@@ -128,7 +125,7 @@ export class FacilitiesService {
   ): Promise<{ facility: FacilityWithDetails; impact: FacilitySuspendImpact }> {
     const facility = await this.findById(id);
     const now = new Date();
-    const inactiveUntil = this.parseInactiveUntil(dto.inactiveUntil, 'inactiveUntil phai lon hon thoi diem hien tai');
+    const inactiveUntil = this.parseInactiveUntil(dto.inactiveUntil, 'thời gian đình chỉ không thể ở quá khứ.');
     const impact = await this.facilityImpactRepository.countSuspendImpact(facility.id, now, inactiveUntil);
 
     facility.status = FacilityStatus.INACTIVE;
@@ -190,11 +187,6 @@ export class FacilitiesService {
   // Xem trước giờ hoạt động của cơ sở y tế dựa trên dữ liệu được cung cấp
   async previewOperatingHours(id: string, dto: UpdateFacilityOperatingHoursDto) {
     return this.facilityOperatingHoursService.previewOperatingHours(id, dto);
-  }
-
-  // Cập nhật giờ hoạt động của cơ sở y tế
-  async updateOperatingHours(id: string, dto: UpdateFacilityOperatingHoursDto) {
-    return this.facilityOperatingHoursService.updateOperatingHours(id, dto);
   }
 
   async applyOperatingHours(id: string, dto: ApplyFacilityOperatingHoursDto) {

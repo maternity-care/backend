@@ -26,6 +26,7 @@ const createFacility = (overrides: Partial<Facility> = {}): Facility => ({
   address: '123 Nguyen Trai',
   province: 'Ho Chi Minh',
   ward: 'Ben Nghe',
+  floorCount: 1,
   latitude: '10.7756000',
   longitude: '106.6871000',
   status: FacilityStatus.ACTIVE,
@@ -63,9 +64,9 @@ describe('FacilitiesService', () => {
     findByName: jest.fn(),
     findByEmail: jest.fn(),
     findByPhone: jest.fn(),
+    findHighestRoomFloor: jest.fn(),
     existsActiveOwner: jest.fn(),
     findAdminOptions: jest.fn(),
-    lookup: jest.fn(),
     remove: jest.fn(),
     countDependencies: jest.fn(),
     countSuspendImpact: jest.fn(),
@@ -73,7 +74,6 @@ describe('FacilitiesService', () => {
     reactivateRoomsSuspendedByFacility: jest.fn(),
     cancelFutureShiftsForFacility: jest.fn(),
     softDelete: jest.fn(),
-    updateStatus: jest.fn(),
   });
 
   let repository: ReturnType<typeof createRepository>;
@@ -90,6 +90,7 @@ describe('FacilitiesService', () => {
     repository.findByName.mockResolvedValue(null);
     repository.findByEmail.mockResolvedValue(null);
     repository.findByPhone.mockResolvedValue(null);
+    repository.findHighestRoomFloor.mockResolvedValue(0);
     repository.syncOperatingHours.mockResolvedValue(undefined);
     repository.applyOperatingHours.mockResolvedValue(0);
     repository.findOperatingHoursByFacilityId.mockResolvedValue([]);
@@ -284,13 +285,13 @@ describe('FacilitiesService', () => {
         { dayOfWeek: 'SUN', openTime: null, closeTime: null, isClosed: true },
       ]);
 
-    await expect(service.updateOperatingHours('fac-1', {
+    await expect(service.applyOperatingHours('fac-1', {
       schedules: [
         { days: ['MON', 'TUE', 'WED', 'THU', 'FRI'] as any, openTime: '07:00:00', closeTime: '19:00:00', isClosed: false },
         { days: ['SAT'] as any, openTime: '08:00:00', closeTime: '17:00:00', isClosed: false },
         { days: ['SUN'] as any, isClosed: true },
       ],
-    })).resolves.toEqual({
+    })).resolves.toMatchObject({
       operatingHours: expect.any(Array),
       operatingHourGroups: [
         expect.objectContaining({ dayLabel: 'Thứ 2 - Thứ 6', displayTime: '07:00 - 19:00' }),
@@ -299,7 +300,7 @@ describe('FacilitiesService', () => {
       ],
     });
 
-    expect(repository.syncOperatingHours).toHaveBeenCalledWith('fac-1', [
+    expect(repository.applyOperatingHours).toHaveBeenCalledWith('fac-1', [
       expect.objectContaining({ dayOfWeek: 'MON', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false }),
       expect.objectContaining({ dayOfWeek: 'TUE', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false }),
       expect.objectContaining({ dayOfWeek: 'WED', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false }),
@@ -307,7 +308,7 @@ describe('FacilitiesService', () => {
       expect.objectContaining({ dayOfWeek: 'FRI', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false }),
       expect.objectContaining({ dayOfWeek: 'SAT', openTime: '08:00:00', closeTime: '17:00:00', isClosed: false }),
       expect.objectContaining({ dayOfWeek: 'SUN', openTime: null, closeTime: null, isClosed: true }),
-    ]);
+    ], []);
   });
 
   // Vai tro: neu thu hep gio hoat dong lam shift sap toi bi nam ngoai khung gio moi thi phai chan cap nhat.
@@ -330,7 +331,7 @@ describe('FacilitiesService', () => {
 
     let error: ConflictException | undefined;
     try {
-      await service.updateOperatingHours('fac-1', {
+      await service.applyOperatingHours('fac-1', {
         schedules: [
           { days: ['MON'] as any, openTime: '08:00:00', closeTime: '17:00:00', isClosed: false },
         ],
@@ -355,7 +356,7 @@ describe('FacilitiesService', () => {
       },
     });
     expect(repository.findActiveShiftsForOperatingHourValidation).toHaveBeenCalledWith('fac-1', '2026-07-24');
-    expect(repository.syncOperatingHours).not.toHaveBeenCalled();
+    expect(repository.applyOperatingHours).not.toHaveBeenCalled();
   });
 
   // Vai tro: preview gio hoat dong chi tra danh sach shift bi anh huong, khong ghi DB.
@@ -545,14 +546,14 @@ describe('FacilitiesService', () => {
       },
     ]);
 
-    await expect(service.updateOperatingHours('fac-1', {
+    await expect(service.applyOperatingHours('fac-1', {
       schedules: [
         { days: ['MON'] as any, openTime: '07:00:00', closeTime: '17:00:00', isClosed: false },
       ],
     })).resolves.toMatchObject({
       operatingHours: expect.any(Array),
     });
-    expect(repository.syncOperatingHours).toHaveBeenCalled();
+    expect(repository.applyOperatingHours).toHaveBeenCalled();
   });
 
   // Vai tro: dam bao ket qua phan trang facility rong cung tra 404 ro rang.
@@ -585,16 +586,6 @@ describe('FacilitiesService', () => {
     await expect(service.findDetailsById('missing')).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  // Vai tro: kiem tra cac ham tim theo code/name duoc uy quyen xuong repository dung cach.
-  it('delegates findByCode and findByName to repository', async () => {
-    const facility = createFacility();
-    repository.findByCode.mockResolvedValue(facility);
-    repository.findByName.mockResolvedValue(null);
-
-    await expect(service.findByCode('FAC-001')).resolves.toBe(facility);
-    await expect(service.findByName('Unknown')).resolves.toBeNull();
-  });
-
   // Vai tro: update field khong doi dinh danh van save binh thuong, khong query duplicate code khong can thiet.
   it('updates non-identity fields without duplicate code check', async () => {
     const facility = createFacility();
@@ -606,6 +597,16 @@ describe('FacilitiesService', () => {
 
     expect(repository.findByCode).not.toHaveBeenCalled();
     expect(repository.save).toHaveBeenCalledWith(facility);
+  });
+
+  it('rejects reducing floor count below an existing room floor', async () => {
+    repository.findById.mockResolvedValue(createFacility({ floorCount: 5 }));
+    repository.findHighestRoomFloor.mockResolvedValue(4);
+
+    await expect(service.update('fac-1', { floorCount: 3 }))
+      .rejects.toBeInstanceOf(BadRequestException);
+
+    expect(repository.save).not.toHaveBeenCalled();
   });
 
   // Vai tro: code la field readonly, neu client co gui len update thi service cung bo qua.
@@ -857,24 +858,6 @@ describe('FacilitiesService', () => {
     expect(repository.findOperatingHoursByFacilityId).toHaveBeenCalledWith('fac-1');
   });
 
-  // Vai tro: cung cap lookup facility cho FE select/autocomplete ma khong can tu ghep API list/filter.
-  it('delegates facility lookup to repository', async () => {
-    const options = [{
-      id: 'fac-1',
-      name: 'Main Clinic',
-      code: 'FAC-001',
-      address: '123 Nguyen Trai',
-      province: 'Ho Chi Minh',
-      ward: 'Ben Nghe',
-      status: FacilityStatus.ACTIVE,
-      ownerName: 'Owner',
-    }];
-    repository.lookup.mockResolvedValue(options);
-
-    await expect(service.lookup({ search: 'main' })).resolves.toBe(options);
-    expect(repository.lookup).toHaveBeenCalledWith({ search: 'main' });
-  });
-
 });
 
 describe('FacilitiesController', () => {
@@ -898,10 +881,8 @@ describe('FacilitiesController', () => {
     findDetailsById: jest.fn(),
     getOperatingHours: jest.fn(),
     previewOperatingHours: jest.fn(),
-    updateOperatingHours: jest.fn(),
     applyOperatingHours: jest.fn(),
     findAdminOptions: jest.fn(),
-    lookup: jest.fn(),
     update: jest.fn(),
     suspend: jest.fn(),
     reactivate: jest.fn(),

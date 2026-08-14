@@ -73,6 +73,10 @@ export class Facility {
   @Column({ name: 'ward', type: 'varchar', length: 255, nullable: true })
   ward: string | null;
 
+  @ApiPropertyOptional({ type: Number, nullable: true, default: 1, minimum: 1 })
+  @Column({ name: 'floor_count', type: 'int', nullable: true, default: 1 })
+  floorCount: number | null;
+
   @ApiProperty({ type: String })
   @Column({ name: 'latitude', type: 'decimal', precision: 10, scale: 7 })
   latitude: string;

@@ -27,6 +27,7 @@ const createFacility = (overrides: Partial<Facility> = {}): Facility => ({
   address: '123 Nguyen Trai',
   province: 'Ho Chi Minh',
   ward: 'Ben Nghe',
+  floorCount: 1,
   latitude: '10.7756000',
   longitude: '106.6871000',
   status: FacilityStatus.ACTIVE,
@@ -170,6 +171,20 @@ describe('RoomsService', () => {
     expect(repository.findCodesByFacilityAndPrefix).toHaveBeenCalledWith('fac-1', 'R-FAC-001');
     expect(repository.create).toHaveBeenCalledWith({ ...dto, code: 'R-FAC-001-001' });
     expect(repository.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a room floor above the facility floor count', async () => {
+    facilitiesService.findById.mockResolvedValue(createFacility({ floorCount: 2 }));
+
+    await expect(service.create({
+      facilityId: 'fac-1',
+      name: 'Room 301',
+      roomTypeId: 'type-1',
+      floor: '3',
+      status: ActiveStatus.ACTIVE,
+    } as any)).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(repository.save).not.toHaveBeenCalled();
   });
 
   // Vai tro: dam bao API bulk-create tao nhieu phong trong cung transaction va tra detail da join.
