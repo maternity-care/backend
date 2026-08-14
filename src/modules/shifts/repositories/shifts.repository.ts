@@ -336,6 +336,46 @@ export class ShiftsRepository implements IShiftsRepository {
     return query.getRawMany<ShiftWithDetails>();
   }
 
+  /**
+   * Dữ liệu nạp tuần cũ vào form tuần mới: loại bác sĩ nghỉ việc và để trống phòng không còn dùng được.
+   * Trạng thái ca không bị lọc ở đây vì ca hủy/nghỉ vẫn chứa mẫu phân công hữu ích cho tuần sau.
+   */
+  async findTemplateWeekWithDetails(
+    facilityId: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<ShiftWithDetails[]> {
+    type TemplateShiftRow = ShiftWithDetails & {
+      roomStatus?: string | null;
+      roomDeletedAt?: Date | null;
+    };
+
+    const rows = await this.buildDetailsQuery()
+      .addSelect('room.status', 'roomStatus')
+      .addSelect('room.deletedAt', 'roomDeletedAt')
+      .where('shift.facilityId = :facilityId', { facilityId })
+      .andWhere('shift.deletedAt IS NULL')
+      .andWhere('shift.shiftDate BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('staff.status = :activeStatus', { activeStatus: 'active' })
+      .andWhere('doctor.status = :activeStatus', { activeStatus: 'active' })
+      .orderBy('shift.shiftDate', 'ASC')
+      .addOrderBy('shift.startTime', 'ASC')
+      .getRawMany<TemplateShiftRow>();
+
+    return rows.map(({ roomStatus, roomDeletedAt, ...shift }) => {
+      const roomIsValid = !shift.roomId || (roomStatus === 'active' && !roomDeletedAt);
+      if (roomIsValid) return shift;
+      return {
+        ...shift,
+        roomId: null,
+        roomName: null,
+        roomType: null,
+        roomTypeId: null,
+        roomTypeName: null,
+      };
+    });
+  }
+
   async findDoctorShiftsForDate(
     facilityId: string,
     doctorId: string,

@@ -198,6 +198,8 @@ export const RESPONSE_MESSAGES = {
     END_TIME_AFTER_START_TIME: 'endTime phải muộn hơn startTime',
     DURATION_INVALID: 'Thời lượng ca trực phải từ 15 phút đến 12 giờ',
     PAST_DATE_INVALID: 'Không thể tạo hoặc kiểm tra ca trực trong quá khứ',
+    CREATE_WEEK_INVALID: 'Chỉ được tạo một ca trực từ ngày mai đến hết Chủ nhật tuần kế tiếp',
+    BULK_CREATE_WEEK_INVALID: 'Tạo ca trực hàng loạt phải chọn đúng tuần kế tiếp, từ thứ Hai đến Chủ nhật',
     OFF_SHIFT_CANNOT_HAVE_ROOM: 'Ca nghỉ không được gán phòng',
     FACILITY_CLOSED_ON_DATE: 'Cơ sở đóng cửa trong ngày được chọn',
     FACILITY_HOURS_NOT_CONFIGURED: 'Cơ sở chưa cấu hình đầy đủ giờ hoạt động cho ngày được chọn',

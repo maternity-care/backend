@@ -6,11 +6,13 @@ import { ShiftRemindersProcessor } from './shift-reminders.processor';
 import { ShiftRemindersRepository } from './shift-reminders.repository';
 import { ShiftRemindersScheduler } from './shift-reminders.scheduler';
 import { ShiftRemindersService } from './shift-reminders.service';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
     BullModule.registerQueue({ name: SHIFT_REMINDERS_QUEUE }),
     NotificationsModule,
+    MailModule,
   ],
   providers: [
     ShiftRemindersRepository,

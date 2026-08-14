@@ -6,6 +6,12 @@ export interface FacilityMissingSchedule {
   name: string;
 }
 
+export interface FacilityScheduleRecipient {
+  id: string;
+  name: string;
+  email: string;
+}
+
 @Injectable()
 export class ShiftRemindersRepository {
   constructor(private readonly dataSource: DataSource) {}
@@ -28,9 +34,12 @@ export class ShiftRemindersRepository {
   }
 
   /** Chỉ lấy admin thuộc cơ sở và chủ cơ sở; Super Admin không nhận cảnh báo vận hành. */
-  async findFacilityAdminIds(facilityId: string): Promise<string[]> {
+  async findFacilityAdminRecipients(facilityId: string): Promise<FacilityScheduleRecipient[]> {
     const rows = await this.dataSource.createQueryBuilder()
-      .select('DISTINCT staff.id', 'id')
+      .select('staff.id', 'id')
+      .addSelect('staff.name', 'name')
+      .addSelect('staff.email', 'email')
+      .distinct(true)
       .from('staffs', 'staff')
       .leftJoin('staff_roles', 'staffRole', 'staffRole.staff_id = staff.id')
       .leftJoin('roles', 'role', 'role.id = staffRole.role_id AND role.deleted_at IS NULL')
@@ -40,8 +49,12 @@ export class ShiftRemindersRepository {
         facilityId,
         admin: 'admin',
       })
-      .getRawMany<{ id: string }>();
+      .getRawMany<FacilityScheduleRecipient>();
 
-    return rows.map(row => String(row.id));
+    return rows.map(row => ({
+      id: String(row.id),
+      name: String(row.name),
+      email: String(row.email),
+    }));
   }
 }

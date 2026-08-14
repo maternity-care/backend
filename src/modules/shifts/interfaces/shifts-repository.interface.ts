@@ -48,6 +48,11 @@ export interface IShiftsRepository {
     endDate: string,
     doctorId?: string,
   ): Promise<ShiftWithDetails[]>;
+  findTemplateWeekWithDetails(
+    facilityId: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<ShiftWithDetails[]>;
   findDoctorShiftsForDate(facilityId: string, doctorId: string, date: string): Promise<Shift[]>;
   findDoctorAppointmentsForDate(
     facilityId: string,

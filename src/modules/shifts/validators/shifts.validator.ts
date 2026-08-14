@@ -15,6 +15,7 @@ import {
   throwIfConflicted,
   validateFacilityHours,
   validateSchedule,
+  validateShiftCreateWeek,
   validateStatusDetails,
   workingDayOf,
 } from '../helpers/shifts.helper';
@@ -76,6 +77,7 @@ export class ShiftsValidator {
     dto: CreateDoctorShiftDto,
     cache?: BulkValidationCache,
   ): Promise<PreparedDoctorShiftInput> {
+    validateShiftCreateWeek(dto.shiftDate);
     const { facility, staffId, roleName } = await this.validateReferences(dto, dto.facilityId, dto.roomId, cache);
     const timing = await this.resolveShiftTiming(dto, true, undefined, cache);
 

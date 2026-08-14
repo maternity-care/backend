@@ -15,6 +15,9 @@ export class ShiftRemindersProcessor extends WorkerHost {
   async process(job: Job): Promise<void> {
     if (job.name !== CHECK_NEXT_WEEK_SHIFTS_JOB) return;
     const result = await this.service.remindMissingNextWeekSchedules();
-    this.logger.log(`Đã kiểm tra ${result.facilities} cơ sở thiếu lịch tuần ${result.weekStart}.`);
+    this.logger.log(
+      `Đã kiểm tra ${result.facilities} cơ sở thiếu lịch tuần ${result.weekStart}; `
+      + `notification: ${result.notifiedAdmins}, email: ${result.emailedAdmins}, lỗi email: ${result.emailFailures}.`,
+    );
   }
 }
