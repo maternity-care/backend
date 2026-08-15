@@ -89,7 +89,7 @@ describe('MaternityPackages DTO validation', () => {
     const dto = plainToInstance(SearchMaternityPackageDto, {
       status: 'deleted',
       page: '0',
-      limit: '101',
+      limit: '201',
     });
     expect((await validate(dto)).map(error => error.property)).toEqual(
       expect.arrayContaining(['status', 'page', 'limit']),
@@ -196,6 +196,25 @@ describe('MaternityPackagesService business logic', () => {
     })).resolves.toMatchObject({ id: '1', code: expect.any(String) });
     expect(repo.findCodesByFacilityAndPrefix).toHaveBeenCalled();
     expect(repo.findByFacilityAndName).toHaveBeenCalledWith('1', 'Gói thai sản cơ bản');
+  });
+
+  // Vai tro: backend van bao ve phan loai dich vu neu client khong dung modal cua he thong.
+  it('rejects a package service with contradictory classification flags', async () => {
+    const { repo, service } = createService();
+
+    await expect(service.create({
+      facilityId: '1',
+      name: 'Gói kiểm tra phân loại',
+      price: '900000.00',
+      status: MaternityPackageStatus.DRAFT,
+      services: [{
+        facilityServiceId: '10',
+        includedQuantity: 1,
+        isRequired: false,
+        isOptional: false,
+      }],
+    })).rejects.toThrow(MATERNITY_PACKAGE_CONSTANT.SERVICE_CLASSIFICATION_INVALID);
+    expect(repo.saveWithItems).not.toHaveBeenCalled();
   });
 
   // Vai tro: tao goi va gan luon danh sach dich vu trong mot API; moi facilityService phai thuoc dung facility cua goi.
@@ -534,11 +553,11 @@ describe('MaternityPackagesService business logic', () => {
     await expect(context.service.findById('99')).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  // Vai tro: dam bao danh sach package rong tra 404 thay vi success voi data rong.
-  it('throws not found when package lists are empty', async () => {
+  // Vai tro: danh sach rong la ket qua hop le de FE hien empty state, khong phai loi 404.
+  it('returns empty package lists without throwing not found', async () => {
     const listContext = createService();
     listContext.repo.findAll.mockResolvedValueOnce([]);
-    await expect(listContext.service.findAll({ status: MaternityPackageStatus.ACTIVE })).rejects.toBeInstanceOf(NotFoundException);
+    await expect(listContext.service.findAll({ status: MaternityPackageStatus.ACTIVE })).resolves.toEqual([]);
 
     const pagedContext = createService();
     pagedContext.repo.findAllPaginated.mockResolvedValueOnce({
@@ -548,7 +567,13 @@ describe('MaternityPackagesService business logic', () => {
       limit: 20,
       totalPages: 0,
     });
-    await expect(pagedContext.service.findAllPaginated({ page: 1, limit: 20 })).rejects.toBeInstanceOf(NotFoundException);
+    await expect(pagedContext.service.findAllPaginated({ page: 1, limit: 20 })).resolves.toEqual({
+      items: [],
+      total: 0,
+      page: 1,
+      limit: 20,
+      totalPages: 0,
+    });
   });
 
   // Vai tro: kiem tra API kha dung theo facility tra goi co day du service va ho tro phan trang.

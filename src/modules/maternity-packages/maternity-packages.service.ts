@@ -92,15 +92,11 @@ export class MaternityPackagesService {
   }
 
   async findAll(filters?: SearchMaternityPackageDto): Promise<MaternityPackageResponseDto[]> {
-    const packages = await this.repository.findAll(filters);
-    this.ensurePackagesFound(packages);
-    return packages;
+    return this.repository.findAll(filters);
   }
 
   async findAllPaginated(filters?: SearchMaternityPackageDto) {
-    const result = await this.repository.findAllPaginated(filters);
-    this.ensurePackagesFound(result.items);
-    return result;
+    return this.repository.findAllPaginated(filters);
   }
 
   async findAvailableByFacilityId(
@@ -318,6 +314,10 @@ export class MaternityPackagesService {
     const items: Partial<PackageItem>[] = [];
     const facilityServiceIds = new Set<string>();
     for (const [index, item] of services.entries()) {
+      if (item.isOptional !== !item.isRequired) {
+        throw new BadRequestException(MATERNITY_PACKAGE_CONSTANT.SERVICE_CLASSIFICATION_INVALID);
+      }
+
       const facilityServiceId = await this.resolvePackageFacilityServiceId(packageFacilityId, item);
 
       if (facilityServiceIds.has(facilityServiceId)) {

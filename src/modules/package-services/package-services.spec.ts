@@ -54,7 +54,7 @@ describe('PackageServices DTO validation', () => {
       packageId: '0',
       allowedFacilityScope: 'bad',
       page: '0',
-      limit: '101',
+      limit: '201',
     });
     expect((await validate(dto)).map((error) => error.property)).toEqual(
       expect.arrayContaining(['packageId', 'allowedFacilityScope', 'page', 'limit']),
@@ -130,6 +130,21 @@ describe('PackageServicesService business logic', () => {
     ).resolves.toMatchObject({ id: '10', isRequired: 1, isOptional: 0 });
     expect(repo.findByPackageAndService).toHaveBeenCalledWith('1', '2');
     expect(repo.saveWithFacilities).toHaveBeenCalled();
+  });
+
+  // Vai tro: chan client gui mot dich vu vua bat buoc vua tuy chon.
+  it('rejects contradictory required and optional flags', async () => {
+    const { repo, service } = createService();
+
+    await expect(service.create({
+      packageId: '1',
+      facilityServiceId: '2',
+      includedQuantity: 1,
+      isRequired: true,
+      isOptional: true,
+      allowedFacilityScope: PackageServiceFacilityScope.ALL,
+    })).rejects.toThrow(PACKAGE_SERVICE_CONSTANT.CLASSIFICATION_INVALID);
+    expect(repo.saveWithFacilities).not.toHaveBeenCalled();
   });
 
   // Vai tro: dam bao scope selected chi hop le khi cac facility duoc chon deu active.

@@ -250,6 +250,7 @@ export const RESPONSE_MESSAGES = {
     CREATED: 'Tạo khung ca thành công',
     UPDATED: 'Cập nhật khung ca thành công',
     DELETED: 'Xóa khung ca thành công',
+    ARCHIVED: 'Khung ca đã được lưu trữ để giữ thông tin cho các ca trực đã tạo',
     NOT_FOUND: 'Khung ca không tồn tại',
     DUPLICATED: 'Khung ca đã tồn tại trong phạm vi này',
     FACILITY_INACTIVE: 'Cơ sở không hoạt động nên không thể cấu hình khung ca',

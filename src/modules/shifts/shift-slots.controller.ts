@@ -86,9 +86,12 @@ export class ShiftSlotsController {
   @ApiOperation({ summary: 'Delete shift slot safely' })
   @ApiResponse({ status: 200 })
   async remove(@Param('id') id: string) {
+    const data = await this.service.remove(id);
     return {
-      message: RESPONSE_MESSAGES.SHIFT_SLOTS.DELETED,
-      data: await this.service.remove(id),
+      message: data.action === 'soft_deleted'
+        ? RESPONSE_MESSAGES.SHIFT_SLOTS.ARCHIVED
+        : RESPONSE_MESSAGES.SHIFT_SLOTS.DELETED,
+      data,
     };
   }
 }

@@ -16,6 +16,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
+import { PACKAGE_SERVICE_CONSTANT } from '../../../../common/constants/package-service.constant';
 
 export enum PackageServiceFacilityScope {
   ALL = 'all',
@@ -30,30 +31,30 @@ function parseBooleanInput(value: unknown): unknown {
 
 export class PackageServiceItemInputDto {
   @ApiProperty({ example: '3' })
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: PACKAGE_SERVICE_CONSTANT.FACILITY_SERVICE_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: PACKAGE_SERVICE_CONSTANT.FACILITY_SERVICE_ID_INVALID })
   facilityServiceId: string;
 
   @ApiProperty({ example: 2, minimum: 1, maximum: 100 })
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
+  @IsInt({ message: PACKAGE_SERVICE_CONSTANT.INCLUDED_QUANTITY_INVALID })
+  @Min(1, { message: PACKAGE_SERVICE_CONSTANT.INCLUDED_QUANTITY_INVALID })
+  @Max(100, { message: PACKAGE_SERVICE_CONSTANT.INCLUDED_QUANTITY_INVALID })
   includedQuantity: number;
 
   @ApiProperty({ example: true })
   @Transform(({ value }) => parseBooleanInput(value))
-  @IsBoolean()
+  @IsBoolean({ message: PACKAGE_SERVICE_CONSTANT.CLASSIFICATION_INVALID })
   isRequired: boolean;
 
   @ApiProperty({ example: false })
   @Transform(({ value }) => parseBooleanInput(value))
-  @IsBoolean()
+  @IsBoolean({ message: PACKAGE_SERVICE_CONSTANT.CLASSIFICATION_INVALID })
   isOptional: boolean;
 
   @ApiProperty({ enum: PackageServiceFacilityScope, example: PackageServiceFacilityScope.ALL })
   @IsOptional()
-  @IsEnum(PackageServiceFacilityScope)
+  @IsEnum(PackageServiceFacilityScope, { message: PACKAGE_SERVICE_CONSTANT.FACILITY_SCOPE_INVALID })
   allowedFacilityScope: PackageServiceFacilityScope = PackageServiceFacilityScope.ALL;
 
   @ApiPropertyOptional({
@@ -64,9 +65,9 @@ export class PackageServiceItemInputDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(1000)
+  @IsInt({ message: PACKAGE_SERVICE_CONSTANT.SORT_ORDER_INVALID })
+  @Min(0, { message: PACKAGE_SERVICE_CONSTANT.SORT_ORDER_INVALID })
+  @Max(1000, { message: PACKAGE_SERVICE_CONSTANT.SORT_ORDER_INVALID })
   sortOrder?: number;
 
   @ApiPropertyOptional({
@@ -77,30 +78,30 @@ export class PackageServiceItemInputDto {
     (dto: PackageServiceItemInputDto) =>
       dto.allowedFacilityScope === PackageServiceFacilityScope.SELECTED,
   )
-  @IsArray()
-  @ArrayNotEmpty()
-  @ArrayUnique()
-  @IsString({ each: true })
-  @Matches(POSITIVE_ID_PATTERN, { each: true })
+  @IsArray({ message: PACKAGE_SERVICE_CONSTANT.SELECTED_FACILITIES_REQUIRED })
+  @ArrayNotEmpty({ message: PACKAGE_SERVICE_CONSTANT.SELECTED_FACILITIES_REQUIRED })
+  @ArrayUnique({ message: PACKAGE_SERVICE_CONSTANT.SELECTED_FACILITIES_REQUIRED })
+  @IsString({ each: true, message: PACKAGE_SERVICE_CONSTANT.FACILITY_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { each: true, message: PACKAGE_SERVICE_CONSTANT.FACILITY_ID_INVALID })
   facilityIds?: string[];
 }
 
 export class CreatePackageServiceDto extends PackageServiceItemInputDto {
   @ApiProperty({ example: '1' })
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: PACKAGE_SERVICE_CONSTANT.PACKAGE_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: PACKAGE_SERVICE_CONSTANT.PACKAGE_ID_INVALID })
   packageId: string;
 }
 
 export class BulkCreatePackageServicesDto {
   @ApiProperty({ example: '1' })
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: PACKAGE_SERVICE_CONSTANT.PACKAGE_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: PACKAGE_SERVICE_CONSTANT.PACKAGE_ID_INVALID })
   packageId: string;
 
   @ApiProperty({ type: [PackageServiceItemInputDto], minItems: 1, maxItems: 100 })
-  @IsArray()
-  @ArrayNotEmpty()
+  @IsArray({ message: PACKAGE_SERVICE_CONSTANT.SERVICES_REQUIRED })
+  @ArrayNotEmpty({ message: PACKAGE_SERVICE_CONSTANT.SERVICES_REQUIRED })
   @ValidateNested({ each: true })
   @Type(() => PackageServiceItemInputDto)
   services: PackageServiceItemInputDto[];
