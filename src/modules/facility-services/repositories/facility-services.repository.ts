@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DeepPartial, In, Repository, SelectQueryBuilder } from 'typeorm';
+import { DeepPartial, EntityManager, In, Repository, SelectQueryBuilder } from 'typeorm';
 import {
   ActiveStatus,
   FacilityStatus,
@@ -34,6 +34,15 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
     return this.repository.save(entity);
   }
 
+  /** Inactive một dịch vụ cơ sở và gỡ nó khỏi mọi gói trong cùng transaction. */
+  async saveAndDetachFromPackages(entity: FacilityService): Promise<FacilityService> {
+    return this.repository.manager.transaction(async (manager) => {
+      const saved = await manager.save(FacilityService, entity);
+      await this.deletePackageItems(manager, entity.id);
+      return saved;
+    });
+  }
+
   saveMany(entities: FacilityService[]): Promise<FacilityService[]> {
     return this.repository.save(entities);
   }
@@ -41,17 +50,7 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
   // Xóa cứng mapping khi chưa có dữ liệu phụ thuộc.
   async remove(entity: FacilityService): Promise<void> {
     await this.repository.manager.transaction(async (manager) => {
-      const packageItems = await manager.find(PackageItem, {
-        where: { facilityServiceId: entity.id },
-        select: { id: true },
-      });
-      const packageItemIds = packageItems.map((item) => item.id);
-
-      if (packageItemIds.length > 0) {
-        await manager.delete(PackageServiceFacility, { packageItemId: In(packageItemIds) });
-        await manager.delete(PackageItem, { id: In(packageItemIds) });
-      }
-
+      await this.deletePackageItems(manager, entity.id);
       await manager.remove(FacilityService, entity);
     });
   }
@@ -141,10 +140,20 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
     return rows.reduce((total, count) => total + count, 0);
   }
 
-  // Chuyển mapping sang unavailable thay vì xóa cứng khi đã có lịch sử sử dụng.
-  updateStatus(entity: FacilityService, status: ActiveStatus): Promise<FacilityService> {
-    entity.status = status;
-    return this.repository.save(entity);
+  // Dùng chung cho inactive và hard delete để không còn package_item mồ côi về nghiệp vụ.
+  private async deletePackageItems(manager: EntityManager, facilityServiceId: string): Promise<void> {
+    const packageItems = await manager.find(PackageItem, {
+      where: { facilityServiceId },
+      select: { id: true },
+    });
+    const packageItemIds = packageItems.map((item) => item.id);
+
+    if (packageItemIds.length === 0) {
+      return;
+    }
+
+    await manager.delete(PackageServiceFacility, { packageItemId: In(packageItemIds) });
+    await manager.delete(PackageItem, { id: In(packageItemIds) });
   }
 
   private buildListQuery(filters?: SearchFacilityServiceDto): SelectQueryBuilder<FacilityService> {

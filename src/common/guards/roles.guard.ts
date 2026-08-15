@@ -24,7 +24,7 @@ export class RolesGuard implements CanActivate {
     const hasRole = requiredRoles.some((role) => checkRole(user, role));
 
     if (!hasRole) {
-      throw new ForbiddenException('You do not have the required role');
+      throw new ForbiddenException('Vai trò của bạn không được phép thực hiện thao tác này');
     }
 
     return true;

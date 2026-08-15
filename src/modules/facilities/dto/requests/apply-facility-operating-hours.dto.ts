@@ -11,7 +11,7 @@ export class ApplyFacilityOperatingHoursDto extends UpdateFacilityOperatingHours
   @ApiPropertyOptional({
     enum: OperatingHoursSlotStrategy,
     default: OperatingHoursSlotStrategy.STRICT,
-    description: 'Cach xu ly shift_slots active neu gio hoat dong moi lam slot khong con hop le',
+    description: 'Cách xử lý các khung ca đang hoạt động nhưng không còn phù hợp với giờ mở cửa mới',
   })
   @IsOptional()
   @IsEnum(OperatingHoursSlotStrategy)
