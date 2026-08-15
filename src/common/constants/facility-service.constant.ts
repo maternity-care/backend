@@ -11,4 +11,13 @@ export const FACILITY_SERVICE_CONSTANT = {
   FACILITY_INACTIVE: 'Cơ sở không hoạt động',
   SERVICE_INACTIVE: 'Dịch vụ gốc không hoạt động',
   PRICE_INVALID: 'Giá dịch vụ tại cơ sở phải là số tiền không âm, tối đa 13 chữ số phần nguyên và 2 chữ số thập phân',
+  FACILITY_ID_INVALID: 'Mã cơ sở phải là số nguyên dương',
+  SERVICE_ID_INVALID: 'Mã dịch vụ phải là số nguyên dương',
+  SERVICE_TYPE_ID_INVALID: 'Mã loại dịch vụ phải là số nguyên dương',
+  DURATION_INVALID: 'Thời lượng dịch vụ phải là số nguyên từ 5 đến 480 phút',
+  STATUS_INVALID: 'Trạng thái dịch vụ tại cơ sở không hợp lệ',
+  SERVICES_INVALID: 'Danh sách dịch vụ phải có ít nhất một dịch vụ và không được trùng',
+  SEARCH_INVALID: 'Từ khóa tìm kiếm phải là chuỗi hợp lệ',
+  PAGE_INVALID: 'Số trang phải là số nguyên dương',
+  LIMIT_INVALID: 'Số bản ghi mỗi trang phải là số nguyên từ 1 đến 200',
 };
