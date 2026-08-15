@@ -163,6 +163,12 @@ export class StaffManagementService {
         'Email cá nhân đã tồn tại trong hệ thống. Vui lòng sử dụng email khác.',
       );
     }
+    const existingPhone = await this.staffProfileRepository.findByPhone(dto.phone);
+    if (existingPhone) {
+      throw new ConflictException(
+        'Số điện thoại đã tồn tại trong hệ thống. Vui lòng sử dụng số khác.',
+      );
+    }
 
     const email = await this.staffProfileRepository.generateStaffEmailFromName(dto.name);
     const password = this.staffProfileRepository.generateStaffPassword();
@@ -222,8 +228,25 @@ export class StaffManagementService {
       : null;
     const staff = await this.staffProfileRepository.findById(id);
     if (!staff) throw new NotFoundException('Không tìm thấy nhân viên.');
+    if (dto.phone && dto.phone !== staff.phone) {
+      const existingPhone = await this.staffProfileRepository.findByPhone(dto.phone);
+      if (existingPhone && existingPhone.id !== staff.id) {
+        throw new ConflictException(
+          'Số điện thoại đã tồn tại trong hệ thống. Vui lòng sử dụng số khác.',
+        );
+      }
+    }
+    if (dto.email && dto.email !== staff.email) {
+      const existingEmail = await this.staffProfileRepository.findByEmail(dto.email);
+      if (existingEmail && existingEmail.id !== staff.id) {
+        throw new ConflictException(
+          'Email đăng nhập đã tồn tại trong hệ thống. Vui lòng sử dụng email khác.',
+        );
+      }
+    }
 
     staff.name = dto.name ?? staff.name;
+    staff.email = dto.email ?? staff.email;
     staff.phone = dto.phone ?? staff.phone;
     staff.status = dto.status ?? staff.status;
     staff.avatar = dto.avatar ?? staff.avatar;
