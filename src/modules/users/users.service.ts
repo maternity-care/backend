@@ -12,7 +12,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { IRedisCacheService, REDIS_CACHE_SERVICE } from '../../common/cache/redis-cache.interface';
 import { CreateUserDto } from './dto/request/create-user.dto';
-import { UpdateProfileDto } from './dto/request/update-profile.dto';
 import { User } from './entities/user.entity';
 import { IUsersRepository, USERS_REPOSITORY } from './interfaces/users-repository.interface';
 import { IUsersService } from './interfaces/users-service.interface';
@@ -127,6 +126,7 @@ export class UsersService implements IUsersService {
     user.dateOfBirth = dto.dateOfBirth ?? user.dateOfBirth;
     user.address = dto.address ?? user.address;
     user.province = dto.province ?? user.province;
+    user.avatar = dto.avatar ?? user.avatar;
     user.ward = dto.ward ?? user.ward;
     user.emergencyContactName = dto.emergencyContactName ?? user.emergencyContactName;
     user.emergencyContactPhone = dto.emergencyContactPhone ?? user.emergencyContactPhone;
@@ -140,10 +140,17 @@ export class UsersService implements IUsersService {
     return this.findById(savedUser.id);
   }
 
-  async updateProfile(id: string, dto: UpdateProfileDto): Promise<User> {
+  async updateProfile(id: string, dto: UpdatePregnantUserDto): Promise<User> {
     const user = await this.findById(id);
 
     user.name = dto.name ?? user.name;
+    user.avatar = dto.avatar ?? user.avatar;
+    user.dateOfBirth = dto.dateOfBirth ?? user.dateOfBirth;
+    user.address = dto.address ?? user.address;
+    user.province = dto.province ?? user.province;
+    user.ward = dto.ward ?? user.ward;
+    user.emergencyContactName = dto.emergencyContactName ?? user.emergencyContactName;
+    user.emergencyContactPhone = dto.emergencyContactPhone ?? user.emergencyContactPhone;
 
     const savedUser = await this.usersRepository.save(user);
     await this.clearUsersCache(id);

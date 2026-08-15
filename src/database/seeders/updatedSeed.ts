@@ -3123,7 +3123,7 @@ async function insertMaternityPackages(): Promise<void> {
 
 async function insertShifts() {
   const facilities = await facilityRepository.find();
-  const roomTypes = await roomTypeRepository.find();
+  // const roomTypes = await roomTypeRepository.find();
   const staffs = await staffRepository.find({
     relations: { roles: true },
     where: { roles: { name: In([RoleEnum.DOCTOR, RoleEnum.NURSE, RoleEnum.STAFF]) } },
@@ -3144,8 +3144,8 @@ async function insertShifts() {
   firstDateOfWeek.setHours(0, 0, 0, 0);
 
   const nextWeek = new Date();
-  nextWeek.setDate(nextWeek.getDate() + 14);
-  nextWeek.setDate(nextWeek.getDate() - ((nextWeek.getDay() + 6) % 7));
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  nextWeek.setDate(nextWeek.getDate() - ((nextWeek.getDay() + 6) % 7) - 1);
   nextWeek.setHours(0, 0, 0, 0);
 
   const distanceDay = Math.ceil(
@@ -3182,7 +3182,7 @@ async function insertShifts() {
           .toISOString()
           .slice(0, 10);
         // insert cho từng rooms
-        roomOfFacility.forEach(async (room) => {
+        for (const room of roomOfFacility) {
           // mỗi room sẽ insert cho các ca
           const isNeedDoctor = roomTypeInFacilityForDoctors.includes(room);
           for (
@@ -3229,7 +3229,7 @@ async function insertShifts() {
               await shiftRepository.save(newShift);
             }
           }
-        });
+        }
       }
     }
   }
@@ -4188,35 +4188,35 @@ async function seedCustomData(): Promise<void> {
     await dataSource.initialize();
     console.log('Kết nối với database thành công.');
 
-    if (shouldFreshSeed) {
-      await clearSeedData();
-    }
+    // if (shouldFreshSeed) {
+    //   await clearSeedData();
+    // }
 
-    await insertPermission();
-    await insertRoles();
-    await insertRolePermission();
-    await insertStaffs();
-    await insertDoctor();
-    await insertFacility();
-    await insertRoomTypes();
-    await insertRooms();
-    await insertSettings();
-    await insertServiceCatalog();
-    await insertMaternityPackages();
-    await insertFaqs();
-    await insertArticles();
-    await insertUsers();
-    await insertPregnancyProfiles();
-    await insertUserAuths();
-    await insertShiftSlots();
+    // await insertPermission();
+    // await insertRoles();
+    // await insertRolePermission();
+    // await insertStaffs();
+    // await insertDoctor();
+    // await insertFacility();
+    // await insertRoomTypes();
+    // await insertRooms();
+    // await insertSettings();
+    // await insertServiceCatalog();
+    // await insertMaternityPackages();
+    // await insertFaqs();
+    // await insertArticles();
+    // await insertUsers();
+    // await insertPregnancyProfiles();
+    // await insertUserAuths();
+    // await insertShiftSlots();
     await insertShifts();
-    await insertOrders();
-    await insertAppointments();
-    await insertMedicalRecords();
-    // await insertCareFlowData();
-    await insertForumData();
-    await insertNotifications();
-    await printSeedSummary();
+    // await insertOrders();
+    // await insertAppointments();
+    // await insertMedicalRecords();
+    // // await insertCareFlowData();
+    // await insertForumData();
+    // await insertNotifications();
+    // await printSeedSummary();
 
     console.log('Tất cả dữ liệu đã được chèn thành công!');
   } catch (error: unknown) {
