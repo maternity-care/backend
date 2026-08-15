@@ -10,6 +10,11 @@ export class UpdatePregnantUserDto {
 
   @ApiPropertyOptional()
   @IsString()
+  @IsOptional()
+  avatar?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
   @Validate((value: string) => {
     if (new Date(value).getTime() + 15 * 365 * 24 * 60 * 60 * 1000 > new Date().getTime()) {
     }

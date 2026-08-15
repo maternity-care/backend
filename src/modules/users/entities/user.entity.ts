@@ -32,6 +32,10 @@ export class User {
   phone: string;
 
   @ApiProperty({ type: String })
+  @Column({ name: 'avatar', type: 'varchar', length: 255, nullable: true })
+  avatar: string | null;
+
+  @ApiProperty({ type: String })
   @Column({ name: 'email', type: 'varchar', length: 191, unique: true })
   email: string;
 

@@ -38,6 +38,11 @@ export class CreateUserDto {
 
   @ApiPropertyOptional()
   @IsString()
+  @IsOptional()
+  avatar?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
   @Validate((value?: string) => {
     if (
       value &&

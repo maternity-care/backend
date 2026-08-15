@@ -179,6 +179,7 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
       },
       skip: query.page ? (query.page - 1) * (query.limit ?? 10) : 0,
       take: query.limit ?? 10,
+      order: { id: 'DESC' },
     });
     return { data, total };
   }

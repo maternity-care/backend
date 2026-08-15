@@ -33,7 +33,6 @@ export { ForumComment } from './forum-comment.entity';
 export { ForumCategoryMetadata } from './forum-category-metadata.entity';
 export { ForumModerationLog } from './forum-moderation-log.entity';
 export { ContentReport } from './content-report.entity';
-export { RolePermission } from './role-permission.entity';
 export { RoomType } from './room-type.entity';
 export { ShiftSlot } from './shift-slot.entity';
 export { UserAuth } from '../../modules/auth/entities/user-auth.entity';
