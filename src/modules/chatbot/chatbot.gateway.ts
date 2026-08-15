@@ -8,7 +8,14 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { createHash } from 'crypto';
+import { JwtService } from '@nestjs/jwt';
+import { InjectRepository } from '@nestjs/typeorm';
 import { Server, Socket } from 'socket.io';
+import { Repository } from 'typeorm';
+import { RoleEnum } from '../../common/constants/role.enum';
+import { AccountStatus } from '../../common/constants/status.enum';
+import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { Staff } from '../staffs/entities/staff.entity';
 import { ChatbotService } from './chatbot.service';
 import {
   ChatbotConversationPayload,
@@ -33,10 +40,25 @@ export class ChatbotGateway implements OnGatewayConnection, OnGatewayDisconnect 
   private readonly userClientConversations = new Map<string, string>();
   private readonly userConversationClients = new Map<string, Set<string>>();
 
-  constructor(private readonly chatbotService: ChatbotService) {}
+  constructor(
+    private readonly chatbotService: ChatbotService,
+    private readonly jwtService: JwtService,
+    @InjectRepository(Staff)
+    private readonly staffRepository: Repository<Staff>,
+  ) {}
 
   async handleConnection(client: Socket): Promise<void> {
     if (this.getClientMode(client) === 'staff') {
+      const staff = await this.authenticateDoctorStaff(client);
+      if (!staff) {
+        client.emit('chatbot:error', { message: 'Chỉ bác sĩ mới được tiếp nhận chat.' });
+        client.disconnect(true);
+        return;
+      }
+
+      client.data.staffId = staff.id;
+      client.data.staffName = staff.name;
+      client.data.canUseStaffChat = true;
       client.join('chatbot:staff');
       client.emit('chatbot:staff-queue', await this.getFreshStaffQueue());
       return;
@@ -101,6 +123,7 @@ export class ChatbotGateway implements OnGatewayConnection, OnGatewayDisconnect 
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: StaffChatbotMessagePayload,
   ): Promise<void> {
+    if (!this.canUseStaffChat(client)) return;
     if (!payload.conversationId) return;
 
     const result = await this.chatbotService.claimConversation(payload);
@@ -121,6 +144,7 @@ export class ChatbotGateway implements OnGatewayConnection, OnGatewayDisconnect 
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: StaffChatbotMessagePayload,
   ): Promise<void> {
+    if (!this.canUseStaffChat(client)) return;
     if (!payload.conversationId) return;
 
     const conversation = await this.chatbotService.receiveStaffMessage(payload);
@@ -145,7 +169,7 @@ export class ChatbotGateway implements OnGatewayConnection, OnGatewayDisconnect 
 
   @SubscribeMessage('chatbot:staff-queue:refresh')
   async handleStaffQueueRefresh(@ConnectedSocket() client: Socket): Promise<void> {
-    if (this.getClientMode(client) !== 'staff') return;
+    if (this.getClientMode(client) !== 'staff' || !this.canUseStaffChat(client)) return;
 
     client.join('chatbot:staff');
     client.emit('chatbot:staff-queue', await this.getFreshStaffQueue());
@@ -186,6 +210,46 @@ export class ChatbotGateway implements OnGatewayConnection, OnGatewayDisconnect 
 
   private getClientMode(client: Socket): 'user' | 'staff' {
     return client.handshake.auth?.mode === 'staff' ? 'staff' : 'user';
+  }
+
+  private getAccessToken(client: Socket): string | null {
+    const authToken = client.handshake.auth?.token;
+    if (typeof authToken === 'string' && authToken.trim()) {
+      return authToken.trim();
+    }
+
+    const header = client.handshake.headers.authorization;
+    if (typeof header === 'string' && header.startsWith('Bearer ')) {
+      return header.slice('Bearer '.length).trim();
+    }
+
+    return null;
+  }
+
+  private async authenticateDoctorStaff(client: Socket): Promise<Staff | null> {
+    const token = this.getAccessToken(client);
+    if (!token) return null;
+
+    try {
+      const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
+      if (payload.accountType !== 'staff') return null;
+
+      const staff = await this.staffRepository.findOne({
+        where: { id: payload.sub, status: AccountStatus.ACTIVE },
+        relations: { roles: true },
+      });
+      if (!staff) return null;
+
+      return staff.roles?.some((role) => role.name === RoleEnum.DOCTOR)
+        ? staff
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private canUseStaffChat(client: Socket): boolean {
+    return this.getClientMode(client) === 'staff' && client.data.canUseStaffChat === true;
   }
 
   private trackUserClient(client: Socket, conversationId: string): void {

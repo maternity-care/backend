@@ -25,34 +25,34 @@ import { SHIFT_TIME_PATTERN } from './create-doctor-shift.dto';
 
 export class BulkGenerateShiftAssignmentDto {
   @ApiProperty({ type: String, example: '10' })
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: RESPONSE_MESSAGES.SHIFTS.STAFF_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.SHIFTS.STAFF_ID_INVALID })
   staffId: string;
 
   @ApiProperty({ type: String, example: '3' })
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: RESPONSE_MESSAGES.SHIFTS.ROLE_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.SHIFTS.ROLE_ID_INVALID })
   roleId: string;
 
   @ApiPropertyOptional({ type: String, example: '2', nullable: true })
   @IsOptional()
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: RESPONSE_MESSAGES.SHIFTS.ROOM_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.SHIFTS.ROOM_ID_INVALID })
   roomId?: string | null;
 
   @ApiProperty({ enum: ShiftWorkingDay, isArray: true, example: ['MON', 'WED', 'FRI'] })
-  @IsArray()
-  @ArrayNotEmpty()
-  @ArrayUnique()
-  @IsEnum(ShiftWorkingDay, { each: true })
+  @IsArray({ message: RESPONSE_MESSAGES.SHIFTS.WORKING_DAYS_INVALID })
+  @ArrayNotEmpty({ message: RESPONSE_MESSAGES.SHIFTS.WORKING_DAYS_INVALID })
+  @ArrayUnique({ message: RESPONSE_MESSAGES.SHIFTS.WORKING_DAYS_INVALID })
+  @IsEnum(ShiftWorkingDay, { each: true, message: RESPONSE_MESSAGES.SHIFTS.WORKING_DAYS_INVALID })
   workingDays: ShiftWorkingDay[];
 
   @ApiPropertyOptional({ type: Number, example: 10, minimum: 1, maximum: 100 })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
+  @IsInt({ message: RESPONSE_MESSAGES.SHIFTS.MAX_APPOINTMENTS_INVALID })
+  @Min(1, { message: RESPONSE_MESSAGES.SHIFTS.MAX_APPOINTMENTS_INVALID })
+  @Max(100, { message: RESPONSE_MESSAGES.SHIFTS.MAX_APPOINTMENTS_INVALID })
   maxAppointments?: number | null;
 
   @ApiProperty({ enum: [DoctorShiftStatus.AVAILABLE, DoctorShiftStatus.OFF], example: DoctorShiftStatus.AVAILABLE })
@@ -65,13 +65,13 @@ export class BulkGenerateShiftAssignmentDto {
 
 export class BulkGenerateSlotAssignmentDto {
   @ApiProperty({ type: String, example: '1' })
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: RESPONSE_MESSAGES.SHIFTS.SLOT_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.SHIFTS.SLOT_ID_INVALID })
   slotId: string;
 
   @ApiProperty({ type: [BulkGenerateShiftAssignmentDto] })
-  @IsArray()
-  @ArrayNotEmpty()
+  @IsArray({ message: RESPONSE_MESSAGES.SHIFTS.BULK_ASSIGNMENTS_REQUIRED })
+  @ArrayNotEmpty({ message: RESPONSE_MESSAGES.SHIFTS.BULK_ASSIGNMENTS_REQUIRED })
   @ValidateNested({ each: true })
   @Type(() => BulkGenerateShiftAssignmentDto)
   assignments: BulkGenerateShiftAssignmentDto[];
@@ -79,26 +79,26 @@ export class BulkGenerateSlotAssignmentDto {
 
 export class AutoGenerateShiftsDto {
   @ApiProperty({ type: String, example: '1' })
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: RESPONSE_MESSAGES.ROOMS.FACILITY_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.ROOMS.FACILITY_ID_INVALID })
   facilityId: string;
 
   @ApiPropertyOptional({
     example: '2026-08-01',
-    description: 'Ngay bat dau tao lich. Neu khong gui, backend lay ngay hien tai theo gio Viet Nam.',
+    description: 'Ngày bắt đầu tạo lịch. Nếu không gửi, backend lấy ngày hiện tại theo giờ Việt Nam.',
   })
   @IsOptional()
-  @IsDateString({ strict: true })
-  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @IsDateString({ strict: true }, { message: RESPONSE_MESSAGES.SHIFTS.SHIFT_DATE_FORMAT_INVALID })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: RESPONSE_MESSAGES.SHIFTS.SHIFT_DATE_FORMAT_INVALID })
   fromDate?: string;
 
   @ApiPropertyOptional({
     example: '2026-08-31',
-    description: 'Ngay ket thuc thu cong. Khong gui dong thoi voi durationDays.',
+    description: 'Ngày kết thúc. Không gửi đồng thời với số ngày cần tạo lịch.',
   })
   @IsOptional()
-  @IsDateString({ strict: true })
-  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @IsDateString({ strict: true }, { message: RESPONSE_MESSAGES.SHIFTS.SHIFT_DATE_FORMAT_INVALID })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: RESPONSE_MESSAGES.SHIFTS.SHIFT_DATE_FORMAT_INVALID })
   toDate?: string;
 
   @ApiPropertyOptional({
@@ -106,13 +106,13 @@ export class AutoGenerateShiftsDto {
     example: 30,
     minimum: 7,
     maximum: 93,
-    description: 'So ngay can render tinh tu fromDate/hom nay. Khong gui dong thoi voi toDate.',
+    description: 'Số ngày cần tạo tính từ ngày bắt đầu. Không gửi đồng thời với ngày kết thúc.',
   })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(7)
-  @Max(93)
+  @IsInt({ message: RESPONSE_MESSAGES.SHIFTS.BULK_DURATION_INVALID })
+  @Min(7, { message: RESPONSE_MESSAGES.SHIFTS.BULK_DURATION_INVALID })
+  @Max(93, { message: RESPONSE_MESSAGES.SHIFTS.BULK_DURATION_INVALID })
   durationDays?: number;
 
   @ApiPropertyOptional({ type: [BulkGenerateSlotAssignmentDto] })
@@ -127,7 +127,7 @@ export class AutoGenerateShiftsDto {
     type: Boolean,
     default: true,
     example: true,
-    description: 'Neu true, confirm luu cac ca hop le va tra kem cac dong loi. Neu false, con loi nao thi khong luu dong nao.',
+    description: 'Nếu bật, hệ thống lưu các ca hợp lệ và trả kèm những dòng lỗi. Nếu tắt, chỉ cần có một dòng lỗi thì không lưu ca nào.',
   })
   @IsOptional()
   @IsBoolean()
@@ -135,46 +135,46 @@ export class AutoGenerateShiftsDto {
 
   @ApiHideProperty()
   @ValidateIf((dto: AutoGenerateShiftsDto) => !dto.slotAssignments?.length)
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: RESPONSE_MESSAGES.SHIFTS.DOCTOR_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.SHIFTS.DOCTOR_ID_INVALID })
   doctorId?: string;
 
   @ApiHideProperty()
   @IsOptional()
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: RESPONSE_MESSAGES.SHIFTS.ROOM_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.SHIFTS.ROOM_ID_INVALID })
   roomId?: string | null;
 
   @ApiHideProperty()
   @IsOptional()
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: RESPONSE_MESSAGES.SHIFTS.SLOT_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.SHIFTS.SLOT_ID_INVALID })
   slotId?: string | null;
 
   @ApiHideProperty()
   @ValidateIf((dto: AutoGenerateShiftsDto) => !dto.slotAssignments?.length)
-  @IsArray()
-  @ArrayNotEmpty()
-  @ArrayUnique()
-  @IsEnum(ShiftWorkingDay, { each: true })
+  @IsArray({ message: RESPONSE_MESSAGES.SHIFTS.WORKING_DAYS_INVALID })
+  @ArrayNotEmpty({ message: RESPONSE_MESSAGES.SHIFTS.WORKING_DAYS_INVALID })
+  @ArrayUnique({ message: RESPONSE_MESSAGES.SHIFTS.WORKING_DAYS_INVALID })
+  @IsEnum(ShiftWorkingDay, { each: true, message: RESPONSE_MESSAGES.SHIFTS.WORKING_DAYS_INVALID })
   workingDays?: ShiftWorkingDay[];
 
   @ApiHideProperty()
   @ValidateIf((dto: AutoGenerateShiftsDto) => !dto.slotAssignments?.length && !dto.slotId)
-  @Matches(SHIFT_TIME_PATTERN)
+  @Matches(SHIFT_TIME_PATTERN, { message: RESPONSE_MESSAGES.SHIFT_SLOTS.START_TIME_FORMAT_INVALID })
   startTime?: string;
 
   @ApiHideProperty()
   @ValidateIf((dto: AutoGenerateShiftsDto) => !dto.slotAssignments?.length && !dto.slotId)
-  @Matches(SHIFT_TIME_PATTERN)
+  @Matches(SHIFT_TIME_PATTERN, { message: RESPONSE_MESSAGES.SHIFT_SLOTS.END_TIME_FORMAT_INVALID })
   endTime?: string;
 
   @ApiHideProperty()
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
+  @IsInt({ message: RESPONSE_MESSAGES.SHIFTS.MAX_APPOINTMENTS_INVALID })
+  @Min(1, { message: RESPONSE_MESSAGES.SHIFTS.MAX_APPOINTMENTS_INVALID })
+  @Max(100, { message: RESPONSE_MESSAGES.SHIFTS.MAX_APPOINTMENTS_INVALID })
   maxAppointments?: number | null;
 
   @ApiHideProperty()

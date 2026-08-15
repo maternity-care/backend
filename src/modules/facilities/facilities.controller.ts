@@ -27,8 +27,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SuspendResourceDto } from '../../common/dto/suspend-resource.dto';
 
 @ApiTags('Management - Facilities')
-// @ApiBearerAuth()
-// @UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('management/facilities')
 export class FacilitiesController {
   constructor(private readonly facilitiesService: FacilitiesService) {}
@@ -41,7 +41,7 @@ export class FacilitiesController {
   }
 
   @Get()
-  // @Permissions(PermissionEnum.FACILITY_VIEW)
+  @Permissions(PermissionEnum.FACILITY_VIEW)
   @ApiOperation({ summary: 'List facilities' })
   @ApiResponse({ status: 200, description: 'Facilities found', type: FacilityPaginatedResponseDto })
   async findAll(
@@ -86,7 +86,7 @@ export class FacilitiesController {
   }
 
   @Get('admin-options')
-  // @Permissions(PermissionEnum.FACILITY_VIEW)
+  @Permissions(PermissionEnum.FACILITY_VIEW)
   @ApiOperation({ summary: 'List admin accounts for assigning as facility owner/admin' })
   @ApiResponse({ status: 200, type: FacilityAdminOptionsPaginatedResponseDto })
   async findAdminOptions(@Query() query: SearchFacilityAdminOptionsDto) {
@@ -101,7 +101,7 @@ export class FacilitiesController {
   }
 
   @Get(':id')
-  // @Permissions(PermissionEnum.FACILITY_VIEW)
+  @Permissions(PermissionEnum.FACILITY_VIEW)
   @ApiOperation({ summary: 'Get facility details' })
   @ApiResponse({ status: 200, type: FacilityResponseDto })
   async findOne(
@@ -121,7 +121,7 @@ export class FacilitiesController {
   }
 
   @Post()
-  // @Permissions(PermissionEnum.FACILITY_CREATE)
+  @Permissions(PermissionEnum.FACILITY_CREATE)
   @ApiOperation({ summary: 'Create facility' })
   @ApiResponse({ status: 201, type: FacilityResponseDto })
   async create(@Body() dto: CreateFacilityDto) {
@@ -137,7 +137,7 @@ export class FacilitiesController {
   }
 
   @Post(':id/operating-hours/preview')
-  // @Permissions(PermissionEnum.FACILITY_UPDATE)
+  @Permissions(PermissionEnum.FACILITY_UPDATE)
   @ApiOperation({ summary: 'Preview facility operating hour changes and impacted upcoming shifts' })
   async previewOperatingHours(
     @CurrentUser() user: AuthenticatedUser,
@@ -156,7 +156,7 @@ export class FacilitiesController {
   }
 
   @Patch(':id/operating-hours/apply')
-  // @Permissions(PermissionEnum.FACILITY_UPDATE)
+  @Permissions(PermissionEnum.FACILITY_UPDATE)
   @ApiOperation({ summary: 'Apply facility operating hour changes with slot handling strategy' })
   async applyOperatingHours(
     @CurrentUser() user: AuthenticatedUser,
@@ -175,7 +175,7 @@ export class FacilitiesController {
   }
 
   @Patch(':id')
-  // @Permissions(PermissionEnum.FACILITY_UPDATE)
+  @Permissions(PermissionEnum.FACILITY_UPDATE)
   @ApiOperation({ summary: 'Update facility' })
   @ApiResponse({ status: 200, type: FacilityResponseDto })
   async update(
@@ -196,7 +196,7 @@ export class FacilitiesController {
   }
 
   @Patch(':id/suspend')
-  // @Permissions(PermissionEnum.FACILITY_UPDATE)
+  @Permissions(PermissionEnum.FACILITY_UPDATE)
   @ApiOperation({ summary: 'Suspend facility for a period or indefinitely' })
   @ApiResponse({ status: 200 })
   async suspend(
@@ -216,7 +216,7 @@ export class FacilitiesController {
   }
 
   @Patch(':id/reactivate')
-  // @Permissions(PermissionEnum.FACILITY_UPDATE)
+  @Permissions(PermissionEnum.FACILITY_UPDATE)
   @ApiOperation({ summary: 'Reactivate suspended facility' })
   @ApiResponse({ status: 200 })
   async reactivate(
@@ -236,7 +236,7 @@ export class FacilitiesController {
 
 
   @Delete(':id')
-  // @Permissions(PermissionEnum.FACILITY_DELETE)
+  @Permissions(PermissionEnum.FACILITY_DELETE)
   @ApiOperation({ summary: 'Delete facility' })
   @ApiResponse({ status: 200 })
   async remove(

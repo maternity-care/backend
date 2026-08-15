@@ -16,4 +16,5 @@ export const SERVICE_CONSTANT = {
   TYPE_NOT_FOUND: 'Không tìm thấy loại dịch vụ',
   TYPE_ACTIVE_NOT_FOUND: 'Loại dịch vụ không tồn tại hoặc đang ngừng hoạt động',
   TYPE_NAME_EXISTS: 'Tên loại dịch vụ đã tồn tại',
+  PRICE_INVALID: 'Giá dịch vụ phải là số tiền không âm, tối đa 13 chữ số phần nguyên và 2 chữ số thập phân',
 };

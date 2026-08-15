@@ -54,7 +54,7 @@ export class CreateShiftSlotDto {
   @ApiPropertyOptional({
     enum: SHIFT_SLOT_APPLICABLE_DAYS,
     isArray: true,
-    description: 'Neu khong gui, backend tu tinh cac ngay mo cua phu hop voi khung gio.',
+    description: 'Nếu không gửi, hệ thống tự xác định các ngày mở cửa phù hợp với khung giờ.',
     example: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
   })
   @IsOptional()

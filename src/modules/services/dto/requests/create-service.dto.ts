@@ -20,6 +20,7 @@ import {
 import { ActiveStatus } from '../../../../common/constants/status.enum';
 import { trimText, trimValue } from '../../../../common/helpers/dto-transform.helper';
 import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
+import { SERVICE_CONSTANT } from '../../../../common/constants/service.constant';
 
 // Quy định service có được bán lẻ hay chỉ được dùng bên trong gói.
 // Field này giúp FE/booking không hiển thị nhầm service "chỉ trong gói" ở màn mua dịch vụ lẻ.
@@ -48,7 +49,7 @@ export class CreateServiceFacilityAssignmentDto {
   @Transform(({ value }) => trimValue(value))
   @IsString()
   @Matches(MONEY_PATTERN, {
-    message: 'price phải là số tiền không âm, tối đa 13 chữ số và 2 số thập phân',
+    message: SERVICE_CONSTANT.PRICE_INVALID,
   })
   price?: string;
 
@@ -113,7 +114,7 @@ export class CreateServiceDto {
   @Transform(({ value }) => trimValue(value))
   @IsString()
   @Matches(MONEY_PATTERN, {
-    message: 'basePrice phải là số tiền không âm, tối đa 13 chữ số và 2 số thập phân',
+    message: SERVICE_CONSTANT.PRICE_INVALID,
   })
   basePrice: string;
 

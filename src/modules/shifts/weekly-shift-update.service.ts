@@ -28,11 +28,11 @@ export class WeeklyShiftUpdateService {
     const removedIds = new Set(dto.removedShiftIds ?? []);
 
     if (submittedIds.size !== dto.shifts.filter(item => item.shiftId).length) {
-      throw new BadRequestException('Mot ca truc khong duoc gui lap lai trong lich tuan.');
+      throw new BadRequestException('Một ca trực không được xuất hiện lặp lại trong cùng yêu cầu cập nhật lịch tuần.');
     }
     for (const shiftId of submittedIds) {
       if (removedIds.has(shiftId)) {
-        throw new BadRequestException(`Ca truc ${shiftId} khong the vua cap nhat vua xoa.`);
+        throw new BadRequestException(`Ca trực ${shiftId} không thể vừa được cập nhật vừa được xóa.`);
       }
     }
 
@@ -46,17 +46,17 @@ export class WeeklyShiftUpdateService {
     for (const [index, shiftId] of [...removedIds].entries()) {
       const shift = existingById.get(shiftId);
       if (!shift) {
-        blocked.push({ index, action: 'remove', shiftId, reason: 'Ca truc khong thuoc tuan hoac co so dang cap nhat.' });
+        blocked.push({ index, action: 'remove', shiftId, reason: 'Ca trực không thuộc tuần hoặc cơ sở đang cập nhật.' });
         continue;
       }
 
       try {
         if (isShiftInPast(shift.shiftDate, shift.startTime, shift.endTime)) {
-          throw new ConflictException('Ca truc trong qua khu chi duoc xem chi tiet.');
+          throw new ConflictException('Ca trực trong quá khứ chỉ được phép xem chi tiết.');
         }
         const appointments = await this.repository.findAppointmentsForShift(shift);
         if (appointments.length > 0) {
-          throw new ConflictException('Ca truc da co lich hen, khong the bo khoi lich tuan; hay huy ca de xu ly disruption.');
+          throw new ConflictException('Ca trực đã có lịch hẹn nên không thể xóa khỏi lịch tuần. Hãy hủy ca để xử lý các lịch hẹn bị ảnh hưởng.');
         }
         await this.shiftsService.remove(shift.id, 'Bo khoi lich khi cap nhat tuan', changedBy);
         removedShiftIds.push(shift.id);
@@ -73,7 +73,7 @@ export class WeeklyShiftUpdateService {
           action: 'update',
           shiftId: item.shiftId,
           shiftDate: item.shiftDate,
-          reason: 'Ca truc khong thuoc tuan hoac co so dang cap nhat.',
+          reason: 'Ca trực không thuộc tuần hoặc cơ sở đang cập nhật.',
         });
         continue;
       }
@@ -140,17 +140,17 @@ export class WeeklyShiftUpdateService {
   private validateWeekInput(dto: WeeklyUpdateShiftsDto): void {
     const weekEnd = addDays(dto.weekStart, 6);
     if (new Date(`${dto.weekStart}T00:00:00+07:00`).getDay() !== 1) {
-      throw new BadRequestException('weekStart phai la ngay Thu Hai.');
+      throw new BadRequestException('Ngày bắt đầu tuần phải là thứ Hai.');
     }
     if (dto.shifts.length === 0 && (dto.removedShiftIds?.length ?? 0) === 0) {
-      throw new BadRequestException('Can gui it nhat mot ca can tao, cap nhat hoac xoa.');
+      throw new BadRequestException('Vui lòng gửi ít nhất một ca trực cần tạo, cập nhật hoặc xóa.');
     }
     for (const item of dto.shifts) {
       if (item.shiftDate < dto.weekStart || item.shiftDate > weekEnd) {
-        throw new BadRequestException(`Ngay ${item.shiftDate} khong nam trong tuan ${dto.weekStart} - ${weekEnd}.`);
+        throw new BadRequestException(`Ngày ${item.shiftDate} không nằm trong tuần ${dto.weekStart} đến ${weekEnd}.`);
       }
       if (![DoctorShiftStatus.AVAILABLE, DoctorShiftStatus.OFF].includes(item.status)) {
-        throw new BadRequestException('Lich tuan chi chap nhan trang thai available hoac off.');
+        throw new BadRequestException('Lịch tuần chỉ chấp nhận trạng thái có thể đặt lịch hoặc nghỉ.');
       }
     }
   }
@@ -175,6 +175,6 @@ export class WeeklyShiftUpdateService {
         return Array.isArray(message) ? message.join('; ') : String(message);
       }
     }
-    return error instanceof Error ? error.message : 'Khong the cap nhat ca truc.';
+    return error instanceof Error ? error.message : 'Không thể cập nhật ca trực.';
   }
 }

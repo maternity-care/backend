@@ -10,4 +10,5 @@ export const FACILITY_SERVICE_CONSTANT = {
   BULK_ALREADY_EXISTS: 'Một hoặc nhiều dịch vụ đã được gán cho cơ sở này',
   FACILITY_INACTIVE: 'Cơ sở không hoạt động',
   SERVICE_INACTIVE: 'Dịch vụ gốc không hoạt động',
+  PRICE_INVALID: 'Giá dịch vụ tại cơ sở phải là số tiền không âm, tối đa 13 chữ số phần nguyên và 2 chữ số thập phân',
 };

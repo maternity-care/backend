@@ -60,7 +60,7 @@ export class CreateFacilityDto {
 
   @ApiPropertyOptional({
     type: [FacilityOperatingHourGroupDto],
-    description: 'Khung gio hoat dong moi. Neu khong gui, backend tao mac dinh T2-T7 07:00-17:00, CN dong cua.',
+    description: 'Giờ hoạt động của cơ sở. Nếu không gửi, hệ thống mặc định mở từ thứ Hai đến thứ Bảy, 07:00-17:00; Chủ nhật đóng cửa.',
   })
   @IsOptional()
   @IsArray()

@@ -435,7 +435,7 @@ export class RoomsService {
 
   private ensureStatusIsNotUpdated(dto: UpdateRoomDto): void {
     if (Object.prototype.hasOwnProperty.call(dto, 'status')) {
-      throw new BadRequestException('Khong doi status bang API update thong tin. Hay dung /suspend hoac /reactivate.');
+      throw new BadRequestException('Không cập nhật trạng thái qua API chỉnh sửa thông tin. Hãy dùng thao tác tạm ngừng hoặc kích hoạt lại phòng.');
     }
   }
 

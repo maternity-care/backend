@@ -225,7 +225,10 @@ export class FacilityServicesService {
     }
 
     Object.assign(entity, dto);
-    const saved = await this.repository.save(entity);
+    // Inactive đồng nghĩa dịch vụ không còn được phép nằm trong cấu hình gói của cơ sở.
+    const saved = dto.status === ActiveStatus.INACTIVE
+      ? await this.repository.saveAndDetachFromPackages(entity)
+      : await this.repository.save(entity);
     return {
       ...(await this.findDetailsById(saved.id)),
       price: saved.price,
@@ -248,7 +251,8 @@ export class FacilityServicesService {
       return { action: 'hard_deleted', affectedCount: 0 };
     }
 
-    await this.repository.updateStatus(entity, ActiveStatus.INACTIVE);
+    entity.status = ActiveStatus.INACTIVE;
+    await this.repository.saveAndDetachFromPackages(entity);
     return { action: 'soft_deleted', affectedCount: dependencyCount };
   }
 

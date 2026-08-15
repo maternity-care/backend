@@ -17,6 +17,7 @@ import { ActiveStatus } from '../../../../common/constants/status.enum';
 import { trimValue } from '../../../../common/helpers/dto-transform.helper';
 import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
 import { MONEY_PATTERN } from '../../../services/dto/requests/create-service.dto';
+import { FACILITY_SERVICE_CONSTANT } from '../../../../common/constants/facility-service.constant';
 
 export class CreateFacilityServiceDto {
   @ApiProperty({ example: '1' })
@@ -33,7 +34,7 @@ export class CreateFacilityServiceDto {
   @Transform(({ value }) => trimValue(value))
   @IsString()
   @Matches(MONEY_PATTERN, {
-    message: 'price phải là số tiền không âm, tối đa 13 chữ số và 2 số thập phân',
+    message: FACILITY_SERVICE_CONSTANT.PRICE_INVALID,
   })
   price: string;
 
@@ -64,7 +65,7 @@ export class BulkFacilityServiceItemDto {
   @Transform(({ value }) => trimValue(value))
   @IsString()
   @Matches(MONEY_PATTERN, {
-    message: 'price phải là số tiền không âm, tối đa 13 chữ số và 2 số thập phân',
+    message: FACILITY_SERVICE_CONSTANT.PRICE_INVALID,
   })
   price?: string;
 

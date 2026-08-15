@@ -70,7 +70,7 @@ export class PublicForumsController {
     @Param('id') id: string,
     @Body() dto: UpdateForumPostDto,
   ) {
-    return { message: 'Da cap nhat bai viet', data: await this.forumsService.updateOwnPost(id, dto, user) };
+    return { message: 'Đã cập nhật bài viết', data: await this.forumsService.updateOwnPost(id, dto, user) };
   }
 
   @Post('posts/:id/comments')
@@ -94,7 +94,7 @@ export class PublicForumsController {
     @Param('id') id: string,
     @Body() dto: UpdateForumCommentDto,
   ) {
-    return { message: 'Da cap nhat binh luan', data: await this.forumsService.updateOwnComment(id, dto, user) };
+    return { message: 'Đã cập nhật bình luận', data: await this.forumsService.updateOwnComment(id, dto, user) };
   }
 
   @Post('reports')

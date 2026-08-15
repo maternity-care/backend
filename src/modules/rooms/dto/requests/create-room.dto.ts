@@ -43,7 +43,7 @@ export class CreateRoomDto {
   @Transform(({ value }) => trimText(value))
   @IsString()
   @IsNotEmpty()
-  @Matches(POSITIVE_ID_PATTERN, { message: 'floor must be a positive integer string' })
+  @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.ROOMS.FLOOR_INVALID })
   floor: string;
 
   @ApiProperty({ enum: ActiveStatus })
@@ -66,7 +66,7 @@ export class BulkCreateRoomsPreviewDto extends BulkCreateRoomsDto {
     example: true,
     required: false,
     description:
-      'true: confirm chi luu cac phong hop le; false: neu con dong loi thi khong luu dong nao',
+      'Bật: chỉ lưu các phòng hợp lệ; tắt: nếu có bất kỳ dòng lỗi nào thì không lưu phòng nào.',
   })
   @IsOptional()
   @IsBoolean()

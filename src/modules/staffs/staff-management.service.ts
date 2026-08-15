@@ -75,17 +75,21 @@ export class StaffManagementService {
       searchValue('keyword') || query.name || query.email || query.phone || query.cccd;
     const role = searchValue('role');
     const roleId = searchValue('roleId') || query.roleId;
-    const facilityId = searchValue('facilityId') || query.facilityId;
+    const requestedFacilityId = searchValue('facilityId') || query.facilityId;
     const status = searchValue('status') || query.status;
     const normalizedKeyword = keyword?.trim().toLowerCase();
     const normalizedRole = role?.trim().toLowerCase();
     const normalizedRoleId = roleId?.trim();
-    const normalizedFacilityId = facilityId?.trim();
+    const actorIsSuperAdmin = isSuperAdmin(actor);
+    const scopedFacilityId = actorIsSuperAdmin
+      ? requestedFacilityId?.trim()
+      : getActiveFacilityId(actor);
 
     const staffs = await this.staffProfileRepository.findAll();
     const filteredStaffs = staffs.filter((staff) => {
       if (status && staff.status !== status) return false;
-      if (normalizedFacilityId && String(staff.facilityId) !== normalizedFacilityId) return false;
+      if (scopedFacilityId && String(staff.facilityId) !== String(scopedFacilityId)) return false;
+      if (!actorIsSuperAdmin && this.hasRoleName(staff, RoleEnum.SUPER_ADMIN)) return false;
       if (
         normalizedKeyword &&
         ![staff.name, staff.email, staff.personalEmail, staff.phone, staff.employeeCode]
@@ -130,6 +134,8 @@ export class StaffManagementService {
   }
 
   async create(dto: AdminCreateUserDto, actor: AuthenticatedUser) {
+    this.assertSingleFacilityAssignment(dto.facilityAssignments);
+    this.assertNoSuperAdminAssignment(dto.facilityAssignments);
     const facilityAssignments = this.getScopedAssignments(dto.facilityAssignments, actor);
     const assignments = await this.resolveFacilityAssignments(facilityAssignments);
     const hasDoctorRole = facilityAssignments.some((assignment) =>
@@ -154,6 +160,12 @@ export class StaffManagementService {
     if (isPersonalEmailExists) {
       throw new ConflictException(
         'Email cá nhân đã tồn tại trong hệ thống. Vui lòng sử dụng email khác.',
+      );
+    }
+    const existingPhone = await this.staffProfileRepository.findByPhone(dto.phone);
+    if (existingPhone) {
+      throw new ConflictException(
+        'Số điện thoại đã tồn tại trong hệ thống. Vui lòng sử dụng số khác.',
       );
     }
 
@@ -203,6 +215,10 @@ export class StaffManagementService {
 
   async update(id: string, dto: UpdateUserDto, actor: AuthenticatedUser) {
     await this.assertStaffAccess(id, actor);
+    if (dto.facilityAssignments) {
+      this.assertSingleFacilityAssignment(dto.facilityAssignments);
+      this.assertNoSuperAdminAssignment(dto.facilityAssignments);
+    }
     const facilityAssignments = dto.facilityAssignments
       ? this.getScopedAssignments(dto.facilityAssignments, actor)
       : null;
@@ -211,8 +227,25 @@ export class StaffManagementService {
       : null;
     const staff = await this.staffProfileRepository.findById(id);
     if (!staff) throw new NotFoundException('Không tìm thấy nhân viên.');
+    if (dto.phone && dto.phone !== staff.phone) {
+      const existingPhone = await this.staffProfileRepository.findByPhone(dto.phone);
+      if (existingPhone && existingPhone.id !== staff.id) {
+        throw new ConflictException(
+          'Số điện thoại đã tồn tại trong hệ thống. Vui lòng sử dụng số khác.',
+        );
+      }
+    }
+    if (dto.email && dto.email !== staff.email) {
+      const existingEmail = await this.staffProfileRepository.findByEmail(dto.email);
+      if (existingEmail && existingEmail.id !== staff.id) {
+        throw new ConflictException(
+          'Email đăng nhập đã tồn tại trong hệ thống. Vui lòng sử dụng email khác.',
+        );
+      }
+    }
 
     staff.name = dto.name ?? staff.name;
+    staff.email = dto.email ?? staff.email;
     staff.phone = dto.phone ?? staff.phone;
     staff.status = dto.status ?? staff.status;
     staff.avatar = dto.avatar ?? staff.avatar;
@@ -376,14 +409,39 @@ export class StaffManagementService {
     }
 
     const staff = await this.staffProfileRepository.findById(staffId);
-    if (!staff || String(staff.facilityId) !== String(activeFacilityId)) {
+    if (
+      !staff ||
+      String(staff.facilityId) !== String(activeFacilityId) ||
+      this.hasRoleName(staff, RoleEnum.SUPER_ADMIN)
+    ) {
       throw new ForbiddenException('Bạn không có quyền thao tác nhân viên ngoài cơ sở đang chọn.');
+    }
+  }
+
+  private hasRoleName(staff: Staff, roleName: RoleEnum | string): boolean {
+    return (staff.roles ?? []).some((role) => role.name === roleName);
+  }
+
+  private assertNoSuperAdminAssignment(assignments?: FacilityStaffAssignmentDto[]): void {
+    if (
+      assignments?.some((assignment) =>
+        assignment.roles.some((role) => String(role) === RoleEnum.SUPER_ADMIN),
+      )
+    ) {
+      throw new ForbiddenException('Không được gán Super Admin từ màn quản lý nhân viên.');
+    }
+  }
+
+  private assertSingleFacilityAssignment(assignments?: FacilityStaffAssignmentDto[]): void {
+    if (!assignments || assignments.length !== 1) {
+      throw new BadRequestException('Mỗi nhân viên chỉ được thuộc một cơ sở.');
     }
   }
 
   private async resolveFacilityAssignments(
     assignments: FacilityStaffAssignmentDto[],
   ): Promise<ResolvedFacilityAssignment[]> {
+    this.assertSingleFacilityAssignment(assignments);
     if (assignments.length === 0) {
       throw new ConflictException('Nhân viên phải thuộc ít nhất một cơ sở.');
     }

@@ -272,7 +272,6 @@ async function insertRolePermission() {
       PermissionEnum.CONSULTATION_REPLY,
       PermissionEnum.FORUM_VIEW,
       PermissionEnum.FORUM_CREATE,
-      PermissionEnum.FORUM_MODERATE,
     ],
     [RoleEnum.NURSE]: [
       PermissionEnum.MEMBER_VIEW,
@@ -322,6 +321,11 @@ async function insertRolePermission() {
       PermissionEnum.ARTICLE_VIEW,
       PermissionEnum.FORUM_VIEW,
       PermissionEnum.FORUM_CREATE,
+      PermissionEnum.FORUM_UPDATE,
+      PermissionEnum.FORUM_DELETE,
+      PermissionEnum.FORUM_MODERATE,
+      PermissionEnum.FORUM_REPORT_VIEW,
+      PermissionEnum.FORUM_REPORT_RESOLVE,
     ],
     [RoleEnum.MODERATOR]: [
       PermissionEnum.FORUM_VIEW,

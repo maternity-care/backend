@@ -21,6 +21,7 @@ import {
   shiftIntervalsOverlap,
   timesOverlap,
   timeToMinutes,
+  validateBulkCreateWeek,
 } from './helpers/shifts.helper';
 import { ShiftsController } from './shifts.controller';
 import { ShiftsRepository } from './repositories/shifts.repository';
@@ -1747,6 +1748,17 @@ describe('ShiftsService business validation', () => {
 });
 
 describe('DoctorShifts helper functions', () => {
+  it('accepts 17/08/2026 as next Monday and rejects the same date in 2025', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-15T03:00:00.000Z'));
+
+    expect(() => validateBulkCreateWeek('2026-08-17', '2026-08-23')).not.toThrow();
+    expect(() => validateBulkCreateWeek('2025-08-17', '2025-08-23')).toThrow(
+      'Tuần hợp lệ hiện tại: 17/08/2026 đến 23/08/2026',
+    );
+
+    jest.useRealTimers();
+  });
+
   // Vai tro: kiem tra helper so sanh overlap dung ca truong hop cham bien khong tinh la trung.
   it('TC-UNIT-DSHIFT-058 detects overlap and non-overlap at boundaries', () => {
     expect(timesOverlap('08:00', '10:00', '09:00', '11:00')).toBe(true);

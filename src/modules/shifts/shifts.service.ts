@@ -459,6 +459,25 @@ export class ShiftsService {
     };
   }
 
+  /** Public booking chỉ cần ca trực có bác sĩ, không trả ca vận hành/nurse/staff khác. */
+  async getPublicWeeklyDoctorSchedule(facilityId: string, weekStart?: string, doctorId?: string) {
+    const { start, end } = await this.validator.prepareWeeklyRange(
+      facilityId,
+      weekStart,
+      doctorId,
+    );
+    const shifts = await this.repository.findWeeklyDoctorShiftsWithDetails(facilityId, start, end, doctorId);
+    return {
+      facilityId,
+      weekStart: start,
+      weekEnd: end,
+      days: Array.from({ length: 7 }, (_, index) => {
+        const date = addDays(start, index);
+        return { date, shifts: shifts.filter(shift => shift.shiftDate === date) };
+      }),
+    };
+  }
+
   async getGroupedSchedule(query: GroupedDoctorShiftDto) {
     validateDateRange(query.dateFrom, query.dateTo);
     const shifts = query.forTemplate
@@ -727,10 +746,14 @@ export class ShiftsService {
       payload: CreateDoctorShiftDto;
     }> = [];
 
+    //kiểm tra khoảng khung ca
     if (dto.slotAssignments?.length) {
+      //Duyệt qua từng Khung giờ (Slot)
       for (const [slotAssignmentIndex, slotAssignment] of dto.slotAssignments.entries()) {
+        //Duyệt qua từng Assignment (bác sĩ, phòng, role, max appointment) trong Slot
         for (const [assignmentIndex, assignment] of slotAssignment.assignments.entries()) {
           const dates = buildShiftDates(range.fromDate, range.toDate, assignment.workingDays);
+          //Nếu trong khoảng thời gian (range) được chọn KHÔNG TỒN TẠI thứ nào khớp với workingDays
           if (dates.length === 0) {
             skippedItems.push({
               index: inputs.length + skippedItems.length,

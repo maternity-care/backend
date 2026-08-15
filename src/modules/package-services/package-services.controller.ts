@@ -19,8 +19,8 @@ import { RESPONSE_MESSAGES } from '../../common/constants/response-message.const
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Management - Maternity Package Items')
-// @ApiBearerAuth()
-// @UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('management/package-services')
 export class PackageServicesController {
   constructor(
@@ -29,7 +29,7 @@ export class PackageServicesController {
   ) {}
 
   @Get()
-  // @Permissions(PermissionEnum.SERVICE_PACKAGE_VIEW)
+  @Permissions(PermissionEnum.SERVICE_PACKAGE_VIEW)
   @ApiOperation({ summary: 'List services inside maternity packages' })
   async findAll(
     @CurrentUser() userOrQuery: AuthenticatedUser | SearchPackageServiceDto | undefined,
@@ -54,7 +54,7 @@ export class PackageServicesController {
   }
 
   @Get(':id')
-  // @Permissions(PermissionEnum.SERVICE_PACKAGE_VIEW)
+  @Permissions(PermissionEnum.SERVICE_PACKAGE_VIEW)
   @ApiOperation({ summary: 'Get package service item details' })
   async findOne(
     @CurrentUser() userOrId: AuthenticatedUser | string | undefined,
@@ -75,7 +75,7 @@ export class PackageServicesController {
   }
 
   @Patch(':id')
-  // @Permissions(PermissionEnum.SERVICE_PACKAGE_UPDATE)
+  @Permissions(PermissionEnum.SERVICE_PACKAGE_UPDATE)
   @ApiOperation({ summary: 'Update package service item' })
   async update(
     @CurrentUser() userOrId: AuthenticatedUser | string | undefined,
@@ -102,7 +102,7 @@ export class PackageServicesController {
   }
 
   @Delete(':id')
-  // @Permissions(PermissionEnum.SERVICE_PACKAGE_DELETE)
+  @Permissions(PermissionEnum.SERVICE_PACKAGE_DELETE)
   @ApiOperation({ summary: 'Remove package service item safely' })
   async remove(
     @CurrentUser() userOrId: AuthenticatedUser | string | undefined,

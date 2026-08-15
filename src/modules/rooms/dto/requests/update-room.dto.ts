@@ -26,7 +26,7 @@ export class UpdateRoomDto {
   @Transform(({ value }) => trimText(value))
   @IsString()
   @IsNotEmpty()
-  @Matches(POSITIVE_ID_PATTERN, { message: 'floor must be a positive integer string' })
+  @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.ROOMS.FLOOR_INVALID })
   floor?: string;
 
 }
