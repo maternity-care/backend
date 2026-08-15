@@ -135,6 +135,7 @@ export class StaffManagementService {
   }
 
   async create(dto: AdminCreateUserDto, actor: AuthenticatedUser) {
+    this.assertSingleFacilityAssignment(dto.facilityAssignments);
     this.assertNoSuperAdminAssignment(dto.facilityAssignments);
     const facilityAssignments = this.getScopedAssignments(dto.facilityAssignments, actor);
     const assignments = await this.resolveFacilityAssignments(facilityAssignments);
@@ -160,6 +161,12 @@ export class StaffManagementService {
     if (isPersonalEmailExists) {
       throw new ConflictException(
         'Email cá nhân đã tồn tại trong hệ thống. Vui lòng sử dụng email khác.',
+      );
+    }
+    const existingPhone = await this.staffProfileRepository.findByPhone(dto.phone);
+    if (existingPhone) {
+      throw new ConflictException(
+        'Số điện thoại đã tồn tại trong hệ thống. Vui lòng sử dụng số khác.',
       );
     }
 
@@ -210,6 +217,7 @@ export class StaffManagementService {
   async update(id: string, dto: UpdateUserDto, actor: AuthenticatedUser) {
     await this.assertStaffAccess(id, actor);
     if (dto.facilityAssignments) {
+      this.assertSingleFacilityAssignment(dto.facilityAssignments);
       this.assertNoSuperAdminAssignment(dto.facilityAssignments);
     }
     const facilityAssignments = dto.facilityAssignments
@@ -220,8 +228,25 @@ export class StaffManagementService {
       : null;
     const staff = await this.staffProfileRepository.findById(id);
     if (!staff) throw new NotFoundException('Không tìm thấy nhân viên.');
+    if (dto.phone && dto.phone !== staff.phone) {
+      const existingPhone = await this.staffProfileRepository.findByPhone(dto.phone);
+      if (existingPhone && existingPhone.id !== staff.id) {
+        throw new ConflictException(
+          'Số điện thoại đã tồn tại trong hệ thống. Vui lòng sử dụng số khác.',
+        );
+      }
+    }
+    if (dto.email && dto.email !== staff.email) {
+      const existingEmail = await this.staffProfileRepository.findByEmail(dto.email);
+      if (existingEmail && existingEmail.id !== staff.id) {
+        throw new ConflictException(
+          'Email đăng nhập đã tồn tại trong hệ thống. Vui lòng sử dụng email khác.',
+        );
+      }
+    }
 
     staff.name = dto.name ?? staff.name;
+    staff.email = dto.email ?? staff.email;
     staff.phone = dto.phone ?? staff.phone;
     staff.status = dto.status ?? staff.status;
     staff.avatar = dto.avatar ?? staff.avatar;
@@ -408,9 +433,16 @@ export class StaffManagementService {
     }
   }
 
+  private assertSingleFacilityAssignment(assignments?: FacilityStaffAssignmentDto[]): void {
+    if (!assignments || assignments.length !== 1) {
+      throw new BadRequestException('Mỗi nhân viên chỉ được thuộc một cơ sở.');
+    }
+  }
+
   private async resolveFacilityAssignments(
     assignments: FacilityStaffAssignmentDto[],
   ): Promise<ResolvedFacilityAssignment[]> {
+    this.assertSingleFacilityAssignment(assignments);
     if (assignments.length === 0) {
       throw new ConflictException('Nhân viên phải thuộc ít nhất một cơ sở.');
     }

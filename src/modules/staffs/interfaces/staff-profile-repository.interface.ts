@@ -7,6 +7,7 @@ export interface IStaffProfileRepository {
   findById(id: string): Promise<Staff | null>;
   findByEmail(email: string): Promise<Staff | null>;
   findByEmailWithPassword(email: string): Promise<Staff | null>;
+  findByPhone(phone: string): Promise<Staff | null>;
   findByEmployeeCode(employeeCode: string): Promise<Staff | null>;
   findAll(): Promise<Staff[]>;
   create(data: DeepPartial<Staff>): Promise<Staff>;

@@ -51,6 +51,13 @@ export class StaffProfileRepository implements IStaffProfileRepository {
     });
   }
 
+  async findByPhone(phone: string): Promise<Staff | null> {
+    return this.repository.findOne({
+      where: { phone },
+      relations: { roles: { permissions: true } },
+    });
+  }
+
   async findByEmailWithPassword(email: string): Promise<Staff | null> {
     return this.repository
       .createQueryBuilder('staff')
