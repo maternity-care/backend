@@ -9,6 +9,7 @@ import { FacilitiesModule } from '../facilities/facilities.module';
 import { RoomsModule } from '../rooms/rooms.module';
 import { AppointmentDisruptionsModule } from '../appointment-disruptions/appointment-disruptions.module';
 import { ShiftsController } from './shifts.controller';
+import { PublicShiftsController } from './public-shifts.controller';
 import { ShiftSlotsController } from './shift-slots.controller';
 import { ShiftsService } from './shifts.service';
 import { ShiftSlotsService } from './shift-slots.service';
@@ -35,7 +36,7 @@ import { WeeklyShiftUpdateService } from './weekly-shift-update.service';
     NotificationsModule,
     MailModule,
   ],
-  controllers: [ShiftsController, ShiftSlotsController],
+  controllers: [ShiftsController, PublicShiftsController, ShiftSlotsController],
   providers: [
     ShiftsService,
     ShiftSlotsService,
