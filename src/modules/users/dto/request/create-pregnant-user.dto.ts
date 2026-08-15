@@ -18,6 +18,11 @@ export class CreatePregnantUserDto {
   })
   phone: string;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  avatar?: string | null;
+
   @ApiPropertyOptional({ description: 'Số CCCD gồm 12 chữ số' })
   @IsOptional()
   @Matches(/^\d{12}$/, { message: 'cccd phải gồm đúng 12 chữ số.' })

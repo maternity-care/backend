@@ -28,7 +28,7 @@ export class UsersRepository implements IUsersRepository {
 
   findAll(): Promise<User[]> {
     return this.repository.find({
-      order: { id: 'ASC' },
+      order: { id: 'DESC' },
     });
   }
 
@@ -154,7 +154,7 @@ export class UsersRepository implements IUsersRepository {
       .orderBy('user.priorityLevel', sort)
       .addOrderBy('pregnancyProfile.createdAt', sort)
       .addOrderBy('pregnancyProfile.riskLevel', sort)
-      .addOrderBy('user.id', 'ASC')
+      .addOrderBy('user.id', 'DESC')
       .skip(offset)
       .take(limit);
 

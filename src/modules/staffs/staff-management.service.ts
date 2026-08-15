@@ -126,6 +126,7 @@ export class StaffManagementService {
   async findById(id: string, actor: AuthenticatedUser) {
     await this.assertStaffAccess(id, actor);
     const staff = await this.staffProfileRepository.findById(id);
+    console.log('============================', staff);
     return staff ? await this.toManagementStaff(staff, actor) : null;
   }
 

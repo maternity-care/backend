@@ -1,3 +1,7 @@
+import {
+  buildCodePrefixFromName,
+  buildNextCodeFromExisting,
+} from 'src/common/helpers/code-generator.helper';
 import { User } from './../../modules/users/entities/user.entity';
 import { Room } from './../../modules/rooms/entities/room.entity';
 import { RoomType } from './../entities/room-type.entity';
@@ -47,12 +51,19 @@ import {
   Shift,
   ShiftSlot,
   UserAuth,
+  MedicalFile,
 } from '../entities';
-import { MaternityPackageStageType, MaternityPackageType } from '../../modules/maternity-packages/dto/requests/create-maternity-package.dto';
+import {
+  MaternityPackageStageType,
+  MaternityPackageType,
+} from '../../modules/maternity-packages/dto/requests/create-maternity-package.dto';
 import { PackageServiceFacilityScope } from '../../modules/package-services/dto/requests/create-package-service.dto';
 import { ServiceSaleMode } from '../../modules/services/dto/requests/create-service.dto';
 import { ForumAuthorRole, ForumCategory } from '../../common/constants/forum.enum';
-import { NotificationReferenceType, NotificationType } from '../../common/constants/notification.enum';
+import {
+  NotificationReferenceType,
+  NotificationType,
+} from '../../common/constants/notification.enum';
 import { PackageServiceFacility } from '../../modules/package-services/entities/package-service-facility.entity';
 import { PackageStage } from '../../modules/maternity-packages/entities/package-stage.entity';
 import { OrderType } from '../../modules/payment/entities/order.entity';
@@ -62,7 +73,7 @@ import { Setting } from '../../modules/settings/entities/setting.entity';
 import { Notification } from '../../modules/notifications/entities/notification.entity';
 import { UserSchedule } from '../../modules/schedules/entities/user-schedule.entity';
 import * as bcrypt from 'bcrypt';
-import { Not, In } from 'typeorm';
+import { Not, In, DeepPartial } from 'typeorm';
 
 // khởi tạo global repository
 const roleRepository = dataSource.getRepository(Role);
@@ -100,6 +111,7 @@ const forumCommentRepository = dataSource.getRepository(ForumComment);
 const settingRepository = dataSource.getRepository(Setting);
 const scheduleRepository = dataSource.getRepository(UserSchedule);
 const notificationRepository = dataSource.getRepository(Notification);
+const medicalFileRepository = dataSource.getRepository(MedicalFile);
 
 //---------------------------------
 
@@ -386,6 +398,159 @@ async function insertRolePermission() {
   }
 }
 
+async function insertRoomTypes() {
+  const roomTypes = [
+    {
+      name: 'Phòng lễ tân',
+      description:
+        'Khu vực tiếp đón người bệnh, kiểm tra thông tin lịch hẹn, hướng dẫn thủ tục và thực hiện check-in.',
+    },
+    {
+      name: 'Phòng chờ',
+      description:
+        'Khu vực dành cho người bệnh và người nhà chờ đến lượt khám hoặc sử dụng dịch vụ.',
+    },
+    {
+      name: 'Phòng tư vấn',
+      description:
+        'Phòng dành cho bác sĩ hoặc nhân viên y tế tư vấn sức khỏe và hướng dẫn chăm sóc thai kỳ.',
+    },
+    {
+      name: 'Phòng khám sản',
+      description:
+        'Phòng thực hiện thăm khám sản khoa, đánh giá tình trạng sức khỏe của mẹ và quá trình phát triển của thai nhi.',
+    },
+    {
+      name: 'Phòng khám tổng quát',
+      description:
+        'Phòng thực hiện khám sức khỏe tổng quát và đánh giá các chỉ số sức khỏe cơ bản.',
+    },
+    {
+      name: 'Phòng siêu âm',
+      description:
+        'Phòng được trang bị thiết bị phục vụ việc siêu âm và theo dõi sự phát triển của thai nhi.',
+    },
+    {
+      name: 'Phòng lấy mẫu xét nghiệm',
+      description: 'Phòng tiếp nhận và lấy các loại mẫu xét nghiệm theo chỉ định của bác sĩ.',
+    },
+    {
+      name: 'Phòng xét nghiệm',
+      description:
+        'Khu vực thực hiện phân tích mẫu và xử lý các kết quả xét nghiệm phục vụ hoạt động khám chữa bệnh.',
+    },
+    {
+      name: 'Phòng thủ thuật',
+      description: 'Phòng thực hiện các thủ thuật y tế phù hợp với phạm vi chuyên môn của cơ sở.',
+    },
+    {
+      name: 'Phòng điều dưỡng',
+      description: 'Phòng làm việc của điều dưỡng, phục vụ theo dõi và hỗ trợ chăm sóc người bệnh.',
+    },
+    {
+      name: 'Phòng làm việc bác sĩ',
+      description:
+        'Phòng làm việc chuyên môn, kiểm tra hồ sơ và trao đổi nghiệp vụ dành cho bác sĩ.',
+    },
+    {
+      name: 'Phòng làm việc nhân viên',
+      description: 'Phòng làm việc dành cho nhân viên hành chính và nhân viên vận hành của cơ sở.',
+    },
+    {
+      name: 'Phòng quản lý',
+      description: 'Phòng làm việc dành cho quản lý cơ sở và xử lý các công việc điều hành.',
+    },
+    {
+      name: 'Phòng họp',
+      description:
+        'Phòng tổ chức họp, trao đổi chuyên môn, đào tạo và điều phối hoạt động của nhân viên.',
+    },
+    {
+      name: 'Phòng lưu trữ hồ sơ',
+      description: 'Khu vực quản lý và lưu trữ hồ sơ, tài liệu chuyên môn của cơ sở.',
+    },
+    {
+      name: 'Kho vật tư y tế',
+      description:
+        'Khu vực lưu trữ dụng cụ, vật tư và thiết bị phục vụ hoạt động chuyên môn của cơ sở.',
+    },
+    {
+      name: 'Phòng cấp phát thuốc',
+      description: 'Khu vực tiếp nhận đơn và cấp phát thuốc theo quy định và chỉ định chuyên môn.',
+    },
+    {
+      name: 'Quầy thanh toán',
+      description:
+        'Khu vực tiếp nhận thanh toán, xử lý hóa đơn và hướng dẫn các vấn đề liên quan đến chi phí dịch vụ.',
+    },
+    {
+      name: 'Phòng nghỉ nhân viên',
+      description: 'Phòng nghỉ giữa ca dành cho bác sĩ, điều dưỡng và các nhân viên của cơ sở.',
+    },
+    {
+      name: 'Phòng kỹ thuật và giám sát',
+      description:
+        'Phòng dành cho thiết bị công nghệ, hệ thống giám sát và hoạt động hỗ trợ kỹ thuật.',
+    },
+  ];
+
+  const getNextSequence = (existingCodes: string[], prefix: string, padding: number) => {
+    const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`^${escapedPrefix}[-_](\\d+)$`);
+    const maxSequence = existingCodes.reduce((max, code) => {
+      if (code === prefix) return Math.max(max, 1);
+      const match = code.match(pattern);
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0);
+
+    return maxSequence + 1;
+  };
+
+  const buildCodePrefixFromName = (name: string) => {
+    const normalized = String(name)
+      .trim()
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase();
+
+    return normalized ? normalized.split(' ').join('_').slice(0, 40) : 'ROOM_TYPE';
+  };
+
+  const generateRoomTypeCode = async (name: string) => {
+    const prefix = buildCodePrefixFromName(name);
+    const rows = await roomTypeRepository
+      .createQueryBuilder('roomType')
+      .withDeleted()
+      .select('roomType.code', 'code')
+      .where('roomType.code LIKE :pattern', { pattern: `${prefix}%` })
+      .getRawMany<{ code: string }>();
+
+    const existingCodes = rows.map((row) => row.code);
+    const nextSequence = getNextSequence(existingCodes, prefix, 2);
+
+    return nextSequence === 1 && !existingCodes.includes(prefix)
+      ? prefix
+      : `${prefix}_${String(nextSequence).padStart(2, '0')}`;
+  };
+
+  const savedRoomType: RoomType[] = [];
+
+  for (const roomType of roomTypes) {
+    const item = {
+      ...roomType,
+      code: await generateRoomTypeCode(roomType.name),
+      status: ActiveStatus.ACTIVE,
+    };
+    const saved = await roomTypeRepository.save(item);
+    savedRoomType.push(saved);
+  }
+}
+
 async function insertStaffs() {
   const dbRoles = await roleRepository.find();
   const hashPassword = await bcrypt.hash('Password@123', 10);
@@ -614,11 +779,9 @@ async function insertStaffs() {
   }> = [
     { role: RoleEnum.SUPER_ADMIN, quantity: 5 },
     { role: RoleEnum.ADMIN, quantity: 5 },
-    { role: RoleEnum.DOCTOR, quantity: 20 },
+    { role: RoleEnum.DOCTOR, quantity: 60 },
     { role: RoleEnum.NURSE, quantity: 20 },
     { role: RoleEnum.STAFF, quantity: 20 },
-    { role: RoleEnum.MEMBER, quantity: 20 },
-    { role: RoleEnum.PARTNER, quantity: 20 },
   ];
 
   const removeVietnameseTones = (value: string): string => {
@@ -641,7 +804,9 @@ async function insertStaffs() {
     return `${lastName}${initials}${String(index + 1).padStart(3, '0')}@gmail.com`;
   };
 
-  const roles = roleQuantities.flatMap(({ role, quantity }) => Array<RoleEnum>(quantity).fill(role));
+  const roles = roleQuantities.flatMap(({ role, quantity }) =>
+    Array<RoleEnum>(quantity).fill(role),
+  );
   const roleCounters = new Map<RoleEnum, number>();
 
   const baseData = names.map((name, index) => {
@@ -652,9 +817,12 @@ async function insertStaffs() {
     return {
       name: roleName === RoleEnum.SUPER_ADMIN && roleSequence === 1 ? 'Super Admin' : name,
       personalEmail: generateEmail(name, index),
-      loginEmail: roleName === RoleEnum.SUPER_ADMIN && roleSequence === 1 ? `superadmin@${EMAIL_DOMAIN}` : undefined,
+      loginEmail:
+        roleName === RoleEnum.SUPER_ADMIN && roleSequence === 1
+          ? `superadmin@${EMAIL_DOMAIN}`
+          : undefined,
       // Tạo các số điện thoại mẫu từ 0985000001 đến 0985000110
-      phoneNumber: `0985${String(index + 1).padStart(5, '0')}`,
+      phoneNumber: `0985${String(index + 1).padStart(6, '0')}`,
       address: addresses[index % addresses.length],
       role: dbRoles.filter((role) => role.name === roleName) || [dbRoles[dbRoles.length - 1]],
     };
@@ -668,6 +836,7 @@ async function insertStaffs() {
       personalEmail: staff.personalEmail,
       employeeCode: employeeCode,
       email: email,
+      avatar: 'https://hthaostudio.com/wp-content/uploads/2022/03/Anh-bac-si-nam-7-min.jpg.webp',
       phone: staff.phoneNumber,
       password: hashPassword,
       address: staff.address,
@@ -685,26 +854,46 @@ async function insertDoctor() {
     where: { roles: { name: RoleEnum.DOCTOR } },
   });
 
+  const roomTypes = await roomTypeRepository.find();
+  const needDoctorRooms = [
+    'Phòng khám sản',
+    'Phòng khám tổng quát',
+    'Phòng siêu âm',
+    'Phòng xét nghiệm',
+    'Phòng thủ thuật',
+  ];
+
+  const roomTypeIds = roomTypes
+    .filter((roomType) => needDoctorRooms.includes(roomType.name))
+    .map((roomType) => roomType.id);
+
   const titleList = [
-    { title: 'Bác sĩ', year: 5 },
-    { title: 'Bác sĩ Chuyên khoa I', year: 8 },
-    { title: 'Bác sĩ Chuyên khoa II', year: 10 },
-    { title: 'Thạc sĩ, Bác sĩ', year: 15 },
-    { title: 'Tiến sĩ, Bác sĩ', year: 20 },
-    { title: 'Phó giáo sư, Tiến sĩ, Bác sĩ', year: 25 },
-    { title: 'Giáo sư, Tiến sĩ, Bác sĩ', year: 30 },
+    { title: 'Bác sĩ', year: 1 },
+    { title: 'Bác sĩ Chuyên khoa I', year: 2 },
+    { title: 'Bác sĩ Chuyên khoa II', year: 2 },
+    { title: 'Thạc sĩ, Bác sĩ', year: 3 },
+    { title: 'Tiến sĩ, Bác sĩ', year: 3 },
+    { title: 'Phó giáo sư, Tiến sĩ, Bác sĩ', year: 4 },
+    { title: 'Giáo sư, Tiến sĩ, Bác sĩ', year: 4 },
   ];
 
   const doctors = staffs.map((staff, index) => {
-    const title = titleList[index % titleList.length];
-    const yearEx = Math.floor(Math.random() * 5) + title.year;
+    const indexRandom = Math.floor(Math.random() * titleList.length);
+    const title = titleList[indexRandom];
+    const yearEx: Record<number, string> = {
+      1: 'hơn 3 năm',
+      2: 'hơn 8 năm',
+      3: 'hơn 15 năm',
+      4: 'hơn 25 năm',
+    };
     return {
       staffId: staff.id,
       licenseNo: `CCHN-OBGYN-2601${index + 10}`,
       title: title.title,
       specialty: 'Sản phụ khoa',
-      yearsOfExperience: yearEx,
-      bio: `${title.title} ${staff.name} có ${yearEx} kinh nghiệm trong lĩnh vực sản phụ khoa, tận tâm tư vấn, thăm khám và đồng hành cùng mẹ bầu trong suốt thai kỳ, hướng đến sự an toàn và chăm sóc phù hợp cho mẹ và bé.`,
+      workingRoomTypeId: roomTypeIds[index % roomTypeIds.length],
+      yearsOfExperience: title.year,
+      bio: `${title.title} ${staff.name} có ${yearEx[Number(title.year)]} kinh nghiệm trong lĩnh vực sản phụ khoa, tận tâm tư vấn, thăm khám và đồng hành cùng mẹ bầu trong suốt thai kỳ, hướng đến sự an toàn và chăm sóc phù hợp cho mẹ và bé.`,
       status: ActiveStatus.ACTIVE,
       createdAt: new Date(new Date().getTime() - 5 * 365 * 24 * 60 * 60 * 1000),
       updatedAt: new Date(new Date().getTime() - 5 * 365 * 24 * 60 * 60 * 1000),
@@ -1055,13 +1244,6 @@ async function insertFacility() {
     },
   ];
   const facilities: Facility[] = [];
-  const buildFacilityStaffEmail = (staff: Staff, facility: Facility) => {
-    const currentLocalPart = String(staff.email).split('@')[0] || toLoginEmailLocalPart(staff.name);
-    const baseLocalPart = currentLocalPart.replace(/\.cs-[a-z0-9-]+$/i, '');
-    const facilityLocalPart = toLoginEmailLocalPart(facility.code);
-
-    return `${baseLocalPart}.${facilityLocalPart}@${EMAIL_DOMAIN}`;
-  };
 
   for (let i = 0; i < baseFacilities.length; i++) {
     const item = {
@@ -1078,9 +1260,9 @@ async function insertFacility() {
   }
 
   admins.forEach((admin, index) => {
-    const facility = facilities.find((f) => f.ownerId === admin.id) || facilities[index % facilities.length];
+    const facility =
+      facilities.find((f) => f.ownerId === admin.id) || facilities[index % facilities.length];
     admin.facilityId = facility.id;
-    admin.email = buildFacilityStaffEmail(admin, facility);
   });
   await staffRepository.save(admins);
   const staffs = await staffRepository.find({
@@ -1091,162 +1273,8 @@ async function insertFacility() {
   staffs.forEach((staff, index) => {
     const facility = facilities[index % facilities.length];
     staff.facilityId = facility.id;
-    staff.email = buildFacilityStaffEmail(staff, facility);
   });
   await staffRepository.save(staffs);
-}
-
-async function insertRoomTypes() {
-  const roomTypes = [
-    {
-      name: 'Phòng lễ tân',
-      description:
-        'Khu vực tiếp đón người bệnh, kiểm tra thông tin lịch hẹn, hướng dẫn thủ tục và thực hiện check-in.',
-    },
-    {
-      name: 'Phòng chờ',
-      description:
-        'Khu vực dành cho người bệnh và người nhà chờ đến lượt khám hoặc sử dụng dịch vụ.',
-    },
-    {
-      name: 'Phòng tư vấn',
-      description:
-        'Phòng dành cho bác sĩ hoặc nhân viên y tế tư vấn sức khỏe và hướng dẫn chăm sóc thai kỳ.',
-    },
-    {
-      name: 'Phòng khám sản',
-      description:
-        'Phòng thực hiện thăm khám sản khoa, đánh giá tình trạng sức khỏe của mẹ và quá trình phát triển của thai nhi.',
-    },
-    {
-      name: 'Phòng khám tổng quát',
-      description:
-        'Phòng thực hiện khám sức khỏe tổng quát và đánh giá các chỉ số sức khỏe cơ bản.',
-    },
-    {
-      name: 'Phòng siêu âm',
-      description:
-        'Phòng được trang bị thiết bị phục vụ việc siêu âm và theo dõi sự phát triển của thai nhi.',
-    },
-    {
-      name: 'Phòng lấy mẫu xét nghiệm',
-      description: 'Phòng tiếp nhận và lấy các loại mẫu xét nghiệm theo chỉ định của bác sĩ.',
-    },
-    {
-      name: 'Phòng xét nghiệm',
-      description:
-        'Khu vực thực hiện phân tích mẫu và xử lý các kết quả xét nghiệm phục vụ hoạt động khám chữa bệnh.',
-    },
-    {
-      name: 'Phòng thủ thuật',
-      description: 'Phòng thực hiện các thủ thuật y tế phù hợp với phạm vi chuyên môn của cơ sở.',
-    },
-    {
-      name: 'Phòng điều dưỡng',
-      description: 'Phòng làm việc của điều dưỡng, phục vụ theo dõi và hỗ trợ chăm sóc người bệnh.',
-    },
-    {
-      name: 'Phòng làm việc bác sĩ',
-      description:
-        'Phòng làm việc chuyên môn, kiểm tra hồ sơ và trao đổi nghiệp vụ dành cho bác sĩ.',
-    },
-    {
-      name: 'Phòng làm việc nhân viên',
-      description: 'Phòng làm việc dành cho nhân viên hành chính và nhân viên vận hành của cơ sở.',
-    },
-    {
-      name: 'Phòng quản lý',
-      description: 'Phòng làm việc dành cho quản lý cơ sở và xử lý các công việc điều hành.',
-    },
-    {
-      name: 'Phòng họp',
-      description:
-        'Phòng tổ chức họp, trao đổi chuyên môn, đào tạo và điều phối hoạt động của nhân viên.',
-    },
-    {
-      name: 'Phòng lưu trữ hồ sơ',
-      description: 'Khu vực quản lý và lưu trữ hồ sơ, tài liệu chuyên môn của cơ sở.',
-    },
-    {
-      name: 'Kho vật tư y tế',
-      description:
-        'Khu vực lưu trữ dụng cụ, vật tư và thiết bị phục vụ hoạt động chuyên môn của cơ sở.',
-    },
-    {
-      name: 'Phòng cấp phát thuốc',
-      description: 'Khu vực tiếp nhận đơn và cấp phát thuốc theo quy định và chỉ định chuyên môn.',
-    },
-    {
-      name: 'Quầy thanh toán',
-      description:
-        'Khu vực tiếp nhận thanh toán, xử lý hóa đơn và hướng dẫn các vấn đề liên quan đến chi phí dịch vụ.',
-    },
-    {
-      name: 'Phòng nghỉ nhân viên',
-      description: 'Phòng nghỉ giữa ca dành cho bác sĩ, điều dưỡng và các nhân viên của cơ sở.',
-    },
-    {
-      name: 'Phòng kỹ thuật và giám sát',
-      description:
-        'Phòng dành cho thiết bị công nghệ, hệ thống giám sát và hoạt động hỗ trợ kỹ thuật.',
-    },
-  ];
-
-  const getNextSequence = (existingCodes: string[], prefix: string, padding: number) => {
-    const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const pattern = new RegExp(`^${escapedPrefix}[-_](\\d+)$`);
-    const maxSequence = existingCodes.reduce((max, code) => {
-      if (code === prefix) return Math.max(max, 1);
-      const match = code.match(pattern);
-      return match ? Math.max(max, Number(match[1])) : max;
-    }, 0);
-
-    return maxSequence + 1;
-  };
-
-  const buildCodePrefixFromName = (name: string) => {
-    const normalized = String(name)
-      .trim()
-      .replace(/đ/g, 'd')
-      .replace(/Đ/g, 'D')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-zA-Z0-9\s]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .toUpperCase();
-
-    return normalized ? normalized.split(' ').join('_').slice(0, 40) : 'ROOM_TYPE';
-  };
-
-  const generateRoomTypeCode = async (name: string) => {
-    const prefix = buildCodePrefixFromName(name);
-    const rows = await roomTypeRepository
-      .createQueryBuilder('roomType')
-      .withDeleted()
-      .select('roomType.code', 'code')
-      .where('roomType.code LIKE :pattern', { pattern: `${prefix}%` })
-      .getRawMany<{ code: string }>();
-
-    const existingCodes = rows.map((row) => row.code);
-    const nextSequence = getNextSequence(existingCodes, prefix, 2);
-
-    return nextSequence === 1 && !existingCodes.includes(prefix)
-      ? prefix
-      : `${prefix}_${String(nextSequence).padStart(2, '0')}`;
-  };
-
-  const savedRoomType: RoomType[] = [];
-
-  for (const roomType of roomTypes) {
-    const item = {
-      ...roomType,
-      code: await generateRoomTypeCode(roomType.name),
-      status: ActiveStatus.ACTIVE,
-    };
-    const saved = await roomTypeRepository.save(item);
-    savedRoomType.push(saved);
-  }
 }
 
 async function insertRooms() {
@@ -1292,9 +1320,9 @@ async function insertRooms() {
   };
 
   for (let index = 0; index < facilities.length; index++) {
-    const floorCount = facilities[index].floorCount ?? 1;
+    const floorCount = (index % 2) + 3;
     for (let floor = 1; floor <= floorCount; floor++) {
-      const roomCount = Math.floor(Math.random() * 5) + 5;
+      const roomCount = Math.floor(Math.random() * 5) + 4;
       for (let room = 1; room <= roomCount; room++) {
         const roomType = roomTypes[Math.floor(Math.random() * roomTypes.length)];
         const newRoom = {
@@ -1753,6 +1781,7 @@ async function insertUsers() {
         name,
         phone,
         email,
+        avatar: 'https://i.pravatar.cc/600?u=' + i * 100 + j + 1,
         dateOfBirth,
         address: addressInfo.street,
         priorityLevel: Math.floor(Math.random() * 3),
@@ -1842,13 +1871,16 @@ async function insertPregnancyProfiles() {
       updatedAt: new Date(user.createdAt),
       createdBy: staffs[Math.floor(Math.random() * staffs.length)].id,
     };
-    data.push(pregnancyProfileData);
 
     if (
       // Nếu người dùng đã được tạo hơn 2 năm trước và chưa quá 1 ngày trước, tạo thêm một hồ sơ thai kỳ khác
       new Date(user.createdAt).getTime() + 2 * 365 * 24 * 60 * 60 * 1000 <
       new Date().getTime() - 1 * 24 * 60 * 60 * 1000
     ) {
+      // complete lần trước, sau đó push vào array
+      pregnancyProfileData.status = PregnancyProfileStatus.COMPLETED;
+      data.push(pregnancyProfileData);
+      // tạo data cho lần 2
       const lastMenstrualPeriod2 = new Date(
         lastMenstrualPeriod.getTime() + 2 * 365 * 24 * 60 * 60 * 1000,
       );
@@ -1870,8 +1902,8 @@ async function insertPregnancyProfiles() {
         paraLivingChildren: paraFullTerm + paraPremature + fetalCount,
         riskLevel: Math.floor(Math.random() * 100 + 1) > 10 ? RiskLevel.LOW : RiskLevel.HIGH,
         notes: '',
-        createdAt: new Date(user.createdAt),
-        updatedAt: new Date(user.createdAt),
+        createdAt: new Date(new Date(user.createdAt).getTime() + 2 * 365 * 24 * 60 * 60 * 1000),
+        updatedAt: new Date(new Date(user.createdAt).getTime() + 2 * 365 * 24 * 60 * 60 * 1000),
         createdBy: staffs[Math.floor(Math.random() * staffs.length)].id,
       };
       data.push(pregnancyProfileData2);
@@ -1954,7 +1986,12 @@ async function insertShiftSlots(): Promise<void> {
 async function insertSettings(): Promise<void> {
   await settingRepository.save([
     { key: 'site.name', value: 'Maternity Care System', group: 'general', isPublic: 1 },
-    { key: 'site.description', value: 'Hệ thống quản lý chăm sóc thai sản', group: 'general', isPublic: 1 },
+    {
+      key: 'site.description',
+      value: 'Hệ thống quản lý chăm sóc thai sản',
+      group: 'general',
+      isPublic: 1,
+    },
     { key: 'contact.email', value: 'support@mcs.com.vn', group: 'contact', isPublic: 1 },
     { key: 'contact.phone', value: '02473010000', group: 'contact', isPublic: 1 },
     { key: 'appointment.reminder_hours', value: 24, group: 'appointment', isPublic: 0 },
@@ -1964,77 +2001,340 @@ async function insertSettings(): Promise<void> {
 
 async function insertServiceCatalog(): Promise<void> {
   const serviceTypes = await serviceTypeRepository.save([
-    { code: 'CONSULT', name: 'Khám và tư vấn', description: 'Các dịch vụ khám, tư vấn thai sản', status: ActiveStatus.ACTIVE },
-    { code: 'ULTRASOUND', name: 'Siêu âm', description: 'Siêu âm thai theo từng mốc thai kỳ', status: ActiveStatus.ACTIVE },
-    { code: 'TEST', name: 'Xét nghiệm', description: 'Xét nghiệm máu, nước tiểu và tầm soát', status: ActiveStatus.ACTIVE },
-    { code: 'CARE', name: 'Chăm sóc sau sinh', description: 'Theo dõi và tư vấn sau sinh', status: ActiveStatus.ACTIVE },
+    {
+      code: 'CONSULTATION',
+      name: 'Khám và tư vấn',
+      description:
+        'Các dịch vụ khám thai định kỳ, khám thai lần đầu, khám thai nguy cơ cao và tư vấn sức khỏe thai kỳ.',
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      code: 'ULTRASOUND',
+      name: 'Siêu âm',
+      description:
+        'Các dịch vụ siêu âm thai 2D, 4D, siêu âm hình thái và siêu âm Doppler theo từng mốc thai kỳ.',
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      code: 'LAB_TEST',
+      name: 'Xét nghiệm',
+      description:
+        'Các xét nghiệm máu, nước tiểu, đường huyết, nhóm máu và những xét nghiệm cơ bản trong thai kỳ.',
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      code: 'PRENATAL_SCREENING',
+      name: 'Sàng lọc trước sinh',
+      description:
+        'Các dịch vụ Double Test, Triple Test, NIPT và sàng lọc nguy cơ bất thường trong thai kỳ.',
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      code: 'MATERNAL_MONITORING',
+      name: 'Theo dõi sức khỏe thai kỳ',
+      description:
+        'Các dịch vụ theo dõi tim thai, cơn co tử cung, huyết áp và các chỉ số sức khỏe của thai phụ.',
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      code: 'POSTPARTUM_CARE',
+      name: 'Chăm sóc sau sinh',
+      description:
+        'Các dịch vụ theo dõi sức khỏe mẹ, chăm sóc vết mổ, tư vấn nuôi con và phục hồi sau sinh.',
+      status: ActiveStatus.ACTIVE,
+    },
   ]);
 
   const typeByCode = new Map(serviceTypes.map((type) => [type.code, type]));
-  const services = await serviceRepository.save([
+
+  const findCodesByPrefix = async (prefix: string) => {
+    const rows = await serviceRepository
+      .createQueryBuilder('service')
+      .select('service.code', 'code')
+      .where('service.code = :prefix OR service.code LIKE :pattern', {
+        prefix,
+        pattern: `${prefix}_%`,
+      })
+      .getRawMany<{ code: string }>();
+
+    return rows.map((row) => row.code);
+  };
+  const generateCode = async (name: string) => {
+    const prefix = buildCodePrefixFromName(name, 'SERVICE');
+    const existingCodes = await findCodesByPrefix(prefix);
+    return buildNextCodeFromExisting(prefix, existingCodes);
+  };
+  const services = [
     {
-      code: 'CONSULT-OB-001',
       name: 'Khám thai định kỳ',
-      description: 'Khám thai, đo chỉ số cơ bản và tư vấn theo tuần thai.',
-      serviceTypeId: typeByCode.get('CONSULT')!.id,
+      description:
+        'Theo dõi sức khỏe thai phụ và đánh giá sự phát triển của thai nhi theo lịch khám.',
+      serviceTypeId: typeByCode.get('CONSULTATION')!.id,
       saleMode: ServiceSaleMode.BOTH,
       defaultDurationMinutes: 30,
-      basePrice: '250000',
+      basePrice: '250000.00',
+      requiresDoctorWarning: false,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      name: 'Khám thai nguy cơ cao',
+      description: 'Khám và theo dõi chuyên sâu dành cho thai phụ có yếu tố nguy cơ trong thai kỳ.',
+      serviceTypeId: typeByCode.get('CONSULTATION')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '500000.00',
       requiresDoctorWarning: true,
       status: ActiveStatus.ACTIVE,
     },
     {
-      code: 'US-2D-001',
+      name: 'Tư vấn kế hoạch chăm sóc thai kỳ',
+      description:
+        'Tư vấn lịch khám, xét nghiệm, siêu âm và chăm sóc phù hợp theo từng giai đoạn thai kỳ.',
+      serviceTypeId: typeByCode.get('CONSULTATION')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '250000.00',
+      requiresDoctorWarning: false,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
       name: 'Siêu âm thai 2D',
-      description: 'Siêu âm kiểm tra sự phát triển của thai nhi.',
+      description: 'Kiểm tra vị trí thai, tim thai và các chỉ số phát triển cơ bản của thai nhi.',
       serviceTypeId: typeByCode.get('ULTRASOUND')!.id,
       saleMode: ServiceSaleMode.BOTH,
-      defaultDurationMinutes: 20,
-      basePrice: '300000',
-      requiresDoctorWarning: true,
+      defaultDurationMinutes: 30,
+      basePrice: '200000.00',
+      requiresDoctorWarning: false,
       status: ActiveStatus.ACTIVE,
     },
     {
-      code: 'US-4D-001',
       name: 'Siêu âm thai 4D',
-      description: 'Siêu âm hình thái thai nhi theo mốc thai kỳ.',
+      description: 'Siêu âm hình ảnh thai nhi bằng công nghệ 4D và đánh giá các chỉ số phát triển.',
       serviceTypeId: typeByCode.get('ULTRASOUND')!.id,
       saleMode: ServiceSaleMode.BOTH,
       defaultDurationMinutes: 30,
-      basePrice: '650000',
+      basePrice: '450000.00',
+      requiresDoctorWarning: false,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      name: 'Siêu âm đo độ mờ da gáy',
+      description: 'Đo độ mờ da gáy trong giai đoạn phù hợp để hỗ trợ sàng lọc nguy cơ bất thường.',
+      serviceTypeId: typeByCode.get('ULTRASOUND')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '500000.00',
       requiresDoctorWarning: true,
       status: ActiveStatus.ACTIVE,
     },
     {
-      code: 'TEST-BLOOD-001',
-      name: 'Xét nghiệm máu thai kỳ',
-      description: 'Xét nghiệm các chỉ số máu thường quy cho mẹ bầu.',
-      serviceTypeId: typeByCode.get('TEST')!.id,
+      name: 'Siêu âm hình thái thai nhi',
+      description: 'Khảo sát hình thái và cấu trúc thai nhi theo mốc thai kỳ được khuyến nghị.',
+      serviceTypeId: typeByCode.get('ULTRASOUND')!.id,
       saleMode: ServiceSaleMode.BOTH,
-      defaultDurationMinutes: 15,
-      basePrice: '450000',
+      defaultDurationMinutes: 30,
+      basePrice: '650000.00',
+      requiresDoctorWarning: true,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      name: 'Siêu âm Doppler thai',
+      description:
+        'Đánh giá tuần hoàn máu giữa thai phụ, nhau thai và thai nhi bằng siêu âm Doppler.',
+      serviceTypeId: typeByCode.get('ULTRASOUND')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '550000.00',
+      requiresDoctorWarning: true,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      name: 'Xét nghiệm công thức máu',
+      description:
+        'Đánh giá các chỉ số tế bào máu và hỗ trợ phát hiện tình trạng thiếu máu trong thai kỳ.',
+      serviceTypeId: typeByCode.get('LAB_TEST')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '150000.00',
+      requiresDoctorWarning: true,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      name: 'Xét nghiệm nước tiểu',
+      description: 'Kiểm tra các chỉ số nước tiểu để hỗ trợ theo dõi sức khỏe thai kỳ.',
+      serviceTypeId: typeByCode.get('LAB_TEST')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '100000.00',
+      requiresDoctorWarning: true,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      name: 'Xét nghiệm nhóm máu và yếu tố Rh',
+      description: 'Xác định nhóm máu ABO và yếu tố Rh của thai phụ.',
+      serviceTypeId: typeByCode.get('LAB_TEST')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '180000.00',
+      requiresDoctorWarning: true,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      name: 'Xét nghiệm đường huyết',
+      description:
+        'Đo nồng độ đường trong máu và hỗ trợ đánh giá nguy cơ rối loạn đường huyết thai kỳ.',
+      serviceTypeId: typeByCode.get('LAB_TEST')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '120000.00',
+      requiresDoctorWarning: true,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      name: 'Nghiệm pháp dung nạp glucose',
+      description: 'Xét nghiệm hỗ trợ phát hiện đái tháo đường thai kỳ theo chỉ định chuyên môn.',
+      serviceTypeId: typeByCode.get('LAB_TEST')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 300,
+      basePrice: '350000.00',
+      requiresDoctorWarning: true,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      name: 'Sàng lọc Double Test',
+      description: 'Sàng lọc nguy cơ một số bất thường nhiễm sắc thể trong ba tháng đầu thai kỳ.',
+      serviceTypeId: typeByCode.get('PRENATAL_SCREENING')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '600000.00',
+      requiresDoctorWarning: true,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      name: 'Sàng lọc Triple Test',
+      description: 'Sàng lọc nguy cơ một số bất thường thai nhi trong ba tháng giữa thai kỳ.',
+      serviceTypeId: typeByCode.get('PRENATAL_SCREENING')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '650000.00',
+      requiresDoctorWarning: true,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      name: 'Sàng lọc NIPT cơ bản',
+      description: 'Sàng lọc trước sinh không xâm lấn dựa trên ADN tự do trong máu thai phụ.',
+      serviceTypeId: typeByCode.get('PRENATAL_SCREENING')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '3500000.00',
+      requiresDoctorWarning: true,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      name: 'Sàng lọc nguy cơ tiền sản giật',
+      description:
+        'Đánh giá nguy cơ tiền sản giật dựa trên thông tin thăm khám và các chỉ số liên quan.',
+      serviceTypeId: typeByCode.get('PRENATAL_SCREENING')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '900000.00',
+      requiresDoctorWarning: true,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      name: 'Theo dõi tim thai',
+      description: 'Theo dõi nhịp tim thai và hoạt động co bóp tử cung theo chỉ định.',
+      serviceTypeId: typeByCode.get('MATERNAL_MONITORING')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '250000.00',
+      requiresDoctorWarning: true,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      name: 'Theo dõi huyết áp thai kỳ',
+      description: 'Đo và ghi nhận huyết áp để hỗ trợ theo dõi nguy cơ trong thai kỳ.',
+      serviceTypeId: typeByCode.get('MATERNAL_MONITORING')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '80000.00',
       requiresDoctorWarning: false,
       status: ActiveStatus.ACTIVE,
     },
     {
-      code: 'CARE-POST-001',
-      name: 'Tư vấn chăm sóc sau sinh',
-      description: 'Tư vấn phục hồi sau sinh và chăm sóc em bé.',
-      serviceTypeId: typeByCode.get('CARE')!.id,
+      name: 'Đánh giá sức khỏe thai kỳ tổng hợp',
+      description:
+        'Đánh giá tổng hợp cân nặng, huyết áp, triệu chứng và các chỉ số theo dõi của thai phụ.',
+      serviceTypeId: typeByCode.get('MATERNAL_MONITORING')!.id,
       saleMode: ServiceSaleMode.BOTH,
       defaultDurationMinutes: 30,
-      basePrice: '350000',
+      basePrice: '200000.00',
       requiresDoctorWarning: false,
       status: ActiveStatus.ACTIVE,
     },
-  ]);
+    {
+      name: 'Khám sức khỏe mẹ sau sinh',
+      description: 'Kiểm tra tình trạng phục hồi và sức khỏe tổng quát của mẹ sau sinh.',
+      serviceTypeId: typeByCode.get('POSTPARTUM_CARE')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '300000.00',
+      requiresDoctorWarning: false,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      name: 'Chăm sóc vết mổ sau sinh',
+      description: 'Kiểm tra và chăm sóc vết mổ sau sinh theo quy trình chuyên môn của phòng khám.',
+      serviceTypeId: typeByCode.get('POSTPARTUM_CARE')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '300000.00',
+      requiresDoctorWarning: true,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      name: 'Tư vấn chăm sóc mẹ và trẻ sơ sinh',
+      description: 'Hướng dẫn theo dõi sức khỏe, chăm sóc mẹ và trẻ sơ sinh tại nhà.',
+      serviceTypeId: typeByCode.get('POSTPARTUM_CARE')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '400000.00',
+      requiresDoctorWarning: false,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      name: 'Theo dõi phục hồi sau sinh',
+      description: 'Theo dõi quá trình phục hồi sức khỏe của mẹ trong giai đoạn sau sinh.',
+      serviceTypeId: typeByCode.get('POSTPARTUM_CARE')!.id,
+      saleMode: ServiceSaleMode.BOTH,
+      defaultDurationMinutes: 30,
+      basePrice: '250000.00',
+      requiresDoctorWarning: false,
+      status: ActiveStatus.ACTIVE,
+    },
+  ];
+
+  const savedServices: Service[] = [];
+
+  for (const service of services) {
+    const code = await generateCode(service.name);
+    const createdTime = new Date(new Date().getTime() - 3 * 360 * 24 * 60 * 60 * 1000);
+    const saved = await serviceRepository.save({
+      ...service,
+      code: code,
+      status: ActiveStatus.ACTIVE,
+      createdAt: createdTime,
+      updatedAt: createdTime,
+    });
+    savedServices.push(saved);
+  }
 
   const facilities = await facilityRepository.find();
   const facilityServices = facilities.flatMap((facility, facilityIndex) =>
-    services.map((service, serviceIndex) => ({
+    savedServices.map((service, serviceIndex) => ({
       facilityId: facility.id,
       serviceId: service.id,
-      price: String(Number(service.basePrice) + facilityIndex * 25000 + serviceIndex * 10000),
+      price: String(Number(service.basePrice) + facilityIndex * 10000 + serviceIndex * 10000),
       durationMinutes: service.defaultDurationMinutes,
       status: ActiveStatus.ACTIVE,
     })),
@@ -2045,272 +2345,1693 @@ async function insertServiceCatalog(): Promise<void> {
 
 async function insertMaternityPackages(): Promise<void> {
   const facilities = await facilityRepository.find();
-  const facilityServices = await facilityServiceRepository.find();
+  const facilityServices = await facilityServiceRepository.find({
+    relations: { facility: true, service: true },
+  });
 
-  for (const facility of facilities) {
-    const servicesForFacility = facilityServices.filter((item) => String(item.facilityId) === String(facility.id));
-    const pkg = await maternityPackageRepository.save({
-      facilityId: facility.id,
-      code: `PKG-${facility.code.replace(/^CS-/, '')}-BASIC`,
-      name: `Gói thai sản cơ bản - ${facility.name}`,
-      description: 'Gói theo dõi thai kỳ gồm khám, siêu âm và xét nghiệm cơ bản.',
-      packageType: MaternityPackageType.SCHEDULE,
-      price: '3500000',
+  const generateCode = async function (facilityId: string, name: string): Promise<string> {
+    const prefix = buildCodePrefixFromName(name, 'PACKAGE');
+    const existingCodes = await findCodesByFacilityAndPrefix(facilityId, prefix);
+    return buildNextCodeFromExisting(prefix, existingCodes);
+  };
+
+  const findCodesByFacilityAndPrefix = async function (
+    facilityId: string,
+    prefix: string,
+  ): Promise<string[]> {
+    const rows = await maternityPackageRepository
+      .createQueryBuilder('pkg')
+      .select('pkg.code', 'code')
+      .where('pkg.facilityId = :facilityId', { facilityId })
+      .andWhere('(pkg.code = :prefix OR pkg.code LIKE :pattern)', {
+        prefix,
+        pattern: `${prefix}_%`,
+      })
+      .getRawMany<{ code: string }>();
+
+    return rows.map((row) => row.code);
+  };
+
+  const quantityMaternityPackages = [
+    {
+      name: 'Gói thai kỳ cơ bản linh hoạt',
+      description:
+        'Gói số lượng cơ bản dành cho thai phụ có thai kỳ ổn định, cho phép sử dụng các lượt khám, siêu âm và xét nghiệm trong thời hạn gói.',
+      packageType: MaternityPackageType.QUANTITY,
       durationDays: 280,
       priorityLevel: 1,
-      status: MaternityPackageStatus.ACTIVE,
-    });
+      discountRate: 0.05,
+      items: [
+        {
+          serviceName: 'Khám thai định kỳ',
+          quantity: 4,
+        },
+        {
+          serviceName: 'Siêu âm thai 2D',
+          quantity: 3,
+        },
+        {
+          serviceName: 'Xét nghiệm công thức máu',
+          quantity: 1,
+        },
+        {
+          serviceName: 'Xét nghiệm nước tiểu',
+          quantity: 2,
+        },
+        {
+          serviceName: 'Theo dõi huyết áp thai kỳ',
+          quantity: 3,
+        },
+      ],
+    },
+    {
+      name: 'Gói thai kỳ tiêu chuẩn linh hoạt',
+      description:
+        'Gói theo số lượng với các dịch vụ khám, siêu âm và xét nghiệm phổ biến trong suốt thai kỳ.',
+      packageType: MaternityPackageType.QUANTITY,
+      durationDays: 280,
+      priorityLevel: 2,
+      discountRate: 0.08,
+      items: [
+        {
+          serviceName: 'Khám thai định kỳ',
+          quantity: 6,
+        },
+        {
+          serviceName: 'Siêu âm thai 2D',
+          quantity: 3,
+        },
+        {
+          serviceName: 'Siêu âm thai 4D',
+          quantity: 1,
+        },
+        {
+          serviceName: 'Siêu âm đo độ mờ da gáy',
+          quantity: 1,
+        },
+        {
+          serviceName: 'Xét nghiệm công thức máu',
+          quantity: 2,
+        },
+        {
+          serviceName: 'Xét nghiệm nước tiểu',
+          quantity: 3,
+        },
+        {
+          serviceName: 'Xét nghiệm đường huyết',
+          quantity: 1,
+        },
+        {
+          serviceName: 'Theo dõi tim thai',
+          quantity: 2,
+        },
+      ],
+    },
+    {
+      name: 'Gói thai kỳ nâng cao linh hoạt',
+      description:
+        'Gói dịch vụ nâng cao bao gồm khám định kỳ, siêu âm chuyên sâu, xét nghiệm và sàng lọc trước sinh.',
+      packageType: MaternityPackageType.QUANTITY,
+      durationDays: 280,
+      priorityLevel: 3,
+      discountRate: 0.1,
+      items: [
+        {
+          serviceName: 'Khám thai định kỳ',
+          quantity: 8,
+        },
+        {
+          serviceName: 'Tư vấn kế hoạch chăm sóc thai kỳ',
+          quantity: 1,
+        },
+        {
+          serviceName: 'Siêu âm thai 2D',
+          quantity: 4,
+        },
+        {
+          serviceName: 'Siêu âm thai 4D',
+          quantity: 2,
+        },
+        {
+          serviceName: 'Siêu âm đo độ mờ da gáy',
+          quantity: 1,
+        },
+        {
+          serviceName: 'Siêu âm hình thái thai nhi',
+          quantity: 1,
+        },
+        {
+          serviceName: 'Xét nghiệm công thức máu',
+          quantity: 2,
+        },
+        {
+          serviceName: 'Xét nghiệm nước tiểu',
+          quantity: 4,
+        },
+        {
+          serviceName: 'Nghiệm pháp dung nạp glucose',
+          quantity: 1,
+        },
+        {
+          serviceName: 'Sàng lọc Double Test',
+          quantity: 1,
+          required: false,
+          optional: true,
+        },
+        {
+          serviceName: 'Theo dõi tim thai',
+          quantity: 3,
+        },
+      ],
+    },
+    {
+      name: 'Gói theo dõi thai kỳ nguy cơ cao',
+      description:
+        'Gói tăng cường số lượt khám, siêu âm Doppler, theo dõi tim thai và các dịch vụ đánh giá nguy cơ.',
+      packageType: MaternityPackageType.QUANTITY,
+      durationDays: 280,
+      priorityLevel: 4,
+      discountRate: 0.12,
+      items: [
+        {
+          serviceName: 'Khám thai nguy cơ cao',
+          quantity: 6,
+        },
+        {
+          serviceName: 'Khám thai định kỳ',
+          quantity: 6,
+        },
+        {
+          serviceName: 'Siêu âm thai 2D',
+          quantity: 4,
+        },
+        {
+          serviceName: 'Siêu âm hình thái thai nhi',
+          quantity: 1,
+        },
+        {
+          serviceName: 'Siêu âm Doppler thai',
+          quantity: 3,
+        },
+        {
+          serviceName: 'Xét nghiệm công thức máu',
+          quantity: 3,
+        },
+        {
+          serviceName: 'Xét nghiệm nước tiểu',
+          quantity: 5,
+        },
+        {
+          serviceName: 'Nghiệm pháp dung nạp glucose',
+          quantity: 1,
+        },
+        {
+          serviceName: 'Sàng lọc nguy cơ tiền sản giật',
+          quantity: 1,
+        },
+        {
+          serviceName: 'Theo dõi tim thai',
+          quantity: 5,
+        },
+        {
+          serviceName: 'Theo dõi huyết áp thai kỳ',
+          quantity: 8,
+        },
+      ],
+    },
+    {
+      name: 'Gói chăm sóc mẹ và bé toàn diện',
+      description:
+        'Gói kết hợp theo dõi thai kỳ và chăm sóc mẹ sau sinh, phù hợp với khách hàng muốn sử dụng dịch vụ xuyên suốt.',
+      packageType: MaternityPackageType.QUANTITY,
+      durationDays: 280,
+      priorityLevel: 5,
+      discountRate: 0.15,
+      items: [
+        {
+          serviceName: 'Khám thai định kỳ',
+          quantity: 8,
+        },
+        {
+          serviceName: 'Siêu âm thai 2D',
+          quantity: 4,
+        },
+        {
+          serviceName: 'Siêu âm thai 4D',
+          quantity: 2,
+        },
+        {
+          serviceName: 'Siêu âm hình thái thai nhi',
+          quantity: 1,
+        },
+        {
+          serviceName: 'Xét nghiệm công thức máu',
+          quantity: 2,
+        },
+        {
+          serviceName: 'Xét nghiệm nước tiểu',
+          quantity: 4,
+        },
+        {
+          serviceName: 'Theo dõi tim thai',
+          quantity: 4,
+        },
+        {
+          serviceName: 'Khám sức khỏe mẹ sau sinh',
+          quantity: 2,
+        },
+        {
+          serviceName: 'Chăm sóc vết mổ sau sinh',
+          quantity: 2,
+          required: false,
+          optional: true,
+        },
+        {
+          serviceName: 'Tư vấn chăm sóc mẹ và trẻ sơ sinh',
+          quantity: 2,
+        },
+        {
+          serviceName: 'Theo dõi phục hồi sau sinh',
+          quantity: 2,
+        },
+      ],
+    },
+  ];
 
-    const stages = await packageStageRepository.save([
-      {
-        packageId: pkg.id,
-        name: 'Tam cá nguyệt 1',
-        stageType: MaternityPackageStageType.PREGNANCY_WEEK,
-        weekFrom: 6,
-        weekTo: 13,
-        goal: 'Xác nhận thai, đánh giá sức khỏe ban đầu và tư vấn chăm sóc.',
-        sortOrder: 1,
-      },
-      {
-        packageId: pkg.id,
-        name: 'Tam cá nguyệt 2',
-        stageType: MaternityPackageStageType.PREGNANCY_WEEK,
-        weekFrom: 14,
-        weekTo: 27,
-        goal: 'Theo dõi phát triển thai nhi và tầm soát các chỉ số quan trọng.',
-        sortOrder: 2,
-      },
-      {
-        packageId: pkg.id,
-        name: 'Tam cá nguyệt 3',
-        stageType: MaternityPackageStageType.PREGNANCY_WEEK,
-        weekFrom: 28,
-        weekTo: 40,
-        goal: 'Chuẩn bị sinh, theo dõi sát sức khỏe mẹ và bé.',
-        sortOrder: 3,
-      },
-    ]);
+  const scheduleMaternityPackages = [
+    {
+      name: 'Lộ trình thai kỳ cơ bản',
+      description: 'Gói lịch trình cơ bản, phân bổ dịch vụ theo các giai đoạn chính của thai kỳ.',
+      packageType: MaternityPackageType.SCHEDULE,
+      durationDays: 300,
+      priorityLevel: 6,
+      discountRate: 0.06,
+      stages: [
+        {
+          name: 'Tam cá nguyệt thứ nhất',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 5,
+          weekTo: 13,
+          goal: 'Xác nhận thai, đánh giá sức khỏe ban đầu và sàng lọc sớm.',
+          sortOrder: 1,
+          items: [
+            ['Khám thai định kỳ', 2],
+            ['Siêu âm thai 2D', 1],
+            ['Siêu âm đo độ mờ da gáy', 1],
+            ['Xét nghiệm công thức máu', 1],
+            ['Xét nghiệm nước tiểu', 1],
+          ],
+        },
+        {
+          name: 'Tam cá nguyệt thứ hai',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 14,
+          weekTo: 27,
+          goal: 'Theo dõi sự phát triển và khảo sát hình thái thai nhi.',
+          sortOrder: 2,
+          items: [
+            ['Khám thai định kỳ', 2],
+            ['Siêu âm hình thái thai nhi', 1],
+            ['Xét nghiệm nước tiểu', 1],
+            ['Xét nghiệm đường huyết', 1],
+          ],
+        },
+        {
+          name: 'Tam cá nguyệt thứ ba',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 28,
+          weekTo: 40,
+          goal: 'Theo dõi tăng trưởng thai nhi và chuẩn bị cho giai đoạn sinh.',
+          sortOrder: 3,
+          items: [
+            ['Khám thai định kỳ', 3],
+            ['Siêu âm thai 2D', 2],
+            ['Theo dõi tim thai', 2],
+            ['Theo dõi huyết áp thai kỳ', 3],
+          ],
+        },
+      ],
+    },
+    {
+      name: 'Lộ trình thai kỳ tiêu chuẩn',
+      description:
+        'Gói theo lịch trình tiêu chuẩn với khám, siêu âm, xét nghiệm và theo dõi theo từng mốc thai kỳ.',
+      packageType: MaternityPackageType.SCHEDULE,
+      durationDays: 330,
+      priorityLevel: 7,
+      discountRate: 0.09,
+      stages: [
+        {
+          name: 'Khởi đầu thai kỳ',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 4,
+          weekTo: 10,
+          goal: 'Đánh giá ban đầu và lập kế hoạch chăm sóc thai kỳ.',
+          sortOrder: 1,
+          items: [
+            ['Tư vấn kế hoạch chăm sóc thai kỳ', 1],
+            ['Khám thai định kỳ', 1],
+            ['Siêu âm thai 2D', 1],
+            ['Xét nghiệm nhóm máu và yếu tố Rh', 1],
+            ['Xét nghiệm công thức máu', 1],
+            ['Xét nghiệm nước tiểu', 1],
+          ],
+        },
+        {
+          name: 'Sàng lọc quý I',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 11,
+          weekTo: 13,
+          goal: 'Sàng lọc nguy cơ bất thường trong ba tháng đầu.',
+          sortOrder: 2,
+          items: [
+            ['Khám thai định kỳ', 1],
+            ['Siêu âm đo độ mờ da gáy', 1],
+            ['Sàng lọc Double Test', 1],
+          ],
+        },
+        {
+          name: 'Theo dõi quý II',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 14,
+          weekTo: 27,
+          goal: 'Theo dõi phát triển, hình thái và đường huyết thai kỳ.',
+          sortOrder: 3,
+          items: [
+            ['Khám thai định kỳ', 3],
+            ['Siêu âm thai 4D', 1],
+            ['Siêu âm hình thái thai nhi', 1],
+            ['Nghiệm pháp dung nạp glucose', 1],
+            ['Xét nghiệm nước tiểu', 2],
+          ],
+        },
+        {
+          name: 'Theo dõi quý III',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 28,
+          weekTo: 40,
+          goal: 'Theo dõi tăng trưởng, tim thai và sức khỏe của thai phụ.',
+          sortOrder: 4,
+          items: [
+            ['Khám thai định kỳ', 4],
+            ['Siêu âm thai 2D', 2],
+            ['Theo dõi tim thai', 3],
+            ['Theo dõi huyết áp thai kỳ', 4],
+          ],
+        },
+      ],
+    },
+    {
+      name: 'Lộ trình thai kỳ toàn diện',
+      description:
+        'Gói quản lý thai kỳ đầy đủ từ giai đoạn đầu đến sau sinh, bao gồm các mốc sàng lọc quan trọng.',
+      packageType: MaternityPackageType.SCHEDULE,
+      durationDays: 420,
+      priorityLevel: 8,
+      discountRate: 0.12,
+      stages: [
+        {
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          name: 'Khởi đầu và đánh giá thai kỳ',
+          weekFrom: 4,
+          weekTo: 10,
+          goal: 'Lập kế hoạch chăm sóc và đánh giá các chỉ số ban đầu.',
+          sortOrder: 1,
+          items: [
+            ['Tư vấn kế hoạch chăm sóc thai kỳ', 1],
+            ['Khám thai định kỳ', 2],
+            ['Siêu âm thai 2D', 1],
+            ['Xét nghiệm nhóm máu và yếu tố Rh', 1],
+            ['Xét nghiệm công thức máu', 1],
+            ['Xét nghiệm nước tiểu', 1],
+          ],
+        },
+        {
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          name: 'Sàng lọc quý I',
+          weekFrom: 11,
+          weekTo: 13,
+          goal: 'Sàng lọc sớm các nguy cơ trong thai kỳ.',
+          sortOrder: 2,
+          items: [
+            ['Khám thai định kỳ', 1],
+            ['Siêu âm đo độ mờ da gáy', 1],
+            ['Sàng lọc NIPT cơ bản', 1],
+            ['Sàng lọc nguy cơ tiền sản giật', 1],
+          ],
+        },
+        {
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          name: 'Theo dõi và khảo sát hình thái',
+          weekFrom: 14,
+          weekTo: 27,
+          goal: 'Đánh giá hình thái, phát triển và chuyển hóa thai kỳ.',
+          sortOrder: 3,
+          items: [
+            ['Khám thai định kỳ', 3],
+            ['Siêu âm thai 4D', 1],
+            ['Siêu âm hình thái thai nhi', 1],
+            ['Nghiệm pháp dung nạp glucose', 1],
+            ['Xét nghiệm công thức máu', 1],
+            ['Xét nghiệm nước tiểu', 2],
+          ],
+        },
+        {
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          name: 'Theo dõi cuối thai kỳ',
+          weekFrom: 28,
+          weekTo: 40,
+          goal: 'Theo dõi tăng trưởng, tuần hoàn và sức khỏe thai nhi.',
+          sortOrder: 4,
+          items: [
+            ['Khám thai định kỳ', 5],
+            ['Siêu âm thai 2D', 2],
+            ['Siêu âm Doppler thai', 1],
+            ['Theo dõi tim thai', 4],
+            ['Theo dõi huyết áp thai kỳ', 5],
+          ],
+        },
+        {
+          name: 'Chăm sóc sau sinh',
+          stageType: MaternityPackageStageType.POSTPARTUM,
+          goal: 'Đánh giá phục hồi và hướng dẫn chăm sóc mẹ và trẻ sơ sinh.',
+          sortOrder: 5,
+          items: [
+            ['Khám sức khỏe mẹ sau sinh', 2],
+            ['Tư vấn chăm sóc mẹ và trẻ sơ sinh', 1],
+            ['Theo dõi phục hồi sau sinh', 2],
+          ],
+        },
+      ],
+    },
+    {
+      name: 'Lộ trình thai kỳ nguy cơ cao',
+      description:
+        'Lộ trình tăng cường dành cho thai phụ có yếu tố nguy cơ, cần bác sĩ đánh giá và theo dõi sát.',
+      packageType: MaternityPackageType.SCHEDULE,
+      durationDays: 365,
+      priorityLevel: 9,
+      discountRate: 0.13,
+      stages: [
+        {
+          name: 'Đánh giá nguy cơ ban đầu',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 4,
+          weekTo: 10,
+          goal: 'Xác định yếu tố nguy cơ và xây dựng kế hoạch theo dõi.',
+          sortOrder: 1,
+          items: [
+            ['Khám thai nguy cơ cao', 2],
+            ['Tư vấn kế hoạch chăm sóc thai kỳ', 1],
+            ['Siêu âm thai 2D', 1],
+            ['Xét nghiệm công thức máu', 1],
+            ['Xét nghiệm nước tiểu', 1],
+            ['Theo dõi huyết áp thai kỳ', 2],
+          ],
+        },
+        {
+          name: 'Sàng lọc nguy cơ quý I',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 11,
+          weekTo: 13,
+          goal: 'Đánh giá chuyên sâu nguy cơ bất thường và tiền sản giật.',
+          sortOrder: 2,
+          items: [
+            ['Khám thai nguy cơ cao', 1],
+            ['Siêu âm đo độ mờ da gáy', 1],
+            ['Sàng lọc NIPT cơ bản', 1],
+            ['Sàng lọc nguy cơ tiền sản giật', 1],
+          ],
+        },
+        {
+          name: 'Theo dõi chuyên sâu quý II',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 14,
+          weekTo: 27,
+          goal: 'Theo dõi hình thái, tuần hoàn và chuyển hóa thai kỳ.',
+          sortOrder: 3,
+          items: [
+            ['Khám thai nguy cơ cao', 3],
+            ['Siêu âm hình thái thai nhi', 1],
+            ['Siêu âm Doppler thai', 1],
+            ['Nghiệm pháp dung nạp glucose', 1],
+            ['Xét nghiệm công thức máu', 1],
+            ['Xét nghiệm nước tiểu', 3],
+            ['Theo dõi huyết áp thai kỳ', 4],
+          ],
+        },
+        {
+          name: 'Theo dõi sát quý III',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 28,
+          weekTo: 40,
+          goal: 'Theo dõi thường xuyên sức khỏe thai phụ và thai nhi.',
+          sortOrder: 4,
+          items: [
+            ['Khám thai nguy cơ cao', 5],
+            ['Khám thai định kỳ', 3],
+            ['Siêu âm Doppler thai', 3],
+            ['Theo dõi tim thai', 6],
+            ['Theo dõi huyết áp thai kỳ', 8],
+            ['Xét nghiệm nước tiểu', 3],
+          ],
+        },
+      ],
+    },
+    {
+      name: 'Lộ trình mẹ và bé sau sinh',
+      description:
+        'Lộ trình kết hợp theo dõi cuối thai kỳ với chăm sóc và phục hồi sức khỏe mẹ sau sinh.',
+      packageType: MaternityPackageType.SCHEDULE,
+      durationDays: 180,
+      priorityLevel: 10,
+      discountRate: 0.1,
+      stages: [
+        {
+          name: 'Chuẩn bị trước sinh',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 28,
+          weekTo: 36,
+          goal: 'Theo dõi cuối thai kỳ và chuẩn bị kế hoạch chăm sóc sau sinh.',
+          sortOrder: 1,
+          items: [
+            ['Khám thai định kỳ', 3],
+            ['Siêu âm thai 2D', 1],
+            ['Theo dõi tim thai', 2],
+            ['Theo dõi huyết áp thai kỳ', 3],
+            ['Tư vấn chăm sóc mẹ và trẻ sơ sinh', 1],
+          ],
+        },
+        {
+          name: 'Theo dõi cận sinh',
+          stageType: MaternityPackageStageType.PREGNANCY_WEEK,
+          weekFrom: 37,
+          weekTo: 40,
+          goal: 'Theo dõi sát sức khỏe thai phụ và thai nhi ở giai đoạn cận sinh.',
+          sortOrder: 2,
+          items: [
+            ['Khám thai định kỳ', 3],
+            ['Siêu âm Doppler thai', 1],
+            ['Theo dõi tim thai', 3],
+            ['Theo dõi huyết áp thai kỳ', 3],
+          ],
+        },
+        {
+          name: 'Chăm sóc sau sinh sớm',
+          stageType: MaternityPackageStageType.POSTPARTUM,
+          goal: 'Theo dõi sức khỏe và quá trình phục hồi sớm của mẹ.',
+          sortOrder: 3,
+          items: [
+            ['Khám sức khỏe mẹ sau sinh', 1],
+            ['Chăm sóc vết mổ sau sinh', 2, false, true],
+            ['Theo dõi phục hồi sau sinh', 2],
+          ],
+        },
+        {
+          name: 'Phục hồi và chăm sóc mẹ bé',
+          stageType: MaternityPackageStageType.POSTPARTUM,
+          goal: 'Đánh giá phục hồi và hướng dẫn chăm sóc mẹ cùng trẻ sơ sinh.',
+          sortOrder: 4,
+          items: [
+            ['Khám sức khỏe mẹ sau sinh', 1],
+            ['Tư vấn chăm sóc mẹ và trẻ sơ sinh', 2],
+            ['Theo dõi phục hồi sau sinh', 2],
+          ],
+        },
+      ],
+    },
+  ];
 
-    const savedItems = [];
-    for (let index = 0; index < servicesForFacility.slice(0, 4).length; index++) {
-      const facilityService = servicesForFacility[index];
-      const item = await packageItemRepository.save({
-        packageId: pkg.id,
-        facilityServiceId: facilityService.id,
-        packageStageId: stages[index % stages.length].id,
-        includedQuantity: index === 0 ? 6 : 2,
-        isRequired: true,
-        isOptional: false,
-        allowedFacilityScope: PackageServiceFacilityScope.SELECTED,
-        sortOrder: index + 1,
+  for (const facility of facilities) {
+    const servicesForFacility = facilityServices.filter(
+      (item) => String(item.facilityId) === String(facility.id),
+    );
+    for (const qtypkg of quantityMaternityPackages) {
+      const code = await generateCode(facility.id, qtypkg.name);
+      const serviceItems: DeepPartial<PackageItem>[] = [];
+      qtypkg.items.map((item) => {
+        const svIt = servicesForFacility.find((i) => i.service.name === item.serviceName);
+        if (svIt) {
+          serviceItems.push({
+            facilityService: svIt,
+            facilityServiceId: svIt.id,
+            includedQuantity: item.quantity,
+            isRequired: item?.required || false,
+            isOptional: item?.optional || false,
+            allowedFacilityScope: PackageServiceFacilityScope.ALL,
+            sortOrder: 0,
+          });
+        }
       });
-      savedItems.push(item);
+      const pkgPrice = serviceItems.reduce(
+        (acc, item) =>
+          Number(acc) + Number(item?.facilityService?.price || 0) * Number(item.includedQuantity),
+        0,
+      );
+      const pkg = await maternityPackageRepository.save({
+        code: code,
+        facilityId: facility.id,
+        name: qtypkg.name,
+        description: qtypkg.description,
+        packageType: qtypkg.packageType,
+        price: String(Math.round((pkgPrice * qtypkg.discountRate) / 10000) * 10000),
+        durationDays: qtypkg.durationDays,
+        priorityLevel: qtypkg.priorityLevel,
+        status: MaternityPackageStatus.ACTIVE,
+      });
+      const savedServiceItems = await packageItemRepository.save(
+        serviceItems.map((item) => {
+          return {
+            packageId: pkg.id,
+            facilityServiceId: item.facilityServiceId,
+            includedQuantity: item.includedQuantity,
+            isRequired: item.isRequired,
+            isOptional: item.isOptional,
+            allowedFacilityScope: item.allowedFacilityScope,
+            sortOrder: item.sortOrder,
+          };
+        }),
+      );
+      await packageServiceFacilityRepository.save(
+        savedServiceItems.map((item) => {
+          return {
+            packageItemId: item.id,
+            facilityId: facility.id,
+          };
+        }),
+      );
     }
 
-    await packageServiceFacilityRepository.save(
-      savedItems.map((item) => ({ packageItemId: item.id, facilityId: facility.id })),
-    );
+    for (const schPkg of scheduleMaternityPackages) {
+      const code = await generateCode(facility.id, schPkg.name);
+      const pkgStgs: DeepPartial<PackageStage>[] = [];
+      schPkg.stages.map((stage) => {
+        const serviceItems: DeepPartial<PackageItem>[] = [];
+        stage.items.map((item, index) => {
+          const svIt = servicesForFacility.find((i) => i.service.name === item[0]);
+          if (svIt) {
+            serviceItems.push({
+              facilityService: svIt,
+              facilityServiceId: svIt.id,
+              includedQuantity: Number(item[1]) || 1,
+              isRequired: false,
+              isOptional: false,
+              allowedFacilityScope: PackageServiceFacilityScope.ALL,
+              sortOrder: index + 1,
+            });
+          }
+        });
+        const pkgStg = {
+          name: stage.name,
+          stageType: stage.stageType,
+          weekFrom: stage.weekFrom,
+          weekTo: stage.weekTo,
+          goal: stage.goal,
+          sortOrder: stage.sortOrder,
+          items: serviceItems || [],
+        };
+        pkgStgs.push(pkgStg);
+      });
+      // save pkgSch
+      const totalPrice = pkgStgs.reduce(
+        (acc, item) =>
+          Number(acc) +
+          Number(
+            item?.items?.reduce(
+              (acc, item) =>
+                Number(acc) + Number(item?.facilityService?.price) * Number(item.includedQuantity),
+              0,
+            ),
+          ),
+        0,
+      );
+      const savedSchPkg = await maternityPackageRepository.save({
+        code: code,
+        facilityId: facility.id,
+        name: schPkg.name,
+        description: schPkg.description,
+        packageType: schPkg.packageType,
+        price: String(Math.round((totalPrice * schPkg.discountRate) / 10000) * 10000),
+        durationDays: schPkg.durationDays,
+        priorityLevel: schPkg.priorityLevel,
+        status: MaternityPackageStatus.ACTIVE,
+      });
+      for (const pkgStg of pkgStgs) {
+        await packageStageRepository.save({
+          packageId: savedSchPkg.id,
+          name: pkgStg.name,
+          stageType: pkgStg.stageType,
+          weekFrom: pkgStg.weekFrom,
+          weekTo: pkgStg.weekTo,
+          goal: pkgStg.goal,
+          sortOrder: pkgStg.sortOrder,
+        });
+        const pkgStgItems = pkgStg.items?.map((item) => {
+          return {
+            packageId: savedSchPkg.id,
+            facilityServiceId: item.facilityServiceId,
+            includedQuantity: item.includedQuantity,
+            isRequired: item.isRequired,
+            isOptional: item.isOptional,
+            allowedFacilityScope: item.allowedFacilityScope,
+            sortOrder: item.sortOrder,
+          };
+        });
+        const savedPkgItems = await packageItemRepository.save(pkgStgItems || []);
+        await packageServiceFacilityRepository.save(
+          savedPkgItems.map((item) => {
+            return {
+              packageItemId: item.id,
+              facilityId: facility.id,
+            };
+          }),
+        );
+      }
+    }
   }
 }
 
 async function insertShifts() {
+  const facilities = await facilityRepository.find();
+  const roomTypes = await roomTypeRepository.find();
   const staffs = await staffRepository.find({
     relations: { roles: true },
     where: { roles: { name: In([RoleEnum.DOCTOR, RoleEnum.NURSE, RoleEnum.STAFF]) } },
   });
   const shiftSlots = await shiftSlotRepository.find();
   const rooms = await roomRepository.find();
-  const today = new Date();
+  const selectedRoomType = [
+    'Phòng khám sản',
+    'Phòng khám tổng quát',
+    'Phòng siêu âm',
+    'Phòng xét nghiệm',
+    'Phòng thủ thuật',
+  ];
+  const firstDateOfWeek = new Date();
 
-  for (let dayOffset = 1; dayOffset <= 14; dayOffset++) {
-    const shiftDate = new Date(today.getTime() + dayOffset * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 10);
+  firstDateOfWeek.setDate(firstDateOfWeek.getDate() - 90);
+  firstDateOfWeek.setDate(firstDateOfWeek.getDate() - ((firstDateOfWeek.getDay() + 6) % 7));
+  firstDateOfWeek.setHours(0, 0, 0, 0);
 
-    for (let staffIndex = 0; staffIndex < staffs.length; staffIndex++) {
-      const staff = staffs[staffIndex];
-      const staffSlots = shiftSlots.filter((slot) => String(slot.facilityId) === String(staff.facilityId));
-      const slot = staffSlots[(dayOffset + staffIndex) % staffSlots.length];
-      const room = rooms.find((item) => String(item.facilityId) === String(staff.facilityId));
+  const nextWeek = new Date();
+  nextWeek.setDate(nextWeek.getDate() + 14);
+  nextWeek.setDate(nextWeek.getDate() - ((nextWeek.getDay() + 6) % 7));
+  nextWeek.setHours(0, 0, 0, 0);
 
-      if (slot) {
-        const newShift = {
-          staffId: staff.id,
-          roleId: staff.roles[0]?.id ?? null,
-          facilityId: staff.facilityId!,
-          roomId: room?.id ?? null,
-          slotId: slot.id,
-          shiftDate,
-          startTime: slot.startTime,
-          endTime: slot.endTime,
-          maxAppointments: 8,
-          status: DoctorShiftStatus.AVAILABLE,
-          note: 'Ca làm việc seed demo',
-        };
-        await shiftRepository.save(newShift);
+  const distanceDay = Math.ceil(
+    (nextWeek.getTime() - firstDateOfWeek.getTime()) / (24 * 60 * 60 * 1000),
+  );
+  const distanceWeek = Math.ceil(distanceDay / 7);
+  for (const facility of facilities) {
+    const roomOfFacility = rooms.filter((room) => String(room.facilityId) === String(facility.id));
+    const roomTypeInFacilityForDoctors = roomOfFacility.filter((room) =>
+      selectedRoomType.includes(room.name),
+    );
+    const doctorsInFacility = staffs.filter(
+      (staff) =>
+        String(staff.facilityId) === String(facility.id) &&
+        staff.roles.some((role) => role.name === RoleEnum.DOCTOR),
+    );
+    const staffInFacility = staffs.filter(
+      (staff) =>
+        String(staff.facilityId) === String(facility.id) &&
+        staff.roles.some((role) => role.name !== RoleEnum.DOCTOR),
+    );
+    // chỉ insert ca sáng chiều tối, ko insert đêm
+    const shiftSlotOfFacility = shiftSlots
+      .filter((slot) => String(slot.facilityId) === String(facility.id))
+      .filter((slot) => ['Ca sáng', 'Ca chiều', 'Ca tối'].includes(slot.name));
+
+    for (let weekOffset = 0; weekOffset < distanceWeek; weekOffset++) {
+      // chia thành các tuần để insert lịch cho từng tuần
+
+      for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+        const shiftDate = new Date(
+          firstDateOfWeek.getTime() + (weekOffset * 7 + dayOffset) * 24 * 60 * 60 * 1000,
+        )
+          .toISOString()
+          .slice(0, 10);
+        // insert cho từng rooms
+        roomOfFacility.forEach(async (room) => {
+          // mỗi room sẽ insert cho các ca
+          const isNeedDoctor = roomTypeInFacilityForDoctors.includes(room);
+          for (
+            let shiftSlotIndex = 0;
+            shiftSlotIndex < shiftSlotOfFacility.length;
+            shiftSlotIndex++
+          ) {
+            const shiftSlot = shiftSlotOfFacility[shiftSlotIndex];
+            if (isNeedDoctor) {
+              const randomDoctorIndex = Math.floor(Math.random() * doctorsInFacility.length);
+              const staff = doctorsInFacility[randomDoctorIndex];
+              const newShift = {
+                staffId: staff.id,
+                roleId: staff.roles[0]?.id ?? null,
+                facilityId: staff.facilityId!,
+                roomId: room.id,
+                slotId: shiftSlot.id,
+                shiftDate,
+                startTime: shiftSlot.startTime,
+                endTime: shiftSlot.endTime,
+                maxAppointment: 8,
+                status: DoctorShiftStatus.AVAILABLE,
+                createdAt: new Date(shiftDate),
+                updatedAt: new Date(shiftDate),
+              };
+              await shiftRepository.save(newShift);
+            } else {
+              const randomStaffIndex = Math.floor(Math.random() * staffInFacility.length);
+              const staff = staffInFacility[randomStaffIndex];
+              const newShift = {
+                staffId: staff.id,
+                roleId: staff.roles[0]?.id ?? null,
+                facilityId: staff.facilityId!,
+                roomId: room.id,
+                slotId: shiftSlot.id,
+                shiftDate,
+                startTime: shiftSlot.startTime,
+                endTime: shiftSlot.endTime,
+                maxAppointment: 8,
+                status: DoctorShiftStatus.AVAILABLE,
+                createdAt: new Date(shiftDate),
+                updatedAt: new Date(shiftDate),
+              };
+              await shiftRepository.save(newShift);
+            }
+          }
+        });
       }
     }
   }
 }
 
-async function insertCareFlowData(): Promise<void> {
-  const toMysqlDateTime = (date: Date) => date.toISOString().slice(0, 19).replace('T', ' ');
-  const users = await userRepository.find();
-  const profiles = await pregnancyProfileRepository.find();
-  const doctors = await staffRepository.find({ relations: { roles: true }, where: { roles: { name: RoleEnum.DOCTOR } } });
-  const services = await serviceRepository.find();
-  const rooms = await roomRepository.find();
-  const shifts = await shiftRepository.find();
-  const packages = await maternityPackageRepository.find();
+async function insertOrders(): Promise<void> {
+  const facilityServices = await facilityServiceRepository.find({
+    relations: { service: true },
+  });
+  const facilityPackages = await maternityPackageRepository.find();
+  const facilities = await facilityRepository.find();
+  const pregnancyProfiles = await pregnancyProfileRepository.find();
+  const dataSeed: DeepPartial<Order>[] = [];
+  const generateOrderCode = (date: Date) => {
+    const now = new Date(date);
+    const formattedDate = now
+      .toISOString()
+      .replace(/[-T:.Z]/g, '')
+      .slice(0, 14);
 
-  const appointments: Array<Partial<Appointment>> = [];
-  for (let index = 0; index < Math.min(users.length, 30); index++) {
-    const profile = profiles.find((item) => String(item.patientId) === String(users[index].id));
-    const shift = shifts[index % shifts.length];
-    const room = rooms.find((item) => String(item.facilityId) === String(shift.facilityId)) ?? rooms[index % rooms.length];
-    const service = services[index % services.length];
-    const doctor = doctors[index % doctors.length];
-    const scheduledStart = new Date(`${shift.shiftDate}T${shift.startTime}`);
-    const scheduledEnd = new Date(scheduledStart.getTime() + service.defaultDurationMinutes * 60 * 1000);
+    const code = Math.floor(Math.random() * 1000000);
+    return formattedDate + String(code).padStart(6, '0');
+  };
 
-    appointments.push({
-      shiftId: shift.id,
-      patientId: users[index].id,
-      pregnancyProfileId: profile?.id ?? null,
-      roomId: room.id,
-      facilityId: shift.facilityId,
-      doctorId: doctor.id,
-      serviceId: service.id,
-      scheduledStart: toMysqlDateTime(scheduledStart),
-      scheduledEnd: toMysqlDateTime(scheduledEnd),
-      checkedInAt: index % 5 === 0 ? scheduledStart : null,
-      status: index % 5 === 0 ? AppointmentStatus.COMPLETED : AppointmentStatus.CONFIRMED,
-      createdBy: doctor.id,
-    });
+  for (const prenancyProfile of pregnancyProfiles) {
+    // chia 2 loại mua: 70% package, 30% service lẻ
+    const buyDate = new Date(new Date(prenancyProfile.createdAt).getTime() + 15 * 60 * 60 * 1000);
+    const randomFacility = facilities[Math.floor(Math.random() * facilities.length)];
+    const randomNumber = Math.floor(Math.random() * 100);
+    if (randomNumber > 30) {
+      // mua package, mua 1 hoặc 2 gói to
+      const randomNumberPackage = Math.floor(Math.random() * 2) + 1;
+      const listPackageOfFacility = facilityPackages.filter(
+        (packageItem) => String(packageItem.facilityId) === String(randomFacility.id),
+      );
+      for (let i = 0; i < randomNumberPackage; i++) {
+        const randomPackage =
+          listPackageOfFacility[Math.floor(Math.random() * listPackageOfFacility.length)];
+
+        const newOrderDetail: DeepPartial<OrderItem> = {
+          itemType: OrderItemType.PACKAGE,
+          itemId: randomPackage.id,
+          name: randomPackage.name,
+          quantity: 1,
+          unitPrice: Number(randomPackage.price),
+          totalPrice: Number(randomPackage.price),
+          createdAt: buyDate,
+          updatedAt: buyDate,
+        };
+
+        const newOrder: DeepPartial<Order> = {
+          code: generateOrderCode(buyDate),
+          pregnancyProfileId: prenancyProfile.id,
+          customerId: prenancyProfile.patientId,
+          facilityId: randomFacility.id,
+          orderType: OrderType.MATERNITY_PACKAGE,
+          subtotalAmount: Number(randomPackage.price),
+          discountAmount: 0,
+          totalAmount: Number(randomPackage.price),
+          status: OrderStatus.PAID,
+          createdAt: buyDate,
+          updatedAt: buyDate,
+          orderItems: [newOrderDetail],
+        };
+        dataSeed.push(newOrder);
+      }
+    } else {
+      // mua gói lẻ => mua nhiều lần
+      const buyingCount = Math.floor(Math.random() * 3) + 3;
+      for (let index = 0; index < buyingCount; index++) {
+        const randomFacilityForService = facilities[Math.floor(Math.random() * facilities.length)];
+        const buyDateService = new Date(
+          new Date(buyDate).getTime() +
+            index * (Math.floor(240 / buyingCount) + Math.random() * 10) * 24 * 60 * 60 * 1000,
+        );
+        const listServiceOfFacility = facilityServices.filter(
+          (serviceItem) => String(serviceItem.facilityId) === String(randomFacilityForService.id),
+        );
+        const listServiceBuy: DeepPartial<OrderItem>[] = [];
+        const countService = Math.floor(Math.random() * 3) + 1; // sẽ mua 1-3 loại service 1 lần
+        for (let count = 0; count < countService; count++) {
+          const randomService = listServiceOfFacility[count % listServiceOfFacility.length];
+          const randomQuantity = Math.floor(Math.random() * 3) + 1; // sẽ mua 1-3 cái
+          const newOrderDetail: DeepPartial<OrderItem> = {
+            itemType: OrderItemType.NORMAL_SERVICE,
+            itemId: randomService.id,
+            name: randomService.service.name,
+            quantity: randomQuantity,
+            unitPrice: Number(randomService.price),
+            totalPrice: Number(randomService.price) * randomQuantity,
+            createdAt: buyDateService,
+            updatedAt: buyDateService,
+          };
+
+          // check trùng itemId
+          if (listServiceBuy.find((item) => item.itemId === newOrderDetail.itemId)) {
+            const index = listServiceBuy.findIndex((item) => item.itemId === newOrderDetail.itemId);
+            listServiceBuy[index] = {
+              ...listServiceBuy[index],
+              quantity:
+                Number(newOrderDetail.quantity || 0) + Number(listServiceBuy[index].quantity || 0),
+            };
+          } else {
+            listServiceBuy.push(newOrderDetail);
+          }
+        }
+        const totalPrice = listServiceBuy.reduce(
+          (total, item) => total + Number(item.totalPrice || 0),
+          0,
+        );
+        const newOrder: DeepPartial<Order> = {
+          code: generateOrderCode(buyDateService),
+          pregnancyProfileId: prenancyProfile.id,
+          customerId: prenancyProfile.patientId,
+          facilityId: randomFacilityForService.id,
+          orderType: OrderType.NORMAL_SERVICE,
+          subtotalAmount: Number(totalPrice),
+          discountAmount: 0,
+          totalAmount: Number(totalPrice),
+          status: OrderStatus.PAID,
+          createdAt: buyDateService,
+          updatedAt: buyDateService,
+          orderItems: listServiceBuy,
+        };
+
+        dataSeed.push(newOrder);
+      }
+    }
   }
+  // tạo xong dataSeed, giờ sắp xếp để insert cho đẹp
+  dataSeed.sort((a, b) => {
+    if (!a.createdAt && !b.createdAt) return 0;
+    if (!a.createdAt) return 1;
+    if (!b.createdAt) return -1;
 
-  const savedAppointments = await appointmentRepository.save(appointments);
-  await appointmentReminderRepository.save(
-    savedAppointments.map((appointment) => ({
-      appointmentId: appointment.id,
-      channel: 'email',
-      scheduledAt: new Date(new Date(appointment.scheduledStart ?? new Date()).getTime() - 24 * 60 * 60 * 1000),
-      sentAt: null,
-      status: ReminderStatus.PENDING,
-      errorMessage: null,
-    })),
-  );
+    return (a.createdAt as Date).getTime() - (b.createdAt as Date).getTime();
+  });
 
-  for (let index = 0; index < Math.min(profiles.length, 25); index++) {
-    const profile = profiles[index];
-    const recorder = doctors[index % doctors.length];
-    await healthMetricRepository.save({
-      pregnancyProfileId: profile.id,
-      recordedBy: recorder.id,
-      gestationalAgeWeeks: 8 + (index % 28),
-      weightKg: 52 + (index % 12),
-      bloodPressureSystolic: 105 + (index % 18),
-      bloodPressureDiastolic: 65 + (index % 12),
-      heartRate: 72 + (index % 10),
-      bloodSugar: 4.8 + (index % 4) * 0.2,
-      fetalHeartRate: 130 + (index % 18),
-      metadata: { source: 'seed' },
-      notes: 'Chỉ số seed demo trong giới hạn theo dõi.',
-    });
+  // bắt đầu insert
+  for (let index = 0; index < dataSeed.length; index++) {
+    const order = dataSeed[index];
+    const savedOrder = await orderRepository.save(order);
+    const orderItems = dataSeed[index].orderItems as DeepPartial<OrderItem>[];
+    for (let indexItem = 0; indexItem < orderItems.length; indexItem++) {
+      const orderItem = orderItems[indexItem];
+      await orderItemRepository.save({
+        ...orderItem,
+        orderId: savedOrder.id,
+      });
+    }
   }
-
-  const completedAppointments = savedAppointments.filter((item) => item.status === AppointmentStatus.COMPLETED);
-  await medicalRecordRepository.save(
-    completedAppointments.map((appointment) => ({
-      appointmentId: appointment.id,
-      pregnancyProfileId: appointment.pregnancyProfileId!,
-      doctorId: appointment.doctorId,
-      diagnosis: 'Thai kỳ tiến triển ổn định.',
-      conclusion: 'Không ghi nhận bất thường trong lần khám.',
-      recommendation: 'Tiếp tục theo dõi, ăn uống đủ chất và tái khám đúng hẹn.',
-      nextAppointmentSuggestedAt: new Date(new Date(appointment.scheduledEnd ?? new Date()).getTime() + 28 * 24 * 60 * 60 * 1000),
-    })),
-  );
-
-  for (let index = 0; index < Math.min(users.length, packages.length); index++) {
-    const user = users[index];
-    const profile = profiles.find((item) => String(item.patientId) === String(user.id));
-    const pkg = packages[index % packages.length];
-    const order = await orderRepository.save({
-      code: `ORD-SEED-${String(index + 1).padStart(4, '0')}`,
-      customerId: user.id,
-      pregnancyProfileId: profile?.id ?? profiles[0].id,
-      facilityId: pkg.facilityId,
-      orderType: OrderType.MATERNITY_PACKAGE,
-      subtotalAmount: Number(pkg.price),
-      discountAmount: 0,
-      totalAmount: Number(pkg.price),
-      status: OrderStatus.PAID,
-    });
-
-    await orderItemRepository.save({
-      orderId: order.id,
-      item: 'maternity_package' as never,
-      itemType: OrderItemType.PACKAGE,
-      itemId: pkg.id,
-      name: pkg.name,
-      quantity: 1,
-      unitPrice: pkg.price,
-      totalPrice: pkg.price,
-      metadata: { source: 'seed' },
-    } as never);
-
-    await paymentRepository.save({
-      orderId: order.id,
-      paymentMethod: 'cash',
-      provider: 'seed',
-      providerTransactionId: `PAY-SEED-${String(index + 1).padStart(4, '0')}`,
-      amount: Number(pkg.price),
-      status: PaymentStatus.SUCCESS,
-      paidAt: new Date(),
-      rawResponse: null,
-    });
-  }
-
-  const packageItems = await packageItemRepository.find({ relations: { facilityService: true } });
-  await patientPackageBenefitRepository.save(
-    users.slice(0, 10).flatMap((user, userIndex) =>
-      packageItems.slice(0, 3).map((item) => ({
-        userId: user.id,
-        serviceId: item.facilityService.serviceId,
-        totalQuantity: item.includedQuantity,
-        usedQuantity: userIndex % 2,
-        remainingQuantity: Math.max(item.includedQuantity - (userIndex % 2), 0),
-      })),
-    ),
-  );
-
-  await scheduleRepository.save(
-    savedAppointments.slice(0, 20).map((appointment) => ({
-      userId: appointment.patientId,
-      title: 'Lịch khám thai',
-      type: 'appointment',
-      scheduleDate: new Date(appointment.scheduledStart ?? new Date()).toISOString().slice(0, 10),
-      scheduleTime: new Date(appointment.scheduledStart ?? new Date()).toTimeString().slice(0, 8),
-      status: 'upcoming',
-      location: 'Maternity Care System',
-      doctor: doctors.find((doctor) => String(doctor.id) === String(appointment.doctorId))?.name ?? null,
-      note: 'Lịch được tạo từ seed demo.',
-      source: 'appointment',
-      appointmentId: appointment.id,
-    })),
-  );
 }
+
+async function insertAppointments(): Promise<void> {
+  const orders = await orderRepository.find({
+    relations: { orderItems: true },
+  });
+  const maternityPackages = await maternityPackageRepository.find({
+    relations: {
+      packageItems: true,
+      stages: {
+        items: true,
+      },
+    },
+  });
+  const facilityServices = await facilityServiceRepository.find();
+  const findServiceIdOfFacilityService = (id: string) =>
+    facilityServices.find((item) => item.id === id)?.serviceId;
+
+  const items = [];
+  // lọc các item cho appointment từ các order đã mua
+  for (const order of orders) {
+    for (const item of order.orderItems) {
+      if (item.itemType === OrderItemType.NORMAL_SERVICE) {
+        const facilityService = facilityServices.find((service) => service.id === item.itemId);
+        if (facilityService) {
+          items.push({
+            serviceId: facilityService.serviceId,
+            quantity: item.quantity,
+            facilityId: facilityService.facilityId,
+            patientId: order.customerId,
+            pregnancyProfileId: order.pregnancyProfileId,
+          });
+        }
+      } else if (item.itemType === OrderItemType.PACKAGE) {
+        const maternityPackage = maternityPackages.find(
+          (packageItem) => packageItem.id === item.itemId,
+        );
+        if (maternityPackage) {
+          if (maternityPackage.packageType === MaternityPackageType.QUANTITY) {
+            const itemsOfPackage = maternityPackage.packageItems;
+            for (const itemOfPackage of itemsOfPackage) {
+              items.push({
+                serviceId: findServiceIdOfFacilityService(itemOfPackage.facilityServiceId),
+                quantity: itemOfPackage.includedQuantity * item.quantity,
+                facilityId: maternityPackage.facilityId,
+                patientId: order.customerId,
+                pregnancyProfileId: order.pregnancyProfileId,
+              });
+            }
+          } else {
+            const itemsOfStages = maternityPackage.stages;
+            for (const itemOfPackage of itemsOfStages) {
+              const itemStage = itemOfPackage.items;
+              for (const itemOfStage of itemStage) {
+                items.push({
+                  serviceId: findServiceIdOfFacilityService(itemOfStage.facilityServiceId),
+                  quantity: itemOfStage.includedQuantity * item.quantity,
+                  facilityId: maternityPackage.facilityId,
+                  patientId: order.customerId,
+                  pregnancyProfileId: order.pregnancyProfileId,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  // xếp lại các service theo các thai phụ
+  type GroupedItem = {
+    pregnancyProfileId: string;
+    facilityId: string;
+    patientId: string;
+    services: Map<string, number>;
+  };
+
+  const groupedMap = items.reduce((result, item) => {
+    const compositeKey = [item.pregnancyProfileId, item.facilityId, item.patientId].join('|');
+
+    if (!result.has(compositeKey)) {
+      result.set(compositeKey, {
+        pregnancyProfileId: item.pregnancyProfileId,
+        facilityId: item.facilityId,
+        patientId: item.patientId,
+        services: new Map<string, number>(),
+      });
+    }
+
+    const group = result.get(compositeKey)!;
+
+    const currentQuantity = group.services.get(item.serviceId as string) ?? 0;
+
+    group.services.set(item.serviceId as string, currentQuantity + item.quantity);
+
+    return result;
+  }, new Map<string, GroupedItem>());
+
+  const groupedItems = Array.from(groupedMap.values()).map((group) => {
+    const services = Array.from(group.services, ([serviceId, quantity]) => ({
+      serviceId,
+      quantity,
+    }));
+
+    return {
+      pregnancyProfileId: group.pregnancyProfileId,
+      facilityId: group.facilityId,
+      patientId: group.patientId,
+
+      // Số loại dịch vụ khác nhau
+      totalServiceTypes: services.length,
+
+      // Tổng số lượt dịch vụ
+      totalQuantity: services.reduce((sum, service) => sum + service.quantity, 0),
+
+      services,
+    };
+  });
+  // sau khi group xong, tạo appointment
+  const doctors = await staffRepository.find({
+    relations: { roles: true },
+    where: { roles: { name: RoleEnum.DOCTOR } },
+  });
+  const staffs = await staffRepository.find({
+    relations: { roles: true },
+    where: { roles: { name: RoleEnum.STAFF } },
+  });
+  const rooms = await roomRepository.find();
+  const pregnancyProfiles = await pregnancyProfileRepository.find();
+  const facilities = await facilityRepository.find();
+  // lấy các shift của doctors
+  const shifts = await shiftRepository.find({
+    relations: { staff: { roles: true } },
+    where: { staff: { roles: { name: RoleEnum.DOCTOR } } },
+  });
+  const roomOfFacility = [];
+  const doctorOfFacility = [];
+  const staffOfFacility = [];
+  const shiftOfFacility = [];
+  for (const faci of facilities) {
+    roomOfFacility[Number(faci.id)] = rooms.filter((room) => room.facilityId === faci.id);
+    doctorOfFacility[Number(faci.id)] = doctors.filter((doctor) => doctor.facilityId === faci.id);
+    staffOfFacility[Number(faci.id)] = staffs.filter((staff) => staff.facilityId === faci.id);
+    shiftOfFacility[Number(faci.id)] = shifts.filter((shift) => shift.facilityId === faci.id);
+  }
+  const toMysqlDateTime = (date: Date) => date.toISOString().slice(0, 19).replace('T', ' ');
+  const appointmentData = [];
+  for (const item of groupedItems) {
+    const pregnancyProfile = pregnancyProfiles.find(
+      (profile) => profile.id === item.pregnancyProfileId,
+    );
+    if (!pregnancyProfile) {
+      continue;
+    }
+    const numberAppoinment = item.totalQuantity;
+    const facilityId = Number(item.facilityId);
+    const rangeDay = Math.floor(270 / numberAppoinment);
+    const serviceLength = item.services.length;
+    for (let i = 0; i < serviceLength; i++) {
+      for (let j = 0; j < item.services[i].quantity; j++) {
+        const indexOfItem = i * serviceLength + j;
+        const date = new Date(
+          pregnancyProfile.createdAt.getTime() +
+            (i * serviceLength + j) *
+              (rangeDay - Math.floor(Math.random() * 5)) *
+              24 *
+              60 *
+              60 *
+              1000,
+        );
+        if (date > new Date(new Date().getTime() - 24 * 60 * 60 * 1000)) {
+          break;
+        }
+        let shift = null;
+        if (shiftOfFacility[facilityId].length === 0) {
+          shift = null;
+        } else {
+          shift =
+            shiftOfFacility[facilityId][
+              Math.floor(Math.random() * shiftOfFacility[facilityId].length)
+            ];
+        }
+        const doctorId =
+          shift?.doctorId ??
+          doctorOfFacility[facilityId][indexOfItem % doctorOfFacility[facilityId].length].id;
+        const roomId =
+          shift?.roomId ??
+          roomOfFacility[facilityId][indexOfItem % roomOfFacility[facilityId].length].id;
+
+        const randomHour = Math.floor(Math.random() * 12) + 8;
+        const minute = indexOfItem % 2 === 0 ? 0 : 30;
+        const scheduleDate = new Date(
+          new Date(date).getTime() + Math.floor(Math.random() * 5) * 24 * 60 * 60 * 1000,
+        ).setHours(randomHour, minute, 0, 0);
+        const status =
+          new Date(scheduleDate).getTime() >= new Date().getTime()
+            ? AppointmentStatus.BOOKED
+            : AppointmentStatus.COMPLETED;
+
+        appointmentData.push({
+          pregnancyProfileId: item.pregnancyProfileId,
+          patientId: item.patientId,
+          facilityId: item.facilityId,
+          roomId: roomId,
+          doctorId: doctorId,
+          scheduledStart: toMysqlDateTime(new Date(scheduleDate)),
+          scheduledEnd: toMysqlDateTime(new Date(scheduleDate + 30 * 60 * 1000)),
+          checkedInAt: toMysqlDateTime(new Date(new Date(scheduleDate).getTime() - 30 * 60 * 1000)),
+          serviceId: item.services[i].serviceId,
+          status: status,
+          createdBy:
+            staffOfFacility[facilityId][indexOfItem % staffOfFacility[facilityId].length].id,
+          createdAt: new Date(date),
+          updatedAt: new Date(date),
+        });
+      }
+    }
+  }
+  const sortedAppointments = appointmentData.sort((a, b) => {
+    const dateA = new Date(a.createdAt);
+    const dateB = new Date(b.createdAt);
+    return dateA.getTime() - dateB.getTime();
+  });
+  for (const item of sortedAppointments) {
+    await appointmentRepository.save(item);
+  }
+}
+
+async function insertMedicalRecords(): Promise<void> {
+  const medicalRecordContents = [
+    {
+      diagnosis:
+        'Thai kỳ đang tiến triển phù hợp với tuổi thai, chưa ghi nhận dấu hiệu bất thường.',
+      conclusion: 'Sức khỏe thai phụ ổn định, thai nhi phát triển phù hợp với tuổi thai.',
+      recommendation:
+        'Tiếp tục theo dõi thai kỳ, bổ sung dinh dưỡng hợp lý và tái khám đúng lịch hẹn.',
+    },
+    {
+      diagnosis:
+        'Thai trong tử cung, tim thai rõ, các chỉ số phát triển hiện tại nằm trong giới hạn phù hợp.',
+      conclusion: 'Thai nhi phát triển ổn định, chưa phát hiện bất thường tại thời điểm thăm khám.',
+      recommendation:
+        'Duy trì chế độ nghỉ ngơi hợp lý, theo dõi các dấu hiệu bất thường và khám lại theo lịch.',
+    },
+    {
+      diagnosis:
+        'Thai phụ có biểu hiện mệt mỏi nhẹ trong thai kỳ, chưa ghi nhận dấu hiệu nguy hiểm.',
+      conclusion:
+        'Tình trạng sức khỏe hiện tại ổn định, cần tiếp tục theo dõi và điều chỉnh sinh hoạt.',
+      recommendation:
+        'Nghỉ ngơi đầy đủ, uống đủ nước, ăn uống cân đối và thực hiện xét nghiệm theo chỉ định.',
+    },
+    {
+      diagnosis:
+        'Kết quả siêu âm cho thấy thai nhi có các chỉ số phát triển phù hợp với tuổi thai.',
+      conclusion: 'Chưa ghi nhận bất thường hình thái thai nhi tại thời điểm siêu âm.',
+      recommendation:
+        'Tiếp tục khám thai định kỳ và thực hiện siêu âm hình thái theo mốc thai kỳ được hướng dẫn.',
+    },
+    {
+      diagnosis:
+        'Kết quả đo độ mờ da gáy nằm trong giới hạn theo dõi, chưa ghi nhận dấu hiệu bất thường rõ ràng.',
+      conclusion:
+        'Kết quả siêu âm hiện tại phù hợp, cần kết hợp với xét nghiệm sàng lọc để đánh giá đầy đủ.',
+      recommendation:
+        'Thực hiện xét nghiệm sàng lọc trước sinh theo tư vấn của bác sĩ và tái khám đúng lịch.',
+    },
+    {
+      diagnosis: 'Kết quả xét nghiệm công thức máu ghi nhận chỉ số huyết sắc tố giảm nhẹ.',
+      conclusion: 'Theo dõi tình trạng thiếu máu nhẹ trong thai kỳ.',
+      recommendation:
+        'Tăng cường thực phẩm giàu sắt và sử dụng thuốc bổ sung theo chỉ định của bác sĩ.',
+    },
+    {
+      diagnosis: 'Kết quả xét nghiệm nước tiểu chưa ghi nhận bất thường đáng chú ý.',
+      conclusion: 'Các chỉ số xét nghiệm nước tiểu hiện tại trong giới hạn theo dõi.',
+      recommendation: 'Uống đủ nước, giữ vệ sinh cá nhân và tái kiểm tra theo lịch khám thai.',
+    },
+    {
+      diagnosis: 'Kết quả đường huyết cao hơn ngưỡng theo dõi thông thường trong thai kỳ.',
+      conclusion: 'Có nguy cơ rối loạn dung nạp glucose, cần thực hiện đánh giá bổ sung.',
+      recommendation:
+        'Thực hiện nghiệm pháp dung nạp glucose và điều chỉnh chế độ ăn theo hướng dẫn chuyên môn.',
+    },
+    {
+      diagnosis: 'Kết quả nghiệm pháp dung nạp glucose cần được tiếp tục theo dõi.',
+      conclusion: 'Thai phụ thuộc nhóm cần kiểm soát đường huyết trong thai kỳ.',
+      recommendation:
+        'Theo dõi đường huyết, điều chỉnh chế độ dinh dưỡng và tái khám theo lịch của bác sĩ.',
+    },
+    {
+      diagnosis: 'Huyết áp thai phụ cao hơn mức theo dõi tại thời điểm thăm khám.',
+      conclusion: 'Cần tiếp tục giám sát huyết áp và đánh giá nguy cơ liên quan trong thai kỳ.',
+      recommendation:
+        'Theo dõi huyết áp thường xuyên, nghỉ ngơi hợp lý và tái khám sớm nếu xuất hiện dấu hiệu bất thường.',
+    },
+    {
+      diagnosis: 'Kết quả theo dõi tim thai ghi nhận nhịp tim thai trong giới hạn phù hợp.',
+      conclusion: 'Tim thai ổn định tại thời điểm kiểm tra.',
+      recommendation:
+        'Tiếp tục theo dõi cử động thai và thực hiện kiểm tra tim thai theo lịch hẹn.',
+    },
+    {
+      diagnosis:
+        'Kết quả siêu âm Doppler ghi nhận tuần hoàn thai nhi hiện tại trong giới hạn theo dõi.',
+      conclusion: 'Chưa phát hiện bất thường rõ ràng về tuần hoàn thai nhi tại thời điểm kiểm tra.',
+      recommendation: 'Tiếp tục theo dõi sự phát triển của thai nhi và tái siêu âm theo chỉ định.',
+    },
+    {
+      diagnosis: 'Thai phụ tăng cân nhanh hơn mức dự kiến trong giai đoạn hiện tại của thai kỳ.',
+      conclusion: 'Cần điều chỉnh chế độ dinh dưỡng và tiếp tục theo dõi cân nặng.',
+      recommendation:
+        'Thực hiện chế độ ăn cân đối, hạn chế thực phẩm nhiều đường và vận động nhẹ phù hợp theo hướng dẫn.',
+    },
+    {
+      diagnosis: 'Thai phụ có tiền sử sản khoa cần được theo dõi chặt chẽ trong thai kỳ hiện tại.',
+      conclusion: 'Thai kỳ thuộc nhóm nguy cơ cần quản lý và thăm khám thường xuyên.',
+      recommendation:
+        'Tuân thủ lịch khám chuyên khoa, thực hiện đầy đủ xét nghiệm và đến cơ sở y tế khi có dấu hiệu bất thường.',
+    },
+    {
+      diagnosis:
+        'Thai đôi trong tử cung, các thai hiện có hoạt động tim thai và chỉ số phát triển cần tiếp tục theo dõi.',
+      conclusion: 'Đa thai thuộc nhóm thai kỳ cần được quản lý chuyên sâu.',
+      recommendation:
+        'Tăng tần suất khám thai theo chỉ định, theo dõi dinh dưỡng và thực hiện siêu âm định kỳ.',
+    },
+    {
+      diagnosis:
+        'Kết quả sàng lọc trước sinh thuộc nhóm nguy cơ thấp đối với các bất thường được khảo sát.',
+      conclusion: 'Chưa ghi nhận nguy cơ cao từ kết quả sàng lọc hiện tại.',
+      recommendation:
+        'Tiếp tục thực hiện các mốc khám và sàng lọc tiếp theo theo hướng dẫn của bác sĩ.',
+    },
+    {
+      diagnosis:
+        'Kết quả sàng lọc cần được bác sĩ chuyên khoa đánh giá thêm trước khi đưa ra kết luận.',
+      conclusion: 'Chưa đủ cơ sở để kết luận, cần thực hiện tư vấn và kiểm tra bổ sung.',
+      recommendation: 'Đăng ký tư vấn chuyên khoa và thực hiện xét nghiệm bổ sung theo chỉ định.',
+    },
+    {
+      diagnosis: 'Sức khỏe thai phụ và thai nhi ổn định',
+      conclusion: 'Thai kỳ đang tiến triển ổn định',
+      recommendation:
+        'Chuẩn bị hồ sơ sinh, theo dõi cử động thai và đến cơ sở y tế khi xuất hiện dấu hiệu chuyển dạ.',
+    },
+  ];
+  const staffs = await staffRepository.find();
+  const facilities = await facilityRepository.find();
+  const staffOfFacility: Staff[][] = [];
+  for (const faci of facilities) {
+    staffOfFacility[Number(faci.id)] = staffs.filter((staff) => staff.facilityId === faci.id);
+  }
+  const appointments = await appointmentRepository.find();
+  for (const appointment of appointments) {
+    const randomContent =
+      medicalRecordContents[Math.floor(Math.random() * medicalRecordContents.length)];
+    const medicalRecord: DeepPartial<MedicalRecord> = {
+      appointmentId: appointment.id,
+      pregnancyProfileId: appointment.pregnancyProfileId as string,
+      doctorId: appointment.doctorId,
+      diagnosis: randomContent.diagnosis,
+      conclusion: randomContent.conclusion,
+      recommendation: randomContent.recommendation,
+      createdAt: appointment.scheduledStart,
+      updatedAt: appointment.scheduledStart,
+    };
+    const savedMedicalRecord = await medicalRecordRepository.save(medicalRecord);
+    const medicalFileData = [
+      {
+        fileType: 'clinical_report',
+        fileName: 'Phieu_kham_thai_MS_51_BV2_da_dien_mau.pdf',
+        fileUrl:
+          'https://s3.vn-hcm-1.vietnix.cloud/maternity-care/medical-records/2/medical-record_9ae0cbafab.pdf',
+        mimeType: 'application/pdf',
+      },
+      {
+        fileType: 'clinical_report',
+        fileName: 'Phieu_kham_thai_dinh_ky.pdf',
+        fileUrl:
+          'https://s3.vn-hcm-1.vietnix.cloud/maternity-care/medical-records/2/medical-record_9ae0cbafab.pdf',
+        mimeType: 'application/pdf',
+      },
+      {
+        fileType: 'ultrasound_image',
+        fileName: 'Hinh_anh_sieu_am_thai_2D.jpg',
+        fileUrl: 'https://medlatec.vn/media/16696/content/20200107_Sieu-am-2D-1.jpg',
+        mimeType: 'image/jpg',
+      },
+      {
+        fileType: 'ultrasound_image',
+        fileName: 'Hinh_anh_sieu_am_thai_4D.png',
+        fileUrl:
+          'https://drtuyhocbaothai.com/wp-content/uploads/2026/06/hinh-anh-sieu-am-4d-thai-nhi-luu-ky-niem.jpg.jpg',
+        mimeType: 'image/jpg',
+      },
+      {
+        fileType: 'ultrasound_report',
+        fileName: 'Ket_qua_sieu_am_do_do_mo_da_gay.pdf',
+        fileUrl:
+          'https://s3.vn-hcm-1.vietnix.cloud/maternity-care/medical-records/2/medical-record_9ae0cbafab.pdf',
+        mimeType: 'application/pdf',
+      },
+      {
+        fileType: 'ultrasound_report',
+        fileName: 'Ket_qua_sieu_am_hinh_thai_thai_nhi.pdf',
+        fileUrl:
+          'https://s3.vn-hcm-1.vietnix.cloud/maternity-care/medical-records/2/medical-record_9ae0cbafab.pdf',
+        mimeType: 'application/pdf',
+      },
+      {
+        fileType: 'laboratory_report',
+        fileName: 'Ket_qua_xet_nghiem_cong_thuc_mau.pdf',
+        fileUrl:
+          'https://s3.vn-hcm-1.vietnix.cloud/maternity-care/medical-records/2/medical-record_9ae0cbafab.pdf',
+        mimeType: 'application/pdf',
+      },
+      {
+        fileType: 'laboratory_report',
+        fileName: 'Ket_qua_xet_nghiem_nuoc_tieu.pdf',
+        fileUrl:
+          'https://s3.vn-hcm-1.vietnix.cloud/maternity-care/medical-records/2/medical-record_9ae0cbafab.pdf',
+        mimeType: 'application/pdf',
+      },
+      {
+        fileType: 'laboratory_report',
+        fileName: 'Ket_qua_nghiem_phap_dung_nap_glucose.pdf',
+        fileUrl:
+          'https://s3.vn-hcm-1.vietnix.cloud/maternity-care/medical-records/2/medical-record_9ae0cbafab.pdf',
+        mimeType: 'application/pdf',
+      },
+      {
+        fileType: 'screening_report',
+        fileName: 'Ket_qua_sang_loc_Double_Test.pdf',
+        fileUrl:
+          'https://s3.vn-hcm-1.vietnix.cloud/maternity-care/medical-records/2/medical-record_9ae0cbafab.pdf',
+        mimeType: 'application/pdf',
+      },
+      {
+        fileType: 'screening_report',
+        fileName: 'Ket_qua_sang_loc_NIPT.pdf',
+        fileUrl:
+          'https://s3.vn-hcm-1.vietnix.cloud/maternity-care/medical-records/2/medical-record_9ae0cbafab.pdf',
+        mimeType: 'application/pdf',
+      },
+    ];
+    const fileData = [];
+    const randomNumbers = Math.floor(Math.random() * 5) + 4;
+    for (let i = 0; i < randomNumbers; i++) {
+      const randomResult = Math.floor(Math.random() * medicalFileData.length);
+      fileData.push(medicalFileData[randomResult]);
+    }
+    const medicalFiles = fileData.map((item) => ({
+      ...item,
+      medicalRecordId: savedMedicalRecord.id,
+      uploadedBy:
+        staffOfFacility[Number(appointment.facilityId)][
+          Math.floor(Math.random() * staffOfFacility[Number(appointment.facilityId)].length)
+        ].id,
+      createdAt: new Date(savedMedicalRecord.createdAt),
+      updatedAt: new Date(savedMedicalRecord.createdAt),
+    }));
+    await medicalFileRepository.save(medicalFiles);
+  }
+}
+
+// async function insertCareFlowData(): Promise<void> {
+//   const toMysqlDateTime = (date: Date) => date.toISOString().slice(0, 19).replace('T', ' ');
+//   const users = await userRepository.find();
+//   const profiles = await pregnancyProfileRepository.find();
+//   const doctors = await staffRepository.find({
+//     relations: { roles: true },
+//     where: { roles: { name: RoleEnum.DOCTOR } },
+//   });
+//   const services = await serviceRepository.find();
+//   const rooms = await roomRepository.find();
+//   const shifts = await shiftRepository.find();
+//   const packages = await maternityPackageRepository.find();
+
+//   const appointments: Array<Partial<Appointment>> = [];
+//   for (let index = 0; index < Math.min(users.length, 30); index++) {
+//     const profile = profiles.find((item) => String(item.patientId) === String(users[index].id));
+//     const shift = shifts[index % shifts.length];
+//     const room =
+//       rooms.find((item) => String(item.facilityId) === String(shift.facilityId)) ??
+//       rooms[index % rooms.length];
+//     const service = services[index % services.length];
+//     const doctor = doctors[index % doctors.length];
+//     const scheduledStart = new Date(`${shift.shiftDate}T${shift.startTime}`);
+//     const scheduledEnd = new Date(
+//       scheduledStart.getTime() + service.defaultDurationMinutes * 60 * 1000,
+//     );
+
+//     appointments.push({
+//       shiftId: shift.id,
+//       patientId: users[index].id,
+//       pregnancyProfileId: profile?.id ?? null,
+//       roomId: room.id,
+//       facilityId: shift.facilityId,
+//       doctorId: doctor.id,
+//       serviceId: service.id,
+//       scheduledStart: toMysqlDateTime(scheduledStart),
+//       scheduledEnd: toMysqlDateTime(scheduledEnd),
+//       checkedInAt: index % 5 === 0 ? scheduledStart : null,
+//       status: index % 5 === 0 ? AppointmentStatus.COMPLETED : AppointmentStatus.CONFIRMED,
+//       createdBy: doctor.id,
+//     });
+//   }
+
+//   const savedAppointments = await appointmentRepository.save(appointments);
+//   await appointmentReminderRepository.save(
+//     savedAppointments.map((appointment) => ({
+//       appointmentId: appointment.id,
+//       channel: 'email',
+//       scheduledAt: new Date(
+//         new Date(appointment.scheduledStart ?? new Date()).getTime() - 24 * 60 * 60 * 1000,
+//       ),
+//       sentAt: null,
+//       status: ReminderStatus.PENDING,
+//       errorMessage: null,
+//     })),
+//   );
+
+//   for (let index = 0; index < Math.min(profiles.length, 25); index++) {
+//     const profile = profiles[index];
+//     const recorder = doctors[index % doctors.length];
+//     await healthMetricRepository.save({
+//       pregnancyProfileId: profile.id,
+//       recordedBy: recorder.id,
+//       gestationalAgeWeeks: 8 + (index % 28),
+//       weightKg: 52 + (index % 12),
+//       bloodPressureSystolic: 105 + (index % 18),
+//       bloodPressureDiastolic: 65 + (index % 12),
+//       heartRate: 72 + (index % 10),
+//       bloodSugar: 4.8 + (index % 4) * 0.2,
+//       fetalHeartRate: 130 + (index % 18),
+//       metadata: { source: 'seed' },
+//       notes: 'Chỉ số seed demo trong giới hạn theo dõi.',
+//     });
+//   }
+
+//   const completedAppointments = savedAppointments.filter(
+//     (item) => item.status === AppointmentStatus.COMPLETED,
+//   );
+//   await medicalRecordRepository.save(
+//     completedAppointments.map((appointment) => ({
+//       appointmentId: appointment.id,
+//       pregnancyProfileId: appointment.pregnancyProfileId!,
+//       doctorId: appointment.doctorId,
+//       diagnosis: 'Thai kỳ tiến triển ổn định.',
+//       conclusion: 'Không ghi nhận bất thường trong lần khám.',
+//       recommendation: 'Tiếp tục theo dõi, ăn uống đủ chất và tái khám đúng hẹn.',
+//       nextAppointmentSuggestedAt: new Date(
+//         new Date(appointment.scheduledEnd ?? new Date()).getTime() + 28 * 24 * 60 * 60 * 1000,
+//       ),
+//     })),
+//   );
+
+//   for (let index = 0; index < Math.min(users.length, packages.length); index++) {
+//     const user = users[index];
+//     const profile = profiles.find((item) => String(item.patientId) === String(user.id));
+//     const pkg = packages[index % packages.length];
+//     const order = await orderRepository.save({
+//       code: `ORD-SEED-${String(index + 1).padStart(4, '0')}`,
+//       customerId: user.id,
+//       pregnancyProfileId: profile?.id ?? profiles[0].id,
+//       facilityId: pkg.facilityId,
+//       orderType: OrderType.MATERNITY_PACKAGE,
+//       subtotalAmount: Number(pkg.price),
+//       discountAmount: 0,
+//       totalAmount: Number(pkg.price),
+//       status: OrderStatus.PAID,
+//     });
+
+//     await orderItemRepository.save({
+//       orderId: order.id,
+//       item: 'maternity_package' as never,
+//       itemType: OrderItemType.PACKAGE,
+//       itemId: pkg.id,
+//       name: pkg.name,
+//       quantity: 1,
+//       unitPrice: pkg.price,
+//       totalPrice: pkg.price,
+//       metadata: { source: 'seed' },
+//     } as never);
+
+//     await paymentRepository.save({
+//       orderId: order.id,
+//       paymentMethod: 'cash',
+//       provider: 'seed',
+//       providerTransactionId: `PAY-SEED-${String(index + 1).padStart(4, '0')}`,
+//       amount: Number(pkg.price),
+//       status: PaymentStatus.SUCCESS,
+//       paidAt: new Date(),
+//       rawResponse: null,
+//     });
+//   }
+
+//   const packageItems = await packageItemRepository.find({ relations: { facilityService: true } });
+//   await patientPackageBenefitRepository.save(
+//     users.slice(0, 10).flatMap((user, userIndex) =>
+//       packageItems.slice(0, 3).map((item) => ({
+//         userId: user.id,
+//         serviceId: item.facilityService.serviceId,
+//         totalQuantity: item.includedQuantity,
+//         usedQuantity: userIndex % 2,
+//         remainingQuantity: Math.max(item.includedQuantity - (userIndex % 2), 0),
+//       })),
+//     ),
+//   );
+
+//   await scheduleRepository.save(
+//     savedAppointments.slice(0, 20).map((appointment) => ({
+//       userId: appointment.patientId,
+//       title: 'Lịch khám thai',
+//       type: 'appointment',
+//       scheduleDate: new Date(appointment.scheduledStart ?? new Date()).toISOString().slice(0, 10),
+//       scheduleTime: new Date(appointment.scheduledStart ?? new Date()).toTimeString().slice(0, 8),
+//       status: 'upcoming',
+//       location: 'Maternity Care System',
+//       doctor:
+//         doctors.find((doctor) => String(doctor.id) === String(appointment.doctorId))?.name ?? null,
+//       note: 'Lịch được tạo từ seed demo.',
+//       source: 'appointment',
+//       appointmentId: appointment.id,
+//     })),
+//   );
+// }
 
 async function insertForumData(): Promise<void> {
   const users = await userRepository.find();
-  const doctors = await staffRepository.find({ relations: { roles: true }, where: { roles: { name: RoleEnum.DOCTOR } } });
-  const admins = await staffRepository.find({ relations: { roles: true }, where: { roles: { name: RoleEnum.ADMIN } } });
+  const doctors = await staffRepository.find({
+    relations: { roles: true },
+    where: { roles: { name: RoleEnum.DOCTOR } },
+  });
+  const admins = await staffRepository.find({
+    relations: { roles: true },
+    where: { roles: { name: RoleEnum.ADMIN } },
+  });
 
   await forumCategoryRepository.save([
-    { code: ForumCategory.PREGNANCY, name: 'Thai kỳ', description: 'Trao đổi về quá trình mang thai', sortOrder: 1, status: ActiveStatus.ACTIVE },
-    { code: ForumCategory.NUTRITION, name: 'Dinh dưỡng', description: 'Chế độ ăn uống cho mẹ và bé', sortOrder: 2, status: ActiveStatus.ACTIVE },
-    { code: ForumCategory.ASK_DOCTOR, name: 'Hỏi bác sĩ', description: 'Câu hỏi cần bác sĩ tư vấn', sortOrder: 3, status: ActiveStatus.ACTIVE },
+    {
+      code: ForumCategory.PREGNANCY,
+      name: 'Thai kỳ',
+      description: 'Trao đổi về quá trình mang thai',
+      sortOrder: 1,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      code: ForumCategory.NUTRITION,
+      name: 'Dinh dưỡng',
+      description: 'Chế độ ăn uống cho mẹ và bé',
+      sortOrder: 2,
+      status: ActiveStatus.ACTIVE,
+    },
+    {
+      code: ForumCategory.ASK_DOCTOR,
+      name: 'Hỏi bác sĩ',
+      description: 'Câu hỏi cần bác sĩ tư vấn',
+      sortOrder: 3,
+      status: ActiveStatus.ACTIVE,
+    },
   ]);
 
   await dataSource.query(
@@ -2333,7 +4054,8 @@ async function insertForumData(): Promise<void> {
       title: 'Mốc khám thai đầu tiên nên chuẩn bị gì?',
       slug: 'moc-kham-thai-dau-tien-seed',
       category: ForumCategory.PREGNANCY,
-      content: 'Mình mới có hồ sơ thai kỳ, muốn hỏi lần khám đầu tiên nên chuẩn bị những giấy tờ gì?',
+      content:
+        'Mình mới có hồ sơ thai kỳ, muốn hỏi lần khám đầu tiên nên chuẩn bị những giấy tờ gì?',
       coverImageUrl: null,
       commentable: true,
       isPinned: true,
@@ -2375,7 +4097,8 @@ async function insertForumData(): Promise<void> {
       authorRole: ForumAuthorRole.DOCTOR,
       parentId: null,
       messageType: 'text',
-      content: 'Bạn nên mang giấy tờ tùy thân, lịch sử khám nếu có và đặt câu hỏi cần tư vấn trước buổi khám.',
+      content:
+        'Bạn nên mang giấy tờ tùy thân, lịch sử khám nếu có và đặt câu hỏi cần tư vấn trước buổi khám.',
       isDoctorAnswer: true,
       status: ForumContentStatus.PUBLISHED,
       moderatedBy: null,
@@ -2477,7 +4200,10 @@ async function seedCustomData(): Promise<void> {
     await insertUserAuths();
     await insertShiftSlots();
     await insertShifts();
-    await insertCareFlowData();
+    await insertOrders();
+    await insertAppointments();
+    await insertMedicalRecords();
+    // await insertCareFlowData();
     await insertForumData();
     await insertNotifications();
     await printSeedSummary();

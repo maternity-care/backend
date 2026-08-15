@@ -37,7 +37,6 @@ import { PregnancyHistoryEvent } from './entities/pregnancy-history-event.entity
 import { PregnancyProfile } from '../modules/pregnancy-profile/entities/pregnancy-profile.entity';
 import { RefreshToken } from '../modules/auth/entities/refresh-token.entity';
 import { Role } from '../modules/roles/entities/role.entity';
-import { RolePermission } from './entities/role-permission.entity';
 import { Room } from '../modules/rooms/entities/room.entity';
 import { RoomType } from './entities/room-type.entity';
 import { Service } from '../modules/services/entities/service.entity';
@@ -66,12 +65,12 @@ import { BackfillAppointmentSchedules1786000000000 } from './migrations/17860000
 import { AddForumModeration1786100000000 } from './migrations/1786100000000-AddForumModeration';
 import { AddForumCategories1786200000000 } from './migrations/1786200000000-AddForumCategories';
 import { AddManagementModulePermissions1786300000000 } from './migrations/1786300000000-AddManagementModulePermissions';
-import {AddFacilityRoomSuspendFields1786400000000} from './migrations/1786400000000-AddFacilityRoomSuspendFields';
+import { AddFacilityRoomSuspendFields1786400000000 } from './migrations/1786400000000-AddFacilityRoomSuspendFields';
 import { AssignDoctorPregnancyCreatePermission1786500000000 } from './migrations/1786500000000-AssignDoctorPregnancyCreatePermission';
 import { AddForumNotifications1786600000000 } from './migrations/1786600000000-AddForumNotifications';
 import { AddApplicableDaysToShiftSlots1786700000000 } from './migrations/1786700000000-AddApplicableDaysToShiftSlots';
 import { DropFacilityClosureDays1786800000000 } from './migrations/1786800000000-DropFacilityClosureDays';
-import { AddFacilityFloorCount1786900000000 } from './migrations/1786900000000-AddFacilityFloorCount';
+import { RebuildDatabaseTest1786726656690 } from './migrations/1786726656690-RebuildDatabaseTest';
 
 config();
 
@@ -134,31 +133,30 @@ export const typeOrmConfig: DataSourceOptions = {
     Payment,
     PregnancyHistoryEvent,
     PregnancyProfile,
-    RolePermission,
     ShiftSlot,
     StaffPermission,
     join(__dirname, 'entities', '*.entity{.ts,.js}'),
   ],
   migrations: [
-    UpdateServicePackageDesign1785120000000,
-    UseDynamicServiceTypes1785200000000,
-    MakeFacilityLocationNullable1785300000000,
-    AddPackageStages1785400000000,
-    AddChatbotPersistence1785500000000,
-    AddChatbotGuestAndUploadRateLimit1785600000000,
-    UseAppointmentTimestamps1785700000000,
-    MakeAppointmentPregnancyProfileNullable1785800000000,
-    AddUserSchedules1785900000000,
-    BackfillAppointmentSchedules1786000000000,
-    AddForumModeration1786100000000,
-    AddForumCategories1786200000000,
-    AddManagementModulePermissions1786300000000,
-    AddFacilityRoomSuspendFields1786400000000,
-    AssignDoctorPregnancyCreatePermission1786500000000,
-    AddForumNotifications1786600000000,
-    AddApplicableDaysToShiftSlots1786700000000,
-    DropFacilityClosureDays1786800000000,
-    AddFacilityFloorCount1786900000000,
+    // UpdateServicePackageDesign1785120000000,
+    // UseDynamicServiceTypes1785200000000,
+    // MakeFacilityLocationNullable1785300000000,
+    // AddPackageStages1785400000000,
+    // AddChatbotPersistence1785500000000,
+    // AddChatbotGuestAndUploadRateLimit1785600000000,
+    // UseAppointmentTimestamps1785700000000,
+    // MakeAppointmentPregnancyProfileNullable1785800000000,
+    // AddUserSchedules1785900000000,
+    // BackfillAppointmentSchedules1786000000000,
+    // AddForumModeration1786100000000,
+    // AddForumCategories1786200000000,
+    // AddManagementModulePermissions1786300000000,
+    // AddFacilityRoomSuspendFields1786400000000,
+    // AssignDoctorPregnancyCreatePermission1786500000000,
+    // AddForumNotifications1786600000000,
+    // AddApplicableDaysToShiftSlots1786700000000,
+    // DropFacilityClosureDays1786800000000,
+    RebuildDatabaseTest1786726656690,
   ],
   charset: 'utf8mb4_unicode_ci',
 };

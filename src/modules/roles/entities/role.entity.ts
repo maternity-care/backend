@@ -1,5 +1,4 @@
 import { Permission } from './../../permissions/entities/permission.entity';
-import { RolePermission } from './../../../database/entities/role-permission.entity';
 import { Staff } from './../../staffs/entities/staff.entity';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
@@ -9,7 +8,6 @@ import {
   Entity,
   JoinTable,
   ManyToMany,
-  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
