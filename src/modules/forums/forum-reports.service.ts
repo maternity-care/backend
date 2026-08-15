@@ -66,7 +66,16 @@ export class ForumReportsService {
     const report = await this.forumReportsRepository.findById(id);
     if (!report) throw new NotFoundException('Không tìm thấy báo cáo nội dung');
 
-    if (
+    const targetExists = await this.forumReportsRepository.targetExists(
+      report.targetType,
+      report.targetId,
+    );
+
+    if (!targetExists && dto.action !== ForumModerationAction.DELETE) {
+      throw new NotFoundException('Nội dung được báo cáo không còn tồn tại');
+    }
+
+    if (targetExists &&
       [
         ForumModerationAction.APPROVE,
         ForumModerationAction.HIDE,
@@ -75,6 +84,8 @@ export class ForumReportsService {
       ].includes(dto.action)
     ) {
       await this.applyReportTargetAction(report.targetType, report.targetId, dto.action, actor, dto.note ?? null);
+    } else if (dto.action === ForumModerationAction.DELETE) {
+      await this.forumReportsRepository.deleteByTarget(report.targetType, report.targetId);
     }
 
     report.status = this.resolveReportStatus(dto.action);
@@ -84,7 +95,10 @@ export class ForumReportsService {
     report.resolutionAction = dto.action;
     report.resolutionNote = dto.note ?? null;
 
-    const saved = await this.forumReportsRepository.save(report);
+    // DELETE đã xóa report cùng nội dung, tuyệt đối không save để tránh tạo lại report mồ côi.
+    const saved = dto.action === ForumModerationAction.DELETE
+      ? report
+      : await this.forumReportsRepository.save(report);
     await this.forumReportsRepository.createResolutionLog({
       report,
       action: dto.action,
@@ -117,11 +131,15 @@ export class ForumReportsService {
     dto: ResolveContentReportDto,
     actor: AuthenticatedUser,
   ) {
-    await this.ensureReportTargetExists(targetType, targetId);
     const reports = await this.forumReportsRepository.findReportsByTarget(targetType, targetId);
+    const targetExists = await this.forumReportsRepository.targetExists(targetType, targetId);
     if (!reports.length) throw new NotFoundException('Không tìm thấy báo cáo nội dung');
 
-    if (
+    if (!targetExists && dto.action !== ForumModerationAction.DELETE) {
+      throw new NotFoundException('Nội dung được báo cáo không còn tồn tại');
+    }
+
+    if (targetExists &&
       [
         ForumModerationAction.APPROVE,
         ForumModerationAction.HIDE,
@@ -130,6 +148,8 @@ export class ForumReportsService {
       ].includes(dto.action)
     ) {
       await this.applyReportTargetAction(targetType, targetId, dto.action, actor, dto.note ?? null);
+    } else if (dto.action === ForumModerationAction.DELETE) {
+      await this.forumReportsRepository.deleteByTarget(targetType, targetId);
     }
 
     const now = new Date();
@@ -143,7 +163,10 @@ export class ForumReportsService {
       report.resolutionNote = dto.note ?? null;
     }
 
-    const savedReports = await this.forumReportsRepository.saveMany(reports);
+    // Chỉ giữ snapshot trong bộ nhớ để ghi log/thông báo, không insert lại report đã xóa.
+    const savedReports = dto.action === ForumModerationAction.DELETE
+      ? reports
+      : await this.forumReportsRepository.saveMany(reports);
     await Promise.all(savedReports.map(async report => {
       await this.forumReportsRepository.createResolutionLog({
         report,

@@ -152,6 +152,14 @@ export function validateDateRange(dateFrom?: string, dateTo?: string): void {
   }
 }
 
+/** Chan API lich tai qua nhieu du lieu trong mot request; thang dai nhat co 31 ngay. */
+export function validateCalendarRange(dateFrom: string, dateTo: string): void {
+  validateDateRange(dateFrom, dateTo);
+  if (dateDiffInDays(dateFrom, dateTo) + 1 > 31) {
+    throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.CALENDAR_RANGE_TOO_LONG);
+  }
+}
+
 /** Lấy ngày hiện tại theo UTC+7 dưới dạng YYYY-MM-DD. */
 export function todayInVietnam(): string {
   return new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);

@@ -13,10 +13,9 @@ import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.int
 import { DoctorShift } from './entities/shift.entity';
 import { AutoGenerateShiftsDto } from './dto/requests/auto-generate-shifts.dto';
 import { CheckShiftConflictDto } from './dto/requests/check-shift-conflict.dto';
-import { CopyWeekDoctorShiftDto } from './dto/requests/copy-week-doctor-shift.dto';
 import { CreateDoctorShiftDto } from './dto/requests/create-doctor-shift.dto';
 import { DoctorAvailabilityQueryDto } from './dto/requests/doctor-availability.dto';
-import { GroupedDoctorShiftDto, SearchDoctorShiftDto } from './dto/requests/search-doctor-shift.dto';
+import { DoctorShiftRangeDto, GroupedDoctorShiftDto, SearchDoctorShiftDto } from './dto/requests/search-doctor-shift.dto';
 import { UpdateDoctorShiftDto } from './dto/requests/update-doctor-shift.dto';
 import {
   addDays,
@@ -34,6 +33,7 @@ import {
   timesOverlap,
   validateBulkCreateRangeLength,
   validateBulkCreateWeek,
+  validateCalendarRange,
   validateDateRange,
   validateShiftId,
 } from './helpers/shifts.helper';
@@ -129,6 +129,12 @@ export class ShiftsService {
     return result;
   }
 
+  /** Lay du ca trong mot khoang lich nho; man ngay/tuan/thang chi can goi API mot lan. */
+  async findCalendarRange(filters: DoctorShiftRangeDto): Promise<ShiftWithDetails[]> {
+    validateCalendarRange(filters.dateFrom, filters.dateTo);
+    return this.repository.findAll(filters);
+  }
+
   /** Lấy entity ca trực theo id, dùng nội bộ cho update/remove. */
   async findById(id: string): Promise<DoctorShift> {
     validateShiftId(id);
@@ -173,6 +179,17 @@ export class ShiftsService {
       );
       if (result.disruptionId) await this.appointmentDisruptions?.dispatchDisruption(result.disruptionId);
       return result.shift;
+    }
+
+    if (
+      shift.status === DoctorShiftStatus.CANCELLED
+      && dto.status === DoctorShiftStatus.AVAILABLE
+    ) {
+      return this.restoreCancelledShift(
+        shift,
+        dto.changeReason ?? dto.note,
+        changedBy,
+      );
     }
 
     if (shift.status === DoctorShiftStatus.CANCELLED) {
@@ -273,45 +290,6 @@ export class ShiftsService {
     };
   }
 
-  /**
-   * Khôi phục một ca hủy nhầm hoặc được mở lại sớm.
-   * Ca chỉ được khôi phục khi còn trên 24 giờ, không còn hồ sơ disruption chờ xử lý và không xung đột.
-   */
-  async restore(id: string, reason?: string, changedBy?: string | null): Promise<DoctorShift> {
-    const shift = await this.findById(id);
-    if (shift.status !== DoctorShiftStatus.CANCELLED) {
-      throw new ConflictException('Chỉ ca trực đã hủy mới có thể khôi phục.');
-    }
-    if (this.getHoursUntilShiftStarts(shift) <= 24) {
-      throw new ConflictException('Chỉ được khôi phục ca trực trước giờ bắt đầu ít nhất 24 giờ.');
-    }
-    if (await this.repository.hasUnresolvedDisruptions(shift.id)) {
-      throw new ConflictException('Ca trực còn lịch hẹn bị ảnh hưởng chưa xử lý xong.');
-    }
-    const activeAppointments = await this.repository.findAppointmentsForShift(shift, true);
-    if (activeAppointments.length > 0) {
-      throw new ConflictException('Ca trực vẫn còn lịch hẹn đang hoạt động nên chưa thể khôi phục.');
-    }
-
-    const doctorId = await this.resolveDoctorIdForExistingShift(shift, shift.facilityId);
-    if (!doctorId) throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.DOCTOR_NOT_ASSIGNED);
-    const after = this.repository.create({ ...shift, status: DoctorShiftStatus.AVAILABLE });
-    await this.validator.validateForUpdate(after, doctorId, {
-      slotWasProvided: Boolean(after.slotId),
-      timeWasProvided: false,
-    });
-    const changes = detectShiftUpdateChanges(shift, after);
-    const result = await this.repository.updateWithAudit({
-      before: shift,
-      after,
-      changes,
-      affectedAppointments: [],
-      reason: reason?.trim() || null,
-      changedBy,
-    });
-    return result.shift;
-  }
-
   /** Kiểm tra xung đột bác sĩ/phòng trước khi FE cho người dùng lưu ca. */
   async checkConflicts(dto: CheckShiftConflictDto) {
     const prepared = await this.validator.validateForConflictCheck(dto);
@@ -327,74 +305,6 @@ export class ShiftsService {
       hasConflict: conflicts.doctorConflicts.length > 0 || conflicts.roomConflicts.length > 0,
       ...conflicts,
     };
-  }
-
-  /** Copy toàn bộ ca của 1 tuần sang tuần khác; ca FULL được copy thành AVAILABLE. */
-  async copyWeek(dto: CopyWeekDoctorShiftDto): Promise<DoctorShift[]> {
-    if (dto.sourceWeekStart === dto.targetWeekStart) {
-      throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.COPY_WEEK_SAME_TARGET);
-    }
-
-    await this.validator.prepareWeeklyRange(dto.facilityId, dto.sourceWeekStart, dto.doctorId);
-    const sourceEnd = addDays(dto.sourceWeekStart, 6);
-    const dayOffset = dateDiffInDays(dto.sourceWeekStart, dto.targetWeekStart);
-    const sourceShifts = await this.repository.findWeeklyWithDetails(
-      dto.facilityId,
-      dto.sourceWeekStart,
-      sourceEnd,
-      dto.doctorId,
-    );
-    const copyableShifts = sourceShifts;
-    if (copyableShifts.length === 0) return [];
-
-    const payloads = copyableShifts.map(sourceShift => ({
-        staffId: sourceShift.staffId ?? sourceShift.doctorId ?? undefined,
-        roleId: sourceShift.roleId,
-        facilityId: sourceShift.facilityId,
-        roomId: sourceShift.roomId,
-        slotId: sourceShift.slotId ?? undefined,
-        shiftDate: addDays(sourceShift.shiftDate, dayOffset),
-        startTime: sourceShift.slotId ? undefined : sourceShift.startTime,
-        endTime: sourceShift.slotId ? undefined : sourceShift.endTime,
-        maxAppointments: sourceShift.maxAppointments,
-        status: [DoctorShiftStatus.FULL, DoctorShiftStatus.CANCELLED].includes(sourceShift.status)
-          ? DoctorShiftStatus.AVAILABLE
-          : sourceShift.status,
-        note: sourceShift.note ?? undefined,
-      } as CreateDoctorShiftDto));
-
-    const preparationResults = await this.validator.prepareManyForCreate(payloads);
-    const preparedInputs = preparationResults.map((result, index) => {
-      if (result.status === 'rejected') throw result.reason;
-      return { index, payload: payloads[index], prepared: result.value };
-    });
-    const batchConflicts = await this.repository.findConflictsForBatch?.(
-      preparedInputs.map(({ index, payload, prepared }) => ({
-        ...payload,
-        index,
-        staffId: prepared.staffId,
-        roleName: prepared.roleName,
-        slotId: prepared.slotId,
-        startTime: prepared.startTime,
-        endTime: prepared.endTime,
-      })),
-    );
-
-    const shifts: DoctorShift[] = [];
-    for (const { index, payload, prepared } of preparedInputs) {
-      const conflicts = batchConflicts?.get(index) ?? await this.repository.findConflicts({
-        ...payload,
-        staffId: prepared.staffId,
-        roleName: prepared.roleName,
-        slotId: prepared.slotId,
-        startTime: prepared.startTime,
-        endTime: prepared.endTime,
-      });
-      throwIfConflicted(conflicts);
-      shifts.push(this.buildShiftEntity(payload, prepared));
-    }
-
-    return this.repository.saveMany(shifts);
   }
 
   /** Sinh các khung giờ còn trống để đặt lịch trong 1 ngày của bác sĩ. */
@@ -436,25 +346,6 @@ export class ShiftsService {
             ? this.buildAvailableSlots(shift, appointmentBlocks, slotMinutes)
             : [],
         };
-      }),
-    };
-  }
-
-  /** Trả lịch tuần đã group theo ngày để FE render calendar dễ hơn. */
-  async getWeeklySchedule(facilityId: string, weekStart?: string, doctorId?: string) {
-    const { start, end } = await this.validator.prepareWeeklyRange(
-      facilityId,
-      weekStart,
-      doctorId,
-    );
-    const shifts = await this.repository.findWeeklyWithDetails(facilityId, start, end, doctorId);
-    return {
-      facilityId,
-      weekStart: start,
-      weekEnd: end,
-      days: Array.from({ length: 7 }, (_, index) => {
-        const date = addDays(start, index);
-        return { date, shifts: shifts.filter(shift => shift.shiftDate === date) };
       }),
     };
   }
@@ -532,6 +423,44 @@ export class ShiftsService {
     if (changes.statusChanged && after.status === DoctorShiftStatus.OFF) {
       throw new ConflictException('Ca trực đã có lịch hẹn không thể chuyển sang nghỉ; hãy dùng thao tác hủy ca.');
     }
+  }
+
+  /**
+   * Khôi phục ca đã hủy qua API cập nhật chung, nhưng vẫn giữ đầy đủ ràng buộc disruption.
+   * Nhờ đó FE không cần duy trì thêm một endpoint restore riêng.
+   */
+  private async restoreCancelledShift(
+    shift: DoctorShift,
+    reason?: string,
+    changedBy?: string | null,
+  ): Promise<DoctorShift> {
+    if (this.getHoursUntilShiftStarts(shift) <= 24) {
+      throw new ConflictException('Chỉ được khôi phục ca trực trước giờ bắt đầu ít nhất 24 giờ.');
+    }
+    if (await this.repository.hasUnresolvedDisruptions(shift.id)) {
+      throw new ConflictException('Ca trực còn lịch hẹn bị ảnh hưởng chưa xử lý xong.');
+    }
+    const activeAppointments = await this.repository.findAppointmentsForShift(shift, true);
+    if (activeAppointments.length > 0) {
+      throw new ConflictException('Ca trực vẫn còn lịch hẹn đang hoạt động nên chưa thể khôi phục.');
+    }
+
+    const doctorId = await this.resolveDoctorIdForExistingShift(shift, shift.facilityId);
+    if (!doctorId) throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.DOCTOR_NOT_ASSIGNED);
+    const after = this.repository.create({ ...shift, status: DoctorShiftStatus.AVAILABLE });
+    await this.validator.validateForUpdate(after, doctorId, {
+      slotWasProvided: Boolean(after.slotId),
+      timeWasProvided: false,
+    });
+    const result = await this.repository.updateWithAudit({
+      before: shift,
+      after,
+      changes: detectShiftUpdateChanges(shift, after),
+      affectedAppointments: [],
+      reason: reason?.trim() || null,
+      changedBy,
+    });
+    return result.shift;
   }
 
   private getHoursUntilShiftStarts(shift: DoctorShift): number {

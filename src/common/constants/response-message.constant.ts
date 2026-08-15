@@ -169,6 +169,7 @@ export const RESPONSE_MESSAGES = {
     IN_USE: 'Loại phòng đang được sử dụng, vui lòng chuyển các phòng sang loại khác trước khi xóa',
   },
   SHIFTS: {
+    CALENDAR_RANGE_TOO_LONG: 'Chỉ được xem lịch trực tối đa 31 ngày mỗi lần',
     CREATED: 'Tạo ca trực bác sĩ thành công',
     UPDATED: 'Cập nhật ca trực bác sĩ thành công',
     DELETED: 'Xóa ca trực bác sĩ thành công',
@@ -180,7 +181,6 @@ export const RESPONSE_MESSAGES = {
     AUTO_GENERATE_CONFIRM_SUCCESS: 'Tạo lịch trực tự động thành công',
     BULK_GENERATE_PREVIEW_SUCCESS: 'Xem trước lịch trực hàng loạt thành công',
     BULK_GENERATE_CONFIRM_SUCCESS: 'Tạo lịch trực hàng loạt thành công',
-    COPY_WEEK_SUCCESS: 'Copy lịch trực theo tuần thành công',
     AVAILABILITY_SUCCESS: 'Lấy lịch trống của bác sĩ thành công',
     WEEKLY_SUCCESS: 'Lấy lịch trực theo tuần thành công',
     WEEKLY_UPDATE_SUCCESS: 'Cập nhật lịch trực theo tuần thành công',
@@ -224,7 +224,6 @@ export const RESPONSE_MESSAGES = {
     AUTO_GENERATE_CANDIDATE_FAILED: 'Không thể tạo candidate ca trực',
     SLOT_LOCKED_TIME_CHANGE:
       'Ca trực đang sử dụng khung ca. Muốn nhập giờ thủ công, hãy bỏ chọn khung ca rồi nhập giờ bắt đầu và giờ kết thúc',
-    COPY_WEEK_SAME_TARGET: 'Tuần đích phải khác tuần nguồn',
     SLOT_TIME_SENT_WITH_SLOT_ID:
       'Khi dùng slotId thì không gửi startTime/endTime để tránh lệch dữ liệu khung ca',
     SLOT_INACTIVE_OR_NOT_FOUND: 'Khung ca không tồn tại hoặc đã ngừng hoạt động',
