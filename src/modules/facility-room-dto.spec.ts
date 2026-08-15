@@ -20,6 +20,7 @@ const validFacility = {
   address: '123 Nguyễn Thị Minh Khai',
   province: 'Hồ Chí Minh',
   ward: 'Phường 5',
+  floorCount: 3,
   latitude: '10.7756',
   longitude: '106.6871',
   status: FacilityStatus.ACTIVE,
@@ -52,6 +53,7 @@ describe('Facility CRUD DTO validation', () => {
     [{ ...validFacility, phone: '123' }, 'phone'],
     [{ ...validFacility, email: 'invalid-email' }, 'email'],
     [{ ...validFacility, ownerId: '0' }, 'ownerId'],
+    [{ ...validFacility, floorCount: 0 }, 'floorCount'],
     [{ ...validFacility, schedules: [{ days: ['MON'], openTime: '18:00', closeTime: '08:00', isClosed: false }] }, 'schedules'],
     [{ ...validFacility, schedules: [{ days: ['MON'], openTime: '08:00', isClosed: false }] }, 'schedules'],
     [{ ...validFacility, schedules: [{ days: ['XXX'], openTime: '08:00', closeTime: '17:30', isClosed: false }] }, 'schedules'],
@@ -96,10 +98,10 @@ describe('Room CRUD DTO validation', () => {
   it('accepts and normalizes a valid room', async () => {
     const dto = plainToInstance(CreateRoomDto, {
       facilityId: '1', name: '  Phòng   khám 201 ', roomTypeId: '2',
-      floor: ' Tầng 2 ', status: ActiveStatus.ACTIVE,
+      floor: ' 2 ', status: ActiveStatus.ACTIVE,
     });
     expect(await validate(dto)).toHaveLength(0);
-    expect(dto).toMatchObject({ name: 'Phòng khám 201', roomTypeId: '2', floor: 'Tầng 2' });
+    expect(dto).toMatchObject({ name: 'Phòng khám 201', roomTypeId: '2', floor: '2' });
   });
 
   // Vai tro: gom cac case input tao room sai de DTO bat loi facilityId, ten phong, loai phong va status.
@@ -107,6 +109,7 @@ describe('Room CRUD DTO validation', () => {
     [{ facilityId: '0', name: 'Phòng 1', roomTypeId: '1', floor: '1', status: ActiveStatus.ACTIVE }, 'facilityId'],
     [{ facilityId: '1', name: ' ', roomTypeId: '1', floor: '1', status: ActiveStatus.ACTIVE }, 'name'],
     [{ facilityId: '1', name: 'Phòng 1', roomTypeId: '0', floor: '1', status: ActiveStatus.ACTIVE }, 'roomTypeId'],
+    [{ facilityId: '1', name: 'Phòng 1', roomTypeId: '1', floor: 'Tầng 1', status: ActiveStatus.ACTIVE }, 'floor'],
     [{ facilityId: '1', name: 'Phòng 1', roomTypeId: '1', floor: '1', status: 'deleted' }, 'status'],
   ])('rejects invalid room create input', async (payload, property) => {
     const errors = await validate(plainToInstance(CreateRoomDto, payload));

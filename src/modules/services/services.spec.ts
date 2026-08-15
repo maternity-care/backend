@@ -3,7 +3,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { ActiveStatus } from '../../common/constants/status.enum';
 import { SERVICE_CONSTANT } from '../../common/constants/service.constant';
-import { CreateServiceDto } from './dto/requests/create-service.dto';
+import { CreateServiceDto, ServiceSaleMode } from './dto/requests/create-service.dto';
 import { SearchServiceDto } from './dto/requests/search-service.dto';
 import { FacilityService } from '../facility-services/entities/facility-service.entity';
 import { PackageItem } from '../package-services/entities/package-item.entity';
@@ -81,6 +81,40 @@ describe('Services DTO validation', () => {
     expect((await validate(dto)).map(error => error.property)).toEqual(
       expect.arrayContaining(['serviceTypeId', 'status', 'page', 'limit']),
     );
+  });
+
+  // Vai tro: khoa cac bien hop le tai dung hai bien duration va cac gia tri enum dung.
+  it.each([5, 480])('accepts service duration at boundary %s minutes', async (duration) => {
+    const dto = plainToInstance(CreateServiceDto, {
+      ...validPayload,
+      defaultDurationMinutes: duration,
+      saleMode: ServiceSaleMode.BOTH,
+    });
+
+    expect(await validate(dto)).toHaveLength(0);
+  });
+
+  // Vai tro: khong cho payload assign trung mot facility vi se tao hai mapping cung cap service giong nhau.
+  it('rejects duplicated facility assignments', async () => {
+    const dto = plainToInstance(CreateServiceDto, {
+      ...validPayload,
+      facilityAssignments: [
+        { facilityId: '1', status: ActiveStatus.ACTIVE },
+        { facilityId: '1', status: ActiveStatus.ACTIVE },
+      ],
+    });
+
+    expect((await validate(dto)).map(error => error.property)).toContain('facilityAssignments');
+  });
+
+  // Vai tro: bat saleMode va dinh dang tien sai truoc khi payload di vao business service.
+  it.each([
+    [{ ...validPayload, saleMode: 'subscription' }, 'saleMode'],
+    [{ ...validPayload, basePrice: '100.123' }, 'basePrice'],
+    [{ ...validPayload, facilityAssignments: [{ facilityId: '1', price: '1.999' }] }, 'facilityAssignments'],
+  ])('rejects additional invalid service payload %#', async (payload, property) => {
+    const errors = await validate(plainToInstance(CreateServiceDto, payload));
+    expect(errors.some(error => error.property === property)).toBe(true);
   });
 });
 
@@ -197,6 +231,103 @@ describe('ServicesService business logic', () => {
     expect(dataSource.transaction).toHaveBeenCalled();
   });
 
+  // Vai tro: assignment can FacilitiesService de xac minh facility ton tai va dang active.
+  it('rejects facility assignments when FacilitiesService is unavailable', async () => {
+    const { repo } = createService();
+    const dataSource = { transaction: jest.fn() };
+    const service = new ServicesService(
+      repo as never,
+      serviceTypesService as never,
+      dataSource as never,
+    );
+
+    await expect(service.create({
+      name: 'Sieu am thai 3D',
+      serviceTypeId: '1',
+      defaultDurationMinutes: 30,
+      basePrice: '350000.00',
+      status: ActiveStatus.ACTIVE,
+      facilityAssignments: [{ facilityId: '1' }],
+    })).rejects.toBeInstanceOf(ConflictException);
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  // Vai tro: khong tao service nua chung transaction neu facility dich dang ngung hoat dong.
+  it('rejects assignment to an inactive facility before opening a transaction', async () => {
+    const { repo } = createService();
+    const dataSource = { transaction: jest.fn() };
+    const facilitiesService = {
+      findById: jest.fn().mockResolvedValue({ id: '1', status: ActiveStatus.INACTIVE }),
+    };
+    const service = new ServicesService(
+      repo as never,
+      serviceTypesService as never,
+      dataSource as never,
+      facilitiesService as never,
+    );
+
+    await expect(service.create({
+      name: 'Sieu am thai 3D',
+      serviceTypeId: '1',
+      defaultDurationMinutes: 30,
+      basePrice: '350000.00',
+      status: ActiveStatus.ACTIVE,
+      facilityAssignments: [{ facilityId: '1' }],
+    })).rejects.toBeInstanceOf(ConflictException);
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  // Vai tro: sau khi validate facility, van phai dung lai ro rang neu transaction DataSource chua duoc cau hinh.
+  it('rejects facility assignments when DataSource is unavailable', async () => {
+    const { repo } = createService();
+    const facilitiesService = {
+      findById: jest.fn().mockResolvedValue({ id: '1', status: ActiveStatus.ACTIVE }),
+    };
+    const service = new ServicesService(
+      repo as never,
+      serviceTypesService as never,
+      undefined,
+      facilitiesService as never,
+    );
+
+    await expect(service.create({
+      name: 'Sieu am thai 3D',
+      serviceTypeId: '1',
+      defaultDurationMinutes: 30,
+      basePrice: '350000.00',
+      status: ActiveStatus.ACTIVE,
+      facilityAssignments: [{ facilityId: '1' }],
+    })).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  // Vai tro: neu mot assignment trong loat khong hop le thi khong duoc save bat ky service nao.
+  it('validates every facility assignment before starting the transaction', async () => {
+    const { repo } = createService();
+    const dataSource = { transaction: jest.fn() };
+    const facilitiesService = {
+      findById: jest.fn()
+        .mockResolvedValueOnce({ id: '1', status: ActiveStatus.ACTIVE })
+        .mockResolvedValueOnce({ id: '2', status: ActiveStatus.INACTIVE }),
+    };
+    const service = new ServicesService(
+      repo as never,
+      serviceTypesService as never,
+      dataSource as never,
+      facilitiesService as never,
+    );
+
+    await expect(service.create({
+      name: 'Sieu am thai 3D',
+      serviceTypeId: '1',
+      defaultDurationMinutes: 30,
+      basePrice: '350000.00',
+      status: ActiveStatus.ACTIVE,
+      facilityAssignments: [{ facilityId: '1' }, { facilityId: '2' }],
+    })).rejects.toBeInstanceOf(ConflictException);
+    expect(facilitiesService.findById).toHaveBeenCalledTimes(2);
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
   // Vai tro: bao ve rule khong cho 2 dich vu goc trung name.
   it('rejects duplicated name', async () => {
     const nameContext = createService();
@@ -227,6 +358,16 @@ describe('ServicesService business logic', () => {
       requiresDoctorWarning: 0,
     });
     expect(repo.save).toHaveBeenCalled();
+  });
+
+  // Vai tro: doi loai dich vu chi duoc save sau khi loai moi ton tai va dang active.
+  it('validates a changed service type before update', async () => {
+    const { repo, service } = createService();
+
+    await service.update('1', { serviceTypeId: '2' });
+
+    expect(serviceTypesService.findActiveById).toHaveBeenCalledWith('2');
+    expect(repo.save).toHaveBeenCalledWith(expect.objectContaining({ serviceTypeId: '2' }));
   });
 
   // Vai tro: kiem tra service tra dung danh sach thuong va danh sach phan trang tu repository.

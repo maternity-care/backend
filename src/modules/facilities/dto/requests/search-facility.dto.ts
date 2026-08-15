@@ -47,25 +47,3 @@ export class SearchFacilityDto {
   @Max(200)
   limit?: number;
 }
-
-export class LookupFacilityDto {
-  @ApiPropertyOptional({ description: 'Tu khoa goi y theo ten, ma, dia chi, owner' })
-  @IsOptional()
-  @Transform(({ value }) => trimText(value))
-  @IsString()
-  @MaxLength(100)
-  search?: string;
-
-  @ApiPropertyOptional({ enum: FacilityStatus })
-  @IsOptional()
-  @IsEnum(FacilityStatus)
-  status?: FacilityStatus;
-
-  @ApiPropertyOptional({ minimum: 1, maximum: 200, default: 20 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(200)
-  limit?: number;
-}

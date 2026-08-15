@@ -156,7 +156,7 @@ export const typeOrmConfig: DataSourceOptions = {
     // AddForumNotifications1786600000000,
     // AddApplicableDaysToShiftSlots1786700000000,
     // DropFacilityClosureDays1786800000000,
-    RebuildDatabaseTest1786726656690
+    RebuildDatabaseTest1786726656690,
   ],
   charset: 'utf8mb4_unicode_ci',
 };

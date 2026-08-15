@@ -182,6 +182,7 @@ export const RESPONSE_MESSAGES = {
     COPY_WEEK_SUCCESS: 'Copy lịch trực theo tuần thành công',
     AVAILABILITY_SUCCESS: 'Lấy lịch trống của bác sĩ thành công',
     WEEKLY_SUCCESS: 'Lấy lịch trực theo tuần thành công',
+    WEEKLY_UPDATE_SUCCESS: 'Cập nhật lịch trực theo tuần thành công',
     NOT_FOUND: 'Ca trực bác sĩ không tồn tại',
     DOCTOR_NOT_ASSIGNED: 'Bác sĩ không hoạt động hoặc chưa được phân công tại cơ sở này',
     STAFF_OR_DOCTOR_REQUIRED: 'Cần chọn nhân viên hoặc bác sĩ cho ca trực',
@@ -197,6 +198,8 @@ export const RESPONSE_MESSAGES = {
     END_TIME_AFTER_START_TIME: 'endTime phải muộn hơn startTime',
     DURATION_INVALID: 'Thời lượng ca trực phải từ 15 phút đến 12 giờ',
     PAST_DATE_INVALID: 'Không thể tạo hoặc kiểm tra ca trực trong quá khứ',
+    CREATE_WEEK_INVALID: 'Chỉ được tạo một ca trực từ ngày mai đến hết Chủ nhật tuần kế tiếp',
+    BULK_CREATE_WEEK_INVALID: 'Tạo ca trực hàng loạt phải chọn đúng tuần kế tiếp, từ thứ Hai đến Chủ nhật',
     OFF_SHIFT_CANNOT_HAVE_ROOM: 'Ca nghỉ không được gán phòng',
     FACILITY_CLOSED_ON_DATE: 'Cơ sở đóng cửa trong ngày được chọn',
     FACILITY_HOURS_NOT_CONFIGURED: 'Cơ sở chưa cấu hình đầy đủ giờ hoạt động cho ngày được chọn',
@@ -225,6 +228,10 @@ export const RESPONSE_MESSAGES = {
     CREATE_STATUS_INVALID: 'Ca mới chỉ có thể ở trạng thái available hoặc off',
     BULK_STATUS_INVALID: 'Ca tạo hàng loạt chỉ có thể ở trạng thái available hoặc off',
     SHIFT_DATE_FORMAT_INVALID: 'shiftDate phải có định dạng YYYY-MM-DD',
+    SHIFT_HAS_APPOINTMENTS_PROTECTED_UPDATE:
+      'Ca trực đã có lịch hẹn, không thể đổi bác sĩ, nhân sự, vai trò, cơ sở, ngày, giờ hoặc khung ca; hãy hủy ca để mở luồng xử lý lịch hẹn bị ảnh hưởng',
+    MAX_APPOINTMENTS_BELOW_BOOKED: 'Số lịch tối đa không được nhỏ hơn số lịch đã đặt',
+    BOOKED_SHIFT_OFF_INVALID: 'Ca trực đã có lịch hẹn, không thể chuyển thành ca nghỉ; hãy hủy ca để xử lý lịch hẹn bị ảnh hưởng',
   },
   SHIFT_SLOTS: {
     GET_LIST_SUCCESS: 'Lấy danh sách khung ca thành công',

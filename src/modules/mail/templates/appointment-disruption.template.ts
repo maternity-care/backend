@@ -25,7 +25,7 @@ export function appointmentDisruptionTemplate(input: SendAppointmentDisruptionEm
     `Xin chào ${input.patientName},`,
     `Lịch khám #${input.appointmentId} tại ${input.facilityName} với ${input.doctorName}, từ ${start} đến ${end}, đã bị ảnh hưởng.`,
     `Lý do: ${input.reason}.`,
-    'Vui lòng đăng nhập để chọn lịch khác hoặc gửi yêu cầu hoàn tiền.',
+    'Vui lòng đăng nhập để chọn lịch khác hoặc hủy lịch khám.',
     input.actionUrl,
   ].join('\n');
 
@@ -40,9 +40,9 @@ export function appointmentDisruptionTemplate(input: SendAppointmentDisruptionEm
           <strong>${escapeHtml(input.facilityName)}</strong> với
           <strong>${escapeHtml(input.doctorName)}</strong>, từ ${escapeHtml(start)} đến ${escapeHtml(end)}, đã bị ảnh hưởng.</p>
         <p><strong>Lý do:</strong> ${escapeHtml(input.reason)}</p>
-        <p>Bạn có thể chọn một lịch khác hoặc gửi yêu cầu hoàn tiền trên website.</p>
+        <p>Bạn có thể chọn một lịch khác hoặc hủy lịch khám trên website.</p>
         <p><a href="${escapeHtml(input.actionUrl)}" style="display:inline-block;padding:10px 16px;background:#be185d;color:white;text-decoration:none;border-radius:6px">Xử lý lịch khám</a></p>
-        <p style="font-size:12px;color:#6b7280">Đây là thông báo tự động. Việc hoàn tiền cần được cơ sở xác nhận trước khi thực hiện.</p>
+        <p style="font-size:12px;color:#6b7280">Đây là thông báo tự động từ hệ thống Maternity Care.</p>
       </div>
     `,
   };

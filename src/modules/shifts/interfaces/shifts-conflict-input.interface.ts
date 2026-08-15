@@ -10,3 +10,9 @@ export interface ShiftConflictInput {
   endTime: string;
   excludeShiftId?: string;
 }
+
+/** Candidate da duoc validator chuan hoa, dung de kiem tra nhieu xung dot trong mot lan doc DB. */
+export interface BatchShiftConflictInput extends ShiftConflictInput {
+  index: number;
+  facilityId: string;
+}

@@ -26,6 +26,7 @@ const createFacility = (overrides: Partial<Facility> = {}): Facility => ({
   address: '123 Nguyen Trai',
   province: 'Ho Chi Minh',
   ward: 'Ben Nghe',
+  floorCount: 1,
   latitude: '10.7756000',
   longitude: '106.6871000',
   status: FacilityStatus.ACTIVE,
@@ -63,8 +64,9 @@ describe('FacilitiesService', () => {
     findByName: jest.fn(),
     findByEmail: jest.fn(),
     findByPhone: jest.fn(),
+    findHighestRoomFloor: jest.fn(),
     existsActiveOwner: jest.fn(),
-    lookup: jest.fn(),
+    findAdminOptions: jest.fn(),
     remove: jest.fn(),
     countDependencies: jest.fn(),
     countSuspendImpact: jest.fn(),
@@ -72,7 +74,6 @@ describe('FacilitiesService', () => {
     reactivateRoomsSuspendedByFacility: jest.fn(),
     cancelFutureShiftsForFacility: jest.fn(),
     softDelete: jest.fn(),
-    updateStatus: jest.fn(),
   });
 
   let repository: ReturnType<typeof createRepository>;
@@ -89,6 +90,7 @@ describe('FacilitiesService', () => {
     repository.findByName.mockResolvedValue(null);
     repository.findByEmail.mockResolvedValue(null);
     repository.findByPhone.mockResolvedValue(null);
+    repository.findHighestRoomFloor.mockResolvedValue(0);
     repository.syncOperatingHours.mockResolvedValue(undefined);
     repository.applyOperatingHours.mockResolvedValue(0);
     repository.findOperatingHoursByFacilityId.mockResolvedValue([]);
@@ -283,13 +285,13 @@ describe('FacilitiesService', () => {
         { dayOfWeek: 'SUN', openTime: null, closeTime: null, isClosed: true },
       ]);
 
-    await expect(service.updateOperatingHours('fac-1', {
+    await expect(service.applyOperatingHours('fac-1', {
       schedules: [
         { days: ['MON', 'TUE', 'WED', 'THU', 'FRI'] as any, openTime: '07:00:00', closeTime: '19:00:00', isClosed: false },
         { days: ['SAT'] as any, openTime: '08:00:00', closeTime: '17:00:00', isClosed: false },
         { days: ['SUN'] as any, isClosed: true },
       ],
-    })).resolves.toEqual({
+    })).resolves.toMatchObject({
       operatingHours: expect.any(Array),
       operatingHourGroups: [
         expect.objectContaining({ dayLabel: 'Thứ 2 - Thứ 6', displayTime: '07:00 - 19:00' }),
@@ -298,7 +300,7 @@ describe('FacilitiesService', () => {
       ],
     });
 
-    expect(repository.syncOperatingHours).toHaveBeenCalledWith('fac-1', [
+    expect(repository.applyOperatingHours).toHaveBeenCalledWith('fac-1', [
       expect.objectContaining({ dayOfWeek: 'MON', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false }),
       expect.objectContaining({ dayOfWeek: 'TUE', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false }),
       expect.objectContaining({ dayOfWeek: 'WED', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false }),
@@ -306,7 +308,7 @@ describe('FacilitiesService', () => {
       expect.objectContaining({ dayOfWeek: 'FRI', openTime: '07:00:00', closeTime: '19:00:00', isClosed: false }),
       expect.objectContaining({ dayOfWeek: 'SAT', openTime: '08:00:00', closeTime: '17:00:00', isClosed: false }),
       expect.objectContaining({ dayOfWeek: 'SUN', openTime: null, closeTime: null, isClosed: true }),
-    ]);
+    ], []);
   });
 
   // Vai tro: neu thu hep gio hoat dong lam shift sap toi bi nam ngoai khung gio moi thi phai chan cap nhat.
@@ -329,7 +331,7 @@ describe('FacilitiesService', () => {
 
     let error: ConflictException | undefined;
     try {
-      await service.updateOperatingHours('fac-1', {
+      await service.applyOperatingHours('fac-1', {
         schedules: [
           { days: ['MON'] as any, openTime: '08:00:00', closeTime: '17:00:00', isClosed: false },
         ],
@@ -354,7 +356,7 @@ describe('FacilitiesService', () => {
       },
     });
     expect(repository.findActiveShiftsForOperatingHourValidation).toHaveBeenCalledWith('fac-1', '2026-07-24');
-    expect(repository.syncOperatingHours).not.toHaveBeenCalled();
+    expect(repository.applyOperatingHours).not.toHaveBeenCalled();
   });
 
   // Vai tro: preview gio hoat dong chi tra danh sach shift bi anh huong, khong ghi DB.
@@ -544,14 +546,14 @@ describe('FacilitiesService', () => {
       },
     ]);
 
-    await expect(service.updateOperatingHours('fac-1', {
+    await expect(service.applyOperatingHours('fac-1', {
       schedules: [
         { days: ['MON'] as any, openTime: '07:00:00', closeTime: '17:00:00', isClosed: false },
       ],
     })).resolves.toMatchObject({
       operatingHours: expect.any(Array),
     });
-    expect(repository.syncOperatingHours).toHaveBeenCalled();
+    expect(repository.applyOperatingHours).toHaveBeenCalled();
   });
 
   // Vai tro: dam bao ket qua phan trang facility rong cung tra 404 ro rang.
@@ -577,14 +579,11 @@ describe('FacilitiesService', () => {
     await expect(service.findById('missing')).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  // Vai tro: kiem tra cac ham tim theo code/name duoc uy quyen xuong repository dung cach.
-  it('delegates findByCode and findByName to repository', async () => {
-    const facility = createFacility();
-    repository.findByCode.mockResolvedValue(facility);
-    repository.findByName.mockResolvedValue(null);
+  // Vai tro: detail khong ton tai phai tra 404, khong tra object rong cho FE.
+  it('throws not found when facility details do not exist', async () => {
+    repository.findDetailsById.mockResolvedValue(null);
 
-    await expect(service.findByCode('FAC-001')).resolves.toBe(facility);
-    await expect(service.findByName('Unknown')).resolves.toBeNull();
+    await expect(service.findDetailsById('missing')).rejects.toBeInstanceOf(NotFoundException);
   });
 
   // Vai tro: update field khong doi dinh danh van save binh thuong, khong query duplicate code khong can thiet.
@@ -600,6 +599,16 @@ describe('FacilitiesService', () => {
     expect(repository.save).toHaveBeenCalledWith(facility);
   });
 
+  it('rejects reducing floor count below an existing room floor', async () => {
+    repository.findById.mockResolvedValue(createFacility({ floorCount: 5 }));
+    repository.findHighestRoomFloor.mockResolvedValue(4);
+
+    await expect(service.update('fac-1', { floorCount: 3 }))
+      .rejects.toBeInstanceOf(BadRequestException);
+
+    expect(repository.save).not.toHaveBeenCalled();
+  });
+
   // Vai tro: code la field readonly, neu client co gui len update thi service cung bo qua.
   it('ignores manual code during update', async () => {
     const facility = createFacility();
@@ -610,6 +619,14 @@ describe('FacilitiesService', () => {
     await expect(service.update('fac-1', { code: 'FAC-002' } as any)).resolves.toMatchObject({ code: 'FAC-001' });
     expect(repository.findByCode).not.toHaveBeenCalled();
     expect(facility.code).toBe('FAC-001');
+  });
+
+  // Vai tro: status chi duoc doi qua suspend/reactivate de khong bo qua xu ly room, shift va appointment.
+  it('rejects status changes through the normal update method', async () => {
+    await expect(service.update('fac-1', { status: FacilityStatus.INACTIVE } as any))
+      .rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.findById).not.toHaveBeenCalled();
+    expect(repository.save).not.toHaveBeenCalled();
   });
 
   // Vai tro: khong cho update facility sang ten/email/phone cua facility khac.
@@ -737,22 +754,108 @@ describe('FacilitiesService', () => {
     expect(repository.reactivateRoomsSuspendedByFacility).toHaveBeenCalledWith('fac-1', 'staff-9');
   });
 
-  // Vai tro: cung cap lookup facility cho FE select/autocomplete ma khong can tu ghep API list/filter.
-  it('delegates facility lookup to repository', async () => {
-    const options = [{
-      id: 'fac-1',
-      name: 'Main Clinic',
-      code: 'FAC-001',
-      address: '123 Nguyen Trai',
-      province: 'Ho Chi Minh',
-      ward: 'Ben Nghe',
-      status: FacilityStatus.ACTIVE,
-      ownerName: 'Owner',
-    }];
-    repository.lookup.mockResolvedValue(options);
+  // Vai tro: inactiveUntil null nghia la ngung vo thoi han; cac room/shift lien quan cung nhan moc ket thuc null.
+  it('suspends a facility indefinitely when inactiveUntil is omitted', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-12T08:00:00.000Z'));
+    repository.findDetailsById.mockResolvedValue(createFacility({
+      status: FacilityStatus.INACTIVE,
+      inactiveUntil: null,
+    }));
 
-    await expect(service.lookup({ search: 'main' })).resolves.toBe(options);
-    expect(repository.lookup).toHaveBeenCalledWith({ search: 'main' });
+    await expect(service.suspend('fac-1', { reason: 'Bao tri chua co ngay mo lai' }, 'staff-9'))
+      .resolves.toMatchObject({ facility: { status: FacilityStatus.INACTIVE } });
+
+    expect(repository.countSuspendImpact).toHaveBeenCalledWith(
+      'fac-1',
+      new Date('2026-08-12T08:00:00.000Z'),
+      null,
+    );
+    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({
+      inactiveUntil: null,
+      inactiveReason: 'Bao tri chua co ngay mo lai',
+    }));
+    expect(repository.suspendActiveRoomsForFacility).toHaveBeenCalledWith(
+      'fac-1',
+      new Date('2026-08-12T08:00:00.000Z'),
+      null,
+      'Bao tri chua co ngay mo lai',
+      'staff-9',
+    );
+    expect(repository.cancelFutureShiftsForFacility).toHaveBeenCalledWith(
+      'fac-1',
+      new Date('2026-08-12T08:00:00.000Z'),
+      null,
+      'Bao tri chua co ngay mo lai',
+      'staff-9',
+    );
+    expect(appointmentDisruptions.dispatchBySource).toHaveBeenCalledWith('facility', 'fac-1');
+  });
+
+  // Vai tro: chan ngay mo lai sai hoac da qua truoc khi ghi status va tao disruption.
+  it.each([
+    'invalid-date',
+    '2026-08-11T08:00:00.000Z',
+    '2026-08-12T08:00:00.000Z',
+  ])('rejects invalid or non-future suspension end time %s', async (inactiveUntil) => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-12T08:00:00.000Z'));
+
+    await expect(service.suspend('fac-1', { inactiveUntil, reason: 'Bao tri' }, 'staff-9'))
+      .rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.countSuspendImpact).not.toHaveBeenCalled();
+    expect(repository.save).not.toHaveBeenCalled();
+    expect(repository.suspendActiveRoomsForFacility).not.toHaveBeenCalled();
+    expect(repository.cancelFutureShiftsForFacility).not.toHaveBeenCalled();
+  });
+
+  // Vai tro: facility het han tam ngung se tu active va chi mo lai room bi facility lam inactive.
+  it('automatically reactivates an expired facility and its affected rooms', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-12T08:00:00.000Z'));
+    const expired = createFacility({
+      status: FacilityStatus.INACTIVE,
+      inactiveUntil: new Date('2026-08-12T07:59:59.000Z'),
+      inactiveSource: InactiveSource.MANUAL,
+    });
+    repository.findById.mockResolvedValue(expired);
+    repository.save.mockImplementation(async value => value);
+
+    await expect(service.findById('fac-1')).resolves.toMatchObject({
+      status: FacilityStatus.ACTIVE,
+      inactiveSource: null,
+      reactivatedBy: null,
+    });
+    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'fac-1',
+      status: FacilityStatus.ACTIVE,
+      inactiveSource: null,
+    }));
+    expect(repository.reactivateRoomsSuspendedByFacility).toHaveBeenCalledWith('fac-1', null);
+  });
+
+  // Vai tro: facility inactive chua den han thi van inactive va khong cham vao room.
+  it('keeps a suspended facility inactive before inactiveUntil', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-12T08:00:00.000Z'));
+    const suspended = createFacility({
+      status: FacilityStatus.INACTIVE,
+      inactiveUntil: new Date('2026-08-13T08:00:00.000Z'),
+    });
+    repository.findById.mockResolvedValue(suspended);
+
+    await expect(service.findById('fac-1')).resolves.toBe(suspended);
+    expect(repository.save).not.toHaveBeenCalled();
+    expect(repository.reactivateRoomsSuspendedByFacility).not.toHaveBeenCalled();
+  });
+
+  // Vai tro: cac lookup nhe cho form quan ly phai delegate dung filter, khong tu sua query.
+  it('delegates admin options and operating-hours lookup to their repositories', async () => {
+    const adminOptions = { items: [{ id: 'staff-1' }], total: 1 };
+    const operatingHours = [{ dayOfWeek: 'MON', openTime: '07:00:00', closeTime: '17:00:00' }];
+    repository.findAdminOptions.mockResolvedValue(adminOptions);
+    repository.findOperatingHoursByFacilityId.mockResolvedValue(operatingHours);
+
+    await expect(service.findAdminOptions({ search: 'admin' } as any)).resolves.toBe(adminOptions);
+    await expect(service.getOperatingHours('fac-1')).resolves.toMatchObject({ operatingHours });
+    expect(repository.findAdminOptions).toHaveBeenCalledWith({ search: 'admin' });
+    expect(repository.findOperatingHoursByFacilityId).toHaveBeenCalledWith('fac-1');
   });
 
 });
@@ -778,10 +881,11 @@ describe('FacilitiesController', () => {
     findDetailsById: jest.fn(),
     getOperatingHours: jest.fn(),
     previewOperatingHours: jest.fn(),
-    updateOperatingHours: jest.fn(),
     applyOperatingHours: jest.fn(),
-    lookup: jest.fn(),
+    findAdminOptions: jest.fn(),
     update: jest.fn(),
+    suspend: jest.fn(),
+    reactivate: jest.fn(),
     remove: jest.fn(),
   });
 
@@ -846,6 +950,68 @@ describe('FacilitiesController', () => {
       message: RESPONSE_MESSAGES.FACILITIES.CREATED,
       data: facility,
     });
+  });
+
+  // Vai tro: detail va update phai kiem tra scope facility roi giu response wrapper thong nhat cho FE.
+  it('wraps facility detail and update responses inside the allowed scope', async () => {
+    const mockService = createService();
+    const facility = createFacility();
+    const updated = createFacility({ address: '456 Le Loi' });
+    mockService.findDetailsById.mockResolvedValue(facility);
+    mockService.update.mockResolvedValue(updated);
+    const controller = new FacilitiesController(mockService as any);
+
+    await expect(controller.findOne(facilityAdmin, 'fac-1')).resolves.toEqual({
+      message: RESPONSE_MESSAGES.FACILITIES.GET_SUCCESS,
+      data: facility,
+    });
+    await expect(controller.update(facilityAdmin, 'fac-1', { address: '456 Le Loi' }))
+      .resolves.toEqual({
+        message: RESPONSE_MESSAGES.FACILITIES.UPDATED,
+        data: updated,
+      });
+    expect(mockService.update).toHaveBeenCalledWith('fac-1', { address: '456 Le Loi' });
+  });
+
+  // Vai tro: API owner options chi boc ket qua service, khong lam mat metadata phan trang.
+  it('wraps facility admin options response', async () => {
+    const mockService = createService();
+    const options = { items: [{ id: 'staff-1', fullName: 'Admin A' }], total: 1 };
+    mockService.findAdminOptions.mockResolvedValue(options);
+    const controller = new FacilitiesController(mockService as any);
+
+    await expect(controller.findAdminOptions({ search: 'Admin' } as any)).resolves.toEqual({
+      message: RESPONSE_MESSAGES.FACILITIES.ADMIN_OPTIONS_SUCCESS,
+      data: options,
+    });
+  });
+
+  // Vai tro: suspend/reactivate phai truyen actor id de audit va chi thao tac trong facility scope duoc phep.
+  it('wraps suspend and reactivate responses with the current actor', async () => {
+    const mockService = createService();
+    const suspended = {
+      facility: createFacility({ status: FacilityStatus.INACTIVE }),
+      impact: { affectedRooms: 2, affectedShifts: 3 },
+    };
+    const reactivated = {
+      facility: createFacility({ status: FacilityStatus.ACTIVE }),
+      impact: { reactivatedRooms: 2 },
+    };
+    mockService.suspend.mockResolvedValue(suspended);
+    mockService.reactivate.mockResolvedValue(reactivated);
+    const controller = new FacilitiesController(mockService as any);
+    const dto = { inactiveUntil: null, reason: 'Bao tri' };
+
+    await expect(controller.suspend(facilityAdmin, 'fac-1', dto)).resolves.toEqual({
+      message: RESPONSE_MESSAGES.FACILITIES.STATUS_UPDATED,
+      data: suspended,
+    });
+    await expect(controller.reactivate(facilityAdmin, 'fac-1')).resolves.toEqual({
+      message: RESPONSE_MESSAGES.FACILITIES.STATUS_UPDATED,
+      data: reactivated,
+    });
+    expect(mockService.suspend).toHaveBeenCalledWith('fac-1', dto, 'user-admin');
+    expect(mockService.reactivate).toHaveBeenCalledWith('fac-1', 'user-admin');
   });
 
   // Vai tro: dam bao controller giu nguyen loi HTTP da biet, khong bien thanh 500 sai nghia.

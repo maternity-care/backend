@@ -5,7 +5,7 @@ import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.in
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RescheduleAppointmentDto } from '../appointments/dto/requests/reschedule-appointment.dto';
 import { AppointmentDisruptionsService } from './appointment-disruptions.service';
-import { RequestRefundDto } from './dto/request-refund.dto';
+import { CancelDisruptedAppointmentDto } from './dto/cancel-disrupted-appointment.dto';
 
 @ApiTags('Appointment Disruptions')
 @ApiBearerAuth()
@@ -36,14 +36,14 @@ export class AppointmentDisruptionsController {
     return { data: await this.service.rescheduleMine(id, user.id, dto) };
   }
 
-  @Patch(':id/refund')
-  async refund(
+  @Patch(':id/cancel')
+  async cancel(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Body() dto: RequestRefundDto,
+    @Body() dto: CancelDisruptedAppointmentDto,
   ) {
     this.assertPatient(user);
-    return { data: await this.service.requestRefund(id, user.id, dto) };
+    return { data: await this.service.cancelMine(id, user.id, dto) };
   }
 
   private assertPatient(user: AuthenticatedUser) {

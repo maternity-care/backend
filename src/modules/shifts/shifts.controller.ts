@@ -20,13 +20,14 @@ import { assertFacilityAccess, getActiveFacilityId } from '../../common/helpers/
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AutoGenerateShiftsDto } from './dto/requests/auto-generate-shifts.dto';
-import { BulkCreateDoctorShiftDto } from './dto/requests/bulk-create-doctor-shift.dto';
 import { CheckShiftConflictDto } from './dto/requests/check-shift-conflict.dto';
-import { CopyWeekDoctorShiftDto } from './dto/requests/copy-week-doctor-shift.dto';
 import { CreateDoctorShiftDto } from './dto/requests/create-doctor-shift.dto';
 import { DoctorAvailabilityQueryDto } from './dto/requests/doctor-availability.dto';
 import { GroupedDoctorShiftDto, SearchDoctorShiftDto, WeeklyDoctorShiftDto } from './dto/requests/search-doctor-shift.dto';
 import { UpdateDoctorShiftDto } from './dto/requests/update-doctor-shift.dto';
+import { RestoreDoctorShiftDto } from './dto/requests/restore-doctor-shift.dto';
+import { WeeklyUpdateShiftsDto } from './dto/requests/weekly-update-shifts.dto';
+import { WeeklyShiftUpdateService } from './weekly-shift-update.service';
 import {
   DoctorShiftPaginatedResponseDto,
   DoctorShiftResponseDto,
@@ -43,7 +44,10 @@ import { ShiftsService } from './shifts.service';
 // @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('management/shifts')
 export class ShiftsController {
-  constructor(private readonly service: ShiftsService) {}
+  constructor(
+    private readonly service: ShiftsService,
+    private readonly weeklyUpdateService: WeeklyShiftUpdateService,
+  ) {}
 
   @Get()
   // @Permissions(PermissionEnum.SHIFT_VIEW)
@@ -71,48 +75,6 @@ export class ShiftsController {
     return {
       message: RESPONSE_MESSAGES.SHIFTS.CHECK_CONFLICT_SUCCESS,
       data: await this.service.checkConflicts(dto),
-    };
-  }
-
-  @Post('bulk-create')
-  // @Permissions(PermissionEnum.SHIFT_CREATE)
-  @ApiOperation({ summary: 'Create many shifts by date range and working days' })
-  async bulkCreate(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: BulkCreateDoctorShiftDto,
-  ) {
-    this.applyFacilityScope(user, dto);
-    return {
-      message: RESPONSE_MESSAGES.SHIFTS.BULK_CREATED,
-      data: await this.service.confirmBulkGenerate(dto as AutoGenerateShiftsDto),
-    };
-  }
-
-  @Post('auto-generate/preview')
-  // @Permissions(PermissionEnum.SHIFT_CREATE)
-  @ApiOperation({ summary: 'Preview auto-generated shifts before saving' })
-  async previewAutoGenerate(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: AutoGenerateShiftsDto,
-  ): Promise<AutoGeneratePreviewApiResponse> {
-    this.applyFacilityScope(user, dto);
-    return {
-      message: RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_PREVIEW_SUCCESS,
-      data: await this.service.previewBulkGenerate(dto),
-    };
-  }
-
-  @Post('auto-generate/confirm')
-  // @Permissions(PermissionEnum.SHIFT_CREATE)
-  @ApiOperation({ summary: 'Confirm and save valid auto-generated shifts' })
-  async confirmAutoGenerate(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: AutoGenerateShiftsDto,
-  ): Promise<AutoGenerateConfirmApiResponse> {
-    this.applyFacilityScope(user, dto);
-    return {
-      message: RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_CONFIRM_SUCCESS,
-      data: await this.service.confirmBulkGenerate(dto),
     };
   }
 
@@ -202,16 +164,6 @@ export class ShiftsController {
     };
   }
 
-  @Post('copy-week')
-  // @Permissions(PermissionEnum.SHIFT_CREATE)
-  @ApiOperation({ summary: 'Copy shift schedule from one week to another week' })
-  async copyWeek(@Body() dto: CopyWeekDoctorShiftDto) {
-    return {
-      message: RESPONSE_MESSAGES.SHIFTS.COPY_WEEK_SUCCESS,
-      data: await this.service.copyWeek(dto),
-    };
-  }
-
   @Get('availability/doctors/:doctorId')
   // @Permissions(PermissionEnum.SHIFT_VIEW)
   @ApiOperation({ summary: 'Get available appointment slots of a doctor on a date' })
@@ -262,6 +214,20 @@ export class ShiftsController {
     };
   }
 
+  @Patch('week')
+  // @Permissions(PermissionEnum.SHIFT_UPDATE)
+  @ApiOperation({ summary: 'Update, create and remove shifts in one target week' })
+  async updateWeek(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: WeeklyUpdateShiftsDto,
+  ) {
+    this.applyFacilityScope(user, dto);
+    return {
+      message: RESPONSE_MESSAGES.SHIFTS.WEEKLY_UPDATE_SUCCESS,
+      data: await this.weeklyUpdateService.updateWeek(dto, user?.id ?? null),
+    };
+  }
+
   @Get(':id')
   // @Permissions(PermissionEnum.SHIFT_VIEW)
   @ApiOperation({ summary: 'Get shift details' })
@@ -299,6 +265,22 @@ export class ShiftsController {
     const activeFacilityId = getActiveFacilityId(user);
     if (activeFacilityId) dto.facilityId = activeFacilityId;
     return { message: RESPONSE_MESSAGES.SHIFTS.UPDATED, data: await this.service.update(id, dto, user?.id ?? null) };
+  }
+
+  @Post(':id/restore')
+  // @Permissions(PermissionEnum.SHIFT_UPDATE)
+  @ApiOperation({ summary: 'Restore a cancelled future shift' })
+  async restore(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() body: RestoreDoctorShiftDto,
+  ) {
+    const existing = await this.service.findById(id);
+    assertFacilityAccess(user, existing.facilityId);
+    return {
+      message: 'Khôi phục ca trực thành công',
+      data: await this.service.restore(id, body.reason, user?.id ?? null),
+    };
   }
 
   @Delete(':id')

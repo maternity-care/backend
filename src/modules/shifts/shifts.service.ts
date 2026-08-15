@@ -1,4 +1,12 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { DoctorShiftStatus } from '../../common/constants/status.enum';
 import { SafeRemoveResult } from '../../common/interfaces/safe-remove-result.interface';
@@ -18,11 +26,14 @@ import {
   getTimeRangeEndMinute,
   isShiftInPast,
   minutesToTime,
+  normalizeTime,
   resolveBulkCreateDateRange,
   shiftIntervalsOverlap,
+  throwIfConflicted,
   timeToMinutes,
   timesOverlap,
   validateBulkCreateRangeLength,
+  validateBulkCreateWeek,
   validateDateRange,
   validateShiftId,
 } from './helpers/shifts.helper';
@@ -42,6 +53,9 @@ import {
 } from './interfaces/auto-generate-shifts.interface';
 import { ShiftsValidator, PreparedDoctorShiftInput } from './validators/shifts.validator';
 import { AppointmentDisruptionsService } from '../appointment-disruptions/appointment-disruptions.service';
+import { detectShiftUpdateChanges, hasMeaningfulShiftChanges } from './helpers/shift-update.helper';
+import { ShiftChangeNotifierService } from './shift-change-notifier.service';
+import { ShiftUpdateChanges } from './interfaces/shift-update.interface';
 
 /**
  * Service chính của ca trực bác sĩ.
@@ -54,6 +68,7 @@ export class ShiftsService {
     private readonly repository: IShiftsRepository,
     private readonly validator: ShiftsValidator,
     @Optional() private readonly appointmentDisruptions?: AppointmentDisruptionsService,
+    @Optional() private readonly shiftChangeNotifier?: ShiftChangeNotifierService,
   ) {}
 
   /** Tạo 1 ca trực bác sĩ; API nhận doctorId nhưng DB lưu staffId để sau này mở rộng cho role khác. */
@@ -138,48 +153,57 @@ export class ShiftsService {
   }
 
   /** Cập nhật ca trực; nếu đổi doctorId thì resolve lại sang staffId trước khi lưu. */
+  /**
+   * Cập nhật ca trực và giữ appointment đồng bộ với ca.
+   * Đổi lịch của ca đã có appointment phải đi qua disruption, không sửa âm thầm tại đây.
+   */
   async update(id: string, dto: UpdateDoctorShiftDto, changedBy?: string | null): Promise<DoctorShift> {
     const shift = await this.findById(id);
     if (isShiftInPast(shift.shiftDate, shift.startTime, shift.endTime)) {
       throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.PAST_DATE_INVALID);
     }
+
     if (dto.status === DoctorShiftStatus.CANCELLED && shift.status !== DoctorShiftStatus.CANCELLED) {
-      const activeAffectedAppointments = await this.repository.findAppointmentsForShift(shift, true);
+      const activeAppointments = await this.repository.findAppointmentsForShift(shift, true);
       const result = await this.repository.cancelShiftWithDisruption(
         shift,
-        activeAffectedAppointments,
-        dto.note,
+        activeAppointments,
+        dto.changeReason ?? dto.note,
         changedBy,
       );
-      if (result.disruptionId) {
-        await this.appointmentDisruptions?.dispatchDisruption(result.disruptionId);
-      }
+      if (result.disruptionId) await this.appointmentDisruptions?.dispatchDisruption(result.disruptionId);
       return result.shift;
+    }
+
+    if (shift.status === DoctorShiftStatus.CANCELLED) {
+      throw new ConflictException('Ca trực đã hủy không thể sửa bằng API cập nhật thông thường.');
     }
 
     const timeWasProvided = Object.prototype.hasOwnProperty.call(dto, 'startTime')
       || Object.prototype.hasOwnProperty.call(dto, 'endTime');
     const slotWasProvided = Object.prototype.hasOwnProperty.call(dto, 'slotId');
-
     if (shift.slotId && timeWasProvided && !slotWasProvided) {
       throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.SLOT_LOCKED_TIME_CHANGE);
     }
 
+    const { changeReason, doctorId: requestedDoctorId, ...shiftData } = dto;
+    const activeAppointments = await this.repository.findAppointmentsForShift(shift, true);
+    const currentDoctorId = await this.resolveDoctorIdForExistingShift(shift, shift.facilityId);
+    this.assertBookedShiftUpdateAllowed(shift, dto, activeAppointments.length, currentDoctorId);
     const targetFacilityId = dto.facilityId ?? shift.facilityId;
-    const doctorId = dto.doctorId
+    const doctorId = requestedDoctorId
       ?? await this.resolveDoctorIdForExistingShift(shift, targetFacilityId);
-    if (!doctorId) {
-      throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.DOCTOR_NOT_ASSIGNED);
-    }
+    if (!doctorId) throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.DOCTOR_NOT_ASSIGNED);
 
-    const merged = this.repository.create({ ...shift, ...dto });
+    const merged = this.repository.create({ ...shift, ...shiftData });
     const prepared = await this.validator.validateForUpdate(merged, doctorId, {
       slotWasProvided,
       timeWasProvided,
     });
 
-    const { doctorId: _doctorId, ...shiftData } = dto;
-    Object.assign(shift, shiftData, {
+    const before = this.repository.create({ ...shift });
+    const after = this.repository.create({ ...shift, ...shiftData });
+    Object.assign(after, {
       staffId: prepared.staffId,
       roleName: prepared.roleName,
       slotId: prepared.slotId,
@@ -187,7 +211,27 @@ export class ShiftsService {
       endTime: prepared.endTime,
     });
 
-    return this.repository.save(shift);
+    const changes = detectShiftUpdateChanges(before, after);
+    if (!hasMeaningfulShiftChanges(changes)) return shift;
+
+    this.validateUpdateAgainstAppointments(after, changes, activeAppointments.length);
+
+    const result = await this.repository.updateWithAudit({
+      before,
+      after,
+      changes,
+      affectedAppointments: activeAppointments,
+      reason: changeReason?.trim() || null,
+      changedBy,
+    });
+    await this.shiftChangeNotifier?.notifyAppointments(
+      before,
+      result.shift,
+      changes,
+      result.changeLogId,
+      changeReason,
+    );
+    return result.shift;
   }
 
   /**
@@ -229,6 +273,45 @@ export class ShiftsService {
     };
   }
 
+  /**
+   * Khôi phục một ca hủy nhầm hoặc được mở lại sớm.
+   * Ca chỉ được khôi phục khi còn trên 24 giờ, không còn hồ sơ disruption chờ xử lý và không xung đột.
+   */
+  async restore(id: string, reason?: string, changedBy?: string | null): Promise<DoctorShift> {
+    const shift = await this.findById(id);
+    if (shift.status !== DoctorShiftStatus.CANCELLED) {
+      throw new ConflictException('Chỉ ca trực đã hủy mới có thể khôi phục.');
+    }
+    if (this.getHoursUntilShiftStarts(shift) <= 24) {
+      throw new ConflictException('Chỉ được khôi phục ca trực trước giờ bắt đầu ít nhất 24 giờ.');
+    }
+    if (await this.repository.hasUnresolvedDisruptions(shift.id)) {
+      throw new ConflictException('Ca trực còn lịch hẹn bị ảnh hưởng chưa xử lý xong.');
+    }
+    const activeAppointments = await this.repository.findAppointmentsForShift(shift, true);
+    if (activeAppointments.length > 0) {
+      throw new ConflictException('Ca trực vẫn còn lịch hẹn đang hoạt động nên chưa thể khôi phục.');
+    }
+
+    const doctorId = await this.resolveDoctorIdForExistingShift(shift, shift.facilityId);
+    if (!doctorId) throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.DOCTOR_NOT_ASSIGNED);
+    const after = this.repository.create({ ...shift, status: DoctorShiftStatus.AVAILABLE });
+    await this.validator.validateForUpdate(after, doctorId, {
+      slotWasProvided: Boolean(after.slotId),
+      timeWasProvided: false,
+    });
+    const changes = detectShiftUpdateChanges(shift, after);
+    const result = await this.repository.updateWithAudit({
+      before: shift,
+      after,
+      changes,
+      affectedAppointments: [],
+      reason: reason?.trim() || null,
+      changedBy,
+    });
+    return result.shift;
+  }
+
   /** Kiểm tra xung đột bác sĩ/phòng trước khi FE cho người dùng lưu ca. */
   async checkConflicts(dto: CheckShiftConflictDto) {
     const prepared = await this.validator.validateForConflictCheck(dto);
@@ -261,13 +344,12 @@ export class ShiftsService {
       sourceEnd,
       dto.doctorId,
     );
-    const copyableShifts = sourceShifts.filter(shift => shift.status !== DoctorShiftStatus.CANCELLED);
+    const copyableShifts = sourceShifts;
     if (copyableShifts.length === 0) return [];
 
-    const shifts: DoctorShift[] = [];
-    for (const sourceShift of copyableShifts) {
-      const payload = {
-        doctorId: sourceShift.doctorId,
+    const payloads = copyableShifts.map(sourceShift => ({
+        staffId: sourceShift.staffId ?? sourceShift.doctorId ?? undefined,
+        roleId: sourceShift.roleId,
         facilityId: sourceShift.facilityId,
         roomId: sourceShift.roomId,
         slotId: sourceShift.slotId ?? undefined,
@@ -275,11 +357,40 @@ export class ShiftsService {
         startTime: sourceShift.slotId ? undefined : sourceShift.startTime,
         endTime: sourceShift.slotId ? undefined : sourceShift.endTime,
         maxAppointments: sourceShift.maxAppointments,
-        status: sourceShift.status === DoctorShiftStatus.FULL
+        status: [DoctorShiftStatus.FULL, DoctorShiftStatus.CANCELLED].includes(sourceShift.status)
           ? DoctorShiftStatus.AVAILABLE
           : sourceShift.status,
-      } as CreateDoctorShiftDto;
-      const prepared = await this.validator.validateForCreate(payload);
+        note: sourceShift.note ?? undefined,
+      } as CreateDoctorShiftDto));
+
+    const preparationResults = await this.validator.prepareManyForCreate(payloads);
+    const preparedInputs = preparationResults.map((result, index) => {
+      if (result.status === 'rejected') throw result.reason;
+      return { index, payload: payloads[index], prepared: result.value };
+    });
+    const batchConflicts = await this.repository.findConflictsForBatch?.(
+      preparedInputs.map(({ index, payload, prepared }) => ({
+        ...payload,
+        index,
+        staffId: prepared.staffId,
+        roleName: prepared.roleName,
+        slotId: prepared.slotId,
+        startTime: prepared.startTime,
+        endTime: prepared.endTime,
+      })),
+    );
+
+    const shifts: DoctorShift[] = [];
+    for (const { index, payload, prepared } of preparedInputs) {
+      const conflicts = batchConflicts?.get(index) ?? await this.repository.findConflicts({
+        ...payload,
+        staffId: prepared.staffId,
+        roleName: prepared.roleName,
+        slotId: prepared.slotId,
+        startTime: prepared.startTime,
+        endTime: prepared.endTime,
+      });
+      throwIfConflicted(conflicts);
       shifts.push(this.buildShiftEntity(payload, prepared));
     }
 
@@ -337,7 +448,6 @@ export class ShiftsService {
       doctorId,
     );
     const shifts = await this.repository.findWeeklyWithDetails(facilityId, start, end, doctorId);
-    this.ensureShiftsFound(shifts);
     return {
       facilityId,
       weekStart: start,
@@ -351,14 +461,20 @@ export class ShiftsService {
 
   async getGroupedSchedule(query: GroupedDoctorShiftDto) {
     validateDateRange(query.dateFrom, query.dateTo);
-    const shifts = await this.repository.findAll({
-      facilityId: query.facilityId,
-      doctorId: query.doctorId,
-      roomId: query.roomId,
-      status: query.status,
-      dateFrom: query.dateFrom,
-      dateTo: query.dateTo,
-    });
+    const shifts = query.forTemplate
+      ? await this.repository.findTemplateWeekWithDetails(
+          query.facilityId as string,
+          query.dateFrom,
+          query.dateTo,
+        )
+      : await this.repository.findAll({
+        facilityId: query.facilityId,
+        doctorId: query.doctorId,
+        roomId: query.roomId,
+        status: query.status,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
+      });
     const groups = this.groupShiftsByPattern(shifts);
 
     return {
@@ -373,10 +489,44 @@ export class ShiftsService {
 
   /** Tạo entity lưu DB từ DTO public-facing và dữ liệu đã được validator chuẩn hóa. */
   /** Tao plan auto-generate dung chung cho preview va confirm de hai API khong lech logic. */
+  /** Áp dụng các giới hạn bảo vệ appointment trước khi repository ghi dữ liệu. */
+  private validateUpdateAgainstAppointments(
+    after: DoctorShift,
+    changes: ShiftUpdateChanges,
+    activeAppointmentCount: number,
+  ): void {
+    if (activeAppointmentCount === 0) return;
+
+    if (changes.scheduleChanged || changes.roleChanged) {
+      throw new ConflictException(
+        'Ca trực đã có lịch hẹn. Muốn đổi ngày, giờ, khung ca, cơ sở hoặc vai trò phải xử lý lịch hẹn bị ảnh hưởng.',
+      );
+    }
+    if (changes.roomChanged && !after.roomId) {
+      throw new ConflictException('Ca trực đã có lịch hẹn nên không thể bỏ phòng khám.');
+    }
+    if (after.maxAppointments !== null && after.maxAppointments < activeAppointmentCount) {
+      throw new ConflictException(
+        `Số lịch tối đa không được nhỏ hơn ${activeAppointmentCount} lịch hẹn đang hoạt động.`,
+      );
+    }
+    if (changes.statusChanged && after.status === DoctorShiftStatus.OFF) {
+      throw new ConflictException('Ca trực đã có lịch hẹn không thể chuyển sang nghỉ; hãy dùng thao tác hủy ca.');
+    }
+  }
+
+  private getHoursUntilShiftStarts(shift: DoctorShift): number {
+    const date = String(shift.shiftDate).slice(0, 10);
+    const time = shift.startTime.slice(0, 8);
+    const startsAt = new Date(`${date}T${time}+07:00`).getTime();
+    return (startsAt - Date.now()) / 3_600_000;
+  }
+
   private async buildAutoGeneratePlan(dto: AutoGenerateShiftsDto): Promise<AutoGeneratePlan> {
     const range = resolveBulkCreateDateRange(dto);
     validateDateRange(range.fromDate, range.toDate);
     validateBulkCreateRangeLength(range.fromDate, range.toDate);
+    validateBulkCreateWeek(range.fromDate, range.toDate);
 
     if (dateDiffInDays(range.fromDate, range.toDate) > 92) {
       throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_RANGE_TOO_LONG);
@@ -389,69 +539,106 @@ export class ShiftsService {
     const candidateInputs = this.buildAutoGenerateInputs(dto, range, skippedItems);
     const preValidationSkippedCount = skippedItems.length;
 
-    for (const candidateInput of candidateInputs) {
+    const preparationResults = await this.validator.prepareManyForCreate(
+      candidateInputs.map(candidateInput => candidateInput.payload),
+    );
+    const preparedCandidates: Array<{
+      input: typeof candidateInputs[number];
+      prepared: PreparedDoctorShiftInput;
+      candidate: AutoGenerateValidItem;
+    }> = [];
+
+    for (const [candidatePosition, candidateInput] of candidateInputs.entries()) {
       const { index, slotAssignmentIndex, assignmentIndex, shiftDate, payload } = candidateInput;
-
-      try {
-        const prepared = await this.validator.prepareForCreate(payload);
-        const candidate = this.buildAutoGenerateCandidate(payload, prepared, index, slotAssignmentIndex, assignmentIndex);
-        // Kiem tra conflict voi cac ca da ton tai trong DB.
-        // Buoc nay bat cac lich da duoc tao truoc do, nhung khong thay duoc cac ca dang nam trong cung payload bulk hien tai.
-        const conflicts = await this.repository.findConflicts({
-          ...payload,
-          staffId: prepared.staffId,
-          roleId: payload.roleId,
-          roleName: prepared.roleName,
-          slotId: prepared.slotId,
-          startTime: prepared.startTime,
-          endTime: prepared.endTime,
-        });
-
-        if (conflicts.doctorConflicts.length > 0 || conflicts.roomConflicts.length > 0) {
-          conflictItems.push({
-            index,
-            slotAssignmentIndex,
-            assignmentIndex,
-            shiftDate,
-            reason: RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_CONFLICT,
-            candidate,
-            doctorConflicts: conflicts.doctorConflicts,
-            roomConflicts: conflicts.roomConflicts,
-          });
-          continue;
+      const preparation = preparationResults[candidatePosition];
+      if (preparation.status === 'rejected') {
+        if (this.isDatabaseConnectionError(preparation.reason)) {
+          throw new ServiceUnavailableException(
+            'Không thể kết nối cơ sở dữ liệu khi xem trước lịch trực. Vui lòng thử lại sau.',
+          );
         }
-
-        // Kiem tra conflict noi bo trong chinh lan bulk-generate nay.
-        // Vi cac candidate hop le phia tren chua duoc save vao DB, repository.findConflicts khong the bat truong hop:
-        // - cung bac si bi xep 2 ca giao nhau trong cung ngay
-        // - hai bac si khac nhau bi xep vao cung phong, cung ngay, cung khung gio
-        const internalConflicts = this.findInternalAutoGenerateConflicts(candidate, validShifts);
-        if (internalConflicts.doctorConflicts.length > 0 || internalConflicts.roomConflicts.length > 0) {
-          conflictItems.push({
-            index,
-            slotAssignmentIndex,
-            assignmentIndex,
-            shiftDate,
-            reason: RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_CONFLICT,
-            candidate,
-            doctorConflicts: internalConflicts.doctorConflicts,
-            roomConflicts: internalConflicts.roomConflicts,
-          });
-          continue;
-        }
-
-        validShifts.push(candidate);
-        internalValidEntities.push(this.buildShiftEntity(payload, prepared));
-      } catch (error) {
         skippedItems.push({
           index,
           slotAssignmentIndex,
           assignmentIndex,
           shiftDate,
-          reason: this.extractErrorMessage(error),
+          reason: this.extractErrorMessage(preparation.reason),
           candidate: { ...payload, index, slotAssignmentIndex, assignmentIndex },
         });
+        continue;
       }
+
+      const prepared = preparation.value;
+      preparedCandidates.push({
+        input: candidateInput,
+        prepared,
+        candidate: this.buildAutoGenerateCandidate(
+          payload,
+          prepared,
+          index,
+          slotAssignmentIndex,
+          assignmentIndex,
+        ),
+      });
+    }
+
+    const batchConflicts = await this.repository.findConflictsForBatch?.(
+      preparedCandidates.map(({ input, prepared }) => ({
+        ...input.payload,
+        index: input.index,
+        staffId: prepared.staffId,
+        roleId: input.payload.roleId,
+        roleName: prepared.roleName,
+        slotId: prepared.slotId,
+        startTime: prepared.startTime,
+        endTime: prepared.endTime,
+      })),
+    );
+
+    for (const { input, prepared, candidate } of preparedCandidates) {
+      const { index, slotAssignmentIndex, assignmentIndex, shiftDate, payload } = input;
+      const conflicts = batchConflicts?.get(index) ?? await this.repository.findConflicts({
+        ...payload,
+        staffId: prepared.staffId,
+        roleId: payload.roleId,
+        roleName: prepared.roleName,
+        slotId: prepared.slotId,
+        startTime: prepared.startTime,
+        endTime: prepared.endTime,
+      });
+
+      if (conflicts.doctorConflicts.length > 0 || conflicts.roomConflicts.length > 0) {
+        conflictItems.push({
+          index,
+          slotAssignmentIndex,
+          assignmentIndex,
+          shiftDate,
+          reason: RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_CONFLICT,
+          candidate,
+          doctorConflicts: conflicts.doctorConflicts,
+          roomConflicts: conflicts.roomConflicts,
+        });
+        continue;
+      }
+
+      // DB batch query khong thay cac candidate chua insert, nen conflict trong payload van kiem tra rieng.
+      const internalConflicts = this.findInternalAutoGenerateConflicts(candidate, validShifts);
+      if (internalConflicts.doctorConflicts.length > 0 || internalConflicts.roomConflicts.length > 0) {
+        conflictItems.push({
+          index,
+          slotAssignmentIndex,
+          assignmentIndex,
+          shiftDate,
+          reason: RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_CONFLICT,
+          candidate,
+          doctorConflicts: internalConflicts.doctorConflicts,
+          roomConflicts: internalConflicts.roomConflicts,
+        });
+        continue;
+      }
+
+      validShifts.push(candidate);
+      internalValidEntities.push(this.buildShiftEntity(payload, prepared));
     }
     const hasIssues = skippedItems.length > 0 || conflictItems.length > 0;
 
@@ -646,6 +833,65 @@ export class ShiftsService {
     };
   }
 
+  /**
+   * Khi ca da co appointment, cac thay doi lam doi trai nghiem kham cua thai phu
+   * phai di qua luong cancel/disruption de tao thong bao, mail va ho so xu ly.
+   */
+  private assertBookedShiftUpdateAllowed(
+    shift: DoctorShift,
+    dto: UpdateDoctorShiftDto,
+    activeAppointmentCount: number,
+    currentDoctorId: string | null,
+  ): void {
+    if (activeAppointmentCount === 0) return;
+
+    if (dto.maxAppointments != null && dto.maxAppointments < activeAppointmentCount) {
+      throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.MAX_APPOINTMENTS_BELOW_BOOKED);
+    }
+
+    if (dto.status === DoctorShiftStatus.OFF) {
+      throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.BOOKED_SHIFT_OFF_INVALID);
+    }
+
+    if (this.hasProtectedBookedShiftChange(shift, dto, currentDoctorId)) {
+      throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.SHIFT_HAS_APPOINTMENTS_PROTECTED_UPDATE);
+    }
+  }
+
+  private hasProtectedBookedShiftChange(
+    shift: DoctorShift,
+    dto: UpdateDoctorShiftDto,
+    currentDoctorId: string | null,
+  ): boolean {
+    const maybeDto = dto as UpdateDoctorShiftDto & { startTime?: string | null; endTime?: string | null };
+    return this.changedId(maybeDto.doctorId, currentDoctorId)
+      || this.changedId(maybeDto.staffId, shift.staffId)
+      || this.changedId(maybeDto.roleId, shift.roleId)
+      || this.changedId(maybeDto.facilityId, shift.facilityId)
+      || this.changedId(maybeDto.slotId, shift.slotId)
+      || this.changedValue(maybeDto.shiftDate, shift.shiftDate)
+      || this.changedTime(maybeDto.startTime, shift.startTime)
+      || this.changedTime(maybeDto.endTime, shift.endTime);
+  }
+
+  private changedId(nextValue: string | null | undefined, currentValue: string | null | undefined): boolean {
+    if (nextValue === undefined) return false;
+    return (nextValue ?? null) !== (currentValue ?? null);
+  }
+
+  private changedValue(nextValue: string | null | undefined, currentValue: string | null | undefined): boolean {
+    if (nextValue === undefined) return false;
+    return (nextValue ?? null) !== (currentValue ?? null);
+  }
+
+  private changedTime(nextValue: string | null | undefined, currentValue: string | null | undefined): boolean {
+    if (nextValue === undefined) return false;
+    if (nextValue === null || currentValue === null || currentValue === undefined) {
+      return (nextValue ?? null) !== (currentValue ?? null);
+    }
+    return normalizeTime(nextValue) !== normalizeTime(currentValue);
+  }
+
   /** Lay message ngan gon tu Nest exception hoac Error thuong de dua vao skippedItems. */
   private extractErrorMessage(error: unknown): string {
     if (error instanceof BadRequestException || error instanceof ConflictException || error instanceof NotFoundException) {
@@ -658,6 +904,26 @@ export class ShiftsService {
     }
 
     return error instanceof Error ? error.message : RESPONSE_MESSAGES.SHIFTS.AUTO_GENERATE_CANDIDATE_FAILED;
+  }
+
+  /** Loi ket noi DB la loi he thong, khong duoc bien thanh validation error cua mot candidate. */
+  private isDatabaseConnectionError(error: unknown): boolean {
+    const connectionCodes = new Set([
+      'ETIMEDOUT',
+      'ECONNREFUSED',
+      'ECONNRESET',
+      'PROTOCOL_CONNECTION_LOST',
+      'ER_CON_COUNT_ERROR',
+    ]);
+    let current: unknown = error;
+
+    for (let depth = 0; depth < 4 && current && typeof current === 'object'; depth += 1) {
+      const details = current as { code?: unknown; message?: unknown; cause?: unknown; driverError?: unknown };
+      if (connectionCodes.has(String(details.code ?? ''))) return true;
+      if (/\b(ETIMEDOUT|ECONNREFUSED|ECONNRESET)\b/i.test(String(details.message ?? ''))) return true;
+      current = details.driverError ?? details.cause;
+    }
+    return false;
   }
 
   private buildShiftEntity(
@@ -736,6 +1002,10 @@ export class ShiftsService {
     );
   }
 
+
+  /// Nhóm các ca trực theo pattern giống nhau 
+  // (cùng bác sĩ, cùng phòng, cùng slot, cùng khung giờ, cùng vai trò, cùng maxAppointments, cùng status)
+  //  để FE render lịch tuần dễ hơn.
   private groupShiftsByPattern(shifts: ShiftWithDetails[]) {
     const sortedShifts = [...shifts].sort((left, right) => {
       const dateCompare = String(left.shiftDate).localeCompare(String(right.shiftDate));
@@ -766,6 +1036,7 @@ export class ShiftsService {
     });
   }
 
+  
   private buildShiftGroupKey(shift: ShiftWithDetails): string {
     return JSON.stringify({
       facilityId: shift.facilityId,

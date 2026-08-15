@@ -22,15 +22,13 @@ import { ShiftDisruption } from '../../shifts/entities/shift-disruption.entity';
 import { ShiftSlot } from '../../../database/entities/shift-slot.entity';
 import {
   FacilityAdminOption,
-  FacilityLookup,
   FacilityWithDetails,
   IFacilitiesRepository,
 } from '../interfaces/facility-repository.interface';
 
 import { SearchFacilityAdminOptionsDto } from '../dto/requests/search-facility-admin-options.dto';
-import { LookupFacilityDto, SearchFacilityDto } from '../dto/requests/search-facility.dto';
+import { SearchFacilityDto } from '../dto/requests/search-facility.dto';
 import { PaginationResult } from '../../../common/helpers/pagination';
-import { RESPONSE_MESSAGES } from '../../../common/constants/response-message.constant';
 import { addDays, dateTimeToTime, shiftIntervalsOverlap } from '../../shifts/helpers/shifts.helper';
 
 interface AffectedAppointmentBlock {
@@ -125,6 +123,20 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       .getOne();
   }
 
+  async findHighestRoomFloor(facilityId: string): Promise<number> {
+    const row = await this.repository.manager
+      .createQueryBuilder()
+      .select('MAX(CAST(room.floor AS UNSIGNED))', 'highestFloor')
+      .from('rooms', 'room')
+      .where('room.facility_id = :facilityId', { facilityId })
+      .andWhere('room.deleted_at IS NULL')
+      .andWhere("room.floor REGEXP '^[1-9][0-9]*$'")
+      .getRawOne<{ highestFloor: string | null }>();
+
+    return Number(row?.highestFloor ?? 0);
+  }
+
+  //kiếm tra xem ownerId có phải là admin đang active hay không
   async existsActiveOwner(ownerId: string): Promise<boolean> {
     const count = await this.repository.manager
       .createQueryBuilder()
@@ -140,6 +152,7 @@ export class FacilitiesRepository implements IFacilitiesRepository {
     return Number(count?.count ?? 0) > 0;
   }
 
+  // tìm các tùy chọn admin cho facility
   async findAdminOptions(filters?: SearchFacilityAdminOptionsDto): Promise<PaginationResult<FacilityAdminOption>> {
     const page = Math.max(1, Number(filters?.page) || 1);
     const limit = Math.max(1, Number(filters?.limit) || 20);
@@ -165,6 +178,7 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       .addSelect('homeFacility.code', 'homeFacilityCode')
       .addSelect('role.id', 'roleId')
       .addSelect('role.name', 'roleName')
+      // subquery to count the number of facilities owned by the staff member
       .addSelect((subQuery) => (
         subQuery
           .select('COUNT(1)')
@@ -185,7 +199,7 @@ export class FacilitiesRepository implements IFacilitiesRepository {
         { search: `%${filters.search}%` },
       );
     }
-
+    
     if (filters?.availableOnly === 'true') {
       query.andWhere(`
         NOT EXISTS (
@@ -217,25 +231,6 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       limit,
       totalPages: Math.ceil(Number(totalRow?.count ?? 0) / limit),
     };
-  }
-
-  lookup(filters?: LookupFacilityDto): Promise<FacilityLookup[]> {
-    const query = this.buildDetailsQuery({
-      search: filters?.search,
-      status: filters?.status,
-    })
-      .select('facility.id', 'id')
-      .addSelect('facility.name', 'name')
-      .addSelect('facility.code', 'code')
-      .addSelect('facility.address', 'address')
-      .addSelect('facility.province', 'province')
-      .addSelect('facility.ward', 'ward')
-      .addSelect('facility.status', 'status')
-      .addSelect('owner.name', 'ownerName')
-      .orderBy('facility.name', 'ASC')
-      .limit(Math.max(1, Number(filters?.limit) || 20));
-
-    return query.getRawMany<FacilityLookup>();
   }
 
   async remove(facility: Facility): Promise<void> {
@@ -270,15 +265,6 @@ export class FacilitiesRepository implements IFacilitiesRepository {
     return this.repository.save(facility);
   }
 
-  async updateStatus(id: string, status: FacilityStatus): Promise<Facility> {
-    const facility = await this.findById(id);
-    if (!facility) {
-      throw new Error(RESPONSE_MESSAGES.FACILITIES.NOT_FOUND);
-    }
-    facility.status = status;
-    return this.repository.save(facility);
-  }
-
   private formatDateOnly(value: string | Date): string {
     if (value instanceof Date) return value.toISOString().slice(0, 10);
     return String(value).slice(0, 10);
@@ -301,6 +287,7 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       .addSelect('facility.address', 'address')
       .addSelect('facility.province', 'province')
       .addSelect('facility.ward', 'ward')
+      .addSelect('facility.floorCount', 'floorCount')
       .addSelect('facility.latitude', 'latitude')
       .addSelect('facility.longitude', 'longitude')
       .addSelect('facility.status', 'status')
@@ -344,7 +331,6 @@ export class FacilitiesRepository implements IFacilitiesRepository {
     if (filters?.status) {
       query.andWhere('facility.status = :status', { status: filters.status });
     }
-
     return query;
   }
 

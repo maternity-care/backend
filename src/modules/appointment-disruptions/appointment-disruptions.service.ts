@@ -24,7 +24,7 @@ import { IMailService, MAIL_SERVICE } from '../mail/interfaces/mail-service.inte
 import { NotificationsService } from '../notifications/notifications.service';
 import { AppointmentDisruptionItem } from '../shifts/entities/appointment-disruption-item.entity';
 import { ShiftDisruption } from '../shifts/entities/shift-disruption.entity';
-import { RequestRefundDto } from './dto/request-refund.dto';
+import { CancelDisruptedAppointmentDto } from './dto/cancel-disrupted-appointment.dto';
 
 const UNRESOLVED_STATUSES = [
   AppointmentDisruptionResolutionStatus.PENDING,
@@ -52,12 +52,6 @@ export class AppointmentDisruptionsService {
       })
       .orderBy('item.created_at', 'DESC')
       .getRawMany();
-  }
-
-  async findManagement(facilityId?: string | null) {
-    const query = this.buildListQuery();
-    if (facilityId) query.andWhere('disruption.facility_id = :facilityId', { facilityId });
-    return query.orderBy('item.created_at', 'DESC').getRawMany();
   }
 
   async findOptions(itemId: string, patientId: string) {
@@ -140,70 +134,32 @@ export class AppointmentDisruptionsService {
     return appointment;
   }
 
-  async rescheduleManagement(itemId: string, actorId: string, facilityId: string | null, dto: RescheduleAppointmentDto) {
-    const item = await this.findManagementItem(itemId, facilityId);
-    this.assertPending(item);
-    const appointment = await this.appointmentsService.reschedule(item.appointmentId, dto, facilityId);
-    await this.completeReschedule(item, dto, actorId);
-    return appointment;
-  }
-
-  async requestRefund(itemId: string, patientId: string, dto: RequestRefundDto) {
+  /** Hủy lịch bị ảnh hưởng và kết thúc hồ sơ xử lý, không mở quy trình hoàn tiền. */
+  async cancelMine(itemId: string, patientId: string, dto: CancelDisruptedAppointmentDto) {
     const item = await this.findOwnedItem(itemId, patientId);
-    this.assertPending(item);
+    this.assertCancellable(item);
+    const reason = dto.reason?.trim() || item.shiftDisruption.reason || 'Ca trực bị hủy';
     await this.dataSource.transaction(async (manager) => {
       await manager.update(Appointment, item.appointmentId, {
         status: AppointmentStatus.CANCELLED,
-        cancelReason: dto.reason?.trim() || item.shiftDisruption.reason || 'Ca trực bị hủy',
+        cancelReason: reason,
       });
       await manager.update(AppointmentDisruptionItem, item.id, {
-        resolutionStatus: AppointmentDisruptionResolutionStatus.REFUND_PENDING,
-        selectedOption: 'refund',
-        resolutionNote: dto.reason?.trim() || null,
+        resolutionStatus: AppointmentDisruptionResolutionStatus.CANCELLED,
+        selectedOption: 'cancel',
+        resolutionNote: reason,
         resolvedBy: patientId,
+        resolvedAt: new Date(),
       });
       await manager.query(
         `UPDATE user_schedules
-         SET status = 'cancelled', note = ?
+         SET status = 'cancelled', note = ?, updated_at = CURRENT_TIMESTAMP
          WHERE appointment_id = ? AND source = 'appointment'`,
-        [dto.reason?.trim() || 'Đang chờ cơ sở xử lý yêu cầu hoàn tiền', item.appointmentId],
+        [reason, item.appointmentId],
       );
     });
     await this.updateDisruptionStatus(item.disruptionId);
-    await this.notifyManagers(item.shiftDisruption, `Thai phụ đã yêu cầu hoàn tiền cho lịch #${item.appointmentId}.`);
     return this.itemRepository.findOneByOrFail({ id: item.id });
-  }
-
-  async completeRefund(itemId: string, actorId: string, facilityId: string | null, dto: RequestRefundDto) {
-    const item = await this.findManagementItem(itemId, facilityId);
-    if (item.resolutionStatus !== AppointmentDisruptionResolutionStatus.REFUND_PENDING) {
-      throw new BadRequestException('Phiếu này không ở trạng thái chờ hoàn tiền');
-    }
-    Object.assign(item, {
-      resolutionStatus: AppointmentDisruptionResolutionStatus.RESOLVED,
-      selectedOption: 'refund',
-      resolutionNote: dto.reason?.trim() || item.resolutionNote,
-      resolvedBy: actorId,
-      resolvedAt: new Date(),
-    });
-    await this.itemRepository.save(item);
-    // Giữ user_schedules nhất quán kể cả khi dữ liệu cũ chưa được đồng bộ.
-    await this.dataSource.query(
-      `UPDATE user_schedules
-       SET status = 'cancelled', note = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE appointment_id = ? AND source = 'appointment'`,
-      [item.resolutionNote || 'Lịch hẹn đã được xử lý hoàn tiền', item.appointmentId],
-    );
-    await this.updateDisruptionStatus(item.disruptionId);
-    await this.notificationsService.createForUserIfMissing(item.appointment.patientId, {
-      reference: `appointment-refund-resolved:${item.id}`,
-      type: NotificationType.APPOINTMENT_DISRUPTION,
-      title: 'Yêu cầu hoàn tiền đã được xử lý',
-      content: `Yêu cầu hoàn tiền cho lịch #${item.appointmentId} đã được cơ sở xác nhận xử lý.`,
-      referenceType: NotificationReferenceType.SHIFT_DISRUPTION,
-      referenceId: item.disruptionId,
-    });
-    return item;
   }
 
   async dispatchBySource(sourceType: string, sourceId: string) {
@@ -240,7 +196,7 @@ export class AppointmentDisruptionsService {
         reference: `appointment-disruption:${row.itemId}`,
         type: NotificationType.APPOINTMENT_DISRUPTION,
         title: 'Lịch khám của bạn bị ảnh hưởng',
-        content: `Lịch #${row.appointmentId} tại ${row.facilityName} đã bị ảnh hưởng. Vui lòng chọn lịch khác hoặc yêu cầu hoàn tiền.`,
+        content: `Lịch #${row.appointmentId} tại ${row.facilityName} đã bị ảnh hưởng. Vui lòng chọn lịch khác hoặc hủy lịch.`,
         referenceType: NotificationReferenceType.SHIFT_DISRUPTION,
         referenceId: String(row.disruptionId),
       });
@@ -248,7 +204,7 @@ export class AppointmentDisruptionsService {
         `UPDATE user_schedules
          SET status = 'action_required', note = ?
          WHERE appointment_id = ? AND source = 'appointment'`,
-        [row.reason || 'Ca trực bị hủy, vui lòng đổi lịch hoặc yêu cầu hoàn tiền', row.appointmentId],
+        [row.reason || 'Ca trực bị hủy, vui lòng đổi lịch hoặc hủy lịch', row.appointmentId],
       );
       if (!row.notifiedAt) {
         await this.itemRepository.update(String(row.itemId), { notifiedAt: new Date() });
@@ -265,7 +221,7 @@ export class AppointmentDisruptionsService {
             scheduledStart: new Date(row.oldScheduledStart),
             scheduledEnd: new Date(row.oldScheduledEnd),
             reason: row.reason || 'Cơ sở hoặc phòng khám tạm ngưng hoạt động',
-            actionUrl: `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/appointment-disruptions`,
+            actionUrl: `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/schedule#appointment-disruptions`,
           });
           await this.itemRepository.update(String(row.itemId), { emailSentAt: new Date() });
         } catch (error) {
@@ -276,7 +232,7 @@ export class AppointmentDisruptionsService {
 
     const disruption = await this.dataSource.getRepository(ShiftDisruption).findOneBy({ id: disruptionId });
     if (disruption) {
-      await this.notifyManagers(disruption, `${rows.length} lịch hẹn cần đổi lịch hoặc xử lý hoàn tiền.`);
+      await this.notifyManagers(disruption, `${rows.length} lịch hẹn cần được thai phụ đổi hoặc hủy lịch.`);
     }
   }
 
@@ -319,20 +275,19 @@ export class AppointmentDisruptionsService {
     return item;
   }
 
-  private async findManagementItem(id: string, facilityId: string | null) {
-    const item = await this.itemRepository.findOne({
-      where: { id },
-      relations: { appointment: true, shiftDisruption: true },
-    });
-    if (!item || (facilityId && item.shiftDisruption.facilityId !== facilityId)) {
-      throw new NotFoundException('Không tìm thấy lịch bị ảnh hưởng');
-    }
-    return item;
-  }
-
   private assertPending(item: AppointmentDisruptionItem) {
     if (item.resolutionStatus !== AppointmentDisruptionResolutionStatus.PENDING) {
       throw new BadRequestException('Lịch bị ảnh hưởng này đã được chọn phương án xử lý');
+    }
+  }
+
+  private assertCancellable(item: AppointmentDisruptionItem) {
+    const cancellableStatuses = [
+      AppointmentDisruptionResolutionStatus.PENDING,
+      AppointmentDisruptionResolutionStatus.REFUND_PENDING,
+    ];
+    if (!cancellableStatuses.includes(item.resolutionStatus)) {
+      throw new BadRequestException('Lịch bị ảnh hưởng này đã được xử lý');
     }
   }
 
@@ -387,8 +342,7 @@ export class AppointmentDisruptionsService {
         LEFT JOIN roles role ON role.id = staffRole.role_id
         LEFT JOIN facilities facility ON facility.id = ?
         WHERE staff.status = 'active'
-          AND (role.name = 'super_admin'
-            OR (staff.facility_id = ? AND role.name = 'admin')
+          AND ((staff.facility_id = ? AND role.name = 'admin')
             OR staff.id = facility.owner_id)
       `,
       [disruption.facilityId, disruption.facilityId],

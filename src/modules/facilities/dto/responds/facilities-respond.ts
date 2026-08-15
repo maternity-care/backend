@@ -73,6 +73,9 @@ export class FacilityResponseDto {
   @ApiPropertyOptional({ nullable: true })
   ward: string | null;
 
+  @ApiPropertyOptional({ type: Number, nullable: true, default: 1 })
+  floorCount: number | null;
+
   @ApiProperty()
   latitude: string;
 
@@ -126,32 +129,6 @@ export class FacilityResponseDto {
 
   @ApiPropertyOptional({ type: [FacilityOperatingHourGroupResponseDto] })
   operatingHourGroups?: FacilityOperatingHourGroupResponseDto[];
-}
-
-export class FacilityLookupResponseDto {
-  @ApiProperty()
-  id: string;
-
-  @ApiProperty()
-  name: string;
-
-  @ApiProperty()
-  code: string;
-
-  @ApiProperty()
-  address: string;
-
-  @ApiPropertyOptional({ nullable: true })
-  province: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  ward: string | null;
-
-  @ApiProperty({ enum: FacilityStatus })
-  status: FacilityStatus;
-
-  @ApiPropertyOptional()
-  ownerName?: string;
 }
 
 export class FacilityPaginatedResponseDto extends PaginationMetaResponseDto {

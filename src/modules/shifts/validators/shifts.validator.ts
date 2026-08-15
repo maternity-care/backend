@@ -15,12 +15,14 @@ import {
   throwIfConflicted,
   validateFacilityHours,
   validateSchedule,
+  validateShiftCreateWeek,
   validateStatusDetails,
   workingDayOf,
 } from '../helpers/shifts.helper';
 import {
   SHIFTS_REPOSITORY,
   IShiftsRepository,
+  ShiftAssigneeDetails,
 } from '../interfaces/shifts-repository.interface';
 import { getShiftRolePolicy, roleRequiresRoom } from '../helpers/shift-role-policy.helper';
 
@@ -30,6 +32,18 @@ export interface PreparedDoctorShiftInput {
   slotId: string | null;
   startTime: string;
   endTime: string;
+}
+
+type OperatingHoursResult = Awaited<ReturnType<FacilitiesService['getOperatingHours']>>;
+type RoomResult = Awaited<ReturnType<RoomsService['findById']>>;
+
+interface BulkValidationCache {
+  facilities: Map<string, Promise<Facility>>;
+  assignees: Map<string, Promise<ShiftAssigneeDetails | null>>;
+  doctorStaffIds: Map<string, Promise<string | null>>;
+  rooms: Map<string, Promise<RoomResult>>;
+  slots: Map<string, ReturnType<IShiftsRepository['findShiftSlotById']>>;
+  operatingHours: Map<string, Promise<OperatingHoursResult>>;
 }
 
 /** Gom toàn bộ validation nghiệp vụ của shifts để service chính chỉ còn điều phối use case. */
@@ -59,16 +73,54 @@ export class ShiftsValidator {
   }
 
   /** Validate candidate tao ca nhung chua check conflict, dung cho preview auto-generate de tra conflict details. */
-  async prepareForCreate(dto: CreateDoctorShiftDto): Promise<PreparedDoctorShiftInput> {
-    const { facility, staffId, roleName } = await this.validateReferences(dto, dto.facilityId, dto.roomId);
-    const timing = await this.resolveShiftTiming(dto);
+  async prepareForCreate(
+    dto: CreateDoctorShiftDto,
+    cache?: BulkValidationCache,
+  ): Promise<PreparedDoctorShiftInput> {
+    validateShiftCreateWeek(dto.shiftDate);
+    const { facility, staffId, roleName } = await this.validateReferences(dto, dto.facilityId, dto.roomId, cache);
+    const timing = await this.resolveShiftTiming(dto, true, undefined, cache);
 
     validateSchedule(dto.shiftDate, timing.startTime, timing.endTime, true);
     validateStatusDetails(dto.status, dto.roomId);
     this.validateRoomPolicy(roleName, dto.status, dto.roomId);
-    await this.validateFacilityOperatingHours(facility.id, dto.shiftDate, timing.startTime, timing.endTime, dto.status);
+    await this.validateFacilityOperatingHours(
+      facility.id,
+      dto.shiftDate,
+      timing.startTime,
+      timing.endTime,
+      dto.status,
+      cache,
+    );
 
     return { staffId, roleName, ...timing };
+  }
+
+  /** Chuan hoa nhieu candidate va tai moi reference chung chi mot lan trong pham vi request. */
+  async prepareManyForCreate(
+    dtos: CreateDoctorShiftDto[],
+  ): Promise<PromiseSettledResult<PreparedDoctorShiftInput>[]> {
+    const cache: BulkValidationCache = {
+      facilities: new Map(),
+      assignees: new Map(),
+      doctorStaffIds: new Map(),
+      rooms: new Map(),
+      slots: new Map(),
+      operatingHours: new Map(),
+    };
+    const results: PromiseSettledResult<PreparedDoctorShiftInput>[] = [];
+
+    // Chay tuan tu de khong day hang loat truy van reference vao pool DB cung luc.
+    // Cache van dam bao moi facility/staff/room/slot chi duoc doc mot lan khi thanh cong.
+    for (const dto of dtos) {
+      try {
+        results.push({ status: 'fulfilled', value: await this.prepareForCreate(dto, cache) });
+      } catch (reason) {
+        results.push({ status: 'rejected', reason });
+      }
+    }
+
+    return results;
   }
 
   /** Validate dữ liệu cập nhật ca, gồm cả trường hợp đổi slotId hoặc đổi giờ thủ công. */
@@ -143,11 +195,21 @@ export class ShiftsValidator {
     input: { doctorId?: string; staffId?: string; roleId?: string | null },
     facilityId: string,
     roomId?: string | null,
+    cache?: BulkValidationCache,
   ): Promise<{ facility: Facility; staffId: string; roleName: string | null }> {
-    const facility = await this.ensureActiveFacility(facilityId);
+    const facility = await this.resolveCached(
+      cache?.facilities,
+      facilityId,
+      () => this.ensureActiveFacility(facilityId),
+    );
 
     if (input.staffId) {
-      const assignee = await this.repository.findShiftAssignee(input.staffId, facilityId, input.roleId);
+      const assigneeKey = `${facilityId}:${input.staffId}:${input.roleId ?? ''}`;
+      const assignee = await this.resolveCached(
+        cache?.assignees,
+        assigneeKey,
+        () => this.repository.findShiftAssignee(input.staffId as string, facilityId, input.roleId),
+      );
       if (!assignee) {
         throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.STAFF_ROLE_INVALID);
       }
@@ -156,7 +218,7 @@ export class ShiftsValidator {
       }
 
       if (roomId) {
-        const room = await this.roomsService.findById(roomId);
+        const room = await this.resolveCached(cache?.rooms, roomId, () => this.roomsService.findById(roomId));
         if (room.facilityId !== facilityId || room.status !== ActiveStatus.ACTIVE) {
           throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.ROOM_INVALID);
         }
@@ -172,15 +234,20 @@ export class ShiftsValidator {
     const repository = this.repository as IShiftsRepository & {
       findDoctorStaffId?: (doctorId: string, facilityId?: string) => Promise<string | null>;
     };
-    const staffId = repository.findDoctorStaffId
-      ? await repository.findDoctorStaffId(input.doctorId, facilityId)
-      : await this.resolveStaffIdWithLegacyRepository(input.doctorId, facilityId);
+    const doctorStaffKey = `${facilityId}:${input.doctorId}`;
+    const staffId = await this.resolveCached(
+      cache?.doctorStaffIds,
+      doctorStaffKey,
+      () => repository.findDoctorStaffId
+        ? repository.findDoctorStaffId(input.doctorId as string, facilityId)
+        : this.resolveStaffIdWithLegacyRepository(input.doctorId as string, facilityId),
+    );
     if (!staffId) {
       throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.DOCTOR_NOT_ASSIGNED);
     }
 
     if (roomId) {
-      const room = await this.roomsService.findById(roomId);
+      const room = await this.resolveCached(cache?.rooms, roomId, () => this.roomsService.findById(roomId));
       if (room.facilityId !== facilityId || room.status !== ActiveStatus.ACTIVE) {
         throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.ROOM_INVALID);
       }
@@ -206,6 +273,7 @@ export class ShiftsValidator {
     input: { slotId?: string | null; facilityId: string; shiftDate?: string; startTime?: string; endTime?: string },
     requireTimes = true,
     options?: { slotWasProvided?: boolean; timeWasProvided?: boolean },
+    cache?: BulkValidationCache,
   ): Promise<{ slotId: string | null; startTime: string; endTime: string }> {
     const slotWasProvided = options?.slotWasProvided ?? Boolean(input.slotId);
     const timeWasProvided = options?.timeWasProvided ?? Boolean(input.startTime || input.endTime);
@@ -215,7 +283,11 @@ export class ShiftsValidator {
     }
 
     if (input.slotId) {
-      const slot = await this.repository.findShiftSlotById(input.slotId);
+      const slot = await this.resolveCached(
+        cache?.slots,
+        input.slotId,
+        () => this.repository.findShiftSlotById(input.slotId as string),
+      );
       if (!slot || slot.status !== ActiveStatus.ACTIVE) {
         throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.SLOT_INACTIVE_OR_NOT_FOUND);
       }
@@ -254,10 +326,15 @@ export class ShiftsValidator {
     startTime: string,
     endTime: string,
     status: DoctorShiftStatus,
+    cache?: BulkValidationCache,
   ): Promise<void> {
     if (status === DoctorShiftStatus.OFF || status === DoctorShiftStatus.CANCELLED) return;
 
-    const schedule = await this.facilitiesService.getOperatingHours(facilityId);
+    const schedule = await this.resolveCached(
+      cache?.operatingHours,
+      facilityId,
+      () => this.facilitiesService.getOperatingHours(facilityId),
+    );
     const dayOfWeek = workingDayOf(shiftDate);
     const nextDayOfWeek = workingDayOf(addDays(shiftDate, 1));
     const operatingHour = schedule.operatingHours.find(item => item.dayOfWeek === dayOfWeek);
@@ -272,6 +349,23 @@ export class ShiftsValidator {
       throw new ConflictException(RESPONSE_MESSAGES.SHIFTS.FACILITY_INACTIVE);
     }
     return facility;
+  }
+
+  private resolveCached<T>(
+    cache: Map<string, Promise<T>> | undefined,
+    key: string,
+    loader: () => Promise<T>,
+  ): Promise<T> {
+    if (!cache) return loader();
+    const existing = cache.get(key);
+    if (existing) return existing;
+    const pending = loader().catch(error => {
+      // Khong giu mot Promise bi reject trong cache; candidate sau co the thu lai loi ket noi tam thoi.
+      cache.delete(key);
+      throw error;
+    });
+    cache.set(key, pending);
+    return pending;
   }
 
 }

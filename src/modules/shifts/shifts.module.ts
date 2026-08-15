@@ -15,6 +15,10 @@ import { ShiftSlotsService } from './shift-slots.service';
 import { SHIFTS_REPOSITORY } from './interfaces/shifts-repository.interface';
 import { ShiftsRepository } from './repositories/shifts.repository';
 import { ShiftsValidator } from './validators/shifts.validator';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { MailModule } from '../mail/mail.module';
+import { ShiftChangeNotifierService } from './shift-change-notifier.service';
+import { WeeklyShiftUpdateService } from './weekly-shift-update.service';
 
 @Module({
   imports: [
@@ -28,12 +32,16 @@ import { ShiftsValidator } from './validators/shifts.validator';
     FacilitiesModule,
     RoomsModule,
     AppointmentDisruptionsModule,
+    NotificationsModule,
+    MailModule,
   ],
   controllers: [ShiftsController, ShiftSlotsController],
   providers: [
     ShiftsService,
     ShiftSlotsService,
     ShiftsValidator,
+    ShiftChangeNotifierService,
+    WeeklyShiftUpdateService,
     { provide: SHIFTS_REPOSITORY, useClass: ShiftsRepository },
   ],
   exports: [ShiftsService, ShiftSlotsService, SHIFTS_REPOSITORY],
