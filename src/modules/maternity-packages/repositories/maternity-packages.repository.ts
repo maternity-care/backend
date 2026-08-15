@@ -262,8 +262,8 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
   private async findFilteredPackageIds(filters?: SearchMaternityPackageDto): Promise<string[]> {
     const rows = await this.buildBasePackageQuery(filters)
       .select('pkg.id', 'id')
-      .orderBy('pkg.priorityLevel', 'DESC')
-      .addOrderBy('pkg.createdAt', 'DESC')
+      .orderBy('pkg.createdAt', 'DESC')
+      .addOrderBy('pkg.id', 'DESC')
       .getRawMany<{ id: string }>();
     return rows.map(row => String(row.id));
   }
@@ -286,8 +286,8 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
       .andWhere('service.status = :active', { active: ActiveStatus.ACTIVE })
       .select('pkg.id', 'id')
       .groupBy('pkg.id')
-      .orderBy('pkg.priorityLevel', 'DESC')
-      .addOrderBy('pkg.createdAt', 'DESC')
+      .orderBy('pkg.createdAt', 'DESC')
+      .addOrderBy('pkg.id', 'DESC')
       .getRawMany<{ id: string }>();
 
     return rows.map(row => String(row.id));
@@ -303,8 +303,8 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
 
     const query = this.buildDetailsQuery()
       .where('pkg.id IN (:...ids)', { ids })
-      .orderBy('pkg.priorityLevel', 'DESC')
-      .addOrderBy('pkg.createdAt', 'DESC')
+      .orderBy('pkg.createdAt', 'DESC')
+      .addOrderBy('pkg.id', 'DESC')
       .addOrderBy('packageStage.sortOrder', 'ASC')
       .addOrderBy('packageStage.id', 'ASC')
       .addOrderBy('packageItem.sortOrder', 'ASC')
@@ -340,6 +340,10 @@ export class MaternityPackagesRepository implements IMaternityPackagesRepository
 
     if (filters?.status) {
       query.andWhere('pkg.status = :status', { status: filters.status });
+    }
+
+    if (filters?.packageType) {
+      query.andWhere('pkg.packageType = :packageType', { packageType: filters.packageType });
     }
 
     if (filters?.facilityId) {

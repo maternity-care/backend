@@ -22,6 +22,7 @@ import { MaternityPackageStatus } from '../../../../common/constants/status.enum
 import { trimText, trimValue } from '../../../../common/helpers/dto-transform.helper';
 import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
 import { MONEY_PATTERN } from '../../../services/dto/requests/create-service.dto';
+import { MATERNITY_PACKAGE_CONSTANT } from '../../../../common/constants/maternity-package.constant';
 
 export enum MaternityPackageType {
   QUANTITY = 'quantity',
@@ -41,33 +42,33 @@ function parseBooleanInput(value: unknown): unknown {
 }
 
 export class MaternityPackageServiceInputDto {
-  @ApiPropertyOptional({ example: '5', description: 'ID cua bang services; backend se tu tao facility_services neu can' })
+  @ApiPropertyOptional({ example: '5', description: 'Mã dịch vụ trong danh mục; backend tự tạo cấu hình dịch vụ tại cơ sở khi cần' })
   @ValidateIf((item: MaternityPackageServiceInputDto) => !item.facilityServiceId)
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: MATERNITY_PACKAGE_CONSTANT.SERVICE_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: MATERNITY_PACKAGE_CONSTANT.SERVICE_ID_INVALID })
   serviceId?: string;
 
-  @ApiPropertyOptional({ example: '3', description: 'ID cua bang facility_services; giu de tuong thich payload cu' })
+  @ApiPropertyOptional({ example: '3', description: 'Mã cấu hình dịch vụ tại cơ sở, giữ để tương thích payload cũ' })
   @ValidateIf((item: MaternityPackageServiceInputDto) => !item.serviceId)
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: MATERNITY_PACKAGE_CONSTANT.FACILITY_SERVICE_ID_INVALID })
   facilityServiceId?: string;
 
   @ApiProperty({ example: 2, minimum: 1, maximum: 100 })
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
+  @IsInt({ message: MATERNITY_PACKAGE_CONSTANT.INCLUDED_QUANTITY_INVALID })
+  @Min(1, { message: MATERNITY_PACKAGE_CONSTANT.INCLUDED_QUANTITY_INVALID })
+  @Max(100, { message: MATERNITY_PACKAGE_CONSTANT.INCLUDED_QUANTITY_INVALID })
   includedQuantity: number;
 
   @ApiProperty({ example: true })
   @Transform(({ value }) => parseBooleanInput(value))
-  @IsBoolean()
+  @IsBoolean({ message: MATERNITY_PACKAGE_CONSTANT.SERVICE_CLASSIFICATION_INVALID })
   isRequired: boolean;
 
   @ApiProperty({ example: false })
   @Transform(({ value }) => parseBooleanInput(value))
-  @IsBoolean()
+  @IsBoolean({ message: MATERNITY_PACKAGE_CONSTANT.SERVICE_CLASSIFICATION_INVALID })
   isOptional: boolean;
 
   @ApiPropertyOptional({
@@ -78,19 +79,19 @@ export class MaternityPackageServiceInputDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(1000)
+  @IsInt({ message: MATERNITY_PACKAGE_CONSTANT.SORT_ORDER_INVALID })
+  @Min(0, { message: MATERNITY_PACKAGE_CONSTANT.SORT_ORDER_INVALID })
+  @Max(1000, { message: MATERNITY_PACKAGE_CONSTANT.SORT_ORDER_INVALID })
   sortOrder?: number;
 }
 
 export class MaternityPackageStageInputDto {
   @ApiProperty({ example: 'Tuần 12 - 14' })
   @Transform(({ value }) => trimText(value))
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(2)
-  @MaxLength(255)
+  @IsString({ message: MATERNITY_PACKAGE_CONSTANT.STAGE_NAME_INVALID })
+  @IsNotEmpty({ message: MATERNITY_PACKAGE_CONSTANT.STAGE_NAME_INVALID })
+  @MinLength(2, { message: MATERNITY_PACKAGE_CONSTANT.STAGE_NAME_INVALID })
+  @MaxLength(255, { message: MATERNITY_PACKAGE_CONSTANT.STAGE_NAME_INVALID })
   name: string;
 
   @ApiPropertyOptional({
@@ -99,23 +100,23 @@ export class MaternityPackageStageInputDto {
     default: MaternityPackageStageType.PREGNANCY_WEEK,
   })
   @IsOptional()
-  @IsEnum(MaternityPackageStageType)
+  @IsEnum(MaternityPackageStageType, { message: MATERNITY_PACKAGE_CONSTANT.STAGE_TYPE_INVALID })
   stageType?: MaternityPackageStageType;
 
   @ApiPropertyOptional({ example: 12, minimum: 1, maximum: 45, nullable: true })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(45)
+  @IsInt({ message: MATERNITY_PACKAGE_CONSTANT.STAGE_WEEK_INVALID })
+  @Min(1, { message: MATERNITY_PACKAGE_CONSTANT.STAGE_WEEK_INVALID })
+  @Max(45, { message: MATERNITY_PACKAGE_CONSTANT.STAGE_WEEK_INVALID })
   weekFrom?: number | null;
 
   @ApiPropertyOptional({ example: 14, minimum: 1, maximum: 45, nullable: true })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(45)
+  @IsInt({ message: MATERNITY_PACKAGE_CONSTANT.STAGE_WEEK_INVALID })
+  @Min(1, { message: MATERNITY_PACKAGE_CONSTANT.STAGE_WEEK_INVALID })
+  @Max(45, { message: MATERNITY_PACKAGE_CONSTANT.STAGE_WEEK_INVALID })
   weekTo?: number | null;
 
   @ApiPropertyOptional({
@@ -124,8 +125,8 @@ export class MaternityPackageStageInputDto {
   })
   @IsOptional()
   @Transform(({ value }) => trimText(value))
-  @IsString()
-  @MaxLength(3000)
+  @IsString({ message: MATERNITY_PACKAGE_CONSTANT.STAGE_GOAL_TOO_LONG })
+  @MaxLength(3000, { message: MATERNITY_PACKAGE_CONSTANT.STAGE_GOAL_TOO_LONG })
   goal?: string | null;
 
   @ApiPropertyOptional({
@@ -136,17 +137,17 @@ export class MaternityPackageStageInputDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(1000)
+  @IsInt({ message: MATERNITY_PACKAGE_CONSTANT.SORT_ORDER_INVALID })
+  @Min(0, { message: MATERNITY_PACKAGE_CONSTANT.SORT_ORDER_INVALID })
+  @Max(1000, { message: MATERNITY_PACKAGE_CONSTANT.SORT_ORDER_INVALID })
   sortOrder?: number;
 
   @ApiProperty({
     type: [MaternityPackageServiceInputDto],
-    description: 'Danh sach dich vu thuoc moc/lo trinh nay; uu tien gui serviceId, backend se tu tao facility_services neu can',
+    description: 'Danh sách dịch vụ thuộc mốc; ưu tiên gửi mã dịch vụ trong danh mục, backend tự tạo cấu hình tại cơ sở khi cần',
   })
-  @IsArray()
-  @ArrayNotEmpty()
+  @IsArray({ message: MATERNITY_PACKAGE_CONSTANT.STAGE_SERVICES_REQUIRED })
+  @ArrayNotEmpty({ message: MATERNITY_PACKAGE_CONSTANT.STAGE_SERVICES_REQUIRED })
   @ValidateNested({ each: true })
   @Type(() => MaternityPackageServiceInputDto)
   services: MaternityPackageServiceInputDto[];
@@ -154,16 +155,16 @@ export class MaternityPackageStageInputDto {
 
 export class CreateMaternityPackageDto {
   @ApiProperty({ example: '1' })
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: MATERNITY_PACKAGE_CONSTANT.FACILITY_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: MATERNITY_PACKAGE_CONSTANT.FACILITY_ID_INVALID })
   facilityId: string;
 
   @ApiProperty({ example: 'Gói thai sản cơ bản' })
   @Transform(({ value }) => trimText(value))
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(2)
-  @MaxLength(200)
+  @IsString({ message: MATERNITY_PACKAGE_CONSTANT.NAME_INVALID })
+  @IsNotEmpty({ message: MATERNITY_PACKAGE_CONSTANT.NAME_INVALID })
+  @MinLength(2, { message: MATERNITY_PACKAGE_CONSTANT.NAME_INVALID })
+  @MaxLength(200, { message: MATERNITY_PACKAGE_CONSTANT.NAME_INVALID })
   name: string;
 
   @ApiPropertyOptional({
@@ -172,8 +173,8 @@ export class CreateMaternityPackageDto {
   })
   @IsOptional()
   @Transform(({ value }) => trimText(value))
-  @IsString()
-  @MaxLength(3000)
+  @IsString({ message: MATERNITY_PACKAGE_CONSTANT.DESCRIPTION_TOO_LONG })
+  @MaxLength(3000, { message: MATERNITY_PACKAGE_CONSTANT.DESCRIPTION_TOO_LONG })
   description?: string;
 
   @ApiPropertyOptional({
@@ -183,45 +184,47 @@ export class CreateMaternityPackageDto {
     description: 'quantity = gói theo số lượt; schedule = gói theo lịch trình tuần thai/sau sinh',
   })
   @IsOptional()
-  @IsEnum(MaternityPackageType)
+  @IsEnum(MaternityPackageType, { message: MATERNITY_PACKAGE_CONSTANT.TYPE_INVALID })
   packageType?: MaternityPackageType;
 
   @ApiProperty({ example: '900000.00' })
   @Transform(({ value }) => trimValue(value))
-  @IsString()
+  @IsString({ message: MATERNITY_PACKAGE_CONSTANT.PRICE_INVALID })
   @Matches(MONEY_PATTERN, {
-    message: 'price phải là số tiền không âm, tối đa 13 chữ số và 2 số thập phân',
+    message: MATERNITY_PACKAGE_CONSTANT.PRICE_INVALID,
   })
   price: string;
 
   @ApiPropertyOptional({ example: 90, minimum: 1, maximum: 2000, nullable: true })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(2000)
+  @IsInt({ message: MATERNITY_PACKAGE_CONSTANT.DURATION_INVALID })
+  @Min(1, { message: MATERNITY_PACKAGE_CONSTANT.DURATION_INVALID })
+  @Max(2000, { message: MATERNITY_PACKAGE_CONSTANT.DURATION_INVALID })
   durationDays?: number;
 
   @ApiPropertyOptional({ example: 0, minimum: 0, maximum: 100, default: 0 })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(100)
+  @IsInt({ message: MATERNITY_PACKAGE_CONSTANT.PRIORITY_INVALID })
+  @Min(0, { message: MATERNITY_PACKAGE_CONSTANT.PRIORITY_INVALID })
+  @Max(100, { message: MATERNITY_PACKAGE_CONSTANT.PRIORITY_INVALID })
   priorityLevel?: number;
 
   @ApiProperty({ enum: MaternityPackageStatus, example: MaternityPackageStatus.DRAFT })
-  @IsEnum(MaternityPackageStatus)
+  @IsEnum(MaternityPackageStatus, { message: MATERNITY_PACKAGE_CONSTANT.STATUS_INVALID })
   status: MaternityPackageStatus;
 
   @ApiPropertyOptional({
     type: [MaternityPackageServiceInputDto],
-    description: 'Dung cho packageType = quantity. Uu tien gui serviceId; backend se tu tao facility_services neu can',
+    description: 'Dùng cho gói theo số lượt. Ưu tiên gửi mã dịch vụ; backend tự tạo cấu hình dịch vụ tại cơ sở khi cần.',
   })
   @IsOptional()
-  @IsArray()
-  @ArrayNotEmpty()
-  @ArrayUnique((item: MaternityPackageServiceInputDto) => item.serviceId ?? item.facilityServiceId)
+  @IsArray({ message: MATERNITY_PACKAGE_CONSTANT.QUANTITY_SERVICES_REQUIRED })
+  @ArrayNotEmpty({ message: MATERNITY_PACKAGE_CONSTANT.QUANTITY_SERVICES_REQUIRED })
+  @ArrayUnique((item: MaternityPackageServiceInputDto) => item.serviceId ?? item.facilityServiceId, {
+    message: MATERNITY_PACKAGE_CONSTANT.PACKAGE_ITEM_DUPLICATED,
+  })
   @ValidateNested({ each: true })
   @Type(() => MaternityPackageServiceInputDto)
   services?: MaternityPackageServiceInputDto[];
@@ -231,8 +234,8 @@ export class CreateMaternityPackageDto {
     description: 'Dùng cho packageType = schedule. Mỗi stage là một mốc tuần thai/sau sinh/custom và chứa danh sách dịch vụ riêng.',
   })
   @IsOptional()
-  @IsArray()
-  @ArrayNotEmpty()
+  @IsArray({ message: MATERNITY_PACKAGE_CONSTANT.SCHEDULE_STAGES_REQUIRED })
+  @ArrayNotEmpty({ message: MATERNITY_PACKAGE_CONSTANT.SCHEDULE_STAGES_REQUIRED })
   @ValidateNested({ each: true })
   @Type(() => MaternityPackageStageInputDto)
   stages?: MaternityPackageStageInputDto[];
@@ -246,11 +249,13 @@ export class CreateQuantityMaternityPackageDto extends OmitType(CreateMaternityP
 ] as const) {
   @ApiProperty({
     type: [MaternityPackageServiceInputDto],
-    description: 'Danh sach dich vu trong goi theo so luot; uu tien dung serviceId cua catalog global',
+    description: 'Danh sách dịch vụ trong gói theo số lượt; ưu tiên dùng mã dịch vụ trong danh mục chung',
   })
-  @IsArray()
-  @ArrayNotEmpty()
-  @ArrayUnique((item: MaternityPackageServiceInputDto) => item.serviceId ?? item.facilityServiceId)
+  @IsArray({ message: MATERNITY_PACKAGE_CONSTANT.QUANTITY_SERVICES_REQUIRED })
+  @ArrayNotEmpty({ message: MATERNITY_PACKAGE_CONSTANT.QUANTITY_SERVICES_REQUIRED })
+  @ArrayUnique((item: MaternityPackageServiceInputDto) => item.serviceId ?? item.facilityServiceId, {
+    message: MATERNITY_PACKAGE_CONSTANT.PACKAGE_ITEM_DUPLICATED,
+  })
   @ValidateNested({ each: true })
   @Type(() => MaternityPackageServiceInputDto)
   services: MaternityPackageServiceInputDto[];
@@ -264,10 +269,10 @@ export class CreateScheduleMaternityPackageDto extends OmitType(CreateMaternityP
 ] as const) {
   @ApiProperty({
     type: [MaternityPackageStageInputDto],
-    description: 'Danh sach moc/lộ trinh cua goi; moi stage chua services[] rieng',
+    description: 'Danh sách mốc của gói; mỗi mốc chứa danh sách dịch vụ riêng',
   })
-  @IsArray()
-  @ArrayNotEmpty()
+  @IsArray({ message: MATERNITY_PACKAGE_CONSTANT.SCHEDULE_STAGES_REQUIRED })
+  @ArrayNotEmpty({ message: MATERNITY_PACKAGE_CONSTANT.SCHEDULE_STAGES_REQUIRED })
   @ValidateNested({ each: true })
   @Type(() => MaternityPackageStageInputDto)
   stages: MaternityPackageStageInputDto[];

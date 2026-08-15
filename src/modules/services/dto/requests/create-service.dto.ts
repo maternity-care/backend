@@ -37,8 +37,8 @@ export const MONEY_PATTERN = /^(0|[1-9]\d{0,12})(\.\d{1,2})?$/;
 // Không có serviceId ở đây vì serviceId sẽ được sinh sau khi tạo service gốc.
 export class CreateServiceFacilityAssignmentDto {
   @ApiProperty({ example: '1', description: 'ID cơ sở sẽ cung cấp service vừa tạo' })
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: SERVICE_CONSTANT.FACILITY_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: SERVICE_CONSTANT.FACILITY_ID_INVALID })
   facilityId: string;
 
   @ApiPropertyOptional({
@@ -47,7 +47,7 @@ export class CreateServiceFacilityAssignmentDto {
   })
   @IsOptional()
   @Transform(({ value }) => trimValue(value))
-  @IsString()
+  @IsString({ message: SERVICE_CONSTANT.PRICE_INVALID })
   @Matches(MONEY_PATTERN, {
     message: SERVICE_CONSTANT.PRICE_INVALID,
   })
@@ -61,36 +61,36 @@ export class CreateServiceFacilityAssignmentDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(5)
-  @Max(480)
+  @IsInt({ message: SERVICE_CONSTANT.DURATION_INVALID })
+  @Min(5, { message: SERVICE_CONSTANT.DURATION_INVALID })
+  @Max(480, { message: SERVICE_CONSTANT.DURATION_INVALID })
   durationMinutes?: number;
 
   @ApiPropertyOptional({ enum: ActiveStatus, example: ActiveStatus.ACTIVE, default: ActiveStatus.ACTIVE })
   @IsOptional()
-  @IsEnum(ActiveStatus)
+  @IsEnum(ActiveStatus, { message: SERVICE_CONSTANT.STATUS_INVALID })
   status?: ActiveStatus;
 }
 
 export class CreateServiceDto {
   @ApiProperty({ example: 'Siêu âm thai 2D' })
   @Transform(({ value }) => trimText(value))
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(2)
-  @MaxLength(200)
+  @IsString({ message: SERVICE_CONSTANT.NAME_INVALID })
+  @IsNotEmpty({ message: SERVICE_CONSTANT.NAME_INVALID })
+  @MinLength(2, { message: SERVICE_CONSTANT.NAME_INVALID })
+  @MaxLength(200, { message: SERVICE_CONSTANT.NAME_INVALID })
   name: string;
 
   @ApiPropertyOptional({ example: 'Dịch vụ siêu âm thai cơ bản', nullable: true })
   @IsOptional()
   @Transform(({ value }) => trimText(value))
-  @IsString()
-  @MaxLength(2000)
+  @IsString({ message: SERVICE_CONSTANT.DESCRIPTION_INVALID })
+  @MaxLength(2000, { message: SERVICE_CONSTANT.DESCRIPTION_INVALID })
   description?: string;
 
   @ApiProperty({ example: '1', description: 'ID của bảng service_types' })
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: SERVICE_CONSTANT.TYPE_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: SERVICE_CONSTANT.TYPE_ID_INVALID })
   serviceTypeId: string;
 
   @ApiPropertyOptional({
@@ -100,19 +100,19 @@ export class CreateServiceDto {
     description: 'standalone = chỉ bán lẻ, package_only = chỉ nằm trong gói, both = cả hai',
   })
   @IsOptional()
-  @IsEnum(ServiceSaleMode)
+  @IsEnum(ServiceSaleMode, { message: SERVICE_CONSTANT.SALE_MODE_INVALID })
   saleMode?: ServiceSaleMode;
 
   @ApiProperty({ example: 30, minimum: 5, maximum: 480 })
   @Type(() => Number)
-  @IsInt()
-  @Min(5)
-  @Max(480)
+  @IsInt({ message: SERVICE_CONSTANT.DURATION_INVALID })
+  @Min(5, { message: SERVICE_CONSTANT.DURATION_INVALID })
+  @Max(480, { message: SERVICE_CONSTANT.DURATION_INVALID })
   defaultDurationMinutes: number;
 
   @ApiProperty({ example: '300000.00' })
   @Transform(({ value }) => trimValue(value))
-  @IsString()
+  @IsString({ message: SERVICE_CONSTANT.PRICE_INVALID })
   @Matches(MONEY_PATTERN, {
     message: SERVICE_CONSTANT.PRICE_INVALID,
   })
@@ -121,11 +121,11 @@ export class CreateServiceDto {
   @ApiPropertyOptional({ example: true, default: false })
   @IsOptional()
   @Type(() => Boolean)
-  @IsBoolean()
+  @IsBoolean({ message: SERVICE_CONSTANT.DOCTOR_REQUIREMENT_INVALID })
   requiresDoctorWarning?: boolean;
 
   @ApiProperty({ enum: ActiveStatus, example: ActiveStatus.ACTIVE })
-  @IsEnum(ActiveStatus)
+  @IsEnum(ActiveStatus, { message: SERVICE_CONSTANT.STATUS_INVALID })
   status: ActiveStatus;
 
   @ApiPropertyOptional({
@@ -133,9 +133,11 @@ export class CreateServiceDto {
     description: 'Danh sách cơ sở muốn gán service ngay sau khi tạo. Bỏ trống nếu chỉ muốn tạo dịch vụ gốc, chưa assign cơ sở.',
   })
   @IsOptional()
-  @IsArray()
-  @ArrayNotEmpty()
-  @ArrayUnique((item: CreateServiceFacilityAssignmentDto) => item.facilityId)
+  @IsArray({ message: SERVICE_CONSTANT.FACILITY_ASSIGNMENTS_INVALID })
+  @ArrayNotEmpty({ message: SERVICE_CONSTANT.FACILITY_ASSIGNMENTS_INVALID })
+  @ArrayUnique((item: CreateServiceFacilityAssignmentDto) => item.facilityId, {
+    message: SERVICE_CONSTANT.FACILITY_ASSIGNMENTS_INVALID,
+  })
   @ValidateNested({ each: true })
   @Type(() => CreateServiceFacilityAssignmentDto)
   facilityAssignments?: CreateServiceFacilityAssignmentDto[];

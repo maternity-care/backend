@@ -33,6 +33,7 @@ export class PackageServicesService {
     const pkg = await this.validatePackage(dto.packageId);
     await this.validateServiceReference(dto.facilityServiceId, pkg.facilityId);
     await this.ensureUniquePair(dto.packageId, dto.facilityServiceId);
+    this.validateClassification(dto.isRequired, dto.isOptional);
 
     const facilityIds = await this.resolveFacilityIds(dto, pkg.facilityId);
     const entity = this.repository.create({
@@ -52,6 +53,7 @@ export class PackageServicesService {
     const entities: PackageItem[] = [];
     const facilityIdsByFacilityServiceId = new Map<string, string[]>();
     for (const [index, item] of dto.services.entries()) {
+      this.validateClassification(item.isRequired, item.isOptional);
       await this.validateServiceReference(item.facilityServiceId, pkg.facilityId);
       await this.ensureUniquePair(dto.packageId, item.facilityServiceId);
       const facilityIds = await this.resolveFacilityIds(item, pkg.facilityId);
@@ -125,12 +127,13 @@ export class PackageServicesService {
       await this.ensureUniquePair(nextPackageId, nextFacilityServiceId, entity.id);
     }
 
+    const classification = this.resolveClassification(entity, dto);
+
     Object.assign(entity, {
       ...dto,
       packageId: nextPackageId,
       facilityServiceId: nextFacilityServiceId,
-      ...(dto.isRequired === undefined ? {} : { isRequired: dto.isRequired ? 1 : 0 }),
-      ...(dto.isOptional === undefined ? {} : { isOptional: dto.isOptional ? 1 : 0 }),
+      ...classification,
     });
 
     const pkg = await this.validatePackage(nextPackageId);
@@ -238,5 +241,31 @@ export class PackageServicesService {
       }
       ids.add(item.facilityServiceId);
     }
+  }
+
+  /** Một dịch vụ trong gói chỉ có thể thuộc đúng một loại: bắt buộc hoặc tùy chọn. */
+  private validateClassification(isRequired: boolean, isOptional: boolean): void {
+    if (isRequired === isOptional) {
+      throw new ConflictException(PACKAGE_SERVICE_CONSTANT.CLASSIFICATION_INVALID);
+    }
+  }
+
+  /** Giữ tương thích API cập nhật một phần và tự đảo giá trị còn lại của công tắc. */
+  private resolveClassification(
+    entity: PackageItem,
+    dto: UpdatePackageServiceDto,
+  ): Pick<PackageItem, 'isRequired' | 'isOptional'> {
+    const currentRequired = Boolean(entity.isRequired);
+    const currentOptional = Boolean(entity.isOptional);
+    const isRequired = dto.isRequired
+      ?? (dto.isOptional === undefined ? currentRequired : !dto.isOptional);
+    const isOptional = dto.isOptional
+      ?? (dto.isRequired === undefined ? currentOptional : !dto.isRequired);
+
+    this.validateClassification(isRequired, isOptional);
+    return {
+      isRequired: isRequired ? 1 : 0,
+      isOptional: isOptional ? 1 : 0,
+    };
   }
 }

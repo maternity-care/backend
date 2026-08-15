@@ -21,18 +21,18 @@ import { FACILITY_SERVICE_CONSTANT } from '../../../../common/constants/facility
 
 export class CreateFacilityServiceDto {
   @ApiProperty({ example: '1' })
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: FACILITY_SERVICE_CONSTANT.FACILITY_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: FACILITY_SERVICE_CONSTANT.FACILITY_ID_INVALID })
   facilityId: string;
 
   @ApiProperty({ example: '3' })
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: FACILITY_SERVICE_CONSTANT.SERVICE_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: FACILITY_SERVICE_CONSTANT.SERVICE_ID_INVALID })
   serviceId: string;
 
   @ApiProperty({ example: '280000.00' })
   @Transform(({ value }) => trimValue(value))
-  @IsString()
+  @IsString({ message: FACILITY_SERVICE_CONSTANT.PRICE_INVALID })
   @Matches(MONEY_PATTERN, {
     message: FACILITY_SERVICE_CONSTANT.PRICE_INVALID,
   })
@@ -40,20 +40,20 @@ export class CreateFacilityServiceDto {
 
   @ApiProperty({ example: 30, minimum: 5, maximum: 480 })
   @Type(() => Number)
-  @IsInt()
-  @Min(5)
-  @Max(480)
+  @IsInt({ message: FACILITY_SERVICE_CONSTANT.DURATION_INVALID })
+  @Min(5, { message: FACILITY_SERVICE_CONSTANT.DURATION_INVALID })
+  @Max(480, { message: FACILITY_SERVICE_CONSTANT.DURATION_INVALID })
   durationMinutes: number;
 
   @ApiProperty({ enum: ActiveStatus, example: ActiveStatus.ACTIVE })
-  @IsEnum(ActiveStatus)
+  @IsEnum(ActiveStatus, { message: FACILITY_SERVICE_CONSTANT.STATUS_INVALID })
   status: ActiveStatus;
 }
 
 export class BulkFacilityServiceItemDto {
   @ApiProperty({ example: '3' })
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: FACILITY_SERVICE_CONSTANT.SERVICE_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: FACILITY_SERVICE_CONSTANT.SERVICE_ID_INVALID })
   serviceId: string;
 
   @ApiProperty({
@@ -63,7 +63,7 @@ export class BulkFacilityServiceItemDto {
   })
   @IsOptional()
   @Transform(({ value }) => trimValue(value))
-  @IsString()
+  @IsString({ message: FACILITY_SERVICE_CONSTANT.PRICE_INVALID })
   @Matches(MONEY_PATTERN, {
     message: FACILITY_SERVICE_CONSTANT.PRICE_INVALID,
   })
@@ -78,27 +78,29 @@ export class BulkFacilityServiceItemDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(5)
-  @Max(480)
+  @IsInt({ message: FACILITY_SERVICE_CONSTANT.DURATION_INVALID })
+  @Min(5, { message: FACILITY_SERVICE_CONSTANT.DURATION_INVALID })
+  @Max(480, { message: FACILITY_SERVICE_CONSTANT.DURATION_INVALID })
   durationMinutes?: number;
 
   @ApiProperty({ enum: ActiveStatus, example: ActiveStatus.ACTIVE, required: false })
   @IsOptional()
-  @IsEnum(ActiveStatus)
+  @IsEnum(ActiveStatus, { message: FACILITY_SERVICE_CONSTANT.STATUS_INVALID })
   status?: ActiveStatus;
 }
 
 export class BulkCreateFacilityServicesDto {
   @ApiProperty({ example: '1' })
-  @IsString()
-  @Matches(POSITIVE_ID_PATTERN)
+  @IsString({ message: FACILITY_SERVICE_CONSTANT.FACILITY_ID_INVALID })
+  @Matches(POSITIVE_ID_PATTERN, { message: FACILITY_SERVICE_CONSTANT.FACILITY_ID_INVALID })
   facilityId: string;
 
   @ApiProperty({ type: [BulkFacilityServiceItemDto], minItems: 1, maxItems: 100 })
-  @IsArray()
-  @ArrayNotEmpty()
-  @ArrayUnique((item: BulkFacilityServiceItemDto) => item.serviceId)
+  @IsArray({ message: FACILITY_SERVICE_CONSTANT.SERVICES_INVALID })
+  @ArrayNotEmpty({ message: FACILITY_SERVICE_CONSTANT.SERVICES_INVALID })
+  @ArrayUnique((item: BulkFacilityServiceItemDto) => item.serviceId, {
+    message: FACILITY_SERVICE_CONSTANT.SERVICES_INVALID,
+  })
   @ValidateNested({ each: true })
   @Type(() => BulkFacilityServiceItemDto)
   services: BulkFacilityServiceItemDto[];
