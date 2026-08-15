@@ -4,9 +4,9 @@ import { RESPONSE_MESSAGES } from '../../common/constants/response-message.const
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { UpdateProfileDto } from './dto/request/update-profile.dto';
 import { UserResponseDto } from './dto/response/user-response.dto';
 import { UsersService } from './users.service';
+import { UpdatePregnantUserDto } from './dto/request/update-pregnant-user.dto';
 
 @ApiTags('User - Profile')
 @ApiBearerAuth()
@@ -34,7 +34,7 @@ export class UsersController {
   @Patch('me')
   @ApiOperation({ summary: 'Update my profile' })
   @ApiResponse({ status: 200, type: UserResponseDto })
-  async updateMe(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateProfileDto) {
+  async updateMe(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdatePregnantUserDto) {
     const data = await this.usersService.updateProfile(user.id, dto);
     return { message: RESPONSE_MESSAGES.PROFILE_UPDATED, data };
   }

@@ -36,6 +36,9 @@ export class UsersRepository implements IUsersRepository {
   findById(id: string): Promise<User | null> {
     return this.repository.findOne({
       where: { id },
+      relations: {
+        pregnancyProfiles: true,
+      },
     });
   }
 

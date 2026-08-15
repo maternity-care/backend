@@ -12,6 +12,7 @@ import { RescheduleAppointmentDto } from './dto/requests/reschedule-appointment.
 import { SearchAppointmentsDto } from './dto/requests/search-appointment.dto';
 import { PermissionEnum } from 'src/common/constants/permission.enum';
 import { Permissions } from 'src/common/decorators/permissions.decorator';
+import { SearchProfileQueryDto } from '../pregnancy-profile/dto/request/search-pregnancy-profiles.dto';
 
 @ApiTags('Management - Appointments')
 @ApiBearerAuth()
@@ -30,6 +31,20 @@ export class ManagementAppointmentsController {
     return {
       message: RESPONSE_MESSAGES.APPOINTMENTS.GET_LIST_SUCCESS,
       data: await this.appointmentsService.findManagement(query, user.id, scopedFacilityId),
+    };
+  }
+
+  @Get('pregnancy-profile')
+  @Permissions(PermissionEnum.PREGNANCY_VIEW)
+  @ApiOperation({ summary: 'Get pregnancy profile of doctor' })
+  async getAllPregnancyProfileOfDoctor(
+    @Query() query: SearchProfileQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const doctorId = user.id;
+    return {
+      message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.GET_LIST_SUCCESS,
+      data: await this.appointmentsService.getPregnancyProfilesOfDoctor(doctorId, query),
     };
   }
 

@@ -1,3 +1,4 @@
+import { PregnancyProfile } from './../pregnancy-profile/entities/pregnancy-profile.entity';
 import {
   BadRequestException,
   ConflictException,
@@ -6,7 +7,11 @@ import {
 } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
-import { ActiveStatus, AppointmentStatus, DoctorShiftStatus } from '../../common/constants/status.enum';
+import {
+  ActiveStatus,
+  AppointmentStatus,
+  DoctorShiftStatus,
+} from '../../common/constants/status.enum';
 import { FacilityService } from '../facility-services/entities/facility-service.entity';
 import { DoctorShift } from '../shifts/entities/shift.entity';
 import { SchedulesService } from '../schedules/schedules.service';
@@ -16,6 +21,7 @@ import { CheckInAppointmentDto } from './dto/requests/check-in-appointment.dto';
 import { Appointment } from './entities/appointment.entity';
 import { RescheduleAppointmentDto } from './dto/requests/reschedule-appointment.dto';
 import { SearchAppointmentsDto } from './dto/requests/search-appointment.dto';
+import { SearchProfileQueryDto } from '../pregnancy-profile/dto/request/search-pregnancy-profiles.dto';
 
 const ACTIVE_APPOINTMENT_STATUSES = [
   AppointmentStatus.PENDING_PAYMENT,
@@ -45,9 +51,10 @@ function isPastDateTime(date: string, time: string) {
 }
 
 function toDateTimeParts(value: string | Date) {
-  const text = value instanceof Date
-    ? `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')} ${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}:${String(value.getSeconds()).padStart(2, '0')}`
-    : String(value);
+  const text =
+    value instanceof Date
+      ? `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')} ${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}:${String(value.getSeconds()).padStart(2, '0')}`
+      : String(value);
   const [date = '', rawTime = ''] = text.includes('T')
     ? [text.slice(0, 10), text.slice(11, 19)]
     : text.split(' ');
@@ -65,10 +72,17 @@ function overlaps(startA: string, endA: string, startB: string | Date, endB: str
     }
 
     const normalized = String(value);
-    return normalizeTime(normalized.includes('T') ? normalized.split('T')[1].slice(0, 8) : normalized.split(' ')[1] ?? normalized);
+    return normalizeTime(
+      normalized.includes('T')
+        ? normalized.split('T')[1].slice(0, 8)
+        : (normalized.split(' ')[1] ?? normalized),
+    );
   };
 
-  return timeToMinutes(startA) < timeToMinutes(toTime(endB)) && timeToMinutes(endA) > timeToMinutes(toTime(startB));
+  return (
+    timeToMinutes(startA) < timeToMinutes(toTime(endB)) &&
+    timeToMinutes(endA) > timeToMinutes(toTime(startB))
+  );
 }
 
 @Injectable()
@@ -110,7 +124,9 @@ export class AppointmentsService {
       ]);
 
       if (!facilityService) {
-        throw new BadRequestException(RESPONSE_MESSAGES.APPOINTMENTS.SERVICE_NOT_AVAILABLE_AT_FACILITY);
+        throw new BadRequestException(
+          RESPONSE_MESSAGES.APPOINTMENTS.SERVICE_NOT_AVAILABLE_AT_FACILITY,
+        );
       }
 
       if (!shift) {
@@ -207,15 +223,89 @@ export class AppointmentsService {
           appointmentScheduleDetails?.facilityName ??
           appointmentScheduleDetails?.facilityAddress ??
           null,
-        doctor: [appointmentScheduleDetails?.doctorTitle, appointmentScheduleDetails?.staffName]
-          .filter(Boolean)
-          .join(' ') || null,
+        doctor:
+          [appointmentScheduleDetails?.doctorTitle, appointmentScheduleDetails?.staffName]
+            .filter(Boolean)
+            .join(' ') || null,
         note: 'Lịch được tạo tự động sau khi đặt lịch khám.',
         type: 'checkup',
       });
 
       return savedAppointment;
     });
+  }
+
+  async getPregnancyProfilesOfDoctor(doctorId: string, query: SearchProfileQueryDto) {
+    const { patientId, name, code, phone, email, status, page = 1, limit = 20 } = query;
+
+    const queryBuilder = this.dataSource
+      .getRepository(PregnancyProfile)
+      .createQueryBuilder('pregnancyProfile')
+      .innerJoin(
+        'pregnancyProfile.appointments',
+        'appointment',
+        `
+        appointment.doctorId = :doctorId
+        AND appointment.status = :appointmentStatus
+        AND appointment.checkedInAt IS NOT NULL
+        AND appointment.checkedInAt < :now
+      `,
+        {
+          doctorId,
+          appointmentStatus: AppointmentStatus.COMPLETED,
+          now: new Date(),
+        },
+      )
+      .leftJoinAndSelect('pregnancyProfile.patient', 'patient')
+      .distinct(true);
+
+    if (patientId) {
+      queryBuilder.andWhere('pregnancyProfile.patientId = :patientId', {
+        patientId,
+      });
+    }
+
+    if (name?.trim()) {
+      queryBuilder.andWhere('LOWER(patient.name) LIKE LOWER(:name)', {
+        name: `%${name.trim()}%`,
+      });
+    }
+
+    if (code?.trim()) {
+      queryBuilder.andWhere('LOWER(pregnancyProfile.code) LIKE LOWER(:code)', {
+        code: `%${code.trim()}%`,
+      });
+    }
+
+    if (phone?.trim()) {
+      queryBuilder.andWhere('patient.phone LIKE :phone', {
+        phone: `%${phone.trim()}%`,
+      });
+    }
+
+    if (email?.trim()) {
+      queryBuilder.andWhere('LOWER(patient.email) LIKE LOWER(:email)', {
+        email: `%${email.trim()}%`,
+      });
+    }
+
+    if (status) {
+      queryBuilder.andWhere('pregnancyProfile.status = :profileStatus', {
+        profileStatus: status,
+      });
+    }
+
+    queryBuilder
+      .orderBy('pregnancyProfile.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [data, total] = await queryBuilder.getManyAndCount();
+
+    return {
+      data,
+      total,
+    };
   }
 
   async getAppointmentOfDoctorAndPregnancyProfile(doctorId: string, pregnancyProfileId: string) {
@@ -229,7 +319,11 @@ export class AppointmentsService {
       .getMany();
   }
 
-  async findManagement(query: SearchAppointmentsDto, actorId: string, scopedFacilityId?: string | null) {
+  async findManagement(
+    query: SearchAppointmentsDto,
+    actorId: string,
+    scopedFacilityId?: string | null,
+  ) {
     const qb = this.buildManagementQuery();
 
     if (scopedFacilityId) {
@@ -238,10 +332,13 @@ export class AppointmentsService {
       qb.andWhere('appointment.facility_id = :facilityId', { facilityId: query.facilityId });
     }
     if (query.doctorId) qb.andWhere('doctor.id = :doctorId', { doctorId: query.doctorId });
-    if (query.patientId) qb.andWhere('appointment.patient_id = :patientId', { patientId: query.patientId });
+    if (query.patientId)
+      qb.andWhere('appointment.patient_id = :patientId', { patientId: query.patientId });
     if (query.status) qb.andWhere('appointment.status = :status', { status: query.status });
-    if (query.dateFrom) qb.andWhere('DATE(appointment.scheduled_start) >= :dateFrom', { dateFrom: query.dateFrom });
-    if (query.dateTo) qb.andWhere('DATE(appointment.scheduled_start) <= :dateTo', { dateTo: query.dateTo });
+    if (query.dateFrom)
+      qb.andWhere('DATE(appointment.scheduled_start) >= :dateFrom', { dateFrom: query.dateFrom });
+    if (query.dateTo)
+      qb.andWhere('DATE(appointment.scheduled_start) <= :dateTo', { dateTo: query.dateTo });
     if (query.scope === 'mine') qb.andWhere('appointment.doctor_id = :actorId', { actorId });
     if (query.search?.trim()) {
       const keyword = `%${query.search.trim().toLowerCase()}%`;
@@ -269,8 +366,7 @@ export class AppointmentsService {
   }
 
   async findManagementById(id: string, scopedFacilityId?: string | null) {
-    const qb = this.buildManagementQuery()
-      .andWhere('appointment.id = :id', { id })
+    const qb = this.buildManagementQuery().andWhere('appointment.id = :id', { id });
     if (scopedFacilityId) {
       qb.andWhere('appointment.facility_id = :scopedFacilityId', { scopedFacilityId });
     }
@@ -285,7 +381,13 @@ export class AppointmentsService {
       const appointment = await manager.getRepository(Appointment).findOne({ where: { id } });
       if (!appointment) throw new NotFoundException(RESPONSE_MESSAGES.APPOINTMENTS.NOT_FOUND);
       this.assertAppointmentFacility(appointment, scopedFacilityId);
-      if ([AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW, AppointmentStatus.COMPLETED].includes(appointment.status)) {
+      if (
+        [
+          AppointmentStatus.CANCELLED,
+          AppointmentStatus.NO_SHOW,
+          AppointmentStatus.COMPLETED,
+        ].includes(appointment.status)
+      ) {
         throw new BadRequestException(RESPONSE_MESSAGES.APPOINTMENTS.CHECK_IN_STATUS_INVALID);
       }
 
@@ -297,7 +399,8 @@ export class AppointmentsService {
         .andWhere('profile.patient_id = :patientId', { patientId: appointment.patientId })
         .andWhere('profile.deleted_at IS NULL')
         .getRawOne<{ id: string }>();
-      if (!profile) throw new BadRequestException(RESPONSE_MESSAGES.APPOINTMENTS.PROFILE_NOT_BELONG_TO_PATIENT);
+      if (!profile)
+        throw new BadRequestException(RESPONSE_MESSAGES.APPOINTMENTS.PROFILE_NOT_BELONG_TO_PATIENT);
 
       if (dto.doctorId) {
         const shift = await this.findShiftForDoctor(
@@ -342,7 +445,15 @@ export class AppointmentsService {
         endTime,
         dto.shiftId,
       );
-      await this.ensureSlotFree(manager, appointment.facilityId, shift.staffId, dto.date, startTime, endTime, id);
+      await this.ensureSlotFree(
+        manager,
+        appointment.facilityId,
+        shift.staffId,
+        dto.date,
+        startTime,
+        endTime,
+        id,
+      );
 
       appointment.doctorId = shift.staffId;
       appointment.shiftId = shift.id;
@@ -358,15 +469,33 @@ export class AppointmentsService {
   }
 
   async cancel(id: string, dto: CancelAppointmentDto, scopedFacilityId?: string | null) {
-    return this.updateStatus(id, AppointmentStatus.CANCELLED, dto.reason, undefined, scopedFacilityId);
+    return this.updateStatus(
+      id,
+      AppointmentStatus.CANCELLED,
+      dto.reason,
+      undefined,
+      scopedFacilityId,
+    );
   }
 
   async noShow(id: string, dto: CancelAppointmentDto, scopedFacilityId?: string | null) {
-    return this.updateStatus(id, AppointmentStatus.NO_SHOW, dto.reason, { noShowHandledAt: new Date() }, scopedFacilityId);
+    return this.updateStatus(
+      id,
+      AppointmentStatus.NO_SHOW,
+      dto.reason,
+      { noShowHandledAt: new Date() },
+      scopedFacilityId,
+    );
   }
 
   async complete(id: string, scopedFacilityId?: string | null) {
-    return this.updateStatus(id, AppointmentStatus.COMPLETED, undefined, undefined, scopedFacilityId);
+    return this.updateStatus(
+      id,
+      AppointmentStatus.COMPLETED,
+      undefined,
+      undefined,
+      scopedFacilityId,
+    );
   }
 
   private async updateStatus(
@@ -383,7 +512,12 @@ export class AppointmentsService {
     appointment.cancelReason = reason?.trim() || appointment.cancelReason;
     Object.assign(appointment, extra);
     await this.dataSource.getRepository(Appointment).save(appointment);
-    await this.syncAppointmentScheduleStatus(this.dataSource.manager, appointment.id, status, reason);
+    await this.syncAppointmentScheduleStatus(
+      this.dataSource.manager,
+      appointment.id,
+      status,
+      reason,
+    );
     return this.findManagementById(id, scopedFacilityId);
   }
 
@@ -475,7 +609,8 @@ export class AppointmentsService {
       query.andWhere('shift.id = :shiftId', { shiftId });
     }
     const shift = await query.getRawOne<{ id: string; staffId: string; roomId: string | null }>();
-    if (!shift) throw new BadRequestException(RESPONSE_MESSAGES.APPOINTMENTS.DOCTOR_SHIFT_NOT_AVAILABLE);
+    if (!shift)
+      throw new BadRequestException(RESPONSE_MESSAGES.APPOINTMENTS.DOCTOR_SHIFT_NOT_AVAILABLE);
     return shift;
   }
 
@@ -495,17 +630,19 @@ export class AppointmentsService {
       .andWhere('appointment.doctorId = :doctorStaffId', { doctorStaffId })
       .andWhere('DATE(appointment.scheduledStart) = :date', { date })
       .andWhere('appointment.status IN (:...statuses)', { statuses: ACTIVE_APPOINTMENT_STATUSES });
-    if (excludeAppointmentId) qb.andWhere('appointment.id != :excludeAppointmentId', { excludeAppointmentId });
+    if (excludeAppointmentId)
+      qb.andWhere('appointment.id != :excludeAppointmentId', { excludeAppointmentId });
     const activeAppointments = await qb.getMany();
-    if (activeAppointments.some((appointment) => overlaps(startTime, endTime, appointment.scheduledStart, appointment.scheduledEnd))) {
+    if (
+      activeAppointments.some((appointment) =>
+        overlaps(startTime, endTime, appointment.scheduledStart, appointment.scheduledEnd),
+      )
+    ) {
       throw new ConflictException(RESPONSE_MESSAGES.APPOINTMENTS.SLOT_CONFLICT);
     }
   }
 
-  private async syncAppointmentSchedule(
-    manager: EntityManager,
-    appointmentId: string,
-  ) {
+  private async syncAppointmentSchedule(manager: EntityManager, appointmentId: string) {
     await manager.query(
       `
       UPDATE user_schedules schedule
@@ -538,13 +675,14 @@ export class AppointmentsService {
     status: AppointmentStatus,
     reason?: string,
   ) {
-    const scheduleStatus = status === AppointmentStatus.COMPLETED
-      ? 'done'
-      : status === AppointmentStatus.NO_SHOW
-        ? 'missed'
-        : status === AppointmentStatus.CANCELLED
-          ? 'cancelled'
-          : null;
+    const scheduleStatus =
+      status === AppointmentStatus.COMPLETED
+        ? 'done'
+        : status === AppointmentStatus.NO_SHOW
+          ? 'missed'
+          : status === AppointmentStatus.CANCELLED
+            ? 'cancelled'
+            : null;
 
     if (!scheduleStatus) return;
 
