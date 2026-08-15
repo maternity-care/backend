@@ -75,17 +75,21 @@ export class StaffManagementService {
       searchValue('keyword') || query.name || query.email || query.phone || query.cccd;
     const role = searchValue('role');
     const roleId = searchValue('roleId') || query.roleId;
-    const facilityId = searchValue('facilityId') || query.facilityId;
+    const requestedFacilityId = searchValue('facilityId') || query.facilityId;
     const status = searchValue('status') || query.status;
     const normalizedKeyword = keyword?.trim().toLowerCase();
     const normalizedRole = role?.trim().toLowerCase();
     const normalizedRoleId = roleId?.trim();
-    const normalizedFacilityId = facilityId?.trim();
+    const actorIsSuperAdmin = isSuperAdmin(actor);
+    const scopedFacilityId = actorIsSuperAdmin
+      ? requestedFacilityId?.trim()
+      : getActiveFacilityId(actor);
 
     const staffs = await this.staffProfileRepository.findAll();
     const filteredStaffs = staffs.filter((staff) => {
       if (status && staff.status !== status) return false;
-      if (normalizedFacilityId && String(staff.facilityId) !== normalizedFacilityId) return false;
+      if (scopedFacilityId && String(staff.facilityId) !== String(scopedFacilityId)) return false;
+      if (!actorIsSuperAdmin && this.hasRoleName(staff, RoleEnum.SUPER_ADMIN)) return false;
       if (
         normalizedKeyword &&
         ![staff.name, staff.email, staff.personalEmail, staff.phone, staff.employeeCode]
@@ -131,6 +135,7 @@ export class StaffManagementService {
   }
 
   async create(dto: AdminCreateUserDto, actor: AuthenticatedUser) {
+    this.assertNoSuperAdminAssignment(dto.facilityAssignments);
     const facilityAssignments = this.getScopedAssignments(dto.facilityAssignments, actor);
     const assignments = await this.resolveFacilityAssignments(facilityAssignments);
     const hasDoctorRole = facilityAssignments.some((assignment) =>
@@ -204,6 +209,9 @@ export class StaffManagementService {
 
   async update(id: string, dto: UpdateUserDto, actor: AuthenticatedUser) {
     await this.assertStaffAccess(id, actor);
+    if (dto.facilityAssignments) {
+      this.assertNoSuperAdminAssignment(dto.facilityAssignments);
+    }
     const facilityAssignments = dto.facilityAssignments
       ? this.getScopedAssignments(dto.facilityAssignments, actor)
       : null;
@@ -377,8 +385,26 @@ export class StaffManagementService {
     }
 
     const staff = await this.staffProfileRepository.findById(staffId);
-    if (!staff || String(staff.facilityId) !== String(activeFacilityId)) {
+    if (
+      !staff ||
+      String(staff.facilityId) !== String(activeFacilityId) ||
+      this.hasRoleName(staff, RoleEnum.SUPER_ADMIN)
+    ) {
       throw new ForbiddenException('Bạn không có quyền thao tác nhân viên ngoài cơ sở đang chọn.');
+    }
+  }
+
+  private hasRoleName(staff: Staff, roleName: RoleEnum | string): boolean {
+    return (staff.roles ?? []).some((role) => role.name === roleName);
+  }
+
+  private assertNoSuperAdminAssignment(assignments?: FacilityStaffAssignmentDto[]): void {
+    if (
+      assignments?.some((assignment) =>
+        assignment.roles.some((role) => String(role) === RoleEnum.SUPER_ADMIN),
+      )
+    ) {
+      throw new ForbiddenException('Không được gán Super Admin từ màn quản lý nhân viên.');
     }
   }
 

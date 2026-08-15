@@ -336,6 +336,24 @@ export class ShiftsRepository implements IShiftsRepository {
     return query.getRawMany<ShiftWithDetails>();
   }
 
+  findWeeklyDoctorShiftsWithDetails(
+    facilityId: string,
+    startDate: string,
+    endDate: string,
+    doctorId?: string,
+  ): Promise<ShiftWithDetails[]> {
+    const query = this.buildDetailsQuery()
+      .where('shift.facilityId = :facilityId', { facilityId })
+      .andWhere('shift.deletedAt IS NULL')
+      .andWhere('doctor.id IS NOT NULL')
+      .andWhere('shift.shiftDate BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .orderBy('shift.shiftDate', 'ASC')
+      .addOrderBy('shift.startTime', 'ASC');
+
+    if (doctorId) query.andWhere('doctor.id = :doctorId', { doctorId });
+    return query.getRawMany<ShiftWithDetails>();
+  }
+
   /**
    * Dữ liệu nạp tuần cũ vào form tuần mới: loại bác sĩ nghỉ việc và để trống phòng không còn dùng được.
    * Trạng thái ca không bị lọc ở đây vì ca hủy/nghỉ vẫn chứa mẫu phân công hữu ích cho tuần sau.

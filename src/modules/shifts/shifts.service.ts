@@ -459,6 +459,25 @@ export class ShiftsService {
     };
   }
 
+  /** Public booking chỉ cần ca trực có bác sĩ, không trả ca vận hành/nurse/staff khác. */
+  async getPublicWeeklyDoctorSchedule(facilityId: string, weekStart?: string, doctorId?: string) {
+    const { start, end } = await this.validator.prepareWeeklyRange(
+      facilityId,
+      weekStart,
+      doctorId,
+    );
+    const shifts = await this.repository.findWeeklyDoctorShiftsWithDetails(facilityId, start, end, doctorId);
+    return {
+      facilityId,
+      weekStart: start,
+      weekEnd: end,
+      days: Array.from({ length: 7 }, (_, index) => {
+        const date = addDays(start, index);
+        return { date, shifts: shifts.filter(shift => shift.shiftDate === date) };
+      }),
+    };
+  }
+
   async getGroupedSchedule(query: GroupedDoctorShiftDto) {
     validateDateRange(query.dateFrom, query.dateTo);
     const shifts = query.forTemplate
