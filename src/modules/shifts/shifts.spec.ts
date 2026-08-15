@@ -2364,6 +2364,7 @@ describe('ShiftSlotsService business validation', () => {
     const repository = {
       create: jest.fn(data => ({ ...data })),
       save: jest.fn(async data => ({ ...data, id: data.id ?? '1' })),
+      softRemove: jest.fn(async data => ({ ...data, deletedAt: new Date() })),
       remove: jest.fn().mockResolvedValue(undefined),
       findOne: jest.fn().mockResolvedValue(null),
       createQueryBuilder: jest.fn()
@@ -2592,8 +2593,8 @@ describe('ShiftSlotsService business validation', () => {
     expect(repository.remove).toHaveBeenCalledWith(slot);
   });
 
-  // Vai tro: khung ca la cau hinh, xoa la xoa cung; ca truc cu van giu startTime/endTime.
-  it('hard deletes a used shift slot and reports affected shifts', async () => {
+  // Vai tro: khung da duoc dung phai xoa mem de ca truc cu con ten va ma khung.
+  it('soft deletes a used shift slot and reports affected shifts', async () => {
     const slot = { id: '1', facilityId: '1', status: ActiveStatus.ACTIVE, deletedAt: null };
     const { service, repository } = createService({
       findOne: jest.fn().mockResolvedValue(slot),
@@ -2602,9 +2603,10 @@ describe('ShiftSlotsService business validation', () => {
       },
     });
 
-    await expect(service.remove('1')).resolves.toEqual({ action: 'hard_deleted', affectedCount: 3 });
-    expect(repository.remove).toHaveBeenCalledWith(slot);
-    expect(repository.save).not.toHaveBeenCalled();
+    await expect(service.remove('1')).resolves.toEqual({ action: 'soft_deleted', affectedCount: 3 });
+    expect(slot.status).toBe(ActiveStatus.INACTIVE);
+    expect(repository.softRemove).toHaveBeenCalledWith(slot);
+    expect(repository.remove).not.toHaveBeenCalled();
   });
 });
 
