@@ -61,7 +61,7 @@ export class ServicesService {
     const assignments = await this.validateFacilityAssignments(dto.facilityAssignments);
 
     if (!this.dataSource) {
-      throw new ConflictException('Không thể gán service vào cơ sở vì DataSource chưa được cấu hình');
+      throw new ConflictException('Không thể gán dịch vụ cho cơ sở vì kết nối dữ liệu chưa được cấu hình');
     }
 
     return this.dataSource.transaction(async (manager) => {
@@ -87,7 +87,7 @@ export class ServicesService {
     assignments: CreateServiceFacilityAssignmentDto[],
   ): Promise<CreateServiceFacilityAssignmentDto[]> {
     if (!this.facilitiesService) {
-      throw new ConflictException('Không thể gán service vào cơ sở vì FacilitiesService chưa được cấu hình');
+      throw new ConflictException('Không thể gán dịch vụ vì thành phần quản lý cơ sở chưa được cấu hình');
     }
 
     for (const assignment of assignments) {

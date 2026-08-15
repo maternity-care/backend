@@ -207,7 +207,7 @@ export class ForumsService {
     const topic = await this.findActiveTopicById(dto.topicId);
     const status = dto.status ?? ForumContentStatus.PUBLISHED;
     if (status === ForumContentStatus.DELETED) {
-      throw new BadRequestException('Khong the tao bai viet o trang thai deleted');
+      throw new BadRequestException('Không thể tạo bài viết ở trạng thái đã xóa');
     }
 
     const now = new Date();
@@ -263,9 +263,9 @@ export class ForumsService {
     actor: AuthenticatedUser,
   ) {
     const post = await this.postRepository.findOne({ where: { id } });
-    if (!post) throw new NotFoundException('Khong tim thay bai viet');
+    if (!post) throw new NotFoundException('Không tìm thấy bài viết');
     if (dto.status === ForumContentStatus.DELETED) {
-      throw new BadRequestException('Dung API DELETE de xoa cung bai viet');
+      throw new BadRequestException('Hãy sử dụng thao tác xóa bài viết để xóa vĩnh viễn');
     }
 
     const oldStatus = post.status;
@@ -328,10 +328,10 @@ export class ForumsService {
   async updateOwnPost(id: string, dto: UpdateForumPostDto, actor: AuthenticatedUser) {
     const post = await this.postRepository.findOne({ where: { id } });
     if (!post || post.authorId !== actor.id) {
-      throw new NotFoundException('Khong tim thay bai viet cua ban');
+      throw new NotFoundException('Không tìm thấy bài viết của bạn');
     }
     if (![ForumContentStatus.PENDING, ForumContentStatus.REJECTED].includes(post.status)) {
-      throw new BadRequestException('Chi co the sua bai dang cho duyet hoac bi tu choi');
+      throw new BadRequestException('Chỉ có thể sửa bài viết đang chờ duyệt hoặc đã bị từ chối');
     }
 
     if (dto.topicId !== undefined && dto.topicId !== post.forumTopicId) {
@@ -379,7 +379,7 @@ export class ForumsService {
   async updateOwnComment(id: string, dto: UpdateForumCommentDto, actor: AuthenticatedUser) {
     const comment = await this.commentRepository.findOne({ where: { id } });
     if (!comment || comment.authorId !== actor.id) {
-      throw new NotFoundException('Khong tim thay binh luan cua ban');
+      throw new NotFoundException('Không tìm thấy bình luận của bạn');
     }
     if (dto.content !== undefined) comment.content = dto.content;
     if (dto.messageType !== undefined) comment.messageType = dto.messageType;
@@ -405,7 +405,7 @@ export class ForumsService {
 
   async updateManagementComment(id: string, dto: UpdateForumCommentDto, actor: AuthenticatedUser) {
     const comment = await this.commentRepository.findOne({ where: { id } });
-    if (!comment) throw new NotFoundException('Khong tim thay binh luan');
+    if (!comment) throw new NotFoundException('Không tìm thấy bình luận');
     if (dto.content !== undefined) comment.content = dto.content;
     if (dto.messageType !== undefined) comment.messageType = dto.messageType;
     comment.status = ForumContentStatus.PUBLISHED;
@@ -436,7 +436,7 @@ export class ForumsService {
 
   async hardDeletePost(id: string, actor: AuthenticatedUser, reason?: string | null) {
     const post = await this.postRepository.findOne({ where: { id } });
-    if (!post) throw new NotFoundException('Khong tim thay bai viet');
+    if (!post) throw new NotFoundException('Không tìm thấy bài viết');
 
     await this.writeModerationLog({
       targetType: ForumTargetType.POST,
@@ -462,7 +462,7 @@ export class ForumsService {
 
   async hardDeleteComment(id: string, actor: AuthenticatedUser, reason?: string | null) {
     const comment = await this.commentRepository.findOne({ where: { id } });
-    if (!comment) throw new NotFoundException('Khong tim thay binh luan');
+    if (!comment) throw new NotFoundException('Không tìm thấy bình luận');
     const ids = await this.findCommentTreeIds(id);
 
     await this.writeModerationLog({
@@ -765,7 +765,7 @@ export class ForumsService {
         post.status = ForumContentStatus.REJECTED;
         break;
       case ForumModerationAction.DELETE:
-        throw new BadRequestException('Dung hardDeletePost de xoa cung bai viet');
+        throw new BadRequestException('Hãy sử dụng thao tác xóa bài viết để xóa vĩnh viễn');
       case ForumModerationAction.LOCK_COMMENTS:
         post.commentable = false;
         break;
@@ -785,7 +785,7 @@ export class ForumsService {
         post.isFeatured = false;
         break;
       default:
-        throw new BadRequestException('Action không hỗ trợ cho bài viết');
+        throw new BadRequestException('Thao tác kiểm duyệt này không áp dụng cho bài viết');
     }
   }
 
@@ -811,9 +811,9 @@ export class ForumsService {
         comment.status = ForumContentStatus.REJECTED;
         break;
       case ForumModerationAction.DELETE:
-        throw new BadRequestException('Dung hardDeleteComment de xoa cung binh luan');
+        throw new BadRequestException('Hãy sử dụng thao tác xóa bình luận để xóa vĩnh viễn');
       default:
-        throw new BadRequestException('Action không hỗ trợ cho bình luận');
+        throw new BadRequestException('Thao tác kiểm duyệt này không áp dụng cho bình luận');
     }
   }
 

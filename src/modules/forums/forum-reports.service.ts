@@ -64,7 +64,7 @@ export class ForumReportsService {
 
   async resolveReport(id: string, dto: ResolveContentReportDto, actor: AuthenticatedUser) {
     const report = await this.forumReportsRepository.findById(id);
-    if (!report) throw new NotFoundException('Khong tim thay report');
+    if (!report) throw new NotFoundException('Không tìm thấy báo cáo nội dung');
 
     if (
       [
@@ -119,7 +119,7 @@ export class ForumReportsService {
   ) {
     await this.ensureReportTargetExists(targetType, targetId);
     const reports = await this.forumReportsRepository.findReportsByTarget(targetType, targetId);
-    if (!reports.length) throw new NotFoundException('Khong tim thay report');
+    if (!reports.length) throw new NotFoundException('Không tìm thấy báo cáo nội dung');
 
     if (
       [
@@ -182,7 +182,7 @@ export class ForumReportsService {
 
   private async ensureReportTargetExists(targetType: ForumTargetType, targetId: string) {
     if (!(await this.forumReportsRepository.targetExists(targetType, targetId))) {
-      throw new NotFoundException('Khong tim thay noi dung can report');
+      throw new NotFoundException('Không tìm thấy nội dung cần báo cáo');
     }
   }
 

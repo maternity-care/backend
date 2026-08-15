@@ -105,6 +105,7 @@ describe('FacilityServicesService business logic', () => {
   const createRepo = () => ({
     create: jest.fn(data => ({ ...data })),
     save: jest.fn(async data => ({ id: data.id ?? '10', ...data })),
+    saveAndDetachFromPackages: jest.fn(async data => ({ id: data.id ?? '10', ...data })),
     saveMany: jest.fn(async (data: Array<Record<string, unknown>>) =>
       data.map((item, index) => ({ id: String(index + 20), ...item }))),
     remove: jest.fn().mockResolvedValue(undefined),
@@ -114,7 +115,6 @@ describe('FacilityServicesService business logic', () => {
     findAllPaginated: jest.fn().mockResolvedValue({ items: [{ ...entity }], total: 1 }),
     findPublicByFacilityId: jest.fn().mockResolvedValue([{ ...entity, serviceName: 'Siêu âm thai 2D' }]),
     countDependencies: jest.fn().mockResolvedValue(0),
-    updateStatus: jest.fn(async (item, status) => ({ ...item, status })),
     findDetailsById: jest.fn().mockResolvedValue({ ...entity }),
   });
   const facilitiesService = { findById: jest.fn().mockResolvedValue(facility) };
@@ -291,6 +291,18 @@ describe('FacilityServicesService business logic', () => {
     expect(repo.findByFacilityAndService).not.toHaveBeenCalled();
   });
 
+  it('detaches a facility service from packages when its status becomes inactive', async () => {
+    const { repo, service: facilityServicesService } = createService();
+
+    await expect(facilityServicesService.update('10', { status: ActiveStatus.INACTIVE }))
+      .resolves.toMatchObject({ status: ActiveStatus.INACTIVE });
+
+    expect(repo.saveAndDetachFromPackages).toHaveBeenCalledWith(
+      expect.objectContaining({ id: '10', status: ActiveStatus.INACTIVE }),
+    );
+    expect(repo.save).not.toHaveBeenCalled();
+  });
+
   // Vai tro: dam bao mapping facility-service khong ton tai tra 404.
   it('throws not found when mapping does not exist', async () => {
     const context = createService();
@@ -321,9 +333,8 @@ describe('FacilityServicesService business logic', () => {
       action: 'soft_deleted',
       affectedCount: 2,
     });
-    expect(softContext.repo.updateStatus).toHaveBeenCalledWith(
-      expect.objectContaining({ id: '10' }),
-      ActiveStatus.INACTIVE,
+    expect(softContext.repo.saveAndDetachFromPackages).toHaveBeenCalledWith(
+      expect.objectContaining({ id: '10', status: ActiveStatus.INACTIVE }),
     );
   });
 });
@@ -341,6 +352,7 @@ describe('FacilityServicesRepository remove rules', () => {
     const transactionManager = {
       find: jest.fn().mockResolvedValue([{ id: 'package-item-1' }]),
       delete: jest.fn().mockResolvedValue(undefined),
+      save: jest.fn(async (_target, value) => value),
       remove: jest.fn().mockResolvedValue(undefined),
     };
     const manager = {
@@ -384,6 +396,24 @@ describe('FacilityServicesRepository remove rules', () => {
       id: expect.any(Object),
     });
     expect(transactionManager.remove).toHaveBeenCalledWith(FacilityService, entity);
+  });
+
+  it('saves inactive status and removes package configuration atomically', async () => {
+    const { repository, transactionManager, facilityServicesRepository } = createRepository();
+    const entity = {
+      id: '10', facilityId: '1', serviceId: '2', status: ActiveStatus.INACTIVE,
+    } as FacilityService;
+
+    await expect(facilityServicesRepository.saveAndDetachFromPackages(entity)).resolves.toBe(entity);
+
+    expect(repository.manager.transaction).toHaveBeenCalled();
+    expect(transactionManager.save).toHaveBeenCalledWith(FacilityService, entity);
+    expect(transactionManager.delete).toHaveBeenNthCalledWith(1, PackageServiceFacility, {
+      packageItemId: expect.any(Object),
+    });
+    expect(transactionManager.delete).toHaveBeenNthCalledWith(2, PackageItem, {
+      id: expect.any(Object),
+    });
   });
 });
 

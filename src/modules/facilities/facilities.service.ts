@@ -88,7 +88,7 @@ export class FacilitiesService {
       const highestRoomFloor = await this.facilitiesRepository.findHighestRoomFloor(facility.id);
       if (nextFloorCount < highestRoomFloor) {
         throw new BadRequestException(
-          `So tang khong the nho hon tang ${highestRoomFloor} dang co phong`,
+          `Số tầng không thể nhỏ hơn tầng ${highestRoomFloor} vì tầng này đang có phòng`,
         );
       }
     }
@@ -235,7 +235,7 @@ export class FacilitiesService {
 
   private ensureStatusIsNotUpdated(dto: UpdateFacilityDto): void {
     if (Object.prototype.hasOwnProperty.call(dto, 'status')) {
-      throw new BadRequestException('Khong doi status bang API update thong tin. Hay dung /suspend hoac /reactivate.');
+      throw new BadRequestException('Không cập nhật trạng thái qua API chỉnh sửa thông tin. Hãy dùng thao tác tạm ngừng hoặc kích hoạt lại cơ sở.');
     }
   }
 

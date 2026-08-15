@@ -120,7 +120,7 @@ export function findImpactedShiftSlotsByOperatingHours(
   if (openOperatingHours.length === 0) {
     return slots.map(slot => toImpactedShiftSlotData(
       slot,
-      'Co so khong con ngay mo cua nao cho khung ca active',
+      'Cơ sở không còn ngày mở cửa phù hợp với khung ca đang hoạt động',
     ));
   }
 
@@ -130,7 +130,7 @@ export function findImpactedShiftSlotsByOperatingHours(
       if (invalidDays.length === 0) return null;
       return toImpactedShiftSlotData(
         slot,
-        `Khung ca khong nam trong gio mo cua moi cua: ${invalidDays.join(', ')}`,
+        `Khung ca không nằm trong giờ mở cửa mới của các ngày: ${invalidDays.join(', ')}`,
       );
     })
     .filter((item): item is ImpactedShiftSlotData => Boolean(item));

@@ -183,7 +183,9 @@ export function singleShiftCreateRange(): { start: string; end: string } {
 export function validateShiftCreateWeek(shiftDate: string): void {
   const { start, end } = singleShiftCreateRange();
   if (shiftDate < start || shiftDate > end) {
-    throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.CREATE_WEEK_INVALID);
+    throw new BadRequestException(
+      `${RESPONSE_MESSAGES.SHIFTS.CREATE_WEEK_INVALID}. Khoảng ngày hợp lệ hiện tại: ${formatDateForMessage(start)} đến ${formatDateForMessage(end)}`,
+    );
   }
 }
 
@@ -191,8 +193,16 @@ export function validateShiftCreateWeek(shiftDate: string): void {
 export function validateBulkCreateWeek(fromDate: string, toDate: string): void {
   const { start, end } = nextWeekPlanningRange();
   if (fromDate !== start || toDate !== end) {
-    throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.BULK_CREATE_WEEK_INVALID);
+    throw new BadRequestException(
+      `${RESPONSE_MESSAGES.SHIFTS.BULK_CREATE_WEEK_INVALID}. Tuần hợp lệ hiện tại: ${formatDateForMessage(start)} đến ${formatDateForMessage(end)}`,
+    );
   }
+}
+
+/** Định dạng ngày ISO thành dd/MM/yyyy để thông báo nghiệp vụ dễ đọc. */
+export function formatDateForMessage(date: string): string {
+  const [year, month, day] = date.split('-');
+  return `${day}/${month}/${year}`;
 }
 
 /** Cộng số ngày mà không phụ thuộc timezone của máy chạy backend. */

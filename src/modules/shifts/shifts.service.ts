@@ -746,10 +746,14 @@ export class ShiftsService {
       payload: CreateDoctorShiftDto;
     }> = [];
 
+    //kiểm tra khoảng khung ca
     if (dto.slotAssignments?.length) {
+      //Duyệt qua từng Khung giờ (Slot)
       for (const [slotAssignmentIndex, slotAssignment] of dto.slotAssignments.entries()) {
+        //Duyệt qua từng Assignment (bác sĩ, phòng, role, max appointment) trong Slot
         for (const [assignmentIndex, assignment] of slotAssignment.assignments.entries()) {
           const dates = buildShiftDates(range.fromDate, range.toDate, assignment.workingDays);
+          //Nếu trong khoảng thời gian (range) được chọn KHÔNG TỒN TẠI thứ nào khớp với workingDays
           if (dates.length === 0) {
             skippedItems.push({
               index: inputs.length + skippedItems.length,
