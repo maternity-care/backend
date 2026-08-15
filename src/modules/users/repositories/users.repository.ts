@@ -1,10 +1,11 @@
+import { PregnancyProfile } from './../../pregnancy-profile/entities/pregnancy-profile.entity';
 import { Appointment } from './../../appointments/entities/appointment.entity';
 import { RESPONSE_MESSAGES } from './../../../common/constants/response-message.constant';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
-import { AccountStatus } from '../../../common/constants/status.enum';
+import { AccountStatus, PregnancyProfileStatus } from '../../../common/constants/status.enum';
 import { IUsersRepository } from '../interfaces/users-repository.interface';
 import { SearchUserDto } from '../dto/request/search-user.dto';
 import { SearchUserResponseDto } from '../dto/response/search-user-response.dto';
@@ -164,6 +165,27 @@ export class UsersRepository implements IUsersRepository {
       users,
       total,
     };
+  }
+
+  async findAllNoPregnant(): Promise<User[]> {
+    const users = await this.repository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.pregnancyProfiles', 'pregnancyProfile')
+      .where((qb) => {
+        const activeProfileQuery = qb
+          .subQuery()
+          .select('1')
+          .from(PregnancyProfile, 'activeProfile')
+          .where('activeProfile.patient_id = user.id')
+          .andWhere('activeProfile.status = :activeStatus')
+          .getQuery();
+
+        return `NOT EXISTS ${activeProfileQuery}`;
+      })
+      .setParameter('activeStatus', PregnancyProfileStatus.ACTIVE)
+      .getMany();
+
+    return users;
   }
 
   async remove(user: User): Promise<void> {

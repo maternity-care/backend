@@ -81,7 +81,12 @@ export class DoctorsRepository implements IDoctorsRepository {
         ...where,
         staff: staffWhere,
       },
-      order: { yearsOfExperience: sortYoE, createdAt: 'DESC' },
+      order: {
+        staff: {
+          createdAt: 'DESC',
+        },
+        yearsOfExperience: sortYoE,
+      },
       take: limit,
       skip: (page - 1) * limit,
     });
@@ -90,6 +95,18 @@ export class DoctorsRepository implements IDoctorsRepository {
       data: dataOut[0],
       count: dataOut[1],
     };
+  }
+
+  async findSpecialties(): Promise<string[]> {
+    const results = await this.repository
+      .createQueryBuilder('doctor')
+      .select('DISTINCT doctor.specialty', 'specialty')
+      .where('doctor.specialty IS NOT NULL')
+      .andWhere("TRIM(doctor.specialty) != ''")
+      .orderBy('doctor.specialty', 'ASC')
+      .getRawMany<{ specialty: string }>();
+
+    return results.map((item) => item.specialty);
   }
 
   findByFacilityId(facilityId: string): Promise<Doctor[]> {
