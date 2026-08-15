@@ -41,6 +41,12 @@ export class ManagementSystemUsersController {
     return { data, success: true, message: 'Lấy danh sách người dùng thành công.' };
   }
 
+  @Get('no-pregnant')
+  async findAllNoPregnant() {
+    const data = await this.usersService.findAllNoPregnant();
+    return { data, success: true, message: 'Lấy thông tin người dùng không mang thai thành công.' };
+  }
+
   @Post()
   // @Permissions(PermissionEnum.USER_CREATE)
   async create(@Body() dto: CreateUserDto) {

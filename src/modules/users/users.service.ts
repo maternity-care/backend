@@ -212,4 +212,8 @@ export class UsersService implements IUsersService {
     }
     return this.usersRepository.searchUsers(query);
   }
+
+  async findAllNoPregnant(): Promise<User[]> {
+    return this.usersRepository.findAllNoPregnant();
+  }
 }

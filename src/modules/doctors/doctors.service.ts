@@ -56,6 +56,10 @@ export class DoctorsService {
     return this.repository.findAll(filters);
   }
 
+  async findSpecialties(): Promise<string[]> {
+    return this.repository.findSpecialties();
+  }
+
   async findByFacilityId(facilityId: string): Promise<Doctor[]> {
     return this.repository.findByFacilityId(facilityId);
   }

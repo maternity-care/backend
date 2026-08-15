@@ -1846,6 +1846,9 @@ async function insertPregnancyProfiles() {
   const data = [];
 
   for (const user of users) {
+    if (user.createdAt.getTime() > new Date().getTime() - 30 * 24 * 60 * 60 * 1000) {
+      continue;
+    }
     const lastMenstrualPeriod = new Date(
       new Date(user.createdAt).getTime() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000,
     );
@@ -1911,6 +1914,8 @@ async function insertPregnancyProfiles() {
         createdBy: staffs[Math.floor(Math.random() * staffs.length)].id,
       };
       data.push(pregnancyProfileData2);
+    } else {
+      data.push(pregnancyProfileData);
     }
   }
   const fullData = data.sort((a, b) => {
@@ -1943,6 +1948,7 @@ async function insertUserAuths(): Promise<void> {
 }
 
 async function insertShiftSlots(): Promise<void> {
+  // todo: fix
   const facilities = await facilityRepository.find();
   const shiftSlots = [
     {
@@ -3597,9 +3603,9 @@ async function insertAppointments(): Promise<void> {
     const dateB = new Date(b.createdAt);
     return dateA.getTime() - dateB.getTime();
   });
-  for (const item of sortedAppointments) {
-    await appointmentRepository.save(item);
-  }
+  await appointmentRepository.save(sortedAppointments, {
+    chunk: 100,
+  });
 }
 
 async function insertMedicalRecords(): Promise<void> {

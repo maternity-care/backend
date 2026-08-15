@@ -54,6 +54,17 @@ export class ManagementDoctorsController {
     };
   }
 
+  @Get('specialty')
+  @Permissions(PermissionEnum.DOCTOR_VIEW)
+  @ApiOperation({ summary: 'List specialties' })
+  @ApiResponse({ status: 200, type: [String] })
+  async findSpecialties() {
+    return {
+      message: 'Thành công',
+      data: await this.doctorsService.findSpecialties(),
+    };
+  }
+
   @Get('/facility/:id')
   @Permissions(PermissionEnum.DOCTOR_VIEW)
   @ApiOperation({ summary: 'List doctors by facility' })
