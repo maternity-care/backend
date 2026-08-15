@@ -184,12 +184,22 @@ export class ShiftSlotsService {
     return this.repository.save(slot);
   }
 
-  /** Xoa cung khung ca. Ca truc cu giu startTime/endTime va slotId duoc DB set null. */
+  /**
+   * Khung chưa được sử dụng có thể xóa cứng. Khung đã được dùng phải xóa mềm
+   * để ca trực cũ vẫn tra được tên/mã khung, còn lookup tạo ca mới sẽ bỏ qua nó.
+   */
   async remove(id: string) {
     const slot = await this.findById(id);
     const dependencyCount = await this.countShiftDependencies(slot.id);
+
+    if (dependencyCount > 0) {
+      slot.status = ActiveStatus.INACTIVE;
+      await this.repository.softRemove(slot);
+      return { action: 'soft_deleted', affectedCount: dependencyCount };
+    }
+
     await this.repository.remove(slot);
-    return { action: 'hard_deleted', affectedCount: dependencyCount };
+    return { action: 'hard_deleted', affectedCount: 0 };
   }
 
   private buildListQuery(filters?: SearchShiftSlotDto): SelectQueryBuilder<ShiftSlot> {
