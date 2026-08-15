@@ -135,6 +135,7 @@ export class StaffManagementService {
   }
 
   async create(dto: AdminCreateUserDto, actor: AuthenticatedUser) {
+    this.assertSingleFacilityAssignment(dto.facilityAssignments);
     this.assertNoSuperAdminAssignment(dto.facilityAssignments);
     const facilityAssignments = this.getScopedAssignments(dto.facilityAssignments, actor);
     const assignments = await this.resolveFacilityAssignments(facilityAssignments);
@@ -210,6 +211,7 @@ export class StaffManagementService {
   async update(id: string, dto: UpdateUserDto, actor: AuthenticatedUser) {
     await this.assertStaffAccess(id, actor);
     if (dto.facilityAssignments) {
+      this.assertSingleFacilityAssignment(dto.facilityAssignments);
       this.assertNoSuperAdminAssignment(dto.facilityAssignments);
     }
     const facilityAssignments = dto.facilityAssignments
@@ -408,9 +410,16 @@ export class StaffManagementService {
     }
   }
 
+  private assertSingleFacilityAssignment(assignments?: FacilityStaffAssignmentDto[]): void {
+    if (!assignments || assignments.length !== 1) {
+      throw new BadRequestException('Mỗi nhân viên chỉ được thuộc một cơ sở.');
+    }
+  }
+
   private async resolveFacilityAssignments(
     assignments: FacilityStaffAssignmentDto[],
   ): Promise<ResolvedFacilityAssignment[]> {
+    this.assertSingleFacilityAssignment(assignments);
     if (assignments.length === 0) {
       throw new ConflictException('Nhân viên phải thuộc ít nhất một cơ sở.');
     }
