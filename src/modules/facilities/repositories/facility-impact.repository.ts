@@ -264,7 +264,7 @@ export class FacilityImpactRepository {
       changedBy: actorId ?? null,
     }).execute();
   }
-
+  
   private async insertShiftDisruption(
     manager: EntityManager,
     shift: Shift,

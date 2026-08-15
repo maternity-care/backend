@@ -42,12 +42,6 @@ export interface IShiftsRepository {
     endDate: string,
     doctorId?: string,
   ): Promise<Shift[]>;
-  findWeeklyWithDetails(
-    facilityId: string,
-    startDate: string,
-    endDate: string,
-    doctorId?: string,
-  ): Promise<ShiftWithDetails[]>;
   findWeeklyDoctorShiftsWithDetails(
     facilityId: string,
     startDate: string,

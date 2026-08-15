@@ -7,10 +7,9 @@ import { RESPONSE_MESSAGES } from '../../common/constants/response-message.const
 import { BulkCreateDoctorShiftDto, ShiftWorkingDay } from './dto/requests/bulk-create-doctor-shift.dto';
 import { CheckShiftConflictDto } from './dto/requests/check-shift-conflict.dto';
 import { AutoGenerateShiftsDto } from './dto/requests/auto-generate-shifts.dto';
-import { CopyWeekDoctorShiftDto } from './dto/requests/copy-week-doctor-shift.dto';
 import { CreateDoctorShiftDto } from './dto/requests/create-doctor-shift.dto';
 import { DoctorAvailabilityQueryDto } from './dto/requests/doctor-availability.dto';
-import { SearchDoctorShiftDto, WeeklyDoctorShiftDto } from './dto/requests/search-doctor-shift.dto';
+import { DoctorShiftRangeDto, SearchDoctorShiftDto, WeeklyDoctorShiftDto } from './dto/requests/search-doctor-shift.dto';
 import { UpdateDoctorShiftDto } from './dto/requests/update-doctor-shift.dto';
 import {
   buildShiftDates,
@@ -171,13 +170,8 @@ describe('DoctorShifts DTO validation', () => {
     expect(errors.some(error => error.property === 'durationDays')).toBe(true);
   });
 
-  // Vai tro: kiem tra DTO copy-week va doctor availability voi input hop le truoc khi vao service.
-  it('validates copy-week and doctor availability payloads', async () => {
-    expect(await validate(plainToInstance(CopyWeekDoctorShiftDto, {
-      facilityId: '1',
-      sourceWeekStart: '2099-07-06',
-      targetWeekStart: '2099-07-13',
-    }))).toHaveLength(0);
+  // Vai tro: kiem tra doctor availability voi input hop le truoc khi vao service.
+  it('validates doctor availability payloads', async () => {
     expect(await validate(plainToInstance(DoctorAvailabilityQueryDto, {
       facilityId: '1',
       date: '2099-07-13',
@@ -300,7 +294,6 @@ describe('ShiftsService business validation', () => {
     findDetailsById: jest.fn().mockResolvedValue({ ...shift }),
     findConflicts: jest.fn().mockResolvedValue({ doctorConflicts: [], roomConflicts: [] }),
     findWeekly: jest.fn().mockResolvedValue([{ ...shift }]),
-    findWeeklyWithDetails: jest.fn().mockResolvedValue([{ ...shift }]),
     findTemplateWeekWithDetails: jest.fn().mockResolvedValue([{ ...shift }]),
     findDoctorShiftsForDate: jest.fn().mockResolvedValue([{ ...shift }]),
     findDoctorAppointmentsForDate: jest.fn().mockResolvedValue([]),
@@ -517,15 +510,6 @@ describe('ShiftsService business validation', () => {
     repo.findConflicts.mockResolvedValue({ doctorConflicts: [shift], roomConflicts: [] });
     const result = await service.checkConflicts(plainToInstance(CheckShiftConflictDto, shift));
     expect(result).toMatchObject({ hasConflict: true, doctorConflicts: [shift] });
-  });
-
-  // Vai tro: dam bao lich tuan luon gom 7 ngay va query dung khoang weekStart-weekEnd.
-  it('returns seven grouped days for the weekly calendar', async () => {
-    const { repo, service } = createService();
-    const result = await service.getWeeklySchedule('1', '2099-07-06', '1');
-    expect(result.weekEnd).toBe('2099-07-12');
-    expect(result.days).toHaveLength(7);
-    expect(repo.findWeeklyWithDetails).toHaveBeenCalledWith('1', '2099-07-06', '2099-07-12', '1');
   });
 
   // Vai tro: dam bao bulk-generate confirm chi sinh ca vao cac ngay lam viec duoc chon.
@@ -915,31 +899,6 @@ describe('ShiftsService business validation', () => {
     expect(result.createdShifts).toHaveLength(2);
   });
 
-  // Vai tro: ca full/cancelled van giu mau phan cong nhung duoc mo lai available o tuan moi.
-  it('copies cancelled and full assignment patterns as available shifts', async () => {
-    const { repo, service } = createService();
-    repo.findWeeklyWithDetails.mockResolvedValueOnce([
-      { ...shift, id: '1', shiftDate: '2099-06-29', status: DoctorShiftStatus.FULL },
-      { ...shift, id: '2', shiftDate: '2099-06-30', status: DoctorShiftStatus.CANCELLED },
-    ]);
-    const result = await service.copyWeek({
-      facilityId: '1',
-      sourceWeekStart: '2099-06-29',
-      targetWeekStart: '2099-07-06',
-    });
-    expect(result).toHaveLength(2);
-    expect(repo.saveMany).toHaveBeenCalledWith([
-      expect.objectContaining({
-        shiftDate: '2099-07-06',
-        status: DoctorShiftStatus.AVAILABLE,
-      }),
-      expect.objectContaining({
-        shiftDate: '2099-07-07',
-        status: DoctorShiftStatus.AVAILABLE,
-      }),
-    ]);
-  });
-
   // Vai tro: dam bao slot kha dung cua bac si loai bo khoang gio da co appointment giu cho.
   it('returns doctor availability slots excluding booked appointments', async () => {
     const { repo, service } = createService();
@@ -1094,6 +1053,24 @@ describe('ShiftsService business validation', () => {
     expect(repo.findAllPaginated).toHaveBeenCalledWith({ page: 1, limit: 20 });
   });
 
+  it('loads a complete calendar range without pagination', async () => {
+    const { repo, service } = createService();
+    const query = { dateFrom: '2099-07-01', dateTo: '2099-07-31' };
+
+    await expect(service.findCalendarRange(query)).resolves.toEqual([{ ...shift }]);
+    expect(repo.findAll).toHaveBeenCalledWith(query);
+  });
+
+  it('rejects a calendar range longer than 31 days', async () => {
+    const { repo, service } = createService();
+
+    await expect(service.findCalendarRange({
+      dateFrom: '2099-07-01',
+      dateTo: '2099-08-01',
+    })).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.findAll).not.toHaveBeenCalled();
+  });
+
   // Vai tro: dam bao danh sach ca truc rong tra 404 thay vi success rong.
   it('returns not found when list or paginated list has no shifts', async () => {
     const listContext = createService();
@@ -1150,6 +1127,43 @@ describe('ShiftsService business validation', () => {
       'doctor unavailable',
       undefined,
     );
+  });
+
+  it('restores a resolved cancelled shift through the normal update API', async () => {
+    const { repo, service } = createService();
+    repo.findById.mockResolvedValueOnce({
+      ...shift,
+      status: DoctorShiftStatus.CANCELLED,
+    });
+
+    await expect(service.update('10', {
+      status: DoctorShiftStatus.AVAILABLE,
+      changeReason: 'Cơ sở mở lại sớm',
+    })).resolves.toMatchObject({ status: DoctorShiftStatus.AVAILABLE });
+
+    expect(repo.hasUnresolvedDisruptions).toHaveBeenCalledWith('10');
+    expect(repo.findAppointmentsForShift).toHaveBeenCalledWith(
+      expect.objectContaining({ id: '10' }),
+      true,
+    );
+    expect(repo.updateWithAudit).toHaveBeenCalledWith(expect.objectContaining({
+      reason: 'Cơ sở mở lại sớm',
+      changes: expect.objectContaining({ statusChanged: true }),
+    }));
+  });
+
+  it('does not restore a cancelled shift while disruption items are unresolved', async () => {
+    const { repo, service } = createService();
+    repo.findById.mockResolvedValueOnce({
+      ...shift,
+      status: DoctorShiftStatus.CANCELLED,
+    });
+    repo.hasUnresolvedDisruptions.mockResolvedValueOnce(true);
+
+    await expect(service.update('10', {
+      status: DoctorShiftStatus.AVAILABLE,
+    })).rejects.toThrow('Ca trực còn lịch hẹn bị ảnh hưởng chưa xử lý xong.');
+    expect(repo.updateWithAudit).not.toHaveBeenCalled();
   });
 
   // Vai tro: ca da co appointment khong duoc doi bac si/ngay/gio/slot vi benh nhan da chon lich cu.
@@ -1357,48 +1371,6 @@ describe('ShiftsService business validation', () => {
     });
   });
 
-  // Vai tro: chan copy-week source va target trung nhau de tranh nhan doi/ghi de vo nghia.
-  it('TC-UNIT-DSHIFT-033 rejects copying a week onto itself', async () => {
-    await expect(createService().service.copyWeek({
-      facilityId: '1',
-      sourceWeekStart: '2099-07-06',
-      targetWeekStart: '2099-07-06',
-    })).rejects.toBeInstanceOf(BadRequestException);
-  });
-
-  // Vai tro: ca huy van duoc dung lam mau, nhung ca moi khong mang trang thai cancelled.
-  it('TC-UNIT-DSHIFT-034 reuses a cancelled shift as an available assignment pattern', async () => {
-    const { repo, service } = createService();
-    repo.findWeeklyWithDetails.mockResolvedValueOnce([{
-      ...shift,
-      shiftDate: '2099-06-29',
-      status: DoctorShiftStatus.CANCELLED,
-    }]);
-
-    await expect(service.copyWeek({
-      facilityId: '1',
-      sourceWeekStart: '2099-06-29',
-      targetWeekStart: '2099-07-06',
-    })).resolves.toHaveLength(1);
-    expect(repo.saveMany).toHaveBeenCalledWith([
-      expect.objectContaining({ status: DoctorShiftStatus.AVAILABLE }),
-    ]);
-  });
-
-  // Vai tro: dam bao copy-week gap conflict o target thi khong save nua chung.
-  it('TC-UNIT-DSHIFT-035 does not save copied shifts when target validation conflicts', async () => {
-    const { repo, service } = createService();
-    repo.findWeeklyWithDetails.mockResolvedValueOnce([{ ...shift, shiftDate: '2099-06-29' }]);
-    repo.findConflicts.mockResolvedValueOnce({ doctorConflicts: [shift], roomConflicts: [] });
-
-    await expect(service.copyWeek({
-      facilityId: '1',
-      sourceWeekStart: '2099-06-29',
-      targetWeekStart: '2099-07-06',
-    })).rejects.toBeInstanceOf(ConflictException);
-    expect(repo.saveMany).not.toHaveBeenCalled();
-  });
-
   // Vai tro: dam bao doctor availability dung slot 60 phut mac dinh khi client khong truyen.
   it('TC-UNIT-DSHIFT-037 defaults doctor availability slotMinutes to 60', async () => {
     const { repo, service } = createService();
@@ -1462,21 +1434,6 @@ describe('ShiftsService business validation', () => {
     })).rejects.toBeInstanceOf(ConflictException);
     expect(repo.findDoctorShiftsForDate).not.toHaveBeenCalled();
     expect(repo.findDoctorAppointmentsForDate).not.toHaveBeenCalled();
-  });
-
-  // Vai tro: dam bao lich tuan mac dinh tinh theo tuan hien tai o mui gio Viet Nam khi thieu weekStart.
-  it('TC-UNIT-DSHIFT-041 uses current Vietnam week when weekStart is omitted', async () => {
-    jest.useFakeTimers().setSystemTime(new Date('2026-07-17T00:00:00Z'));
-    try {
-      const { repo, service } = createService();
-
-      const result = await service.getWeeklySchedule('1');
-
-      expect(result).toMatchObject({ weekStart: '2026-07-13', weekEnd: '2026-07-19' });
-      expect(repo.findWeeklyWithDetails).toHaveBeenCalledWith('1', '2026-07-13', '2026-07-19', undefined);
-    } finally {
-      jest.useRealTimers();
-    }
   });
 
   // Vai tro: gom cac ca giong nhau trong mot khoang ngay thanh workingDays de FE nap lai mau phan cong.
@@ -1600,17 +1557,6 @@ describe('ShiftsService business validation', () => {
     });
   });
 
-  it('returns seven empty days when a weekly schedule has no shifts', async () => {
-    const { repo, service } = createService();
-    repo.findWeeklyWithDetails.mockResolvedValueOnce([]);
-
-    await expect(service.getWeeklySchedule('1', '2099-07-06')).resolves.toMatchObject({
-      weekStart: '2099-07-06',
-      weekEnd: '2099-07-12',
-      days: expect.arrayContaining([{ date: '2099-07-06', shifts: [] }]),
-    });
-  });
-
   // Vai tro: dam bao bac si khong co ca lam viec trong ngay thi availability tra 404.
   it('returns not found when doctor availability has no working shifts', async () => {
     const { repo, service } = createService();
@@ -1701,26 +1647,6 @@ describe('ShiftsService business validation', () => {
     expect(result.shifts[0].availableSlots).toEqual([
       { startTime: '08:00:00', endTime: '08:30:00' },
       { startTime: '08:30:00', endTime: '09:00:00' },
-    ]);
-  });
-
-  // Vai tro: dam bao copy-week giu nguyen status available/off cho cac ca hop le.
-  it('copies available and off shifts without changing their statuses', async () => {
-    const { repo, service } = createService();
-    repo.findWeeklyWithDetails.mockResolvedValueOnce([
-      { ...shift, id: '1', shiftDate: '2099-06-29', status: DoctorShiftStatus.AVAILABLE },
-      { ...shift, id: '2', roomId: null, shiftDate: '2099-06-30', status: DoctorShiftStatus.OFF },
-    ]);
-
-    await service.copyWeek({
-      facilityId: '1',
-      sourceWeekStart: '2099-06-29',
-      targetWeekStart: '2099-07-06',
-    });
-
-    expect(repo.saveMany).toHaveBeenCalledWith([
-      expect.objectContaining({ shiftDate: '2099-07-06', status: DoctorShiftStatus.AVAILABLE }),
-      expect.objectContaining({ shiftDate: '2099-07-07', status: DoctorShiftStatus.OFF, roomId: null }),
     ]);
   });
 
@@ -1847,12 +1773,11 @@ describe('ShiftsController unit routing and scope', () => {
     const service = {
       findAll: jest.fn().mockResolvedValue([shift]),
       findAllPaginated: jest.fn().mockResolvedValue({ items: [shift], total: 1, page: 1, limit: 20 }),
+      findCalendarRange: jest.fn().mockResolvedValue([shift]),
       checkConflicts: jest.fn().mockResolvedValue({ hasConflict: false, doctorConflicts: [], roomConflicts: [] }),
       previewBulkGenerate: jest.fn().mockResolvedValue({ summary: { validCount: 1 } }),
       confirmBulkGenerate: jest.fn().mockResolvedValue({ createdShifts: [shift] }),
-      copyWeek: jest.fn().mockResolvedValue([shift]),
       getDoctorAvailability: jest.fn().mockResolvedValue({ shifts: [] }),
-      getWeeklySchedule: jest.fn().mockResolvedValue({ days: [] }),
       getGroupedSchedule: jest.fn().mockResolvedValue({ groups: [] }),
       findById: jest.fn().mockResolvedValue(shift),
       findByIdForRemoval: jest.fn().mockResolvedValue(shift),
@@ -1879,11 +1804,31 @@ describe('ShiftsController unit routing and scope', () => {
     expect(service.findAll).not.toHaveBeenCalled();
   });
 
-  // Vai tro: dam bao API weekly schedule bat buoc co facilityId de xac dinh lich co so.
-  it('TC-UNIT-DSHIFT-050 rejects weekly calendar requests without facilityId', async () => {
-    const { controller } = createController();
+  it('scopes doctor calendar requests by staff id from the token', async () => {
+    const { service, controller } = createController();
+    const doctorUser = {
+      id: '15',
+      roles: [{ name: RoleEnum.DOCTOR }],
+      activeFacilityId: '1',
+      facilities: [{
+        id: '1',
+        status: FacilityStatus.ACTIVE,
+        roles: [{ name: RoleEnum.DOCTOR }],
+      }],
+    };
+    const query: DoctorShiftRangeDto = {
+      dateFrom: '2099-07-01',
+      dateTo: '2099-07-07',
+    };
 
-    await expect(controller.getWeekly(superUser as never, {} as never)).rejects.toBeInstanceOf(BadRequestException);
+    await controller.findCalendarRange(doctorUser as never, query);
+
+    expect(service.findCalendarRange).toHaveBeenCalledWith({
+      dateFrom: '2099-07-01',
+      dateTo: '2099-07-07',
+      facilityId: '1',
+      staffId: '15',
+    });
   });
 
   // Vai tro: API grouped tu dong scope facility cho manager va goi service gom ca theo khoang ngay.
@@ -1974,8 +1919,8 @@ describe('ShiftsController unit routing and scope', () => {
     expect(service.confirmBulkGenerate).toHaveBeenCalledWith(dto);
   });
 
-  // Vai tro: dam bao controller route availability va weekly schedule hop le xuong dung service method.
-  it('routes availability and valid weekly calendar requests to the service', async () => {
+  // Vai tro: dam bao controller route availability hop le xuong dung service method.
+  it('routes availability requests to the service', async () => {
     const { service, controller } = createController();
 
     await expect(controller.getDoctorAvailability('1', {
@@ -1983,17 +1928,11 @@ describe('ShiftsController unit routing and scope', () => {
       date: '2099-07-07',
       slotMinutes: 30,
     })).resolves.toMatchObject({ data: { shifts: [] } });
-    await expect(controller.getWeekly(superUser as never, {
-      facilityId: '1',
-      weekStart: '2099-07-06',
-      doctorId: '2',
-    } as never)).resolves.toMatchObject({ data: { days: [] } });
     expect(service.getDoctorAvailability).toHaveBeenCalledWith('1', {
       facilityId: '1',
       date: '2099-07-07',
       slotMinutes: 30,
     });
-    expect(service.getWeeklySchedule).toHaveBeenCalledWith('1', '2099-07-06', '2');
   });
 });
 

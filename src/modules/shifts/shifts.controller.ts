@@ -18,14 +18,14 @@ import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { assertFacilityAccess, getActiveFacilityId } from '../../common/helpers/facility-scope.helper';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import { RoleEnum } from '../../common/constants/role.enum';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AutoGenerateShiftsDto } from './dto/requests/auto-generate-shifts.dto';
 import { CheckShiftConflictDto } from './dto/requests/check-shift-conflict.dto';
 import { CreateDoctorShiftDto } from './dto/requests/create-doctor-shift.dto';
 import { DoctorAvailabilityQueryDto } from './dto/requests/doctor-availability.dto';
-import { GroupedDoctorShiftDto, SearchDoctorShiftDto, WeeklyDoctorShiftDto } from './dto/requests/search-doctor-shift.dto';
+import { DoctorShiftRangeDto, GroupedDoctorShiftDto, SearchDoctorShiftDto } from './dto/requests/search-doctor-shift.dto';
 import { UpdateDoctorShiftDto } from './dto/requests/update-doctor-shift.dto';
-import { RestoreDoctorShiftDto } from './dto/requests/restore-doctor-shift.dto';
 import { WeeklyUpdateShiftsDto } from './dto/requests/weekly-update-shifts.dto';
 import { WeeklyShiftUpdateService } from './weekly-shift-update.service';
 import {
@@ -56,10 +56,24 @@ export class ShiftsController {
   async findAll(
     @CurrentUser() user: AuthenticatedUser,
    @Query() query: SearchDoctorShiftDto) {
-    const activeFacilityId = getActiveFacilityId(user);
-    if (activeFacilityId) query.facilityId = activeFacilityId;
+    this.applyReadScope(user, query);
     const data = await this.service.findAllPaginated(query);
     return { message: RESPONSE_MESSAGES.SHIFTS.FOUND, data };
+  }
+
+  @Get('range')
+  @Permissions(PermissionEnum.SHIFT_VIEW)
+  @ApiOperation({ summary: 'Get all shifts in a bounded calendar range' })
+  @ApiResponse({ status: 200, type: [DoctorShiftResponseDto] })
+  async findCalendarRange(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: DoctorShiftRangeDto,
+  ) {
+    this.applyReadScope(user, query);
+    return {
+      message: RESPONSE_MESSAGES.SHIFTS.FOUND,
+      data: await this.service.findCalendarRange(query),
+    };
   }
 
   @Post('check-conflicts')
@@ -177,25 +191,6 @@ export class ShiftsController {
     };
   }
 
-  @Get('weekly')
-   @Permissions(PermissionEnum.SHIFT_VIEW)
-  @ApiOperation({ summary: 'Get weekly shift calendar' })
-  @ApiResponse({ status: 200, type: [DoctorShiftResponseDto] })
-  async getWeekly(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query() query: WeeklyDoctorShiftDto,
-  ) {
-    const facilityId =
-     getActiveFacilityId(user) ?? 
-     query.facilityId;
-    if (!facilityId) throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.FACILITY_ID_REQUIRED);
-     assertFacilityAccess(user, facilityId);
-    return {
-      message: RESPONSE_MESSAGES.SHIFTS.WEEKLY_SUCCESS,
-      data: await this.service.getWeeklySchedule(facilityId, query.weekStart, query.doctorId),
-    };
-  }
-
   @Get('grouped')
    @Permissions(PermissionEnum.SHIFT_VIEW)
   @ApiOperation({ summary: 'Group shifts in a date range by same schedule pattern' })
@@ -267,22 +262,6 @@ export class ShiftsController {
     return { message: RESPONSE_MESSAGES.SHIFTS.UPDATED, data: await this.service.update(id, dto, user?.id ?? null) };
   }
 
-  @Post(':id/restore')
-   @Permissions(PermissionEnum.SHIFT_UPDATE)
-  @ApiOperation({ summary: 'Restore a cancelled future shift' })
-  async restore(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-    @Body() body: RestoreDoctorShiftDto,
-  ) {
-    const existing = await this.service.findById(id);
-    assertFacilityAccess(user, existing.facilityId);
-    return {
-      message: 'Khôi phục ca trực thành công',
-      data: await this.service.restore(id, body.reason, user?.id ?? null),
-    };
-  }
-
   @Delete(':id')
    @Permissions(PermissionEnum.SHIFT_DELETE)
   @ApiOperation({ summary: 'Delete shift' })
@@ -304,5 +283,20 @@ export class ShiftsController {
       return;
     }
     assertFacilityAccess(user, dto.facilityId);
+  }
+
+  /** Bac si chi doc ca cua staff trong token; admin van doc toan bo ca cua co so. */
+  private applyReadScope(
+    user: AuthenticatedUser,
+    query: { facilityId?: string; staffId?: string },
+  ): void {
+    const activeFacilityId = getActiveFacilityId(user);
+    if (activeFacilityId) query.facilityId = activeFacilityId;
+
+    const roleNames = new Set(user.roles.map(role => role.name));
+    const isDoctorViewer = roleNames.has(RoleEnum.DOCTOR)
+      && !roleNames.has(RoleEnum.ADMIN)
+      && !roleNames.has(RoleEnum.SUPER_ADMIN);
+    if (isDoctorViewer) query.staffId = String(user.id);
   }
 }

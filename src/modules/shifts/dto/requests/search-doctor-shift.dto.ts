@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiHideProperty, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsDateString, IsEnum, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 import { DoctorShiftStatus } from '../../../../common/constants/status.enum';
 import { POSITIVE_ID_PATTERN } from '../../../rooms/dto/requests/create-room.dto';
@@ -10,6 +10,13 @@ export class SearchDoctorShiftDto {
   @IsString()
   @Matches(POSITIVE_ID_PATTERN)
   doctorId?: string;
+
+  /** Backend gan staffId tu token khi tai khoan bac si xem lich cua chinh minh. */
+  @ApiHideProperty()
+  @IsOptional()
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  staffId?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -52,6 +59,46 @@ export class SearchDoctorShiftDto {
   @Min(1)
   @Max(200)
   limit?: number;
+}
+
+/** Query rieng cho man lich: lay tron mot khoang ngay bang mot request, khong phan trang. */
+export class DoctorShiftRangeDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  doctorId?: string;
+
+  @ApiHideProperty()
+  @IsOptional()
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  staffId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  facilityId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(POSITIVE_ID_PATTERN)
+  roomId?: string;
+
+  @ApiProperty({ example: '2026-08-17' })
+  @IsDateString({ strict: true })
+  dateFrom: string;
+
+  @ApiProperty({ example: '2026-08-23' })
+  @IsDateString({ strict: true })
+  dateTo: string;
+
+  @ApiPropertyOptional({ enum: DoctorShiftStatus })
+  @IsOptional()
+  @IsEnum(DoctorShiftStatus)
+  status?: DoctorShiftStatus;
 }
 
 export class WeeklyDoctorShiftDto {
