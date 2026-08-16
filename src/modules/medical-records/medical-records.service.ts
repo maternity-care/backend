@@ -59,6 +59,7 @@ export class MedicalRecordsService implements IMedicalRecordService {
     const record = this.repository.create({
       ...dto,
       diagnosis: dto?.diagnosis ?? null,
+      conclusion: dto?.conclusion ?? null,
       recommendation: dto?.recommendation ?? null,
       nextAppointmentSuggestedAt: dto.nextAppointmentSuggestedAt
         ? new Date(dto.nextAppointmentSuggestedAt)
