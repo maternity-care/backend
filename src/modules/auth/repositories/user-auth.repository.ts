@@ -17,7 +17,9 @@ export class UserAuthRepository implements IUserAuthRepository {
     const user = await this.repository.findOne({
       where: { email },
       relations: {
-        user: true,
+        user: {
+          pregnancyProfiles: true,
+        },
       },
     });
     return user;

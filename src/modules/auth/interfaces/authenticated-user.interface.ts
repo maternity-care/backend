@@ -37,4 +37,17 @@ export interface AuthenticatedUser {
   facilityRole: AuthenticatedRole | null;
   facilityRoles: AuthenticatedRole[];
   activeFacilityId: string | null;
+  address?: string | null;
+  createdAt?: string | Date | null;
+  updatedAt?: string | Date | null;
+  cccd?: string | null;
+  dateOfBirth?: string | null;
+  priorityLevel?: number | null;
+  province?: string | null;
+  ward?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  gestationalWeek?: string | number | null;
+  expectedDueDate?: string | null;
+  bloodType?: string | null;
 }
