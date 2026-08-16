@@ -1,3 +1,4 @@
+import { PregnancyProfile } from './../pregnancy-profile/entities/pregnancy-profile.entity';
 import { UserAuth } from './../auth/entities/user-auth.entity';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -13,7 +14,11 @@ import { ManagementSystemUsersController } from './management-system-users.contr
 import { Appointment } from '../appointments/entities/appointment.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Appointment, UserAuth]), JobsModule, ConfigModule],
+  imports: [
+    TypeOrmModule.forFeature([User, Appointment, UserAuth, PregnancyProfile]),
+    JobsModule,
+    ConfigModule,
+  ],
   controllers: [UsersController, ManagementSystemUsersController],
   providers: [
     UsersService,
