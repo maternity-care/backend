@@ -235,8 +235,31 @@ export class AppointmentsService {
     });
   }
 
-  async getPregnancyProfilesOfDoctor(doctorId: string, query: SearchProfileQueryDto) {
+  async getPregnancyProfilesOfDoctor(
+    doctorId: string | null,
+    query: SearchProfileQueryDto,
+    scopedFacilityId?: string | null,
+  ) {
     const { patientId, name, code, phone, email, status, page = 1, limit = 20 } = query;
+    const appointmentConditions = [
+      'appointment.status = :appointmentStatus',
+      'appointment.checkedInAt IS NOT NULL',
+      'appointment.checkedInAt < :now',
+    ];
+    const appointmentParams: Record<string, string | Date> = {
+      appointmentStatus: AppointmentStatus.COMPLETED,
+      now: new Date(),
+    };
+
+    if (doctorId) {
+      appointmentConditions.unshift('appointment.doctorId = :doctorId');
+      appointmentParams.doctorId = doctorId;
+    }
+
+    if (scopedFacilityId) {
+      appointmentConditions.unshift('appointment.facilityId = :scopedFacilityId');
+      appointmentParams.scopedFacilityId = scopedFacilityId;
+    }
 
     const queryBuilder = this.dataSource
       .getRepository(PregnancyProfile)
@@ -244,17 +267,8 @@ export class AppointmentsService {
       .innerJoin(
         'pregnancyProfile.appointments',
         'appointment',
-        `
-        appointment.doctorId = :doctorId
-        AND appointment.status = :appointmentStatus
-        AND appointment.checkedInAt IS NOT NULL
-        AND appointment.checkedInAt < :now
-      `,
-        {
-          doctorId,
-          appointmentStatus: AppointmentStatus.COMPLETED,
-          now: new Date(),
-        },
+        appointmentConditions.join(' AND '),
+        appointmentParams,
       )
       .leftJoinAndSelect('pregnancyProfile.patient', 'patient')
       .distinct(true);
@@ -308,15 +322,29 @@ export class AppointmentsService {
     };
   }
 
-  async getAppointmentOfDoctorAndPregnancyProfile(doctorId: string, pregnancyProfileId: string) {
+  async getAppointmentOfDoctorAndPregnancyProfile(
+    doctorId: string | null,
+    pregnancyProfileId: string,
+    scopedFacilityId?: string | null,
+  ) {
     const appointmentRepository = this.dataSource.getRepository(Appointment);
-    return await appointmentRepository
+    const queryBuilder = appointmentRepository
       .createQueryBuilder('appointment')
-      .where('appointment.doctorId = :doctorId', { doctorId })
-      .andWhere('appointment.pregnancyProfileId = :pregnancyProfileId', { pregnancyProfileId })
+      .where('appointment.pregnancyProfileId = :pregnancyProfileId', { pregnancyProfileId })
       .andWhere('appointment.status =:status', { status: AppointmentStatus.COMPLETED })
+      .andWhere('appointment.checkedInAt IS NOT NULL')
       .andWhere('appointment.checkedInAt < :now', { now: new Date() })
-      .getMany();
+      .orderBy('appointment.checkedInAt', 'DESC');
+
+    if (doctorId) {
+      queryBuilder.andWhere('appointment.doctorId = :doctorId', { doctorId });
+    }
+
+    if (scopedFacilityId) {
+      queryBuilder.andWhere('appointment.facilityId = :scopedFacilityId', { scopedFacilityId });
+    }
+
+    return await queryBuilder.getMany();
   }
 
   async findManagement(

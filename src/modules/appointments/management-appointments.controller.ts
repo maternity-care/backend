@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
+import { RoleEnum } from '../../common/constants/role.enum';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { getActiveFacilityId } from '../../common/helpers/facility-scope.helper';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
@@ -20,6 +21,10 @@ import { SearchProfileQueryDto } from '../pregnancy-profile/dto/request/search-p
 @Controller('management/appointments')
 export class ManagementAppointmentsController {
   constructor(private readonly appointmentsService: AppointmentsService) {}
+
+  private isDoctor(user: AuthenticatedUser) {
+    return user.roles.some((role) => role.name === RoleEnum.DOCTOR);
+  }
 
   @Get()
   @ApiOperation({ summary: 'List appointments for management' })
@@ -41,10 +46,15 @@ export class ManagementAppointmentsController {
     @Query() query: SearchProfileQueryDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const doctorId = user.id;
+    const scopedFacilityId = getActiveFacilityId(user);
+    const doctorId = this.isDoctor(user) ? user.id : null;
     return {
       message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.GET_LIST_SUCCESS,
-      data: await this.appointmentsService.getPregnancyProfilesOfDoctor(doctorId, query),
+      data: await this.appointmentsService.getPregnancyProfilesOfDoctor(
+        doctorId,
+        query,
+        scopedFacilityId,
+      ),
     };
   }
 
@@ -55,10 +65,15 @@ export class ManagementAppointmentsController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
   ) {
-    const doctorId = user.id;
+    const scopedFacilityId = getActiveFacilityId(user);
+    const doctorId = this.isDoctor(user) ? user.id : null;
     return {
       message: RESPONSE_MESSAGES.APPOINTMENTS.GET_LIST_SUCCESS,
-      data: await this.appointmentsService.getAppointmentOfDoctorAndPregnancyProfile(doctorId, id),
+      data: await this.appointmentsService.getAppointmentOfDoctorAndPregnancyProfile(
+        doctorId,
+        id,
+        scopedFacilityId,
+      ),
     };
   }
 

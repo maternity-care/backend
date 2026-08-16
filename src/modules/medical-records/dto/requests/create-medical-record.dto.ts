@@ -3,7 +3,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsArray,
   IsDateString,
-  IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
@@ -37,12 +36,12 @@ export class CreateMedicalRecordDto {
   @MaxLength(10000)
   diagnosis?: string | null;
 
-  @ApiPropertyOptional({ example: 'Sức khỏe mẹ và thai nhi ổn định' })
+  @ApiPropertyOptional({ nullable: true, example: 'Sức khỏe mẹ và thai nhi ổn định' })
+  @IsOptional()
   @Transform(({ value }) => trimText(value))
   @IsString()
-  @IsNotEmpty()
   @MaxLength(10000)
-  conclusion?: string;
+  conclusion?: string | null;
 
   @ApiPropertyOptional({ nullable: true, example: 'Tái khám sau 4 tuần' })
   @IsOptional()
