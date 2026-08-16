@@ -171,25 +171,31 @@ export class UsersRepository implements IUsersRepository {
   }
 
   async findAllNoPregnant(doctorId: string): Promise<User[]> {
-    return this.repository
-      .createQueryBuilder('user')
-      .innerJoin('user.appointments', 'appointment')
-      .leftJoinAndSelect('user.pregnancyProfiles', 'pregnancyProfile')
-      .where('appointment.doctorId = :doctorId', { doctorId })
-      .andWhere((qb) => {
-        const activeProfileSubQuery = qb
-          .subQuery()
-          .select('1')
-          .from(PregnancyProfile, 'activeProfile')
-          .where('activeProfile.patientId = user.id')
-          .andWhere('activeProfile.status = :activeStatus')
-          .getQuery();
+    try {
+      const users = this.repository
+        .createQueryBuilder('user')
+        .innerJoin(Appointment, 'appointment', 'appointment.patientId = user.id')
+        .leftJoinAndSelect('user.pregnancyProfiles', 'pregnancyProfile')
+        .where('appointment.doctorId', { doctorId })
+        .andWhere((qb) => {
+          const activeProfileSubQuery = qb
+            .subQuery()
+            .select('1')
+            .from(PregnancyProfile, 'activeProfile')
+            .where('activeProfile.patientId = user.id')
+            .andWhere('activeProfile.status = :activeStatus')
+            .getQuery();
 
-        return `NOT EXISTS (${activeProfileSubQuery})`;
-      })
-      .setParameter('activeStatus', PregnancyProfileStatus.ACTIVE)
-      .distinct(true)
-      .getMany();
+          return `NOT EXISTS (${activeProfileSubQuery})`;
+        })
+        .setParameter('activeStatus', PregnancyProfileStatus.ACTIVE)
+        .distinct(true)
+        .getMany();
+      return users;
+    } catch (error) {
+      console.log('error', error);
+      return [];
+    }
   }
 
   async remove(user: User): Promise<void> {

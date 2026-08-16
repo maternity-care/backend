@@ -70,7 +70,7 @@ export class DoctorsRepository implements IDoctorsRepository {
       where.yearsOfExperience = filters.filterYearsOfExperienceLevel;
     }
 
-    const sortYoE = filters?.sortYearsOfExperience || 'DESC';
+    // const sortYoE = filters?.sortYearsOfExperience || 'DESC';
 
     const page = Math.max(1, Number(filters?.page) || 1);
     const limit = Math.max(1, Number(filters?.limit) || 20);
@@ -85,7 +85,6 @@ export class DoctorsRepository implements IDoctorsRepository {
         staff: {
           createdAt: 'DESC',
         },
-        yearsOfExperience: sortYoE,
       },
       take: limit,
       skip: (page - 1) * limit,
