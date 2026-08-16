@@ -18,7 +18,6 @@ import { IUsersService } from './interfaces/users-service.interface';
 import { UserStatusEnum } from './users.enum';
 import { SearchUserDto } from './dto/request/search-user.dto';
 import { SearchUserResponseDto } from './dto/response/search-user-response.dto';
-import { AccountStatus } from '../../common/constants/status.enum';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { getActiveFacilityId, isSuperAdmin } from '../../common/helpers/facility-scope.helper';
 import { UserAuthRepository } from '../auth/repositories/user-auth.repository';
@@ -131,11 +130,19 @@ export class UsersService implements IUsersService {
     user.emergencyContactName = dto.emergencyContactName ?? user.emergencyContactName;
     user.emergencyContactPhone = dto.emergencyContactPhone ?? user.emergencyContactPhone;
     user.status = dto.status ?? user.status;
-    if (dto.status && dto.status === UserStatusEnum.ACTIVE) {
-      await this.userAuthRepository.updateStatus(user.id, AccountStatus.ACTIVE);
-    }
 
     const savedUser = await this.usersRepository.save(user);
+    if (dto.status) {
+      try {
+        await this.userAuthRepository.updateStatus(user.id, dto.status);
+      } catch (error) {
+        this.logger.warn(
+          `Could not sync auth status for user ${user.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
     await this.clearUsersCache(id);
     return this.findById(savedUser.id);
   }
