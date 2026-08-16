@@ -170,25 +170,26 @@ export class UsersRepository implements IUsersRepository {
     };
   }
 
-  async findAllNoPregnant(): Promise<User[]> {
-    const users = await this.repository
+  async findAllNoPregnant(doctorId: string): Promise<User[]> {
+    return this.repository
       .createQueryBuilder('user')
+      .innerJoin('user.appointments', 'appointment')
       .leftJoinAndSelect('user.pregnancyProfiles', 'pregnancyProfile')
-      .where((qb) => {
-        const activeProfileQuery = qb
+      .where('appointment.doctorId = :doctorId', { doctorId })
+      .andWhere((qb) => {
+        const activeProfileSubQuery = qb
           .subQuery()
           .select('1')
           .from(PregnancyProfile, 'activeProfile')
-          .where('activeProfile.patient_id = user.id')
+          .where('activeProfile.patientId = user.id')
           .andWhere('activeProfile.status = :activeStatus')
           .getQuery();
 
-        return `NOT EXISTS ${activeProfileQuery}`;
+        return `NOT EXISTS (${activeProfileSubQuery})`;
       })
       .setParameter('activeStatus', PregnancyProfileStatus.ACTIVE)
+      .distinct(true)
       .getMany();
-
-    return users;
   }
 
   async remove(user: User): Promise<void> {

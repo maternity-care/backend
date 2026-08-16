@@ -19,5 +19,5 @@ export interface IUsersRepository {
   updateStatus(id: string, status: AccountStatus, reason?: string): Promise<void>;
   checkPhoneExists(phone: string): Promise<boolean>;
   searchUsers(query: SearchUserDto): Promise<SearchUserResponseDto>;
-  findAllNoPregnant(): Promise<User[]>;
+  findAllNoPregnant(doctorId: string): Promise<User[]>;
 }

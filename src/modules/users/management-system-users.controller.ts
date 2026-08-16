@@ -42,8 +42,8 @@ export class ManagementSystemUsersController {
   }
 
   @Get('no-pregnant')
-  async findAllNoPregnant() {
-    const data = await this.usersService.findAllNoPregnant();
+  async findAllNoPregnant(@CurrentUser() currentUser: AuthenticatedUser) {
+    const data = await this.usersService.findAllNoPregnant(currentUser.id);
     return { data, success: true, message: 'Lấy thông tin người dùng không mang thai thành công.' };
   }
 
