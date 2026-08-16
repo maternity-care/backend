@@ -3129,7 +3129,7 @@ async function insertShifts() {
     where: { roles: { name: In([RoleEnum.DOCTOR, RoleEnum.NURSE, RoleEnum.STAFF]) } },
   });
   const shiftSlots = await shiftSlotRepository.find();
-  const rooms = await roomRepository.find();
+  const rooms = await roomRepository.find({ relations: { roomType: true } });
   const selectedRoomType = [
     'Phòng khám sản',
     'Phòng khám tổng quát',
@@ -3139,12 +3139,12 @@ async function insertShifts() {
   ];
   const firstDateOfWeek = new Date();
 
-  firstDateOfWeek.setDate(firstDateOfWeek.getDate() - 90);
+  firstDateOfWeek.setDate(firstDateOfWeek.getDate() - 30);
   firstDateOfWeek.setDate(firstDateOfWeek.getDate() - ((firstDateOfWeek.getDay() + 6) % 7));
   firstDateOfWeek.setHours(0, 0, 0, 0);
 
   const nextWeek = new Date();
-  nextWeek.setDate(nextWeek.getDate() + 7);
+  nextWeek.setDate(nextWeek.getDate());
   nextWeek.setDate(nextWeek.getDate() - ((nextWeek.getDay() + 6) % 7) - 1);
   nextWeek.setHours(0, 0, 0, 0);
 
@@ -3152,10 +3152,11 @@ async function insertShifts() {
     (nextWeek.getTime() - firstDateOfWeek.getTime()) / (24 * 60 * 60 * 1000),
   );
   const distanceWeek = Math.ceil(distanceDay / 7);
+  const shiftData = [];
   for (const facility of facilities) {
     const roomOfFacility = rooms.filter((room) => String(room.facilityId) === String(facility.id));
     const roomTypeInFacilityForDoctors = roomOfFacility.filter((room) =>
-      selectedRoomType.includes(room.name),
+      selectedRoomType.includes(room.roomType.name),
     );
     const doctorsInFacility = staffs.filter(
       (staff) =>
@@ -3175,64 +3176,46 @@ async function insertShifts() {
     for (let weekOffset = 0; weekOffset < distanceWeek; weekOffset++) {
       // chia thành các tuần để insert lịch cho từng tuần
 
-      for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+      for (let dayOffset = 0; dayOffset < 6; dayOffset++) {
         const shiftDate = new Date(
           firstDateOfWeek.getTime() + (weekOffset * 7 + dayOffset) * 24 * 60 * 60 * 1000,
         )
           .toISOString()
           .slice(0, 10);
-        // insert cho từng rooms
-        for (const room of roomOfFacility) {
+        // insert cho từng room trong các rooms cần doctor
+        for (const room of roomTypeInFacilityForDoctors) {
           // mỗi room sẽ insert cho các ca
-          const isNeedDoctor = roomTypeInFacilityForDoctors.includes(room);
           for (
             let shiftSlotIndex = 0;
             shiftSlotIndex < shiftSlotOfFacility.length;
             shiftSlotIndex++
           ) {
             const shiftSlot = shiftSlotOfFacility[shiftSlotIndex];
-            if (isNeedDoctor) {
-              const randomDoctorIndex = Math.floor(Math.random() * doctorsInFacility.length);
-              const staff = doctorsInFacility[randomDoctorIndex];
-              const newShift = {
-                staffId: staff.id,
-                roleId: staff.roles[0]?.id ?? null,
-                facilityId: staff.facilityId!,
-                roomId: room.id,
-                slotId: shiftSlot.id,
-                shiftDate,
-                startTime: shiftSlot.startTime,
-                endTime: shiftSlot.endTime,
-                maxAppointment: 8,
-                status: DoctorShiftStatus.AVAILABLE,
-                createdAt: new Date(shiftDate),
-                updatedAt: new Date(shiftDate),
-              };
-              await shiftRepository.save(newShift);
-            } else {
-              const randomStaffIndex = Math.floor(Math.random() * staffInFacility.length);
-              const staff = staffInFacility[randomStaffIndex];
-              const newShift = {
-                staffId: staff.id,
-                roleId: staff.roles[0]?.id ?? null,
-                facilityId: staff.facilityId!,
-                roomId: room.id,
-                slotId: shiftSlot.id,
-                shiftDate,
-                startTime: shiftSlot.startTime,
-                endTime: shiftSlot.endTime,
-                maxAppointment: 8,
-                status: DoctorShiftStatus.AVAILABLE,
-                createdAt: new Date(shiftDate),
-                updatedAt: new Date(shiftDate),
-              };
-              await shiftRepository.save(newShift);
-            }
+            const randomDoctorIndex = Math.floor(Math.random() * doctorsInFacility.length);
+            const staff = doctorsInFacility[randomDoctorIndex];
+            const newShift = {
+              staffId: staff.id,
+              roleId: staff.roles[0]?.id ?? null,
+              facilityId: staff.facilityId!,
+              roomId: room.id,
+              slotId: shiftSlot.id,
+              shiftDate,
+              startTime: shiftSlot.startTime,
+              endTime: shiftSlot.endTime,
+              maxAppointment: 8,
+              status: DoctorShiftStatus.AVAILABLE,
+              createdAt: new Date(shiftDate),
+              updatedAt: new Date(shiftDate),
+            };
+            shiftData.push(newShift);
           }
         }
       }
     }
   }
+  await shiftRepository.save(shiftData, {
+    chunk: 100,
+  });
 }
 
 async function insertOrders(): Promise<void> {
@@ -3604,6 +3587,38 @@ async function insertAppointments(): Promise<void> {
     return dateA.getTime() - dateB.getTime();
   });
   await appointmentRepository.save(sortedAppointments, {
+    chunk: 100,
+  });
+}
+
+async function insertUserSchedules(): Promise<void> {
+  const appointments = await appointmentRepository.find({
+    relations: {
+      patient: true,
+      facility: true,
+      doctor: { doctor: true },
+      service: true,
+    },
+  });
+  const userScheduleData = [];
+  for (const appointment of appointments) {
+    userScheduleData.push({
+      userId: appointment.patient.id,
+      title: `Khám: ${appointment?.service?.name}`,
+      type: 'checkup',
+      scheduleDate: String(appointment.scheduledStart).slice(0, 10),
+      scheduleTime: String(appointment.scheduledStart).slice(11, 18),
+      status: appointment.status,
+      location: appointment.facility.name,
+      doctor: `${appointment.doctor.doctor?.specialty} ${appointment.doctor.name}`,
+      note: 'Lịch khám từ người dùng đặt lịch hẹn.',
+      source: 'appointment',
+      appointmentId: appointment.id,
+      createdAt: new Date(appointment.createdAt),
+      updatedAt: new Date(appointment.createdAt),
+    });
+  }
+  await scheduleRepository.save(userScheduleData, {
     chunk: 100,
   });
 }
@@ -4209,9 +4224,10 @@ async function seedCustomData(): Promise<void> {
     // await insertPregnancyProfiles();
     // await insertUserAuths();
     // await insertShiftSlots();
-    await insertShifts();
+    // await insertShifts();
     // await insertOrders();
     // await insertAppointments();
+    await insertUserSchedules();
     // await insertMedicalRecords();
     // // await insertCareFlowData();
     // await insertForumData();

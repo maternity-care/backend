@@ -220,7 +220,7 @@ export class UsersService implements IUsersService {
     return this.usersRepository.searchUsers(query);
   }
 
-  async findAllNoPregnant(): Promise<User[]> {
-    return this.usersRepository.findAllNoPregnant();
+  async findAllNoPregnant(doctorId: string): Promise<User[]> {
+    return this.usersRepository.findAllNoPregnant(doctorId);
   }
 }

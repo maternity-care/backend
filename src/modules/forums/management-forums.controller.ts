@@ -28,7 +28,7 @@ import { ForumsService } from './forums.service';
 @ApiTags('Management - Forums')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-@Roles(RoleEnum.SUPER_ADMIN, RoleEnum.ADMIN, RoleEnum.MODERATOR, RoleEnum.STAFF)
+@Roles(RoleEnum.SUPER_ADMIN, RoleEnum.ADMIN, RoleEnum.MODERATOR, RoleEnum.STAFF, RoleEnum.DOCTOR)
 @Controller('management/forums')
 export class ManagementForumsController {
   constructor(
