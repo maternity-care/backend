@@ -188,6 +188,10 @@ export class ForumReportsRepository {
     });
   }
 
+  deleteByTarget(targetType: ForumTargetType, targetId: string) {
+    return this.reportRepository.delete({ targetType, targetId });
+  }
+
   async createResolutionLog(input: ModerationLogInput) {
     const log = this.moderationLogRepository.create({
       targetType: input.report.targetType,

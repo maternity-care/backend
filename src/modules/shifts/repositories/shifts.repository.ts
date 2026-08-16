@@ -319,23 +319,6 @@ export class ShiftsRepository implements IShiftsRepository {
     return query.getMany();
   }
 
-  findWeeklyWithDetails(
-    facilityId: string,
-    startDate: string,
-    endDate: string,
-    doctorId?: string,
-  ): Promise<ShiftWithDetails[]> {
-    const query = this.buildDetailsQuery()
-      .where('shift.facilityId = :facilityId', { facilityId })
-      .andWhere('shift.deletedAt IS NULL')
-      .andWhere('shift.shiftDate BETWEEN :startDate AND :endDate', { startDate, endDate })
-      .orderBy('shift.shiftDate', 'ASC')
-      .addOrderBy('shift.startTime', 'ASC');
-
-    if (doctorId) query.andWhere('doctor.id = :doctorId', { doctorId });
-    return query.getRawMany<ShiftWithDetails>();
-  }
-
   findWeeklyDoctorShiftsWithDetails(
     facilityId: string,
     startDate: string,
@@ -722,6 +705,7 @@ export class ShiftsRepository implements IShiftsRepository {
       .orderBy('shift.shiftDate', 'DESC')
       .addOrderBy('shift.startTime', 'ASC');
     if (filters?.doctorId) query.andWhere('doctor.id = :doctorId', { doctorId: filters.doctorId });
+    if (filters?.staffId) query.andWhere('shift.staffId = :staffId', { staffId: filters.staffId });
     if (filters?.facilityId) query.andWhere('shift.facilityId = :facilityId', { facilityId: filters.facilityId });
     if (filters?.roomId) query.andWhere('shift.roomId = :roomId', { roomId: filters.roomId });
     if (filters?.status) query.andWhere('shift.status = :status', { status: filters.status });

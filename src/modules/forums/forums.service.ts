@@ -436,6 +436,11 @@ export class ForumsService {
 
   async hardDeletePost(id: string, actor: AuthenticatedUser, reason?: string | null) {
     const post = await this.postRepository.findOne({ where: { id } });
+    const comments = await this.commentRepository.find({
+      where: { postId: id },
+      select: { id: true },
+    });
+    const commentIds = comments.map(comment => comment.id);
     if (!post) throw new NotFoundException('Không tìm thấy bài viết');
 
     await this.writeModerationLog({
@@ -446,8 +451,27 @@ export class ForumsService {
       reason: reason ?? null,
       metadata: { mode: 'hard_delete' },
     });
-    await this.commentRepository.delete({ postId: id });
-    await this.postRepository.delete(id);
+    const deletedReportCount = await this.postRepository.manager.transaction(async manager => {
+      let affectedReports = (
+        await manager.delete(ContentReport, {
+          targetType: ForumTargetType.POST,
+          targetId: id,
+        })
+      ).affected ?? 0;
+
+      if (commentIds.length > 0) {
+        affectedReports += (
+          await manager.delete(ContentReport, {
+            targetType: ForumTargetType.COMMENT,
+            targetId: In(commentIds),
+          })
+        ).affected ?? 0;
+      }
+
+      await manager.delete(ForumComment, { postId: id });
+      await manager.delete(ForumPost, { id });
+      return affectedReports;
+    });
     this.realtimeEvents.emitForumEvent('forum:post.deleted', {
       id,
       postId: id,
@@ -457,7 +481,7 @@ export class ForumsService {
       public: true,
       postRoom: true,
     });
-    return { action: 'hard_deleted', id };
+    return { action: 'hard_deleted', id, deletedReportCount };
   }
 
   async hardDeleteComment(id: string, actor: AuthenticatedUser, reason?: string | null) {
@@ -473,12 +497,15 @@ export class ForumsService {
       reason: reason ?? null,
       metadata: { mode: 'hard_delete', deletedIds: ids },
     });
-    await this.commentRepository
-      .createQueryBuilder()
-      .delete()
-      .from(ForumComment)
-      .where('id IN (:...ids)', { ids })
-      .execute();
+    // Xóa report và toàn bộ cây trả lời trong cùng transaction để không còn report mồ côi.
+    const deletedReportCount = await this.commentRepository.manager.transaction(async manager => {
+      const reportResult = await manager.delete(ContentReport, {
+        targetType: ForumTargetType.COMMENT,
+        targetId: In(ids),
+      });
+      await manager.delete(ForumComment, { id: In(ids) });
+      return reportResult.affected ?? 0;
+    });
     this.realtimeEvents.emitForumEvent('forum:comment.deleted', {
       id,
       postId: comment.postId,
@@ -489,7 +516,12 @@ export class ForumsService {
       public: true,
       postRoom: true,
     });
-    return { action: 'hard_deleted', id, affectedCount: ids.length };
+    return {
+      action: 'hard_deleted',
+      id,
+      affectedCount: ids.length,
+      deletedReportCount,
+    };
   }
 
   async createComment(postId: string, dto: CreateForumCommentDto, actor: AuthenticatedUser) {
