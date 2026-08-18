@@ -101,6 +101,13 @@ export enum PermissionEnum {
   CONSULTATION_REPLY = 'consultation.reply',
   CONSULTATION_CLOSE = 'consultation.close',
 
+  MESSAGING_VIEW = 'messaging.view',
+  MESSAGING_CREATE = 'messaging.create',
+  MESSAGING_UPDATE = 'messaging.update',
+  MESSAGING_DELETE = 'messaging.delete',
+  MESSAGING_REPLY = 'messaging.reply',
+  MESSAGING_ACCOUNT_MANAGE = 'messaging.account_manage',
+
   ARTICLE_VIEW = 'article.view',
   ARTICLE_CREATE = 'article.create',
   ARTICLE_UPDATE = 'article.update',

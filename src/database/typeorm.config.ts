@@ -52,6 +52,12 @@ import { User } from '../modules/users/entities/user.entity';
 import { UserAuth } from '../modules/auth/entities/user-auth.entity';
 import { UserSchedule } from '../modules/schedules/entities/user-schedule.entity';
 import { Notification } from '../modules/notifications/entities/notification.entity';
+import { MessagingChannelAccount } from '../modules/messaging/entities/messaging-channel-account.entity';
+import { MessagingConversationTag } from '../modules/messaging/entities/messaging-conversation-tag.entity';
+import { MessagingConversation } from '../modules/messaging/entities/messaging-conversation.entity';
+import { MessagingCustomerIdentity } from '../modules/messaging/entities/messaging-customer-identity.entity';
+import { MessagingMessage } from '../modules/messaging/entities/messaging-message.entity';
+import { MessagingTag } from '../modules/messaging/entities/messaging-tag.entity';
 import { UpdateServicePackageDesign1785120000000 } from './migrations/1785120000000-UpdateServicePackageDesign';
 import { UseDynamicServiceTypes1785200000000 } from './migrations/1785200000000-UseDynamicServiceTypes';
 import { MakeFacilityLocationNullable1785300000000 } from './migrations/1785300000000-MakeFacilityLocationNullable';
@@ -71,6 +77,9 @@ import { AddForumNotifications1786600000000 } from './migrations/1786600000000-A
 import { AddApplicableDaysToShiftSlots1786700000000 } from './migrations/1786700000000-AddApplicableDaysToShiftSlots';
 import { DropFacilityClosureDays1786800000000 } from './migrations/1786800000000-DropFacilityClosureDays';
 import { RebuildDatabaseTest1786726656690 } from './migrations/1786726656690-RebuildDatabaseTest';
+import { AddMessagingModule1787100000000 } from './migrations/1787100000000-AddMessagingModule';
+import { AddMessagingTags1787200000000 } from './migrations/1787200000000-AddMessagingTags';
+import { AddMessagingCustomerIdentities1787300000000 } from './migrations/1787300000000-AddMessagingCustomerIdentities';
 
 config();
 
@@ -135,6 +144,12 @@ export const typeOrmConfig: DataSourceOptions = {
     PregnancyProfile,
     ShiftSlot,
     StaffPermission,
+    MessagingChannelAccount,
+    MessagingConversation,
+    MessagingConversationTag,
+    MessagingCustomerIdentity,
+    MessagingMessage,
+    MessagingTag,
     join(__dirname, 'entities', '*.entity{.ts,.js}'),
   ],
   migrations: [
@@ -157,6 +172,9 @@ export const typeOrmConfig: DataSourceOptions = {
     // AddApplicableDaysToShiftSlots1786700000000,
     // DropFacilityClosureDays1786800000000,
     RebuildDatabaseTest1786726656690,
+    AddMessagingModule1787100000000,
+    AddMessagingTags1787200000000,
+    AddMessagingCustomerIdentities1787300000000,
   ],
   charset: 'utf8mb4_unicode_ci',
 };

@@ -34,6 +34,7 @@ import { ForumsModule } from './modules/forums/forums.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { AppointmentDisruptionsModule } from './modules/appointment-disruptions/appointment-disruptions.module';
 import { ShiftRemindersModule } from './modules/shift-reminders/shift-reminders.module';
+import { MessagingModule } from './modules/messaging/messaging.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -84,6 +85,7 @@ import { ShiftRemindersModule } from './modules/shift-reminders/shift-reminders.
     PaymentModule,
     AppointmentDisruptionsModule,
     ShiftRemindersModule,
+    MessagingModule,
   ],
 })
 export class AppModule {}
