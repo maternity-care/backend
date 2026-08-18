@@ -16,7 +16,23 @@ export default () => ({
     managementRateLimit: Number(process.env.UPLOAD_MANAGEMENT_RATE_LIMIT ?? 60),
     rateLimitWindowSeconds: Number(process.env.UPLOAD_RATE_LIMIT_WINDOW_SECONDS ?? 600),
     allowedMimeTypes: (
-      process.env.UPLOAD_ALLOWED_MIME_TYPES ?? 'image/jpeg,image/png,image/webp,application/pdf'
+      process.env.UPLOAD_ALLOWED_MIME_TYPES ??
+      [
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'application/pdf',
+        'text/plain',
+        'text/csv',
+        'application/json',
+        'application/zip',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      ].join(',')
     )
       .split(',')
       .map((mimeType) => mimeType.trim())

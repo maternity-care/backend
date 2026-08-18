@@ -1,0 +1,556 @@
+import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { MessagingService } from '../messaging.service';
+import {
+  MessagingAccountStatus,
+  MessagingChannel,
+  MessagingMessageType,
+} from '../types/messaging.enums';
+
+type ZcaApi = {
+  listener?: {
+    on: (event: string, cb: (...args: any[]) => unknown) => unknown;
+    once?: (event: string, cb: (...args: any[]) => unknown) => unknown;
+    start: (options?: { retryOnClose?: boolean }) => void;
+    stop: () => void;
+  };
+  sendMessage: (message: string | { msg: string; attachments?: unknown }, threadId: string, type?: number) => Promise<unknown>;
+  undo?: (
+    payload: { msgId: string | number; cliMsgId: string | number },
+    threadId: string,
+    type?: number,
+  ) => Promise<unknown>;
+  getUserInfo?: (userId: string | string[], avatarSize?: number) => Promise<{
+    changed_profiles?: Record<string, {
+      avatar?: string;
+      displayName?: string;
+      zaloName?: string;
+    }>;
+  }>;
+  findUser?: (phoneNumber: string, avatarSize?: number) => Promise<ZaloFoundUser>;
+};
+
+export type ZaloFoundUser = {
+  uid: string;
+  zalo_name?: string;
+  display_name?: string;
+  avatar?: string;
+  cover?: string;
+  [key: string]: unknown;
+};
+
+type ZaloAttachmentInput = {
+  url: string;
+  name?: string | null;
+  mimeType?: string | null;
+  size?: number | null;
+};
+
+type RuntimeSession = {
+  api: ZcaApi;
+  accountId: string;
+};
+
+type ProxyAgentConstructor = new (proxy: string) => unknown;
+
+const DEFAULT_ZALO_WEB_USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
+
+@Injectable()
+export class ZaloPersonalRuntimeService implements OnModuleInit {
+  private readonly logger = new Logger(ZaloPersonalRuntimeService.name);
+  private readonly sessions = new Map<string, RuntimeSession>();
+
+  constructor(private readonly messagingService: MessagingService) {}
+
+  async onModuleInit(): Promise<void> {
+    const accounts = await this.messagingService.listAccounts();
+    await Promise.all(
+      accounts
+        .filter((account) => account.channel === MessagingChannel.ZALO_PERSONAL && account.autoStart)
+        .map((account) => this.start(account.id).catch((error) => {
+          this.logger.warn(`Cannot auto-start Zalo account ${account.id}: ${this.getErrorMessage(error)}`);
+        })),
+    );
+  }
+
+  async start(accountId: string): Promise<void> {
+    if (this.sessions.has(accountId)) return;
+
+    const account = await this.messagingService.getAccountForRuntime(accountId);
+    if (account.channel !== MessagingChannel.ZALO_PERSONAL) return;
+    if (!account.credentials) throw new Error('Account chưa có credentials để đăng nhập.');
+
+    await this.messagingService.setAccountAutoStart(accountId, true);
+    await this.messagingService.setAccountStatus(accountId, MessagingAccountStatus.CONNECTING);
+
+    try {
+      const { Zalo } = await import('zca-js');
+      const ProxyAgent = this.loadProxyAgent();
+      const options: Record<string, unknown> = {
+        selfListen: false,
+        checkUpdate: true,
+        logging: false,
+        ...(account.proxyUrl ? { agent: new ProxyAgent(account.proxyUrl) } : {}),
+      };
+      const zalo = new Zalo(options as never);
+
+      const api = await zalo.login(account.credentials as never) as ZcaApi;
+      this.sessions.set(accountId, { api, accountId });
+      this.bindListener(accountId, api);
+      await this.startListener(accountId, api);
+    } catch (error) {
+      await this.messagingService.setAccountStatus(
+        accountId,
+        MessagingAccountStatus.ERROR,
+        this.getErrorMessage(error),
+      );
+      throw error;
+    }
+  }
+
+  async startQrLogin(input: {
+    displayName?: string;
+    proxyUrl?: string;
+    autoStart?: boolean;
+  }): Promise<{ accountId: string }> {
+    const account = await this.messagingService.createZaloQrAccount(input);
+
+    void this.runQrLogin(account.id).catch(async (error) => {
+      this.emitQrError(account.id, error);
+      await this.messagingService.setAccountStatus(
+        account.id,
+        MessagingAccountStatus.ERROR,
+        this.getErrorMessage(error),
+      );
+    });
+
+    return { accountId: account.id };
+  }
+
+  async startQrLoginForAccount(accountId: string): Promise<{ accountId: string }> {
+    await this.stop(accountId);
+    await this.messagingService.setAccountStatus(accountId, MessagingAccountStatus.CONNECTING);
+
+    void this.runQrLogin(accountId).catch(async (error) => {
+      this.emitQrError(accountId, error);
+      await this.messagingService.setAccountStatus(
+        accountId,
+        MessagingAccountStatus.ERROR,
+        this.getErrorMessage(error),
+      );
+    });
+
+    return { accountId };
+  }
+
+  async stop(accountId: string): Promise<void> {
+    const session = this.sessions.get(accountId);
+    if (session) {
+      session.api.listener?.stop();
+      this.sessions.delete(accountId);
+    }
+    await this.messagingService.setAccountAutoStart(accountId, false);
+    await this.messagingService.setAccountStatus(accountId, MessagingAccountStatus.DISCONNECTED);
+  }
+
+  async sendMessage(
+    accountId: string,
+    externalThreadId: string,
+    externalThreadType: string,
+    content: string,
+    attachment?: ZaloAttachmentInput | null,
+  ): Promise<unknown> {
+    const session = this.sessions.get(accountId);
+    if (!session) throw new Error('Zalo account chưa chạy. Hãy start account trước khi gửi.');
+    const source = attachment ? await this.buildAttachmentSource(attachment) : null;
+    const clientIds: string[] = [];
+    const originalDateNow = Date.now;
+    Date.now = () => {
+      const value = originalDateNow();
+      clientIds.push(String(value));
+      return value;
+    };
+    try {
+      const response = await session.api.sendMessage(
+        source ? { msg: content, attachments: source } : { msg: content },
+        externalThreadId,
+        externalThreadType === 'group' ? 1 : 0,
+      );
+      return {
+        ...(typeof response === 'object' && response !== null ? response as Record<string, unknown> : { response }),
+        _clientIds: clientIds,
+        _cliMsgId: clientIds[0] ?? null,
+      };
+    } finally {
+      Date.now = originalDateNow;
+    }
+  }
+
+  async undoMessage(
+    accountId: string,
+    externalThreadId: string,
+    externalThreadType: string,
+    payload: { msgId: string | number; cliMsgId: string | number },
+  ): Promise<unknown> {
+    const session = this.sessions.get(accountId);
+    if (!session) throw new Error('Zalo account chưa chạy. Hãy start account trước khi thu hồi.');
+    if (!session.api.undo) throw new Error('Phiên bản zca-js hiện tại chưa hỗ trợ thu hồi tin nhắn.');
+    return session.api.undo(payload, externalThreadId, externalThreadType === 'group' ? 1 : 0);
+  }
+
+  async findUserByPhone(accountId: string, phone: string): Promise<ZaloFoundUser> {
+    const normalizedPhone = this.normalizePhone(phone);
+    if (!normalizedPhone) throw new BadRequestException('Nhập số điện thoại Zalo trước khi tạo hội thoại.');
+
+    const session = this.sessions.get(accountId);
+    if (!session) throw new BadRequestException('Zalo account chưa chạy. Hãy start account trước khi tìm SĐT.');
+    if (!session.api.findUser) throw new BadRequestException('Phiên bản zca-js hiện tại chưa hỗ trợ tìm user theo SĐT.');
+
+    const profile = await session.api.findUser(normalizedPhone, 120);
+    if (!profile?.uid) throw new BadRequestException('Không tìm thấy tài khoản Zalo từ SĐT này.');
+    return profile;
+  }
+
+  private async buildAttachmentSource(attachment: ZaloAttachmentInput): Promise<{
+    data: Buffer;
+    filename: `${string}.${string}`;
+    metadata: { totalSize: number; width?: number; height?: number };
+  }> {
+    const response = await fetch(attachment.url);
+    if (!response.ok) {
+      throw new Error(`Không tải được file đính kèm (${response.status}).`);
+    }
+    const data = Buffer.from(await response.arrayBuffer());
+    const filename = this.normalizeAttachmentName(attachment.name, attachment.mimeType, attachment.url);
+    const dimensions = attachment.mimeType?.startsWith('image/')
+      ? this.readImageDimensions(data, attachment.mimeType)
+      : null;
+    return {
+      data,
+      filename,
+      metadata: {
+        totalSize: attachment.size && attachment.size > 0 ? attachment.size : data.length,
+        width: dimensions?.width,
+        height: dimensions?.height,
+      },
+    };
+  }
+
+  private normalizeAttachmentName(name?: string | null, mimeType?: string | null, url?: string): `${string}.${string}` {
+    const rawName = this.readString(name) || this.readString(url?.split('/').pop()?.split('?')[0]) || 'attachment';
+    const safeName = rawName.replace(/[^\w.\-() ]+/g, '_').replace(/\s+/g, '_');
+    if (/\.[a-z0-9]{2,8}$/i.test(safeName)) return safeName as `${string}.${string}`;
+    const extension = this.mimeExtension(mimeType) || 'bin';
+    return `${safeName}.${extension}` as `${string}.${string}`;
+  }
+
+  private mimeExtension(mimeType?: string | null): string | null {
+    const mime = this.readString(mimeType).toLowerCase();
+    if (mime === 'image/jpeg') return 'jpg';
+    if (mime === 'image/png') return 'png';
+    if (mime === 'image/webp') return 'webp';
+    if (mime === 'image/gif') return 'gif';
+    if (mime === 'application/pdf') return 'pdf';
+    if (mime.includes('/')) return mime.split('/')[1]?.replace(/[^a-z0-9]/g, '') || null;
+    return null;
+  }
+
+  private readImageDimensions(data: Buffer, mimeType?: string | null): { width: number; height: number } | null {
+    const mime = this.readString(mimeType).toLowerCase();
+    if (mime === 'image/png' && data.length >= 24 && data.toString('ascii', 1, 4) === 'PNG') {
+      return { width: data.readUInt32BE(16), height: data.readUInt32BE(20) };
+    }
+    if ((mime === 'image/jpeg' || mime === 'image/jpg') && data.length > 4) {
+      let offset = 2;
+      while (offset < data.length) {
+        if (data[offset] !== 0xff) break;
+        const marker = data[offset + 1];
+        const length = data.readUInt16BE(offset + 2);
+        if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
+          return { height: data.readUInt16BE(offset + 5), width: data.readUInt16BE(offset + 7) };
+        }
+        offset += 2 + length;
+      }
+    }
+    if (mime === 'image/webp' && data.length >= 30 && data.toString('ascii', 0, 4) === 'RIFF' && data.toString('ascii', 8, 12) === 'WEBP') {
+      const chunk = data.toString('ascii', 12, 16);
+      if (chunk === 'VP8X') {
+        return {
+          width: 1 + data.readUIntLE(24, 3),
+          height: 1 + data.readUIntLE(27, 3),
+        };
+      }
+    }
+    return null;
+  }
+
+  private async runQrLogin(accountId: string): Promise<void> {
+    const account = await this.messagingService.getAccountForRuntime(accountId);
+    const { Zalo } = await import('zca-js');
+    const ProxyAgent = this.loadProxyAgent();
+    const options: Record<string, unknown> = {
+      selfListen: false,
+      checkUpdate: true,
+      logging: false,
+      ...(account.proxyUrl ? { agent: new ProxyAgent(account.proxyUrl) } : {}),
+    };
+    const zalo = new Zalo(options as never);
+    const userAgent = this.readUserAgent(account.credentials) ?? DEFAULT_ZALO_WEB_USER_AGENT;
+    let capturedCredentials: { imei: string; cookie: unknown; userAgent: string; language?: string } | null = null;
+
+    const api = await zalo.loginQR(
+      { userAgent, language: 'vi' },
+      (event: any) => {
+        if (event.type === 0) {
+          const image = this.normalizeQrImage(event.data?.image);
+          this.messagingService.emitQrEvent({
+            accountId,
+            status: 'qr_generated',
+            qrCode: event.data?.code,
+            qrImage: image,
+            token: event.data?.token,
+            message: 'QR đã tạo, đang chờ quét bằng Zalo mobile.',
+          });
+        } else if (event.type === 1) {
+          this.messagingService.emitQrEvent({
+            accountId,
+            status: 'qr_expired',
+            message: 'QR đã hết hạn, bấm Xem QR để tạo lại.',
+          });
+        } else if (event.type === 2) {
+          this.messagingService.emitQrEvent({
+            accountId,
+            status: 'qr_scanned',
+            profile: event.data,
+            message: 'Đã quét QR, vui lòng xác nhận đăng nhập trên điện thoại.',
+          });
+        } else if (event.type === 3) {
+          this.messagingService.emitQrEvent({
+            accountId,
+            status: 'qr_declined',
+            code: event.data?.code,
+            message: 'Thiết bị đã từ chối đăng nhập.',
+          });
+        } else if (event.type === 4) {
+          capturedCredentials = {
+            imei: event.data?.imei,
+            cookie: event.data?.cookie,
+            userAgent: event.data?.userAgent || userAgent,
+            language: 'vi',
+          };
+          this.messagingService.emitQrEvent({
+            accountId,
+            status: 'qr_confirmed',
+            message: 'Điện thoại đã xác nhận, đang lưu session.',
+          });
+        }
+      },
+    ) as ZcaApi;
+
+    if (capturedCredentials) {
+      await this.messagingService.setAccountAutoStart(accountId, true);
+      await this.messagingService.completeZaloQrLogin(accountId, capturedCredentials);
+    }
+
+    this.sessions.set(accountId, { api, accountId });
+    this.bindListener(accountId, api);
+    await this.startListener(accountId, api);
+    this.messagingService.emitQrEvent({
+      accountId,
+      status: 'qr_authenticated',
+      message: 'Đăng nhập Zalo thành công, account đã sẵn sàng nhận/gửi tin.',
+    });
+  }
+
+  private bindListener(accountId: string, api: ZcaApi): void {
+    api.listener?.on('message', async (message: any) => {
+      try {
+        if (message?.isSelf) return;
+        const data = message?.data ?? {};
+        const content = typeof data.content === 'string' ? data.content : null;
+        const attachment = this.readAttachment(data.content);
+        const externalThreadId = String(message.threadId ?? data.uidFrom ?? data.idTo ?? '');
+        if (!externalThreadId) {
+          this.logger.warn(`Skip Zalo message without thread id for account ${accountId}`);
+          return;
+        }
+        const senderId = data.uidFrom ? String(data.uidFrom) : null;
+        const profile = await this.loadZaloProfile(api, senderId);
+        const senderName = profile?.displayName || profile?.zaloName || (typeof data.dName === 'string' ? data.dName : null);
+
+        await this.messagingService.recordIncoming({
+          accountId,
+          externalThreadId,
+          externalThreadType: Number(message.type) === 1 ? 'group' : 'user',
+          externalMessageId: data.msgId ? String(data.msgId) : data.cliMsgId ? String(data.cliMsgId) : null,
+          senderId,
+          senderName,
+          content: content ?? attachment?.title ?? null,
+          messageType: content ? MessagingMessageType.TEXT : attachment?.messageType ?? MessagingMessageType.UNSUPPORTED,
+          sentAt: data.ts ? new Date(Number(data.ts)) : new Date(),
+          metadata: {
+            zcaType: message.type,
+            customerAvatarUrl: profile?.avatar,
+            customerDisplayName: senderName,
+            imageUrl: attachment?.imageUrl,
+            thumbnailUrl: attachment?.thumbnailUrl,
+            attachmentUrl: attachment?.attachmentUrl,
+            attachmentTitle: attachment?.title,
+            attachmentType: attachment?.type,
+            raw: data,
+          },
+        });
+      } catch (error) {
+        this.logger.warn(`Cannot persist incoming Zalo message: ${this.getErrorMessage(error)}`);
+      }
+    });
+
+    api.listener?.on('connected', () => {
+      this.logger.log(`Zalo listener connected for account ${accountId}`);
+      void this.messagingService.setAccountStatus(accountId, MessagingAccountStatus.CONNECTED);
+    });
+    api.listener?.on('disconnected', (_code: unknown, reason: unknown) => {
+      void this.messagingService.setAccountStatus(
+        accountId,
+        MessagingAccountStatus.DISCONNECTED,
+        this.isNormalClosure(_code, reason) ? null : typeof reason === 'string' ? reason : null,
+      );
+    });
+    api.listener?.on('closed', (_code: unknown, reason: unknown) => {
+      this.sessions.delete(accountId);
+      void this.messagingService.setAccountStatus(
+        accountId,
+        MessagingAccountStatus.DISCONNECTED,
+        this.isNormalClosure(_code, reason) ? null : typeof reason === 'string' ? reason : null,
+      );
+    });
+    api.listener?.on('error', (error: unknown) => {
+      this.logger.warn(`Zalo listener error for account ${accountId}: ${this.getErrorMessage(error)}`);
+      void this.messagingService.setAccountStatus(accountId, MessagingAccountStatus.ERROR, this.getErrorMessage(error));
+    });
+  }
+
+  private readAttachment(content: unknown): {
+    messageType: MessagingMessageType;
+    imageUrl?: string;
+    thumbnailUrl?: string;
+    attachmentUrl?: string;
+    title?: string;
+    type?: string;
+  } | null {
+    if (!content || typeof content !== 'object') return null;
+    const payload = content as Record<string, unknown>;
+    const type = this.readString(payload.type).toLowerCase();
+    const href = this.readString(payload.href) || this.readString(payload.url) || this.readString(payload.oriUrl) || this.readString(payload.normalUrl);
+    const thumb = this.readString(payload.thumb) || this.readString(payload.thumbUrl) || this.readString(payload.thumbnail) || this.readString(payload.preview);
+    const title = this.readString(payload.title) || this.readString(payload.description) || null;
+    const msgType = this.readString((payload as { msgType?: unknown }).msgType).toLowerCase();
+    const isImage = type.includes('image') || type.includes('photo') || msgType.includes('photo') || /\.(png|jpe?g|gif|webp)(\?|$)/i.test(href || thumb);
+    const isSticker = type.includes('sticker') || msgType.includes('sticker');
+
+    if (isImage || thumb || href) {
+      return {
+        messageType: isSticker ? MessagingMessageType.STICKER : isImage ? MessagingMessageType.IMAGE : MessagingMessageType.FILE,
+        imageUrl: isImage ? href || thumb : undefined,
+        thumbnailUrl: thumb || href || undefined,
+        attachmentUrl: href || thumb || undefined,
+        title: title || (isImage ? 'Hình ảnh' : 'Tệp đính kèm'),
+        type: type || msgType || undefined,
+      };
+    }
+
+    return null;
+  }
+
+  private async startListener(accountId: string, api: ZcaApi): Promise<void> {
+    if (!api.listener) {
+      await this.messagingService.setAccountStatus(accountId, MessagingAccountStatus.CONNECTED);
+      return;
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const settle = (callback: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        callback();
+      };
+      const timer = setTimeout(() => {
+        this.logger.warn(`Zalo listener did not emit connected quickly for account ${accountId}; keeping session running.`);
+        settle(resolve);
+      }, 10000);
+
+      api.listener?.once?.('connected', () => settle(resolve));
+      api.listener?.once?.('error', (error: unknown) => settle(() => reject(error)));
+      api.listener?.once?.('closed', (_code: unknown, reason: unknown) => {
+        settle(() => reject(new Error(typeof reason === 'string' && reason ? reason : 'Zalo listener closed.')));
+      });
+      api.listener?.start({ retryOnClose: true });
+    });
+
+    await this.messagingService.setAccountStatus(accountId, MessagingAccountStatus.CONNECTED);
+  }
+
+  private loadProxyAgent(): ProxyAgentConstructor {
+    // proxy-agent publishes modern exports that this project TS config cannot type-resolve.
+    // Runtime require works in the current CommonJS Nest build.
+    return require('proxy-agent').ProxyAgent as ProxyAgentConstructor;
+  }
+
+  private normalizeQrImage(value: unknown): string | null {
+    if (typeof value !== 'string' || !value.trim()) return null;
+    const image = value.trim();
+    if (image.startsWith('data:image/')) return image;
+    return `data:image/png;base64,${image}`;
+  }
+
+  private readUserAgent(credentials: unknown): string | null {
+    if (!credentials || typeof credentials !== 'object') return null;
+    const userAgent = (credentials as { userAgent?: unknown }).userAgent;
+    return typeof userAgent === 'string' && userAgent.trim() ? userAgent.trim() : null;
+  }
+
+  private async loadZaloProfile(
+    api: ZcaApi,
+    userId: string | null,
+  ): Promise<{ avatar?: string; displayName?: string; zaloName?: string } | null> {
+    if (!userId || !api.getUserInfo) return null;
+    try {
+      const response = await api.getUserInfo(userId, 120);
+      return response.changed_profiles?.[userId] ?? null;
+    } catch (error) {
+      this.logger.warn(`Cannot load Zalo profile ${userId}: ${this.getErrorMessage(error)}`);
+      return null;
+    }
+  }
+
+  private emitQrError(accountId: string, error: unknown): void {
+    this.messagingService.emitQrEvent({
+      accountId,
+      status: 'qr_error',
+      error: this.getErrorMessage(error),
+      message: 'QR login lỗi, bấm Xem QR để thử lại.',
+    });
+  }
+
+  private isNormalClosure(code: unknown, reason: unknown): boolean {
+    return code === 1000 || reason === 'NORMAL_CLOSURE';
+  }
+
+  private readString(value: unknown): string {
+    return typeof value === 'string' ? value.trim() : '';
+  }
+
+  private normalizePhone(value: string): string {
+    const raw = this.readString(value).replace(/[^\d+]/g, '');
+    if (!raw) return '';
+    if (raw.startsWith('+84')) return `0${raw.slice(3)}`;
+    if (raw.startsWith('84') && raw.length >= 10) return `0${raw.slice(2)}`;
+    return raw;
+  }
+
+  private getErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
