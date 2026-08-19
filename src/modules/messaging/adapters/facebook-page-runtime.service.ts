@@ -78,17 +78,11 @@ export class FacebookPageRuntimeService implements OnModuleInit {
       response_type: 'code',
     });
     const loginConfigId = this.readString(process.env.FACEBOOK_LOGIN_CONFIG_ID);
-    if (loginConfigId) {
-      params.set('config_id', loginConfigId);
-      params.set('override_default_response_type', 'true');
-    } else {
-      params.set('scope', [
-        'pages_show_list',
-        'pages_read_engagement',
-        'pages_manage_metadata',
-        'pages_messaging',
-      ].join(','));
+    if (!loginConfigId) {
+      throw new BadRequestException('Chưa cấu hình FACEBOOK_LOGIN_CONFIG_ID. Hãy nhập Page token từ Messenger app hoặc cấu hình Facebook Login for Business.');
     }
+    params.set('config_id', loginConfigId);
+    params.set('override_default_response_type', 'true');
     return {
       state,
       url: `https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth?${params.toString()}`,
