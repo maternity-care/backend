@@ -86,8 +86,13 @@ export class MessagingController {
 
   @Post('accounts/facebook-page')
   @Permissions(PermissionEnum.MESSAGING_ACCOUNT_MANAGE)
-  createFacebookPageAccount(@Body() dto: FacebookPageAccountDto) {
-    return this.messagingService.createFacebookPageAccount(dto);
+  async createFacebookPageAccount(@Body() dto: FacebookPageAccountDto) {
+    const account = await this.messagingService.createFacebookPageAccount(dto);
+    if (dto.autoStart) {
+      await this.facebookRuntime.start(account.id);
+      return this.messagingService.getAccount(account.id);
+    }
+    return account;
   }
 
   @Post('accounts/facebook/oauth-url')
