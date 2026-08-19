@@ -104,6 +104,10 @@ export class MessagingService {
     return accounts.map((account) => this.maskAccount(account));
   }
 
+  async getAccount(id: string): Promise<MessagingChannelAccount> {
+    return this.maskAccount(await this.getAccountEntity(id));
+  }
+
   async createAccount(dto: CreateMessagingAccountDto): Promise<MessagingChannelAccount> {
     const account = await this.accountRepository.save(
       this.accountRepository.create({

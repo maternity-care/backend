@@ -60,7 +60,8 @@ export class FacebookPageRuntimeService implements OnModuleInit {
   async start(accountId: string): Promise<void> {
     const account = await this.messagingService.getAccountForRuntime(accountId);
     if (account.channel !== MessagingChannel.FACEBOOK_PAGE) return;
-    this.readCredentials(account.credentials);
+    const credentials = this.readCredentials(account.credentials);
+    await this.subscribePage(credentials);
     await this.messagingService.setAccountAutoStart(accountId, true);
     await this.messagingService.setAccountStatus(accountId, MessagingAccountStatus.CONNECTED);
   }
@@ -245,6 +246,10 @@ export class FacebookPageRuntimeService implements OnModuleInit {
         this.logger.warn(`Skip Facebook webhook for unknown page ${pageId || 'unknown'}`);
         continue;
       }
+      if (account.status !== MessagingAccountStatus.CONNECTED) {
+        this.logger.debug(`Skip Facebook webhook for stopped page ${pageId}`);
+        continue;
+      }
 
       const credentials = this.readCredentials(account.credentials);
       const events = Array.isArray(entryObject.messaging) ? entryObject.messaging : [];
@@ -326,9 +331,12 @@ export class FacebookPageRuntimeService implements OnModuleInit {
     recipientId: string,
     payload: Record<string, unknown>,
   ): Promise<unknown> {
-    const response = await fetch(`${GRAPH_BASE_URL}/me/messages?access_token=${encodeURIComponent(credentials.pageAccessToken)}`, {
+    const response = await fetch(`${GRAPH_BASE_URL}/${encodeURIComponent(credentials.pageId)}/messages`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        authorization: `Bearer ${credentials.pageAccessToken}`,
+        'content-type': 'application/json',
+      },
       body: JSON.stringify(payload),
     });
     const data = await response.json().catch(() => null);
@@ -337,6 +345,24 @@ export class FacebookPageRuntimeService implements OnModuleInit {
       throw new Error(message);
     }
     return data ?? { recipientId };
+  }
+
+  private async subscribePage(credentials: FacebookPageCredentials): Promise<void> {
+    const fields = this.readString(process.env.FACEBOOK_SUBSCRIBED_FIELDS) ||
+      'messages,messaging_postbacks,message_deliveries,message_reads';
+    const params = new URLSearchParams({ subscribed_fields: fields });
+    const response = await fetch(`${GRAPH_BASE_URL}/${encodeURIComponent(credentials.pageId)}/subscribed_apps?${params.toString()}`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${credentials.pageAccessToken}`,
+        'content-type': 'application/json',
+      },
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      const message = this.extractGraphError(data) || `Không subscribe được Facebook Page webhook (${response.status}).`;
+      throw new BadRequestException(message);
+    }
   }
 
   private async graphGet(path: string, params: Record<string, string>): Promise<unknown> {
