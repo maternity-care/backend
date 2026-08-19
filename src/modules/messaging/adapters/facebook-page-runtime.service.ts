@@ -79,6 +79,7 @@ export class FacebookPageRuntimeService implements OnModuleInit {
     const loginConfigId = this.readString(process.env.FACEBOOK_LOGIN_CONFIG_ID);
     if (loginConfigId) {
       params.set('config_id', loginConfigId);
+      params.set('override_default_response_type', 'true');
     } else {
       params.set('scope', [
         'pages_show_list',
