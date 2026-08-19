@@ -2,6 +2,7 @@ export enum MessagingChannel {
   ZALO_PERSONAL = 'zalo_personal',
   ZALO_OA = 'zalo_oa',
   FACEBOOK_PAGE = 'facebook_page',
+  WEB_CHAT = 'web_chat',
 }
 
 export enum MessagingAccountStatus {
@@ -39,4 +40,5 @@ export enum MessagingMessageType {
 
 export enum MessagingImportFormat {
   ZALO_EXTRACTOR = 'zalo_extractor',
+  WEB_CHAT = 'web_chat',
 }

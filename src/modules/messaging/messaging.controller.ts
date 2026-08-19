@@ -203,6 +203,19 @@ export class MessagingController {
     return { deleted: true };
   }
 
+  @Patch('conversations/:id/close')
+  @Permissions(PermissionEnum.MESSAGING_UPDATE)
+  closeConversation(
+    @Param('id') id: string,
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    return this.messagingService.closeConversation(id, {
+      id: user?.id,
+      name: user?.name,
+      email: user?.email,
+    });
+  }
+
   @Get('conversations/:id/customer')
   @Permissions(PermissionEnum.MESSAGING_VIEW)
   getConversationCustomer(@Param('id') id: string) {

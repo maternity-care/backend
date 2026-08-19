@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
+import { ChatbotModule } from '../chatbot/chatbot.module';
 import { Staff } from '../staffs/entities/staff.entity';
 import { Appointment } from '../appointments/entities/appointment.entity';
 import { User } from '../users/entities/user.entity';
@@ -20,6 +21,7 @@ import { ZaloPersonalRuntimeService } from './adapters/zalo-personal-runtime.ser
 @Module({
   imports: [
     AuthModule,
+    forwardRef(() => ChatbotModule),
     TypeOrmModule.forFeature([
       MessagingChannelAccount,
       MessagingConversation,
@@ -40,5 +42,6 @@ import { ZaloPersonalRuntimeService } from './adapters/zalo-personal-runtime.ser
     FacebookPageRuntimeService,
     ZaloPersonalRuntimeService,
   ],
+  exports: [MessagingEventsService, MessagingService],
 })
 export class MessagingModule {}

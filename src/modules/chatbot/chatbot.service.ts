@@ -1,10 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ConversationStatus } from '../../common/constants/status.enum';
+import { MessagingChannelAccount } from '../messaging/entities/messaging-channel-account.entity';
+import { MessagingConversation } from '../messaging/entities/messaging-conversation.entity';
+import { MessagingCustomerIdentity } from '../messaging/entities/messaging-customer-identity.entity';
+import { MessagingMessage } from '../messaging/entities/messaging-message.entity';
+import { MessagingEventsService } from '../messaging/messaging-events.service';
+import {
+  MessagingAccountStatus,
+  MessagingChannel,
+  MessagingConversationStatus,
+  MessagingImportFormat,
+  MessagingMessageDirection,
+  MessagingMessageType,
+  MessagingSenderType,
+} from '../messaging/types/messaging.enums';
 import { UploadsService } from '../uploads/uploads.service';
-import { ChatConversation } from './entities/chat-conversation.entity';
-import { ChatMessage } from './entities/chat-message.entity';
 import {
   ChatbotConversationPayload,
   ChatbotHistoryResponse,
@@ -30,34 +41,48 @@ const MAX_HISTORY_LIMIT = 50;
 @Injectable()
 export class ChatbotService {
   constructor(
-    @InjectRepository(ChatConversation)
-    private readonly conversationRepository: Repository<ChatConversation>,
-    @InjectRepository(ChatMessage)
-    private readonly messageRepository: Repository<ChatMessage>,
+    @InjectRepository(MessagingChannelAccount)
+    private readonly accountRepository: Repository<MessagingChannelAccount>,
+    @InjectRepository(MessagingConversation)
+    private readonly conversationRepository: Repository<MessagingConversation>,
+    @InjectRepository(MessagingCustomerIdentity)
+    private readonly customerIdentityRepository: Repository<MessagingCustomerIdentity>,
+    @InjectRepository(MessagingMessage)
+    private readonly messageRepository: Repository<MessagingMessage>,
     private readonly uploadsService: UploadsService,
     private readonly geminiChatbotService: GeminiChatbotService,
+    private readonly events: MessagingEventsService,
   ) {}
 
   async startConversation(conversationId?: string, requester?: ChatbotRequester): Promise<ChatbotConversationPayload> {
-    let conversation = conversationId
-      ? await this.conversationRepository.findOne({ where: { id: conversationId } })
-      : null;
-
+    let conversation = await this.findReusableConversation(conversationId, requester);
     if (!conversation) {
+      const account = await this.getWebChatAccount();
+      const requesterMetadata = this.sanitizeRequester(requester);
       conversation = await this.conversationRepository.save(
         this.conversationRepository.create({
-          doctorId: null,
-          facilityId: requester?.activeFacilityId ?? requester?.facilities?.[0]?.id ?? null,
-          userId: requester?.id ?? null,
-          guestKey: requester?.id ? null : this.normalizeGuestKey(requester),
-          conversationType: 'chatbot',
-          chatbotStatus: 'bot',
-          priority: 0,
-          status: ConversationStatus.OPEN,
-          requesterMetadata: this.sanitizeRequester(requester),
+          accountId: account.id,
+          account,
+          channel: MessagingChannel.WEB_CHAT,
+          externalThreadId: this.resolveExternalThreadId(requester),
+          externalThreadType: 'web_chat',
+          customerExternalId: requester?.id ?? requester?.guestKey ?? requester?.ipHash ?? null,
+          customerName: requester?.name ?? 'Khách web',
+          status: MessagingConversationStatus.OPEN,
+          unreadCount: 0,
+          metadata: {
+            source: 'web_chatbot',
+            chatbotStatus: 'bot',
+            requester: requesterMetadata,
+            guestKey: this.normalizeGuestKey(requester),
+            userId: requester?.id ?? null,
+            activeFacilityId: requester?.activeFacilityId ?? requester?.facilities?.[0]?.id ?? null,
+          },
         }),
       );
+      conversation = await this.syncLoggedInRequesterIdentity(conversation, requester);
       await this.createMessage(conversation.id, 'bot', DEFAULT_WELCOME_MESSAGE);
+      await this.emitConversationUpdated(conversation.id);
     } else if (requester) {
       conversation = await this.updateRequester(conversation, requester);
     }
@@ -70,17 +95,15 @@ export class ChatbotService {
     shouldNotifyStaff: boolean;
   }> {
     let conversation = await this.ensureConversation(payload.conversationId, payload.requester);
-    const wasClosed = conversation.chatbotStatus === 'closed';
+    const wasClosed = this.getChatbotStatus(conversation) === 'closed';
 
     if (wasClosed) {
-      conversation.chatbotStatus = 'waiting_for_staff';
-      conversation = await this.clearAssignment(conversation);
+      conversation = await this.setChatbotStatus(await this.clearAssignment(conversation), 'waiting_for_staff');
     }
 
     if (payload.requestStaff) {
-      const alreadyWaiting = !wasClosed && conversation.chatbotStatus !== 'bot';
-      conversation.chatbotStatus = 'waiting_for_staff';
-      conversation = await this.clearAssignment(conversation);
+      const alreadyWaiting = !wasClosed && this.getChatbotStatus(conversation) !== 'bot';
+      conversation = await this.setChatbotStatus(await this.clearAssignment(conversation), 'waiting_for_staff');
 
       if (!alreadyWaiting) {
         await this.createMessage(
@@ -90,6 +113,7 @@ export class ChatbotService {
         );
       }
 
+      await this.emitConversationUpdated(conversation.id);
       return {
         conversation: await this.getConversation(conversation.id),
         shouldNotifyStaff: true,
@@ -121,15 +145,14 @@ export class ChatbotService {
         'Cuộc trò chuyện đã được mở lại và đang chờ tư vấn viên/bác sĩ tiếp nhận.',
       );
     } else if (content && this.shouldHandoffToStaff(content)) {
-      conversation.chatbotStatus = 'waiting_for_staff';
-      conversation = await this.clearAssignment(conversation);
+      conversation = await this.setChatbotStatus(await this.clearAssignment(conversation), 'waiting_for_staff');
       await this.createMessage(
         conversation.id,
         'system',
         'Mình đã chuyển cuộc trò chuyện này đến tư vấn viên/bác sĩ. Bạn chờ một chút nhé.',
       );
       shouldNotifyStaff = true;
-    } else if (conversation.chatbotStatus === 'waiting_for_staff' || conversation.chatbotStatus === 'staff_joined') {
+    } else if (['waiting_for_staff', 'staff_joined'].includes(this.getChatbotStatus(conversation))) {
       shouldNotifyStaff = !conversation.assignedStaffId;
     } else if (content || geminiReadableFiles.length > 0) {
       const recentMessages = await this.getLatestMessageEntities(conversation.id, 8);
@@ -145,6 +168,7 @@ export class ChatbotService {
       );
     }
 
+    await this.emitConversationUpdated(conversation.id);
     return {
       conversation: await this.getConversation(conversation.id),
       shouldNotifyStaff,
@@ -152,17 +176,13 @@ export class ChatbotService {
   }
 
   async receiveStaffMessage(payload: StaffChatbotMessagePayload): Promise<ChatbotConversationPayload> {
-    if (!payload.conversationId) {
-      return this.startConversation(undefined);
-    }
+    if (!payload.conversationId) return this.startConversation(undefined);
 
     let conversation = await this.ensureConversation(payload.conversationId);
     const content = payload.content?.trim();
     const hasFile = Boolean(payload.fileUrl);
 
-    if (!content && !hasFile) {
-      return this.getConversation(conversation.id);
-    }
+    if (!content && !hasFile) return this.getConversation(conversation.id);
 
     const staffName = payload.staffName?.trim() || 'Tư vấn viên';
     const staffId = payload.staffId?.trim() || staffName;
@@ -171,14 +191,17 @@ export class ChatbotService {
       return this.getConversation(conversation.id);
     }
 
-    conversation.chatbotStatus = 'staff_joined';
     conversation.assignedStaffId = staffId;
     conversation.assignedStaffName = staffName;
-    conversation.claimExpiresAt = null;
+    conversation.metadata = {
+      ...(conversation.metadata ?? {}),
+      chatbotStatus: 'staff_joined',
+      claimExpiresAt: null,
+    };
     conversation = await this.conversationRepository.save(conversation);
 
     await this.createMessage(conversation.id, 'staff', content ?? '', {
-      senderId: /^\d+$/.test(staffId) ? staffId : undefined,
+      senderId: staffId,
       senderName: staffName,
       messageType: payload.messageType ?? (payload.fileUrl ? 'file' : 'text'),
       fileUrl: payload.fileKey ?? payload.fileUrl,
@@ -187,6 +210,7 @@ export class ChatbotService {
       fileSize: payload.fileSize,
     });
 
+    await this.emitConversationUpdated(conversation.id);
     return this.getConversation(conversation.id);
   }
 
@@ -211,20 +235,20 @@ export class ChatbotService {
     const wasAssigned = Boolean(conversation.assignedStaffId);
     const expiresAt = new Date(Date.now() + STAFF_CLAIM_TIMEOUT_MS);
 
-    conversation.chatbotStatus = 'staff_joined';
     conversation.assignedStaffId = staffId;
     conversation.assignedStaffName = staffName;
-    conversation.claimExpiresAt = expiresAt;
+    conversation.metadata = {
+      ...(conversation.metadata ?? {}),
+      chatbotStatus: 'staff_joined',
+      claimExpiresAt: expiresAt.toISOString(),
+    };
     conversation = await this.conversationRepository.save(conversation);
 
     if (!wasAssigned) {
-      await this.createMessage(
-        conversation.id,
-        'system',
-        `${staffName} đang nhận tư vấn cuộc trò chuyện này.`,
-      );
+      await this.createMessage(conversation.id, 'system', `${staffName} đang nhận tư vấn cuộc trò chuyện này.`);
     }
 
+    await this.emitConversationUpdated(conversation.id);
     return {
       conversation: await this.getConversation(conversation.id),
       claimed: !wasAssigned,
@@ -234,11 +258,10 @@ export class ChatbotService {
 
   async releaseClaimIfNoReply(conversationId: string): Promise<ChatbotConversationPayload | null> {
     let conversation = await this.conversationRepository.findOne({ where: { id: conversationId } });
-    if (!conversation?.claimExpiresAt) return null;
+    if (!conversation || !this.getClaimExpiresAt(conversation)) return null;
 
     const assignedStaffName = conversation.assignedStaffName || 'Tư vấn viên';
-    conversation.chatbotStatus = 'waiting_for_staff';
-    conversation = await this.clearAssignment(conversation);
+    conversation = await this.setChatbotStatus(await this.clearAssignment(conversation), 'waiting_for_staff');
 
     await this.createMessage(
       conversationId,
@@ -246,21 +269,21 @@ export class ChatbotService {
       `${assignedStaffName} chưa phản hồi sau 5 phút, cuộc chat đã được mở lại cho bác sĩ/tư vấn viên khác.`,
     );
 
+    await this.emitConversationUpdated(conversation.id);
     return this.getConversation(conversationId);
   }
 
   async closeConversationForUserIdle(conversationId: string): Promise<ChatbotConversationPayload> {
     let conversation = await this.ensureConversation(conversationId);
-    if (conversation.chatbotStatus === 'bot' || conversation.chatbotStatus === 'closed') {
+    if (this.getChatbotStatus(conversation) === 'bot' || this.getChatbotStatus(conversation) === 'closed') {
       return this.getConversation(conversation.id);
     }
 
     const assignedStaffName = conversation.assignedStaffName || 'Tư vấn viên';
     const hadAssignedStaff = Boolean(conversation.assignedStaffId);
 
-    conversation.chatbotStatus = 'closed';
-    conversation.status = ConversationStatus.CLOSED;
-    conversation = await this.clearAssignment(conversation);
+    conversation.status = MessagingConversationStatus.CLOSED;
+    conversation = await this.setChatbotStatus(await this.clearAssignment(conversation), 'closed');
 
     await this.createMessage(
       conversation.id,
@@ -270,13 +293,44 @@ export class ChatbotService {
         : 'Cuộc trò chuyện đã đóng vì bạn đã ngắt kết nối quá 5 phút. Nếu cần hỗ trợ tiếp, hãy nhắn lại để hệ thống phân tư vấn viên/bác sĩ mới.',
     );
 
+    await this.emitConversationUpdated(conversation.id);
+    return this.getConversation(conversation.id);
+  }
+
+  async endConversation(
+    conversationId: string,
+    actor: { type: 'user' | 'staff'; id?: string | null; name?: string | null },
+  ): Promise<ChatbotConversationPayload> {
+    let conversation = await this.ensureConversation(conversationId);
+    if (this.getChatbotStatus(conversation) === 'closed') {
+      return this.getConversation(conversation.id);
+    }
+
+    const actorName = actor.name?.trim() || (actor.type === 'staff' ? 'Tư vấn viên' : 'Khách hàng');
+    conversation.status = MessagingConversationStatus.CLOSED;
+    conversation = await this.setChatbotStatus(await this.clearAssignment(conversation), 'closed');
+    await this.createMessage(
+      conversation.id,
+      'system',
+      actor.type === 'staff'
+        ? `${actorName} đã kết thúc cuộc trò chuyện.`
+        : 'Bạn đã kết thúc cuộc trò chuyện. Nếu cần hỗ trợ tiếp, hãy mở chat và nhắn lại nhé.',
+      {
+        senderId: actor.id,
+        senderName: actorName,
+      },
+    );
+    await this.emitConversationUpdated(conversation.id);
     return this.getConversation(conversation.id);
   }
 
   async getStaffQueue(): Promise<ChatbotConversationPayload[]> {
     const conversations = await this.conversationRepository
       .createQueryBuilder('conversation')
-      .where('conversation.chatbotStatus NOT IN (:...hidden)', { hidden: ['bot', 'closed'] })
+      .where('conversation.channel = :channel', { channel: MessagingChannel.WEB_CHAT })
+      .andWhere("JSON_UNQUOTE(JSON_EXTRACT(conversation.metadata, '$.chatbotStatus')) NOT IN (:...hidden)", {
+        hidden: ['bot', 'closed'],
+      })
       .orderBy('conversation.updatedAt', 'DESC')
       .take(50)
       .getMany();
@@ -288,13 +342,14 @@ export class ChatbotService {
     const cutoff = new Date(Date.now() - USER_IDLE_TIMEOUT_MS);
     const query = this.conversationRepository
       .createQueryBuilder('conversation')
-      .where('conversation.chatbotStatus NOT IN (:...hidden)', { hidden: ['bot', 'closed'] })
+      .where('conversation.channel = :channel', { channel: MessagingChannel.WEB_CHAT })
+      .andWhere("JSON_UNQUOTE(JSON_EXTRACT(conversation.metadata, '$.chatbotStatus')) NOT IN (:...hidden)", {
+        hidden: ['bot', 'closed'],
+      })
       .andWhere('conversation.updatedAt < :cutoff', { cutoff });
 
     if (activeConversationIds.length > 0) {
-      query.andWhere('conversation.id NOT IN (:...activeConversationIds)', {
-        activeConversationIds,
-      });
+      query.andWhere('conversation.id NOT IN (:...activeConversationIds)', { activeConversationIds });
     }
 
     const conversations = await query.getMany();
@@ -311,11 +366,11 @@ export class ChatbotService {
 
     return {
       conversationId: conversation.id,
-      status: conversation.chatbotStatus as ChatbotConversationPayload['status'],
-      requester: conversation.requesterMetadata as ChatbotRequester | undefined,
+      status: this.getChatbotStatus(conversation),
+      requester: this.getRequester(conversation),
       assignedStaffId: conversation.assignedStaffId ?? undefined,
       assignedStaffName: conversation.assignedStaffName ?? undefined,
-      claimExpiresAt: conversation.claimExpiresAt?.toISOString(),
+      claimExpiresAt: this.getClaimExpiresAt(conversation)?.toISOString(),
       messages: await this.mapMessages(visibleMessages),
       hasMoreMessages,
     };
@@ -352,11 +407,9 @@ export class ChatbotService {
     };
   }
 
-  private async ensureConversation(conversationId?: string, requester?: ChatbotRequester): Promise<ChatConversation> {
+  private async ensureConversation(conversationId?: string, requester?: ChatbotRequester): Promise<MessagingConversation> {
     const conversation = await this.findReusableConversation(conversationId, requester);
-    if (conversation) {
-      return requester ? this.updateRequester(conversation, requester) : conversation;
-    }
+    if (conversation) return requester ? this.updateRequester(conversation, requester) : conversation;
 
     const created = await this.startConversation(undefined, requester);
     return this.conversationRepository.findOneOrFail({ where: { id: created.conversationId } });
@@ -365,52 +418,132 @@ export class ChatbotService {
   private async findReusableConversation(
     conversationId?: string,
     requester?: ChatbotRequester,
-  ): Promise<ChatConversation | null> {
+  ): Promise<MessagingConversation | null> {
     const byId = conversationId
-      ? await this.conversationRepository.findOne({ where: { id: conversationId } })
+      ? await this.conversationRepository.findOne({ where: { id: conversationId, channel: MessagingChannel.WEB_CHAT } })
       : null;
+    if (byId) return byId;
 
-    if (requester?.id) {
-      if (byId && (!byId.userId || byId.userId === requester.id)) {
-        return byId;
-      }
-
-      return this.conversationRepository.findOne({
-        where: {
-          userId: requester.id,
-          conversationType: 'chatbot',
-        },
-        order: { updatedAt: 'DESC', id: 'DESC' },
-      });
+    const account = await this.getWebChatAccount();
+    if (conversationId) {
+      const byLegacyId = await this.conversationRepository
+        .createQueryBuilder('conversation')
+        .where('conversation.accountId = :accountId', { accountId: account.id })
+        .andWhere("JSON_UNQUOTE(JSON_EXTRACT(conversation.metadata, '$.oldChatConversationId')) = :conversationId", {
+          conversationId,
+        })
+        .orderBy('conversation.updatedAt', 'DESC')
+        .addOrderBy('conversation.id', 'DESC')
+        .getOne();
+      if (byLegacyId) return byLegacyId;
     }
 
-    const guestKey = this.normalizeGuestKey(requester);
-    if (guestKey) {
-      if (byId && !byId.userId && byId.guestKey === guestKey) {
-        return byId;
-      }
-
-      return this.conversationRepository.findOne({
-        where: {
-          guestKey,
-          conversationType: 'chatbot',
-        },
-        order: { updatedAt: 'DESC', id: 'DESC' },
-      });
-    }
-
-    return byId;
+    const externalThreadId = this.resolveExternalThreadId(requester);
+    return this.conversationRepository.findOne({
+      where: {
+        accountId: account.id,
+        externalThreadId,
+      },
+      order: { updatedAt: 'DESC', id: 'DESC' },
+    });
   }
 
   private async updateRequester(
-    conversation: ChatConversation,
+    conversation: MessagingConversation,
     requester: ChatbotRequester,
-  ): Promise<ChatConversation> {
-    conversation.userId = requester.id ?? conversation.userId;
-    conversation.guestKey = requester.id ? null : this.normalizeGuestKey(requester) ?? conversation.guestKey;
-    conversation.facilityId =
-      requester.activeFacilityId ?? requester.facilities?.[0]?.id ?? conversation.facilityId;
-    conversation.requesterMetadata = this.sanitizeRequester(requester);
+  ): Promise<MessagingConversation> {
+    const requesterMetadata = this.sanitizeRequester(requester);
+    conversation.customerExternalId = requester.id ?? requester.guestKey ?? requester.ipHash ?? conversation.customerExternalId;
+    conversation.customerName = requester.name ?? conversation.customerName;
+    conversation.metadata = {
+      ...(conversation.metadata ?? {}),
+      requester: requesterMetadata,
+      guestKey: requester.id ? null : this.normalizeGuestKey(requester) ?? conversation.metadata?.guestKey ?? null,
+      userId: requester.id ?? conversation.metadata?.userId ?? null,
+      activeFacilityId: requester.activeFacilityId ?? requester.facilities?.[0]?.id ?? conversation.metadata?.activeFacilityId ?? null,
+    };
+    const saved = await this.conversationRepository.save(conversation);
+    return this.syncLoggedInRequesterIdentity(saved, requester);
+  }
+
+  private async syncLoggedInRequesterIdentity(
+    conversation: MessagingConversation,
+    requester?: ChatbotRequester,
+  ): Promise<MessagingConversation> {
+    if (!requester?.id) return conversation;
+
+    const externalUserId = String(requester.id);
+    let identity = await this.customerIdentityRepository.findOne({
+      where: {
+        channel: MessagingChannel.WEB_CHAT,
+        accountId: conversation.accountId,
+        externalUserId,
+      },
+    });
+
+    identity ??= this.customerIdentityRepository.create({
+      channel: MessagingChannel.WEB_CHAT,
+      accountId: conversation.accountId,
+      externalUserId,
+    });
+    identity.userId = externalUserId;
+    identity.displayName = requester.name ?? identity.displayName ?? conversation.customerName;
+    identity.phone = requester.phone ?? identity.phone ?? null;
+    identity.email = requester.email ?? identity.email ?? null;
+    identity.address = requester.address ?? identity.address ?? null;
+    identity.metadata = {
+      ...(identity.metadata ?? {}),
+      source: 'web_chatbot',
+      requester: this.sanitizeRequester(requester),
+    };
+    identity = await this.customerIdentityRepository.save(identity);
+
+    conversation.customerExternalId = externalUserId;
+    conversation.customerName = requester.name ?? conversation.customerName;
+    conversation.metadata = {
+      ...(conversation.metadata ?? {}),
+      customerIdentityId: identity.id,
+      userId: externalUserId,
+      mappedUserId: externalUserId,
+      customerPhone: identity.phone,
+      customerEmail: identity.email,
+      customerAddress: identity.address,
+    };
+    return this.conversationRepository.save(conversation);
+  }
+
+  private async getWebChatAccount(): Promise<MessagingChannelAccount> {
+    const externalAccountId = 'web-chatbot';
+    let account = await this.accountRepository.findOne({
+      where: { channel: MessagingChannel.WEB_CHAT, externalAccountId },
+    });
+    if (account) return account;
+
+    account = await this.accountRepository.save(
+      this.accountRepository.create({
+        channel: MessagingChannel.WEB_CHAT,
+        displayName: 'Website chatbot',
+        externalAccountId,
+        status: MessagingAccountStatus.CONNECTED,
+        autoStart: true,
+        credentialFormat: MessagingImportFormat.WEB_CHAT,
+        credentials: { source: 'builtin_chatbot' },
+      }),
+    );
+    this.events.emitToStaff('messages:account.updated', account);
+    return account;
+  }
+
+  private async setChatbotStatus(
+    conversation: MessagingConversation,
+    status: ChatbotConversationPayload['status'],
+  ): Promise<MessagingConversation> {
+    conversation.metadata = {
+      ...(conversation.metadata ?? {}),
+      chatbotStatus: status,
+      claimExpiresAt: status === 'staff_joined' ? conversation.metadata?.claimExpiresAt ?? null : null,
+    };
+    if (status !== 'closed') conversation.status = MessagingConversationStatus.OPEN;
     return this.conversationRepository.save(conversation);
   }
 
@@ -442,10 +575,20 @@ export class ChatbotService {
     return raw.replace(/[^a-zA-Z0-9:_-]/g, '').slice(0, 120) || null;
   }
 
-  private async clearAssignment(conversation: ChatConversation): Promise<ChatConversation> {
+  private resolveExternalThreadId(requester?: ChatbotRequester): string {
+    if (requester?.id) return `user:${requester.id}`;
+    const guestKey = this.normalizeGuestKey(requester);
+    if (guestKey) return `guest:${guestKey}`;
+    return 'guest:anonymous';
+  }
+
+  private async clearAssignment(conversation: MessagingConversation): Promise<MessagingConversation> {
     conversation.assignedStaffId = null;
     conversation.assignedStaffName = null;
-    conversation.claimExpiresAt = null;
+    conversation.metadata = {
+      ...(conversation.metadata ?? {}),
+      claimExpiresAt: null,
+    };
     return this.conversationRepository.save(conversation);
   }
 
@@ -458,10 +601,7 @@ export class ChatbotService {
       return [];
     }
 
-    const urls = [payload.aiFileUrl, payload.fileUrl].filter(
-      (url): url is string => Boolean(url?.trim()),
-    );
-
+    const urls = [payload.aiFileUrl, payload.fileUrl].filter((url): url is string => Boolean(url?.trim()));
     return Array.from(new Set(urls)).map((url) => ({ url, mimeType: payload.mimeType! }));
   }
 
@@ -478,27 +618,51 @@ export class ChatbotService {
       mimeType?: string;
       fileSize?: number;
     } = {},
-  ): Promise<ChatMessage> {
+  ): Promise<MessagingMessage> {
+    const conversation = await this.conversationRepository.findOneOrFail({ where: { id: conversationId } });
+    const now = new Date();
+    const messageType = this.toMessagingMessageType(options.messageType);
+    const attachmentUrl = options.fileUrl ?? null;
+    const attachmentName = options.fileName ?? null;
+    const isOutbound = sender !== 'user';
     const message = await this.messageRepository.save(
       this.messageRepository.create({
         conversationId,
+        accountId: conversation.accountId,
+        externalMessageId: null,
+        direction: isOutbound ? MessagingMessageDirection.OUTBOUND : MessagingMessageDirection.INBOUND,
+        senderType: sender === 'user'
+          ? MessagingSenderType.CUSTOMER
+          : sender === 'staff'
+            ? MessagingSenderType.STAFF
+            : MessagingSenderType.SYSTEM,
         senderId: options.senderId && /^\d+$/.test(options.senderId) ? options.senderId : null,
-        senderType: sender,
-        senderName: options.senderName ?? null,
-        messageType: options.messageType ?? 'text',
-        content,
-        fileUrl: options.fileUrl ?? null,
-        fileName: options.fileName ?? null,
-        mimeType: options.mimeType ?? null,
-        fileSize: options.fileSize ?? null,
+        senderName: options.senderName ?? (sender === 'bot' ? 'AI hỗ trợ' : null),
+        messageType,
+        content: content || null,
+        metadata: {
+          source: 'web_chatbot',
+          autoReply: sender === 'bot',
+          attachmentUrl,
+          attachmentName,
+          attachmentMimeType: options.mimeType ?? null,
+          attachmentSize: options.fileSize ?? null,
+          imageUrl: messageType === MessagingMessageType.IMAGE ? attachmentUrl : null,
+        },
+        sentAt: now,
         readAt: null,
       }),
     );
-    await this.conversationRepository.update(conversationId, { updatedAt: new Date() });
+
+    conversation.lastMessagePreview = content || attachmentName || this.messageTypePreview(messageType);
+    conversation.lastMessageAt = now;
+    conversation.unreadCount = sender === 'user' ? Number(conversation.unreadCount ?? 0) + 1 : 0;
+    await this.conversationRepository.save(conversation);
+    this.events.emitConversation(conversation.id, 'messages:message.new', message);
     return message;
   }
 
-  private async getLatestMessageEntities(conversationId: string, limit: number): Promise<ChatMessage[]> {
+  private async getLatestMessageEntities(conversationId: string, limit: number): Promise<MessagingMessage[]> {
     const rows = await this.messageRepository.find({
       where: { conversationId },
       order: { createdAt: 'DESC', id: 'DESC' },
@@ -507,44 +671,106 @@ export class ChatbotService {
     return rows.reverse();
   }
 
-  private async mapMessages(messages: ChatMessage[]): Promise<ChatbotMessage[]> {
+  private async mapMessages(messages: MessagingMessage[]): Promise<ChatbotMessage[]> {
     return Promise.all(messages.map((message) => this.mapMessage(message)));
   }
 
-  private async mapMessage(message: ChatMessage): Promise<ChatbotMessage> {
-    const fileUrl = message.fileUrl
-      ? await this.resolveFileUrl(message.fileUrl)
-      : null;
+  private async mapMessage(message: MessagingMessage): Promise<ChatbotMessage> {
+    const attachmentUrl = this.readMetadataString(message.metadata, 'imageUrl') ??
+      this.readMetadataString(message.metadata, 'attachmentUrl');
+    const fileUrl = attachmentUrl ? await this.resolveFileUrl(attachmentUrl) : null;
+    const fileName = this.readMetadataString(message.metadata, 'attachmentName');
+    const mimeType = this.readMetadataString(message.metadata, 'attachmentMimeType');
+    const fileSizeValue = message.metadata?.attachmentSize;
+    const fileSize = typeof fileSizeValue === 'number' ? fileSizeValue : null;
 
     return {
       id: message.id,
       conversationId: message.conversationId,
-      sender: message.senderType,
+      sender: this.fromMessagingSender(message),
       senderName: message.senderName ?? undefined,
-      messageType: (message.messageType as ChatbotMessage['messageType']) ?? 'text',
-      content: message.content ?? '',
+      messageType: this.fromMessagingMessageType(message.messageType),
+      content: message.content ?? fileName ?? '',
       fileUrl,
-      fileName: message.fileName,
-      mimeType: message.mimeType,
-      fileSize: message.fileSize,
-      createdAt: message.createdAt.toISOString(),
+      fileName,
+      mimeType,
+      fileSize,
+      createdAt: (message.sentAt ?? message.createdAt).toISOString(),
     };
   }
 
-  private mapMessageForPrompt(message: ChatMessage): ChatbotMessage {
+  private mapMessageForPrompt(message: MessagingMessage): ChatbotMessage {
     return {
       id: message.id,
       conversationId: message.conversationId,
-      sender: message.senderType,
+      sender: this.fromMessagingSender(message),
       senderName: message.senderName ?? undefined,
-      messageType: (message.messageType as ChatbotMessage['messageType']) ?? 'text',
-      content: message.content ?? '',
-      fileUrl: message.fileUrl,
-      fileName: message.fileName,
-      mimeType: message.mimeType,
-      fileSize: message.fileSize,
-      createdAt: message.createdAt.toISOString(),
+      messageType: this.fromMessagingMessageType(message.messageType),
+      content: message.content ?? this.readMetadataString(message.metadata, 'attachmentName') ?? '',
+      fileUrl: this.readMetadataString(message.metadata, 'imageUrl') ?? this.readMetadataString(message.metadata, 'attachmentUrl'),
+      fileName: this.readMetadataString(message.metadata, 'attachmentName'),
+      mimeType: this.readMetadataString(message.metadata, 'attachmentMimeType'),
+      fileSize: null,
+      createdAt: (message.sentAt ?? message.createdAt).toISOString(),
     };
+  }
+
+  private async emitConversationUpdated(conversationId: string): Promise<void> {
+    const conversation = await this.conversationRepository.findOne({
+      where: { id: conversationId },
+      relations: { account: true },
+    });
+    if (!conversation) return;
+    this.events.emitToStaff('messages:conversation.updated', conversation);
+  }
+
+  private getChatbotStatus(conversation: MessagingConversation): ChatbotConversationPayload['status'] {
+    const status = this.readMetadataString(conversation.metadata, 'chatbotStatus');
+    if (status === 'waiting_for_staff' || status === 'staff_joined' || status === 'closed') return status;
+    return 'bot';
+  }
+
+  private getRequester(conversation: MessagingConversation): ChatbotRequester | undefined {
+    const requester = conversation.metadata?.requester;
+    return requester && typeof requester === 'object' ? requester as ChatbotRequester : undefined;
+  }
+
+  private getClaimExpiresAt(conversation: MessagingConversation): Date | null {
+    const raw = this.readMetadataString(conversation.metadata, 'claimExpiresAt');
+    if (!raw) return null;
+    const value = new Date(raw);
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  private toMessagingMessageType(type?: 'text' | 'image' | 'file'): MessagingMessageType {
+    if (type === 'image') return MessagingMessageType.IMAGE;
+    if (type === 'file') return MessagingMessageType.FILE;
+    return MessagingMessageType.TEXT;
+  }
+
+  private fromMessagingMessageType(type: MessagingMessageType): ChatbotMessage['messageType'] {
+    if (type === MessagingMessageType.IMAGE) return 'image';
+    if (type === MessagingMessageType.FILE) return 'file';
+    return 'text';
+  }
+
+  private fromMessagingSender(message: MessagingMessage): ChatbotSender {
+    if (message.direction === MessagingMessageDirection.INBOUND) return 'user';
+    if (message.metadata?.autoReply) return 'bot';
+    if (message.senderType === MessagingSenderType.STAFF) return 'staff';
+    return 'system';
+  }
+
+  private messageTypePreview(messageType?: MessagingMessageType): string {
+    if (messageType === MessagingMessageType.IMAGE) return '[Hình ảnh]';
+    if (messageType === MessagingMessageType.FILE) return '[Tệp đính kèm]';
+    return '[Nội dung chưa hỗ trợ]';
+  }
+
+  private readMetadataString(metadata: Record<string, unknown> | null | undefined, key: string): string | null {
+    const value = metadata?.[key];
+    if (typeof value === 'number') return String(value);
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
   }
 
   private async resolveFileUrl(value: string): Promise<string> {
@@ -559,7 +785,6 @@ export class ChatbotService {
 
   private shouldHandoffToStaff(input: string): boolean {
     const message = input.toLowerCase();
-
     return this.includesAny(message, [
       'gặp bác sĩ',
       'gặp bsi',
@@ -585,23 +810,18 @@ export class ChatbotService {
     if (this.includesAny(message, ['lịch', 'khám', 'hẹn', 'appointment', 'schedule'])) {
       return 'Bạn có thể vào mục [Lịch khám](/schedule) để xem lịch hiện tại hoặc đặt lịch mới. Nếu muốn đổi lịch sát giờ khám, hãy gọi trực tiếp cơ sở để được hỗ trợ nhanh hơn.';
     }
-
     if (this.includesAny(message, ['hồ sơ', 'thai kỳ', 'chỉ số', 'record', 'profile'])) {
       return 'Bạn có thể theo dõi trong mục [Hồ sơ thai kỳ](/record-keeping). Hãy cập nhật chỉ số sau mỗi lần khám để bác sĩ có thêm dữ liệu tham khảo.';
     }
-
     if (this.includesAny(message, ['dịch vụ', 'gói', 'giá', 'package', 'service'])) {
       return 'Bạn có thể xem [Dịch vụ](/#services) và [Gói thai sản](/#packages) trên trang chủ. Giá/lịch có thể khác nhau theo từng cơ sở, nên bạn cần chọn cơ sở để xem thông tin chính xác.';
     }
-
     if (this.includesAny(message, ['cấp cứu', 'khẩn cấp', 'đau bụng', 'ra máu', 'emergency'])) {
       return 'Nếu có dấu hiệu khẩn cấp như đau bụng dữ dội, ra máu, khó thở hoặc thai máy bất thường, vui lòng gọi cấp cứu hoặc đến cơ sở y tế gần nhất ngay.';
     }
-
     if (this.includesAny(message, ['kê đơn', 'đơn thuốc', 'uống thuốc', 'liều', 'bị ho', 'thuốc gì', 'toa thuốc'])) {
       return 'Mình không thể kê đơn hoặc chỉ định thuốc thay bác sĩ. Bạn hãy bấm nút “Gặp tư vấn viên/bác sĩ” trong khung chat này để được bác sĩ hỗ trợ an toàn hơn nhé.';
     }
-
     if (this.includesAny(message, ['liên hệ', 'hotline', 'số điện thoại', 'support'])) {
       return 'Bạn có thể liên hệ cơ sở đã chọn qua thông tin trên website. Nếu chưa chọn cơ sở, hãy xem [Dịch vụ](/#services) hoặc bấm “Gặp tư vấn viên/bác sĩ” trong khung chat để được hỗ trợ.';
     }

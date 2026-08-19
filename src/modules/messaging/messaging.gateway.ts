@@ -149,12 +149,12 @@ export class MessagingGateway implements OnGatewayConnection {
     for (const viewer of this.conversationViewers.get(conversationId)?.values() ?? []) {
       unique.set(viewer.id, viewer);
     }
-    this.server
-      .to(`messages:conversation:${conversationId}`)
-      .emit('messages:conversation.viewers', {
-        conversationId,
-        viewers: Array.from(unique.values()),
-      });
+    const payload = {
+      conversationId,
+      viewers: Array.from(unique.values()),
+    };
+    this.server.to(`messages:conversation:${conversationId}`).emit('messages:conversation.viewers', payload);
+    this.server.to('messages:staff').emit('messages:conversation.viewers', payload);
   }
 
   private getAccessToken(client: Socket): string | null {
