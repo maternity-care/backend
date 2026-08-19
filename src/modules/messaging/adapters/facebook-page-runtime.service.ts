@@ -75,13 +75,18 @@ export class FacebookPageRuntimeService implements OnModuleInit {
       redirect_uri: cleanRedirectUri,
       state,
       response_type: 'code',
-      scope: [
+    });
+    const loginConfigId = this.readString(process.env.FACEBOOK_LOGIN_CONFIG_ID);
+    if (loginConfigId) {
+      params.set('config_id', loginConfigId);
+    } else {
+      params.set('scope', [
         'pages_show_list',
         'pages_read_engagement',
         'pages_manage_metadata',
         'pages_messaging',
-      ].join(','),
-    });
+      ].join(','));
+    }
     return {
       state,
       url: `https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth?${params.toString()}`,
