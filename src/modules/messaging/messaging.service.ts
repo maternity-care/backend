@@ -27,6 +27,7 @@ import {
   MessagingSenderType,
 } from './types/messaging.enums';
 import { CreateMessagingAccountDto } from './dto/create-messaging-account.dto';
+import { FacebookPageAccountDto } from './dto/facebook-page-account.dto';
 import { ImportZaloAccountDto } from './dto/import-zalo-account.dto';
 import { UpdateMessagingAccountDto } from './dto/update-messaging-account.dto';
 import { MessagingEventsService } from './messaging-events.service';
@@ -135,6 +136,43 @@ export class MessagingService {
     return account;
   }
 
+  async createFacebookPageAccount(dto: FacebookPageAccountDto): Promise<MessagingChannelAccount> {
+    const pageId = this.readString(dto.pageId);
+    const pageName = this.readString(dto.pageName);
+    const pageAccessToken = this.readString(dto.pageAccessToken);
+    if (!pageId || !pageName || !pageAccessToken) {
+      throw new BadRequestException('Facebook Page cần Page ID, tên page và access token.');
+    }
+
+    const existing = await this.accountRepository.findOne({
+      where: {
+        channel: MessagingChannel.FACEBOOK_PAGE,
+        externalAccountId: pageId,
+      },
+    });
+    const account = existing ?? this.accountRepository.create({
+      channel: MessagingChannel.FACEBOOK_PAGE,
+      externalAccountId: pageId,
+      status: MessagingAccountStatus.DISCONNECTED,
+    });
+
+    account.displayName = pageName;
+    account.autoStart = Boolean(dto.autoStart);
+    account.proxyUrl = null;
+    account.credentials = {
+      pageId,
+      pageName,
+      pageAccessToken,
+      verifyToken: this.readString(dto.verifyToken) || null,
+    };
+    account.credentialFormat = 'facebook_page_token';
+    account.lastError = null;
+
+    const saved = await this.accountRepository.save(account);
+    this.events.emitToStaff('messages:account.updated', this.maskAccount(saved));
+    return this.maskAccount(saved);
+  }
+
   async updateAccount(id: string, dto: UpdateMessagingAccountDto): Promise<MessagingChannelAccount> {
     const account = await this.getAccountEntity(id);
     if (dto.displayName !== undefined) account.displayName = dto.displayName.trim();
@@ -190,6 +228,26 @@ export class MessagingService {
 
   async getAccountForRuntime(id: string): Promise<MessagingChannelAccount> {
     return this.getAccountEntity(id);
+  }
+
+  async findFacebookPageAccount(pageId: string): Promise<MessagingChannelAccount | null> {
+    const cleanPageId = this.readString(pageId);
+    if (!cleanPageId) return null;
+    return this.accountRepository.findOne({
+      where: {
+        channel: MessagingChannel.FACEBOOK_PAGE,
+        externalAccountId: cleanPageId,
+      },
+    });
+  }
+
+  async hasFacebookVerifyToken(token: string): Promise<boolean> {
+    const cleanToken = this.readString(token);
+    if (!cleanToken) return false;
+    const accounts = await this.accountRepository.find({
+      where: { channel: MessagingChannel.FACEBOOK_PAGE },
+    });
+    return accounts.some((account) => this.readString(account.credentials?.verifyToken) === cleanToken);
   }
 
   async setAccountStatus(
@@ -580,6 +638,8 @@ export class MessagingService {
       this.readMetadataString(message.metadata, 'zaloMsgId');
     const zaloCliMsgId = this.extractProviderString(providerResponse, ['cliMsgId', '_cliMsgId', '_clientIds.0', 'message.cliMsgId', 'attachment.0.cliMsgId']) ??
       this.readMetadataString(message.metadata, 'zaloCliMsgId');
+    const facebookMessageId = this.extractProviderString(providerResponse, ['message_id', 'responses.0.message_id', 'responses.1.message_id']) ??
+      this.readMetadataString(message.metadata, 'facebookMessageId');
     const metadata = {
       ...(message.metadata ?? {}),
       deliveryStatus: status,
@@ -589,8 +649,11 @@ export class MessagingService {
       zaloSendResponse: providerResponse ?? message.metadata?.zaloSendResponse ?? null,
       zaloMsgId: zaloMsgId ?? null,
       zaloCliMsgId: zaloCliMsgId ?? null,
+      facebookSendResponse: facebookMessageId ? providerResponse : message.metadata?.facebookSendResponse ?? null,
+      facebookMessageId: facebookMessageId ?? null,
     };
     if (status === 'sent' && zaloMsgId) message.externalMessageId = zaloMsgId;
+    if (status === 'sent' && facebookMessageId) message.externalMessageId = facebookMessageId;
     message.metadata = metadata;
     const saved = await this.messageRepository.save(message);
     this.events.emitConversation(saved.conversationId, 'messages:message.updated', saved);

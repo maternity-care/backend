@@ -27,6 +27,12 @@ type ZcaApi = {
     }>;
   }>;
   findUser?: (phoneNumber: string, avatarSize?: number) => Promise<ZaloFoundUser>;
+  getContext?: () => {
+    imei?: string;
+    cookie?: { toJSON?: () => { cookies?: unknown } };
+    userAgent?: string;
+    language?: string;
+  };
 };
 
 export type ZaloFoundUser = {
@@ -48,6 +54,13 @@ type ZaloAttachmentInput = {
 type RuntimeSession = {
   api: ZcaApi;
   accountId: string;
+};
+
+type ZaloRuntimeCredentials = {
+  imei: string;
+  cookie: unknown;
+  userAgent: string;
+  language?: string;
 };
 
 type ProxyAgentConstructor = new (proxy: string) => unknown;
@@ -128,10 +141,9 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
   }
 
   async startQrLoginForAccount(accountId: string): Promise<{ accountId: string }> {
-    await this.stop(accountId);
     await this.messagingService.setAccountStatus(accountId, MessagingAccountStatus.CONNECTING);
 
-    void this.runQrLogin(accountId).catch(async (error) => {
+    void this.runQrLoginForExistingAccount(accountId).catch(async (error) => {
       this.emitQrError(accountId, error);
       await this.messagingService.setAccountStatus(
         accountId,
@@ -143,13 +155,15 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
     return { accountId };
   }
 
-  async stop(accountId: string): Promise<void> {
+  async stop(accountId: string, options?: { keepAutoStart?: boolean }): Promise<void> {
     const session = this.sessions.get(accountId);
     if (session) {
       session.api.listener?.stop();
       this.sessions.delete(accountId);
     }
-    await this.messagingService.setAccountAutoStart(accountId, false);
+    if (!options?.keepAutoStart) {
+      await this.messagingService.setAccountAutoStart(accountId, false);
+    }
     await this.messagingService.setAccountStatus(accountId, MessagingAccountStatus.DISCONNECTED);
   }
 
@@ -296,12 +310,14 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
     };
     const zalo = new Zalo(options as never);
     const userAgent = this.readUserAgent(account.credentials) ?? DEFAULT_ZALO_WEB_USER_AGENT;
-    let capturedCredentials: { imei: string; cookie: unknown; userAgent: string; language?: string } | null = null;
+    let capturedCredentials: ZaloRuntimeCredentials | null = null;
 
     const api = await zalo.loginQR(
       { userAgent, language: 'vi' },
       (event: any) => {
-        if (event.type === 0) {
+        const eventType = this.normalizeQrEventType(event?.type);
+
+        if (eventType === 0) {
           const image = this.normalizeQrImage(event.data?.image);
           this.messagingService.emitQrEvent({
             accountId,
@@ -311,45 +327,44 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
             token: event.data?.token,
             message: 'QR đã tạo, đang chờ quét bằng Zalo mobile.',
           });
-        } else if (event.type === 1) {
+        } else if (eventType === 1) {
           this.messagingService.emitQrEvent({
             accountId,
             status: 'qr_expired',
             message: 'QR đã hết hạn, bấm Xem QR để tạo lại.',
           });
-        } else if (event.type === 2) {
+        } else if (eventType === 2) {
           this.messagingService.emitQrEvent({
             accountId,
             status: 'qr_scanned',
             profile: event.data,
-            message: 'Đã quét QR, vui lòng xác nhận đăng nhập trên điện thoại.',
+            message: 'Đã quét QR, đang hoàn tất đăng nhập. Nếu thiết bị đã tin cậy thì có thể không cần xác nhận thêm.',
           });
-        } else if (event.type === 3) {
+        } else if (eventType === 3) {
           this.messagingService.emitQrEvent({
             accountId,
             status: 'qr_declined',
             code: event.data?.code,
             message: 'Thiết bị đã từ chối đăng nhập.',
           });
-        } else if (event.type === 4) {
-          capturedCredentials = {
-            imei: event.data?.imei,
-            cookie: event.data?.cookie,
-            userAgent: event.data?.userAgent || userAgent,
-            language: 'vi',
-          };
+        } else if (eventType === 4) {
+          capturedCredentials = this.normalizeZaloRuntimeCredentials(event.data, userAgent);
           this.messagingService.emitQrEvent({
             accountId,
             status: 'qr_confirmed',
-            message: 'Điện thoại đã xác nhận, đang lưu session.',
+            message: 'Đã lấy được session Zalo, đang lưu account.',
           });
         }
       },
     ) as ZcaApi;
 
+    capturedCredentials ??= this.credentialsFromApiContext(api, userAgent);
+
     if (capturedCredentials) {
       await this.messagingService.setAccountAutoStart(accountId, true);
       await this.messagingService.completeZaloQrLogin(accountId, capturedCredentials);
+    } else {
+      this.logger.warn(`Zalo QR login returned api without credentials for account ${accountId}`);
     }
 
     this.sessions.set(accountId, { api, accountId });
@@ -360,6 +375,29 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
       status: 'qr_authenticated',
       message: 'Đăng nhập Zalo thành công, account đã sẵn sàng nhận/gửi tin.',
     });
+  }
+
+  private async runQrLoginForExistingAccount(accountId: string): Promise<void> {
+    const account = await this.messagingService.getAccountForRuntime(accountId);
+
+    if (account.credentials) {
+      try {
+        await this.stop(accountId, { keepAutoStart: true });
+        await this.start(accountId);
+        this.messagingService.emitQrEvent({
+          accountId,
+          status: 'qr_authenticated',
+          message: 'Session Zalo còn hiệu lực, đã kết nối lại mà không cần quét QR.',
+        });
+        return;
+      } catch (error) {
+        this.logger.warn(`Stored Zalo session cannot reconnect for account ${accountId}; falling back to QR: ${this.getErrorMessage(error)}`);
+      }
+    }
+
+    await this.stop(accountId, { keepAutoStart: true });
+    await this.messagingService.setAccountStatus(accountId, MessagingAccountStatus.CONNECTING);
+    await this.runQrLogin(accountId);
   }
 
   private bindListener(accountId: string, api: ZcaApi): void {
@@ -540,6 +578,77 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
 
   private readString(value: unknown): string {
     return typeof value === 'string' ? value.trim() : '';
+  }
+
+  private normalizeQrEventType(type: unknown): number | null {
+    if (typeof type === 'number') return type;
+    if (typeof type !== 'string') return null;
+
+    const normalized = type.trim().toLowerCase();
+    const aliases: Record<string, number> = {
+      qrcodegenerated: 0,
+      qr_code_generated: 0,
+      qrgenerated: 0,
+      generated: 0,
+      qrcodeexpired: 1,
+      qr_code_expired: 1,
+      qrexpired: 1,
+      expired: 1,
+      qrcodescanned: 2,
+      qr_code_scanned: 2,
+      qrscanned: 2,
+      scanned: 2,
+      qrcodedeclined: 3,
+      qr_code_declined: 3,
+      qrdeclined: 3,
+      declined: 3,
+      gotlogininfo: 4,
+      got_login_info: 4,
+      logininfo: 4,
+      authenticated: 4,
+    };
+
+    return aliases[normalized] ?? null;
+  }
+
+  private normalizeZaloRuntimeCredentials(
+    data: unknown,
+    fallbackUserAgent: string,
+  ): ZaloRuntimeCredentials | null {
+    if (!data || typeof data !== 'object') return null;
+    const source = data as { imei?: unknown; cookie?: unknown; userAgent?: unknown; language?: unknown };
+    const imei = this.readString(source.imei);
+    const userAgent = this.readString(source.userAgent) || fallbackUserAgent;
+
+    if (!imei || !source.cookie || !userAgent) return null;
+
+    return {
+      imei,
+      cookie: source.cookie,
+      userAgent,
+      language: this.readString(source.language) || 'vi',
+    };
+  }
+
+  private credentialsFromApiContext(api: ZcaApi, fallbackUserAgent: string): ZaloRuntimeCredentials | null {
+    try {
+      const context = api.getContext?.();
+      const imei = this.readString(context?.imei);
+      const cookie = context?.cookie?.toJSON?.().cookies;
+      const userAgent = this.readString(context?.userAgent) || fallbackUserAgent;
+
+      if (!imei || !cookie || !userAgent) return null;
+
+      return {
+        imei,
+        cookie,
+        userAgent,
+        language: this.readString(context?.language) || 'vi',
+      };
+    } catch (error) {
+      this.logger.warn(`Cannot read Zalo credentials from api context: ${this.getErrorMessage(error)}`);
+      return null;
+    }
   }
 
   private normalizePhone(value: string): string {

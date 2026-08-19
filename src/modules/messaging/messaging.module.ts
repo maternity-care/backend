@@ -10,10 +10,11 @@ import { MessagingConversationTag } from './entities/messaging-conversation-tag.
 import { MessagingConversation } from './entities/messaging-conversation.entity';
 import { MessagingMessage } from './entities/messaging-message.entity';
 import { MessagingTag } from './entities/messaging-tag.entity';
-import { MessagingController } from './messaging.controller';
+import { FacebookWebhookController, MessagingController } from './messaging.controller';
 import { MessagingEventsService } from './messaging-events.service';
 import { MessagingGateway } from './messaging.gateway';
 import { MessagingService } from './messaging.service';
+import { FacebookPageRuntimeService } from './adapters/facebook-page-runtime.service';
 import { ZaloPersonalRuntimeService } from './adapters/zalo-personal-runtime.service';
 
 @Module({
@@ -31,11 +32,12 @@ import { ZaloPersonalRuntimeService } from './adapters/zalo-personal-runtime.ser
       User,
     ]),
   ],
-  controllers: [MessagingController],
+  controllers: [MessagingController, FacebookWebhookController],
   providers: [
     MessagingService,
     MessagingEventsService,
     MessagingGateway,
+    FacebookPageRuntimeService,
     ZaloPersonalRuntimeService,
   ],
 })

@@ -19,12 +19,20 @@ import { Permissions } from '../../common/decorators/permissions.decorator';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { FacebookPageRuntimeService } from './adapters/facebook-page-runtime.service';
 import { ZaloPersonalRuntimeService } from './adapters/zalo-personal-runtime.service';
 import { CreateMessagingAccountDto } from './dto/create-messaging-account.dto';
+import {
+  FacebookOAuthConnectDto,
+  FacebookOAuthExchangeDto,
+  FacebookOAuthUrlDto,
+  FacebookPageAccountDto,
+} from './dto/facebook-page-account.dto';
 import { ImportZaloAccountDto } from './dto/import-zalo-account.dto';
 import { SendMessagingMessageDto } from './dto/send-message.dto';
 import { UpdateMessagingAccountDto } from './dto/update-messaging-account.dto';
 import { MessagingService } from './messaging.service';
+import { MessagingChannel } from './types/messaging.enums';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('management/messages')
@@ -32,6 +40,7 @@ export class MessagingController {
   constructor(
     private readonly messagingService: MessagingService,
     private readonly zaloRuntime: ZaloPersonalRuntimeService,
+    private readonly facebookRuntime: FacebookPageRuntimeService,
   ) {}
 
   @Get('accounts')
@@ -75,6 +84,30 @@ export class MessagingController {
     return this.zaloRuntime.startQrLogin(dto);
   }
 
+  @Post('accounts/facebook-page')
+  @Permissions(PermissionEnum.MESSAGING_ACCOUNT_MANAGE)
+  createFacebookPageAccount(@Body() dto: FacebookPageAccountDto) {
+    return this.messagingService.createFacebookPageAccount(dto);
+  }
+
+  @Post('accounts/facebook/oauth-url')
+  @Permissions(PermissionEnum.MESSAGING_ACCOUNT_MANAGE)
+  createFacebookOAuthUrl(@Body() dto: FacebookOAuthUrlDto) {
+    return this.facebookRuntime.createOAuthUrl(dto.redirectUri);
+  }
+
+  @Post('accounts/facebook/oauth-exchange')
+  @Permissions(PermissionEnum.MESSAGING_ACCOUNT_MANAGE)
+  exchangeFacebookOAuth(@Body() dto: FacebookOAuthExchangeDto) {
+    return this.facebookRuntime.exchangeOAuthCode(dto);
+  }
+
+  @Post('accounts/facebook/oauth-connect')
+  @Permissions(PermissionEnum.MESSAGING_ACCOUNT_MANAGE)
+  connectFacebookOAuthPage(@Body() dto: FacebookOAuthConnectDto) {
+    return this.facebookRuntime.connectOAuthPage(dto);
+  }
+
   @Post('accounts/:id/qr')
   @Permissions(PermissionEnum.MESSAGING_ACCOUNT_MANAGE)
   startZaloQrLoginForAccount(@Param('id') id: string) {
@@ -84,14 +117,24 @@ export class MessagingController {
   @Post('accounts/:id/start')
   @Permissions(PermissionEnum.MESSAGING_ACCOUNT_MANAGE)
   async startAccount(@Param('id') id: string) {
-    await this.zaloRuntime.start(id);
+    const account = await this.messagingService.getAccountForRuntime(id);
+    if (account.channel === MessagingChannel.FACEBOOK_PAGE) {
+      await this.facebookRuntime.start(id);
+    } else {
+      await this.zaloRuntime.start(id);
+    }
     return { started: true };
   }
 
   @Post('accounts/:id/stop')
   @Permissions(PermissionEnum.MESSAGING_ACCOUNT_MANAGE)
   async stopAccount(@Param('id') id: string) {
-    await this.zaloRuntime.stop(id);
+    const account = await this.messagingService.getAccountForRuntime(id);
+    if (account.channel === MessagingChannel.FACEBOOK_PAGE) {
+      await this.facebookRuntime.stop(id);
+    } else {
+      await this.zaloRuntime.stop(id);
+    }
     return { stopped: true };
   }
 
@@ -240,13 +283,20 @@ export class MessagingController {
       attachment,
     );
     try {
-      const providerResponse = await this.zaloRuntime.sendMessage(
-        conversation.accountId,
-        conversation.externalThreadId,
-        conversation.externalThreadType,
-        content,
-        attachment,
-      );
+      const providerResponse = conversation.channel === MessagingChannel.FACEBOOK_PAGE
+        ? await this.facebookRuntime.sendMessage(
+            conversation.accountId,
+            conversation.externalThreadId,
+            content,
+            attachment,
+          )
+        : await this.zaloRuntime.sendMessage(
+            conversation.accountId,
+            conversation.externalThreadId,
+            conversation.externalThreadType,
+            content,
+            attachment,
+          );
       return this.messagingService.updateOutboundDelivery(message.id, 'sent', null, providerResponse);
     } catch (error) {
       return this.messagingService.updateOutboundDelivery(message.id, 'failed', this.getErrorMessage(error));
@@ -265,21 +315,29 @@ export class MessagingController {
     );
     await this.messagingService.updateOutboundDelivery(message.id, 'pending', null);
     const attachmentUrl = this.readMetadataString(message.metadata, 'attachmentUrl');
+    const attachment = attachmentUrl
+      ? {
+          url: attachmentUrl,
+          name: this.readMetadataString(message.metadata, 'attachmentName'),
+          mimeType: this.readMetadataString(message.metadata, 'attachmentMimeType'),
+          size: this.readMetadataNumber(message.metadata, 'attachmentSize'),
+        }
+      : null;
     try {
-      const providerResponse = await this.zaloRuntime.sendMessage(
-        conversation.accountId,
-        conversation.externalThreadId,
-        conversation.externalThreadType,
-        message.content ?? '',
-        attachmentUrl
-          ? {
-              url: attachmentUrl,
-              name: this.readMetadataString(message.metadata, 'attachmentName'),
-              mimeType: this.readMetadataString(message.metadata, 'attachmentMimeType'),
-              size: this.readMetadataNumber(message.metadata, 'attachmentSize'),
-            }
-          : null,
-      );
+      const providerResponse = conversation.channel === MessagingChannel.FACEBOOK_PAGE
+        ? await this.facebookRuntime.sendMessage(
+            conversation.accountId,
+            conversation.externalThreadId,
+            message.content ?? '',
+            attachment,
+          )
+        : await this.zaloRuntime.sendMessage(
+            conversation.accountId,
+            conversation.externalThreadId,
+            conversation.externalThreadType,
+            message.content ?? '',
+            attachment,
+          );
       return this.messagingService.updateOutboundDelivery(message.id, 'sent', null, providerResponse);
     } catch (error) {
       return this.messagingService.updateOutboundDelivery(message.id, 'failed', this.getErrorMessage(error));
@@ -296,6 +354,9 @@ export class MessagingController {
       conversationId,
       messageId,
     );
+    if (conversation.channel === MessagingChannel.FACEBOOK_PAGE) {
+      throw new BadRequestException('Facebook Page không hỗ trợ thu hồi tin qua API này.');
+    }
     try {
       const providerResponse = await this.zaloRuntime.undoMessage(
         conversation.accountId,
@@ -321,5 +382,25 @@ export class MessagingController {
 
   private getErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+  }
+}
+
+@Controller('webhooks/facebook')
+export class FacebookWebhookController {
+  constructor(private readonly facebookRuntime: FacebookPageRuntimeService) {}
+
+  @Get()
+  verify(
+    @Query('hub.mode') mode?: string,
+    @Query('hub.verify_token') token?: string,
+    @Query('hub.challenge') challenge?: string,
+  ) {
+    return this.facebookRuntime.verifyWebhook(mode, token, challenge);
+  }
+
+  @Post()
+  async receive(@Body() body: unknown) {
+    await this.facebookRuntime.handleWebhook(body);
+    return { received: true };
   }
 }
