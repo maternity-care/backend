@@ -8,11 +8,13 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import { PermissionEnum } from '../../common/constants/permission.enum';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -395,12 +397,14 @@ export class FacebookWebhookController {
   constructor(private readonly facebookRuntime: FacebookPageRuntimeService) {}
 
   @Get()
-  verify(
+  async verify(
+    @Res() response: Response,
     @Query('hub.mode') mode?: string,
     @Query('hub.verify_token') token?: string,
     @Query('hub.challenge') challenge?: string,
   ) {
-    return this.facebookRuntime.verifyWebhook(mode, token, challenge);
+    const verifiedChallenge = await this.facebookRuntime.verifyWebhook(mode, token, challenge);
+    return response.status(200).type('text/plain').send(verifiedChallenge);
   }
 
   @Post()
