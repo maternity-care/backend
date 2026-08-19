@@ -157,6 +157,44 @@ export class ChatbotGateway implements OnGatewayConnection, OnGatewayDisconnect 
       .emit('chatbot:staff-queue', await this.getFreshStaffQueue());
   }
 
+  @SubscribeMessage('chatbot:end')
+  async handleUserEnd(@ConnectedSocket() client: Socket): Promise<void> {
+    const conversationId = this.userClientConversations.get(client.id) || this.getConversationId(client);
+    if (!conversationId) return;
+
+    const requester = this.getRequester(client);
+    const conversation = await this.chatbotService.endConversation(conversationId, {
+      type: 'user',
+      id: requester?.id,
+      name: requester?.name,
+    });
+    this.clearUserIdleTimer(conversation.conversationId);
+    this.server.to(conversation.conversationId).emit('chatbot:conversation', conversation);
+    this.server
+      .to('chatbot:staff')
+      .emit('chatbot:staff-queue', await this.getFreshStaffQueue());
+  }
+
+  @SubscribeMessage('chatbot:staff-end')
+  async handleStaffEnd(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { conversationId?: string },
+  ): Promise<void> {
+    if (!this.canUseStaffChat(client) || !payload.conversationId) return;
+
+    const conversation = await this.chatbotService.endConversation(payload.conversationId, {
+      type: 'staff',
+      id: client.data.staffId,
+      name: client.data.staffName,
+    });
+    this.clearClaimTimer(conversation.conversationId);
+    this.clearUserIdleTimer(conversation.conversationId);
+    this.server.to(conversation.conversationId).emit('chatbot:conversation', conversation);
+    this.server
+      .to('chatbot:staff')
+      .emit('chatbot:staff-queue', await this.getFreshStaffQueue());
+  }
+
   @SubscribeMessage('chatbot:history')
   async handleHistory(
     @ConnectedSocket() client: Socket,

@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { MessagingService } from '../messaging.service';
+import { GeminiChatbotService } from '../../chatbot/gemini-chatbot.service';
 import {
   MessagingAccountStatus,
   MessagingChannel,
@@ -73,7 +74,10 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
   private readonly logger = new Logger(ZaloPersonalRuntimeService.name);
   private readonly sessions = new Map<string, RuntimeSession>();
 
-  constructor(private readonly messagingService: MessagingService) {}
+  constructor(
+    private readonly messagingService: MessagingService,
+    private readonly geminiChatbotService: GeminiChatbotService,
+  ) {}
 
   async onModuleInit(): Promise<void> {
     const accounts = await this.messagingService.listAccounts();
@@ -416,7 +420,7 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
         const profile = await this.loadZaloProfile(api, senderId);
         const senderName = profile?.displayName || profile?.zaloName || (typeof data.dName === 'string' ? data.dName : null);
 
-        await this.messagingService.recordIncoming({
+        const result = await this.messagingService.recordIncoming({
           accountId,
           externalThreadId,
           externalThreadType: Number(message.type) === 1 ? 'group' : 'user',
@@ -438,6 +442,7 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
             raw: data,
           },
         });
+        await this.maybeAutoReply(accountId, result.conversation.externalThreadId, result.conversation.externalThreadType, result.message);
       } catch (error) {
         this.logger.warn(`Cannot persist incoming Zalo message: ${this.getErrorMessage(error)}`);
       }
@@ -466,6 +471,42 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
       this.logger.warn(`Zalo listener error for account ${accountId}: ${this.getErrorMessage(error)}`);
       void this.messagingService.setAccountStatus(accountId, MessagingAccountStatus.ERROR, this.getErrorMessage(error));
     });
+  }
+
+  private async maybeAutoReply(
+    accountId: string,
+    externalThreadId: string,
+    externalThreadType: string,
+    message: { id: string; conversationId: string; content: string | null; messageType: MessagingMessageType; metadata: Record<string, unknown> | null },
+  ): Promise<void> {
+    if (externalThreadType !== 'user') return;
+    if (!(await this.messagingService.shouldAutoReply(message.conversationId))) return;
+
+    const history = await this.messagingService.buildAutoReplyHistory(message.conversationId);
+    const imageUrl = this.readString(message.metadata?.imageUrl);
+    const userMessage = this.readString(message.content) ||
+      this.readString(message.metadata?.attachmentTitle) ||
+      (message.messageType === MessagingMessageType.IMAGE ? 'Khách vừa gửi hình ảnh.' : 'Khách vừa gửi tin nhắn mới.');
+    const files = imageUrl ? [{ url: imageUrl, mimeType: 'image/jpeg' }] : [];
+    const reply = await this.geminiChatbotService.generateReplyWithFiles(userMessage, history, files) ||
+      'Mình đã nhận được tin nhắn của bạn. Tư vấn viên/bác sĩ sẽ phản hồi sớm nhé.';
+    const outbound = await this.messagingService.recordAutoReplyOutbound({
+      conversationId: message.conversationId,
+      content: reply,
+      reason: 'zalo_inbound_after_60m_or_no_reply',
+    });
+
+    try {
+      const providerResponse = await this.sendMessage(accountId, externalThreadId, externalThreadType, reply);
+      await this.messagingService.updateOutboundDelivery(outbound.message.id, 'sent', null, providerResponse);
+    } catch (error) {
+      await this.messagingService.updateOutboundDelivery(
+        outbound.message.id,
+        'failed',
+        this.getErrorMessage(error),
+      );
+      this.logger.warn(`Cannot send Zalo AI auto-reply: ${this.getErrorMessage(error)}`);
+    }
   }
 
   private readAttachment(content: unknown): {

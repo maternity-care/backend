@@ -9,8 +9,6 @@ import { Appointment } from '../modules/appointments/entities/appointment.entity
 import { AppointmentReminder } from './entities/appointment-reminder.entity';
 import { AppointmentStatusLog } from './entities/appointment-status-log.entity';
 import { Article } from './entities/article.entity';
-import { ChatConversation } from '../modules/chatbot/entities/chat-conversation.entity';
-import { ChatMessage } from '../modules/chatbot/entities/chat-message.entity';
 import { ContentReport } from './entities/content-report.entity';
 import { Doctor } from '../modules/doctors/entities/doctor.entity';
 import { DoctorShiftChangeLog } from '../modules/shifts/entities/doctor-shift-change-log.entity';
@@ -80,6 +78,7 @@ import { RebuildDatabaseTest1786726656690 } from './migrations/1786726656690-Reb
 import { AddMessagingModule1787100000000 } from './migrations/1787100000000-AddMessagingModule';
 import { AddMessagingTags1787200000000 } from './migrations/1787200000000-AddMessagingTags';
 import { AddMessagingCustomerIdentities1787300000000 } from './migrations/1787300000000-AddMessagingCustomerIdentities';
+import { MigrateChatbotToMessaging1787400000000 } from './migrations/1787400000000-MigrateChatbotToMessaging';
 
 config();
 
@@ -125,8 +124,6 @@ export const typeOrmConfig: DataSourceOptions = {
     AppointmentReminder,
     AppointmentStatusLog,
     Article,
-    ChatConversation,
-    ChatMessage,
     ContentReport,
     Faq,
     ForumCategoryMetadata,
@@ -175,6 +172,7 @@ export const typeOrmConfig: DataSourceOptions = {
     AddMessagingModule1787100000000,
     AddMessagingTags1787200000000,
     AddMessagingCustomerIdentities1787300000000,
+    MigrateChatbotToMessaging1787400000000,
   ],
   charset: 'utf8mb4_unicode_ci',
 };

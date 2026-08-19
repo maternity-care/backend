@@ -17,6 +17,7 @@ import { Staff } from '../staffs/entities/staff.entity';
 import { Appointment } from '../appointments/entities/appointment.entity';
 import { User } from '../users/entities/user.entity';
 import { UserStatusEnum } from '../users/users.enum';
+import { ChatbotMessage } from '../chatbot/chatbot.types';
 import {
   MessagingAccountStatus,
   MessagingChannel,
@@ -64,6 +65,12 @@ type OutboundAttachmentInput = {
   name?: string | null;
   mimeType?: string | null;
   size?: number | null;
+};
+
+type AiAutoReplyInput = {
+  conversationId: string;
+  content: string;
+  reason?: string;
 };
 
 type ZaloPhoneProfile = {
@@ -574,11 +581,13 @@ export class MessagingService {
       }),
     );
 
-    this.events.emitToStaff('messages:conversation.updated', conversation);
+    conversation.account = account;
+    const [hydratedConversation] = await this.hydrateConversationTags([conversation]);
+    this.events.emitToStaff('messages:conversation.updated', hydratedConversation);
     this.events.emitConversation(conversation.id, 'messages:message.new', message);
-    this.events.emitToStaff('messages:message.new', { conversation, message });
+    this.events.emitToStaff('messages:message.new', { conversation: hydratedConversation, message });
 
-    return { conversation, message };
+    return { conversation: hydratedConversation, message };
   }
 
   async recordOutbound(
@@ -624,9 +633,62 @@ export class MessagingService {
     conversation.unreadCount = 0;
     conversation = await this.conversationRepository.save(conversation);
 
-    this.events.emitToStaff('messages:conversation.updated', conversation);
+    const [hydratedConversation] = await this.hydrateConversationTags([conversation]);
+    this.events.emitToStaff('messages:conversation.updated', hydratedConversation);
     this.events.emitConversation(conversation.id, 'messages:message.new', message);
-    return { conversation, message };
+    return { conversation: hydratedConversation, message };
+  }
+
+  async shouldAutoReply(conversationId: string): Promise<boolean> {
+    await this.getConversationEntity(conversationId);
+    const outboundMessages = await this.messageRepository.find({
+      where: {
+        conversationId,
+        direction: MessagingMessageDirection.OUTBOUND,
+      },
+      order: {
+        sentAt: 'DESC',
+        createdAt: 'DESC',
+        id: 'DESC',
+      },
+      take: 20,
+    });
+    const lastOutbound = outboundMessages.find((message) => !message.metadata?.autoReply);
+
+    if (!lastOutbound) return true;
+    const lastReplyAt = lastOutbound.sentAt ?? lastOutbound.createdAt;
+    return Date.now() - lastReplyAt.getTime() > 60 * 60 * 1000;
+  }
+
+  async buildAutoReplyHistory(conversationId: string, limit = 8): Promise<ChatbotMessage[]> {
+    await this.getConversationEntity(conversationId);
+    const messages = await this.messageRepository.find({
+      where: { conversationId },
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
+    return messages.reverse().map((message) => this.toChatbotHistoryMessage(message));
+  }
+
+  async recordAutoReplyOutbound(input: AiAutoReplyInput): Promise<{
+    conversation: MessagingConversation;
+    message: MessagingMessage;
+  }> {
+    const result = await this.recordOutbound(
+      input.conversationId,
+      { id: 'ai:auto-reply', name: 'AI hỗ trợ' },
+      input.content,
+    );
+    result.message.metadata = {
+      ...(result.message.metadata ?? {}),
+      autoReply: true,
+      autoReplyProvider: 'gemini',
+      autoReplyReason: input.reason ?? 'last_reply_gt_60m_or_none',
+    };
+    const saved = await this.messageRepository.save(result.message);
+    this.events.emitConversation(saved.conversationId, 'messages:message.updated', saved);
+    this.events.emitToStaff('messages:message.updated', saved);
+    return { conversation: result.conversation, message: saved };
   }
 
   async updateOutboundDelivery(
@@ -715,6 +777,34 @@ export class MessagingService {
     await this.conversationTagRepository.delete({ conversationId: id });
     await this.conversationRepository.delete(id);
     this.events.emitToStaff('messages:conversation.deleted', { id });
+  }
+
+  async closeConversation(
+    conversationId: string,
+    actor?: MessagingActor | null,
+  ): Promise<MessagingConversation> {
+    const conversation = await this.getConversationEntity(conversationId);
+    conversation.status = MessagingConversationStatus.CLOSED;
+    conversation.unreadCount = 0;
+    conversation.assignedStaffId = null;
+    conversation.assignedStaffName = null;
+    conversation.metadata = this.appendConversationHistory(
+      {
+        ...(conversation.metadata ?? {}),
+        chatbotStatus: conversation.channel === MessagingChannel.WEB_CHAT ? 'closed' : conversation.metadata?.chatbotStatus,
+        claimExpiresAt: null,
+      },
+      {
+        type: 'conversation_closed',
+        actor,
+        description: 'kết thúc hội thoại',
+        at: new Date().toISOString(),
+      },
+    );
+    const [saved] = await this.hydrateConversationTags([await this.conversationRepository.save(conversation)]);
+    this.events.emitToStaff('messages:conversation.updated', saved);
+    this.events.emitConversation(saved.id, 'messages:conversation.updated', saved);
+    return saved;
   }
 
   async getOutboundMessageForRetry(conversationId: string, messageId: string): Promise<{
@@ -855,6 +945,43 @@ export class MessagingService {
     if (messageType === MessagingMessageType.STICKER) return '[Sticker]';
     if (messageType === MessagingMessageType.FILE) return '[Tệp đính kèm]';
     return '[Nội dung chưa hỗ trợ]';
+  }
+
+  private toChatbotHistoryMessage(message: MessagingMessage): ChatbotMessage {
+    const attachmentUrl =
+      this.readMetadataString(message.metadata, 'imageUrl') ??
+      this.readMetadataString(message.metadata, 'attachmentUrl');
+    const attachmentName = this.readMetadataString(message.metadata, 'attachmentName') ??
+      this.readMetadataString(message.metadata, 'attachmentTitle');
+    const attachmentMimeType = this.readMetadataString(message.metadata, 'attachmentMimeType');
+    const isAutoReply = Boolean(message.metadata?.autoReply);
+    const content = message.content ??
+      attachmentName ??
+      this.messageTypePreview(message.messageType);
+
+    return {
+      id: String(message.id),
+      conversationId: String(message.conversationId),
+      sender: message.direction === MessagingMessageDirection.INBOUND
+        ? 'user'
+        : isAutoReply
+          ? 'bot'
+          : message.senderType === MessagingSenderType.SYSTEM
+            ? 'system'
+            : 'staff',
+      messageType: message.messageType === MessagingMessageType.IMAGE
+        ? 'image'
+        : message.messageType === MessagingMessageType.FILE
+          ? 'file'
+          : 'text',
+      content,
+      senderName: message.senderName ?? undefined,
+      fileUrl: attachmentUrl,
+      fileName: attachmentName,
+      mimeType: attachmentMimeType,
+      fileSize: null,
+      createdAt: (message.sentAt ?? message.createdAt).toISOString(),
+    };
   }
 
   private upsertMetadataList(

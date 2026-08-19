@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { MessagingService } from '../messaging.service';
+import { GeminiChatbotService } from '../../chatbot/gemini-chatbot.service';
 import {
   MessagingAccountStatus,
   MessagingChannel,
@@ -44,7 +45,10 @@ export class FacebookPageRuntimeService implements OnModuleInit {
   private readonly logger = new Logger(FacebookPageRuntimeService.name);
   private readonly oauthSessions = new Map<string, FacebookOAuthSession>();
 
-  constructor(private readonly messagingService: MessagingService) {}
+  constructor(
+    private readonly messagingService: MessagingService,
+    private readonly geminiChatbotService: GeminiChatbotService,
+  ) {}
 
   async onModuleInit(): Promise<void> {
     const accounts = await this.messagingService.listAccounts();
@@ -297,7 +301,7 @@ export class FacebookPageRuntimeService implements OnModuleInit {
       ? (attachmentType === 'image' ? MessagingMessageType.IMAGE : MessagingMessageType.FILE)
       : MessagingMessageType.TEXT;
 
-    await this.messagingService.recordIncoming({
+    const result = await this.messagingService.recordIncoming({
       accountId,
       externalThreadId: senderId,
       externalThreadType: 'user',
@@ -318,6 +322,40 @@ export class FacebookPageRuntimeService implements OnModuleInit {
         rawEvent: event,
       },
     });
+    await this.maybeAutoReply(accountId, senderId, result.message);
+  }
+
+  private async maybeAutoReply(
+    accountId: string,
+    recipientId: string,
+    message: { id: string; conversationId: string; content: string | null; messageType: MessagingMessageType; metadata: Record<string, unknown> | null },
+  ): Promise<void> {
+    if (!(await this.messagingService.shouldAutoReply(message.conversationId))) return;
+
+    const history = await this.messagingService.buildAutoReplyHistory(message.conversationId);
+    const imageUrl = this.readString(message.metadata?.imageUrl);
+    const userMessage = this.readString(message.content) ||
+      (message.messageType === MessagingMessageType.IMAGE ? 'Khách vừa gửi hình ảnh.' : 'Khách vừa gửi tin nhắn mới.');
+    const files = imageUrl ? [{ url: imageUrl, mimeType: 'image/jpeg' }] : [];
+    const reply = await this.geminiChatbotService.generateReplyWithFiles(userMessage, history, files) ||
+      'Mình đã nhận được tin nhắn của bạn. Tư vấn viên/bác sĩ sẽ phản hồi sớm nhé.';
+    const outbound = await this.messagingService.recordAutoReplyOutbound({
+      conversationId: message.conversationId,
+      content: reply,
+      reason: 'facebook_inbound_after_60m_or_no_reply',
+    });
+
+    try {
+      const providerResponse = await this.sendMessage(accountId, recipientId, reply);
+      await this.messagingService.updateOutboundDelivery(outbound.message.id, 'sent', null, providerResponse);
+    } catch (error) {
+      await this.messagingService.updateOutboundDelivery(
+        outbound.message.id,
+        'failed',
+        this.getErrorMessage(error),
+      );
+      this.logger.warn(`Cannot send Facebook AI auto-reply: ${this.getErrorMessage(error)}`);
+    }
   }
 
   private async sendGraphMessage(
