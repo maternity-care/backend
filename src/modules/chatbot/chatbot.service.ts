@@ -160,6 +160,11 @@ export class ChatbotService {
         content ?? '',
         recentMessages.map((message) => this.mapMessageForPrompt(message)),
         geminiReadableFiles,
+        {
+          channel: 'web_chat',
+          supportsButtons: true,
+          supportsLinks: true,
+        },
       );
       await this.createMessage(
         conversation.id,
@@ -657,8 +662,16 @@ export class ChatbotService {
     conversation.lastMessagePreview = content || attachmentName || this.messageTypePreview(messageType);
     conversation.lastMessageAt = now;
     conversation.unreadCount = sender === 'user' ? Number(conversation.unreadCount ?? 0) + 1 : 0;
-    await this.conversationRepository.save(conversation);
+    const savedConversation = await this.conversationRepository.save(conversation);
+    const conversationPayload = await this.conversationRepository.findOne({
+      where: { id: savedConversation.id },
+      relations: { account: true },
+    });
     this.events.emitConversation(conversation.id, 'messages:message.new', message);
+    this.events.emitToStaff('messages:message.new', {
+      conversation: conversationPayload ?? savedConversation,
+      message,
+    });
     return message;
   }
 

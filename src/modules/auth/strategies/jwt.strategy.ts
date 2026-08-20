@@ -12,6 +12,7 @@ import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 import { Facility } from '../../facilities/entities/facility.entity';
 import { AccountStatus } from '../../../common/constants/status.enum';
 import { RoleEnum } from '../../../common/constants/role.enum';
+import { RESPONSE_MESSAGES } from '../../../common/constants/response-message.constant';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -38,7 +39,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     const user = await this.usersService.findById(payload.sub);
     if (!user || user.status !== AccountStatus.ACTIVE) {
-      throw new UnauthorizedException('Invalid or inactive user');
+      throw new UnauthorizedException(RESPONSE_MESSAGES.AUTH_USER_INACTIVE);
     }
 
     return {
@@ -68,7 +69,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
 
     if (!staff) {
-      throw new UnauthorizedException('Invalid or inactive staff');
+      throw new UnauthorizedException(RESPONSE_MESSAGES.AUTH_STAFF_INACTIVE);
     }
 
     const roles = staff.roles.map((role) => ({

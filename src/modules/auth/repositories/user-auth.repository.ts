@@ -3,6 +3,7 @@ import { IUserAuthRepository } from '../interfaces/user-auth-repository.interfac
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserAuth } from '../entities/user-auth.entity';
 import { DeepPartial, Repository } from 'typeorm';
+import { RESPONSE_MESSAGES } from '../../../common/constants/response-message.constant';
 
 export class UserAuthRepository implements IUserAuthRepository {
   constructor(
@@ -36,7 +37,7 @@ export class UserAuthRepository implements IUserAuthRepository {
   async update(id: string, email: string, password: string): Promise<void> {
     const user = await this.repository.findOneBy({ id });
     if (!user) {
-      throw new Error('User not found');
+      throw new Error(RESPONSE_MESSAGES.AUTH_USER_INVALID);
     }
     user.email = email;
     user.password = password;
@@ -46,7 +47,7 @@ export class UserAuthRepository implements IUserAuthRepository {
   async updateStatus(id: string, status: AccountStatus): Promise<void> {
     const user = await this.repository.findOne({ where: { userId: id } });
     if (!user) {
-      throw new Error('User account not found');
+      throw new Error(RESPONSE_MESSAGES.AUTH_USER_INVALID);
     }
     user.status = status;
     await this.repository.save(user);

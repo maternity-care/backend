@@ -20,6 +20,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FacebookPageRuntimeService } from './adapters/facebook-page-runtime.service';
 import { ZaloPersonalRuntimeService } from './adapters/zalo-personal-runtime.service';
@@ -375,7 +376,7 @@ export class MessagingController {
       messageId,
     );
     if (conversation.channel === MessagingChannel.FACEBOOK_PAGE) {
-      throw new BadRequestException('Facebook Page không hỗ trợ thu hồi tin qua API này.');
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.FACEBOOK_UNSEND_UNSUPPORTED);
     }
     try {
       const providerResponse = await this.zaloRuntime.undoMessage(

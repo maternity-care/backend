@@ -23,6 +23,7 @@ import { getActiveFacilityId, isSuperAdmin } from '../../common/helpers/facility
 import { UserAuthRepository } from '../auth/repositories/user-auth.repository';
 import { UpdatePregnantUserDto } from './dto/request/update-pregnant-user.dto';
 import { JobsService } from '../jobs/jobs.service';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 
 @Injectable()
 export class UsersService implements IUsersService {
@@ -42,19 +43,17 @@ export class UsersService implements IUsersService {
   async create(dto: CreateUserDto): Promise<User> {
     const existingEmail = await this.usersRepository.findByEmail(dto.email);
     if (existingEmail) {
-      throw new ConflictException('Email đã tồn tại trong hệ thống. Vui lòng sử dụng email khác.');
+      throw new ConflictException(RESPONSE_MESSAGES.USERS.EMAIL_EXISTS);
     }
 
     const existingPhone = await this.usersRepository.findByPhone(dto.phone);
     if (existingPhone) {
-      throw new ConflictException(
-        'Số điện thoại đã tồn tại trong hệ thống. Vui lòng sử dụng số đồ khác.',
-      );
+      throw new ConflictException(RESPONSE_MESSAGES.USERS.PHONE_EXISTS);
     }
 
     const existingCccd = await this.usersRepository.findByCccd(dto.cccd);
     if (existingCccd) {
-      throw new ConflictException('Cccd đã tồn tại trong hệ thống. Vui lòng sử dụng cccd khác.');
+      throw new ConflictException(RESPONSE_MESSAGES.USERS.CCCD_EXISTS);
     }
 
     const user = this.usersRepository.create({
@@ -100,7 +99,7 @@ export class UsersService implements IUsersService {
   async findById(id: string): Promise<User> {
     const user = await this.usersRepository.findById(id);
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException(RESPONSE_MESSAGES.USERS.NOT_FOUND);
     }
 
     return user;
@@ -167,12 +166,12 @@ export class UsersService implements IUsersService {
   async updateStatus(id: string, status: UserStatusEnum, reason?: string): Promise<void> {
     const user = await this.findById(id);
     if (!user) {
-      throw new NotFoundException('Không tìm thấy thông tin người dùng.');
+      throw new NotFoundException(RESPONSE_MESSAGES.USERS.NOT_FOUND);
     }
 
     if (status === UserStatusEnum.INACTIVE || status === UserStatusEnum.LOCKED) {
       if (!reason) {
-        throw new BadRequestException('Vui lý nhập lý do khóa tài khoản.');
+        throw new BadRequestException(RESPONSE_MESSAGES.USERS.LOCK_REASON_REQUIRED);
       }
 
       await this.usersRepository.updateStatus(id, status, reason);
@@ -203,6 +202,16 @@ export class UsersService implements IUsersService {
     }
 
     await this.usersRepository.updateStatus(id, status);
+    try {
+      await this.userAuthRepository.updateStatus(user.id, status);
+    } catch (error) {
+      this.logger.warn(
+        `Could not sync auth status for user ${user.id}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    await this.clearUsersCache(id);
     return;
   }
 
