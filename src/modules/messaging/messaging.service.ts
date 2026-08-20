@@ -32,6 +32,7 @@ import { FacebookPageAccountDto } from './dto/facebook-page-account.dto';
 import { ImportZaloAccountDto } from './dto/import-zalo-account.dto';
 import { UpdateMessagingAccountDto } from './dto/update-messaging-account.dto';
 import { MessagingEventsService } from './messaging-events.service';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 
 type ZaloCredentials = {
   imei: string;
@@ -152,7 +153,7 @@ export class MessagingService {
     const pageName = this.readString(dto.pageName);
     const pageAccessToken = this.readString(dto.pageAccessToken);
     if (!pageId || !pageName || !pageAccessToken) {
-      throw new BadRequestException('Facebook Page cần Page ID, tên page và access token.');
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.FACEBOOK_PAGE_ACCOUNT_REQUIRED);
     }
 
     const existing = await this.accountRepository.findOne({
@@ -202,7 +203,7 @@ export class MessagingService {
       account.status === MessagingAccountStatus.CONNECTED ||
       account.status === MessagingAccountStatus.CONNECTING
     ) {
-      throw new BadRequestException('Vui lòng stop account trước khi xoá.');
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.ACCOUNT_STOP_BEFORE_DELETE);
     }
 
     await this.accountRepository.delete(id);
@@ -358,9 +359,11 @@ export class MessagingService {
   }): Promise<MessagingConversation> {
     const account = await this.getAccountEntity(input.accountId);
     if (account.channel !== MessagingChannel.ZALO_PERSONAL) {
-      throw new BadRequestException('Chỉ account Zalo cá nhân mới tìm hội thoại theo SĐT ở bước này.');
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.ZALO_PHONE_SEARCH_ACCOUNT_ONLY);
     }
-    if (!input.profile?.uid) throw new BadRequestException('Không tìm thấy Zalo uid từ SĐT này.');
+    if (!input.profile?.uid) {
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.ZALO_UID_NOT_FOUND);
+    }
 
     const phone = this.normalizePhone(input.phone);
     const externalUserId = String(input.profile.uid);
@@ -471,7 +474,7 @@ export class MessagingService {
     }
 
     const user = await this.userRepository.findOne({ where: { id: String(userId) } });
-    if (!user) throw new NotFoundException('Không tìm thấy user để map.');
+    if (!user) throw new NotFoundException(RESPONSE_MESSAGES.MESSAGING.USER_MAP_NOT_FOUND);
     identity.userId = user.id;
     identity.displayName = identity.displayName || user.name;
     identity.phone = identity.phone || user.phone;
@@ -489,7 +492,7 @@ export class MessagingService {
     const phone = this.readString(identity.phone);
     const email = this.readString(identity.email);
     if (!phone || !email) {
-      throw new BadRequestException('Cần nhập số điện thoại và email trước khi tạo user nhanh.');
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.USER_QUICK_CREATE_REQUIRED);
     }
 
     let user = await this.userRepository.findOne({ where: [{ phone }, { email }] });
@@ -698,7 +701,7 @@ export class MessagingService {
     providerResponse?: unknown,
   ): Promise<MessagingMessage> {
     const message = await this.messageRepository.findOne({ where: { id: messageId } });
-    if (!message) throw new NotFoundException('Không tìm thấy tin nhắn.');
+    if (!message) throw new NotFoundException(RESPONSE_MESSAGES.MESSAGING.MESSAGE_NOT_FOUND);
 
     const zaloMsgId = this.extractProviderString(providerResponse, ['msgId', 'message.msgId', 'attachment.0.msgId']) ??
       this.readMetadataString(message.metadata, 'zaloMsgId');
@@ -734,12 +737,12 @@ export class MessagingService {
   }> {
     const conversation = await this.getConversationEntity(conversationId);
     const message = await this.messageRepository.findOne({ where: { id: messageId, conversationId } });
-    if (!message) throw new NotFoundException('Không tìm thấy tin nhắn.');
+    if (!message) throw new NotFoundException(RESPONSE_MESSAGES.MESSAGING.MESSAGE_NOT_FOUND);
     if (message.direction !== MessagingMessageDirection.OUTBOUND) {
-      throw new BadRequestException('Chỉ thu hồi được tin nhắn mình gửi.');
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.OUTBOUND_ONLY_UNSEND);
     }
     if (this.readMetadataString(message.metadata, 'recalledAt')) {
-      throw new BadRequestException('Tin nhắn này đã được thu hồi.');
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.MESSAGE_ALREADY_UNSENT);
     }
 
     const response = message.metadata?.zaloSendResponse;
@@ -749,14 +752,14 @@ export class MessagingService {
     const cliMsgId = this.readMetadataString(message.metadata, 'zaloCliMsgId') ??
       this.extractProviderString(response, ['cliMsgId', '_cliMsgId', '_clientIds.0', 'message.cliMsgId', 'attachment.0.cliMsgId']);
     if (!msgId || !cliMsgId) {
-      throw new BadRequestException('Tin nhắn này thiếu mã thu hồi từ Zalo. Hãy thử với tin nhắn gửi mới sau khi cập nhật.');
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.ZALO_RECALL_ID_MISSING);
     }
     return { conversation, message, payload: { msgId, cliMsgId } };
   }
 
   async markOutboundRecalled(messageId: string, providerResponse?: unknown): Promise<MessagingMessage> {
     const message = await this.messageRepository.findOne({ where: { id: messageId } });
-    if (!message) throw new NotFoundException('Không tìm thấy tin nhắn.');
+    if (!message) throw new NotFoundException(RESPONSE_MESSAGES.MESSAGING.MESSAGE_NOT_FOUND);
     const now = new Date().toISOString();
     message.metadata = {
       ...(message.metadata ?? {}),
@@ -813,9 +816,9 @@ export class MessagingService {
   }> {
     const conversation = await this.getConversationEntity(conversationId);
     const message = await this.messageRepository.findOne({ where: { id: messageId, conversationId } });
-    if (!message) throw new NotFoundException('Không tìm thấy tin nhắn.');
+    if (!message) throw new NotFoundException(RESPONSE_MESSAGES.MESSAGING.MESSAGE_NOT_FOUND);
     if (message.direction !== MessagingMessageDirection.OUTBOUND) {
-      throw new BadRequestException('Chỉ retry được tin nhắn gửi ra.');
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.OUTBOUND_ONLY_RETRY);
     }
     return { conversation, message };
   }
@@ -853,7 +856,7 @@ export class MessagingService {
       conversation.assignedStaffName = null;
     } else {
       const staff = await this.staffRepository.findOne({ where: { id: staffId } });
-      if (!staff) throw new NotFoundException('Không tìm thấy nhân viên để phân công.');
+      if (!staff) throw new NotFoundException(RESPONSE_MESSAGES.MESSAGING.STAFF_ASSIGN_NOT_FOUND);
       conversation.assignedStaffId = staff.id;
       conversation.assignedStaffName = staff.name;
     }
@@ -998,7 +1001,9 @@ export class MessagingService {
   }
 
   private readImportPayload(file: { buffer: Buffer; originalname?: string }): Record<string, unknown> {
-    if (!file?.buffer?.length) throw new BadRequestException('File import không hợp lệ.');
+    if (!file?.buffer?.length) {
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.IMPORT_FILE_INVALID);
+    }
 
     const name = file.originalname?.toLowerCase() ?? '';
     if (name.endsWith('.zip')) {
@@ -1006,7 +1011,7 @@ export class MessagingService {
       const entry = zip
         .getEntries()
         .find((item) => !item.isDirectory && item.entryName.toLowerCase().endsWith('.json'));
-      if (!entry) throw new BadRequestException('Zip không có file JSON phiên đăng nhập.');
+      if (!entry) throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.IMPORT_ZIP_JSON_MISSING);
       return this.parseJson(entry.getData().toString('utf8'));
     }
 
@@ -1021,7 +1026,7 @@ export class MessagingService {
       }
       return value as Record<string, unknown>;
     } catch {
-      throw new BadRequestException('Không đọc được JSON trong file import.');
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.IMPORT_JSON_INVALID);
     }
   }
 
@@ -1036,7 +1041,7 @@ export class MessagingService {
     const language = this.readString(source.language) || 'vi';
 
     if (!imei || !userAgent || !cookie) {
-      throw new BadRequestException('File import cần có imei, cookies và userAgent.');
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.IMPORT_SESSION_FIELDS_REQUIRED);
     }
 
     return { imei, cookie, userAgent, language };
@@ -1123,21 +1128,23 @@ export class MessagingService {
 
   private async getTagEntity(id: string): Promise<MessagingTag> {
     const tag = await this.tagRepository.findOne({ where: { id } });
-    if (!tag) throw new NotFoundException('Không tìm thấy thẻ hội thoại.');
+    if (!tag) throw new NotFoundException(RESPONSE_MESSAGES.MESSAGING.TAG_NOT_FOUND);
     return tag;
   }
 
   private normalizeTagName(value?: string): string {
     const name = this.readString(value).replace(/\s+/g, ' ');
-    if (!name) throw new BadRequestException('Tên thẻ không được trống.');
-    if (name.length > 80) throw new BadRequestException('Tên thẻ tối đa 80 ký tự.');
+    if (!name) throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.TAG_NAME_REQUIRED);
+    if (name.length > 80) {
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.TAG_NAME_TOO_LONG);
+    }
     return name;
   }
 
   private normalizeTagColor(value?: string): string {
     const color = this.readString(value) || '#64748b';
     if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
-      throw new BadRequestException('Màu thẻ cần là mã hex, ví dụ #0f766e.');
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.TAG_COLOR_INVALID);
     }
     return color.toLowerCase();
   }
@@ -1152,7 +1159,7 @@ export class MessagingService {
 
   private async getAccountEntity(id: string): Promise<MessagingChannelAccount> {
     const account = await this.accountRepository.findOne({ where: { id } });
-    if (!account) throw new NotFoundException('Không tìm thấy account messaging.');
+    if (!account) throw new NotFoundException(RESPONSE_MESSAGES.MESSAGING.ACCOUNT_NOT_FOUND);
     return account;
   }
 
@@ -1161,7 +1168,7 @@ export class MessagingService {
       where: { id },
       relations: { account: true },
     });
-    if (!conversation) throw new NotFoundException('Không tìm thấy hội thoại.');
+    if (!conversation) throw new NotFoundException(RESPONSE_MESSAGES.MESSAGING.CONVERSATION_NOT_FOUND);
     return conversation;
   }
 

@@ -6,6 +6,7 @@ import {
   MessagingChannel,
   MessagingMessageType,
 } from '../types/messaging.enums';
+import { RESPONSE_MESSAGES } from '../../../common/constants/response-message.constant';
 
 type ZcaApi = {
   listener?: {
@@ -218,14 +219,16 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
 
   async findUserByPhone(accountId: string, phone: string): Promise<ZaloFoundUser> {
     const normalizedPhone = this.normalizePhone(phone);
-    if (!normalizedPhone) throw new BadRequestException('Nhập số điện thoại Zalo trước khi tạo hội thoại.');
+    if (!normalizedPhone) throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.ZALO_PHONE_REQUIRED);
 
     const session = this.sessions.get(accountId);
-    if (!session) throw new BadRequestException('Zalo account chưa chạy. Hãy start account trước khi tìm SĐT.');
-    if (!session.api.findUser) throw new BadRequestException('Phiên bản zca-js hiện tại chưa hỗ trợ tìm user theo SĐT.');
+    if (!session) throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.ZALO_ACCOUNT_NOT_RUNNING);
+    if (!session.api.findUser) {
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.ZALO_FIND_USER_UNSUPPORTED);
+    }
 
     const profile = await session.api.findUser(normalizedPhone, 120);
-    if (!profile?.uid) throw new BadRequestException('Không tìm thấy tài khoản Zalo từ SĐT này.');
+    if (!profile?.uid) throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.ZALO_USER_NOT_FOUND);
     return profile;
   }
 
@@ -488,7 +491,11 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
       this.readString(message.metadata?.attachmentTitle) ||
       (message.messageType === MessagingMessageType.IMAGE ? 'Khách vừa gửi hình ảnh.' : 'Khách vừa gửi tin nhắn mới.');
     const files = imageUrl ? [{ url: imageUrl, mimeType: 'image/jpeg' }] : [];
-    const reply = await this.geminiChatbotService.generateReplyWithFiles(userMessage, history, files) ||
+    const reply = await this.geminiChatbotService.generateReplyWithFiles(userMessage, history, files, {
+      channel: 'zalo_personal',
+      supportsButtons: false,
+      supportsLinks: false,
+    }) ||
       'Mình đã nhận được tin nhắn của bạn. Tư vấn viên/bác sĩ sẽ phản hồi sớm nhé.';
     const outbound = await this.messagingService.recordAutoReplyOutbound({
       conversationId: message.conversationId,

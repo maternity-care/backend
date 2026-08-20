@@ -7,6 +7,7 @@ import {
   MessagingChannel,
   MessagingMessageType,
 } from '../types/messaging.enums';
+import { RESPONSE_MESSAGES } from '../../../common/constants/response-message.constant';
 
 type FacebookPageCredentials = {
   pageId: string;
@@ -20,6 +21,11 @@ type FacebookAttachmentInput = {
   name?: string | null;
   mimeType?: string | null;
   size?: number | null;
+};
+
+type FacebookQuickReplyInput = {
+  title: string;
+  payload: string;
 };
 
 type FacebookOAuthPage = {
@@ -73,7 +79,9 @@ export class FacebookPageRuntimeService implements OnModuleInit {
   createOAuthUrl(redirectUri: string): { url: string; state: string } {
     const appId = this.readFacebookAppId();
     const cleanRedirectUri = this.readString(redirectUri);
-    if (!cleanRedirectUri) throw new BadRequestException('Thiếu redirectUri cho Facebook OAuth.');
+    if (!cleanRedirectUri) {
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.FACEBOOK_REDIRECT_URI_REQUIRED);
+    }
     const state = randomUUID();
     const params = new URLSearchParams({
       client_id: appId,
@@ -83,7 +91,7 @@ export class FacebookPageRuntimeService implements OnModuleInit {
     });
     const loginConfigId = this.readString(process.env.FACEBOOK_LOGIN_CONFIG_ID);
     if (!loginConfigId) {
-      throw new BadRequestException('Chưa cấu hình FACEBOOK_LOGIN_CONFIG_ID. Hãy nhập Page token từ Messenger app hoặc cấu hình Facebook Login for Business.');
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.FACEBOOK_LOGIN_CONFIG_REQUIRED);
     }
     params.set('config_id', loginConfigId);
     params.set('override_default_response_type', 'true');
@@ -107,7 +115,7 @@ export class FacebookPageRuntimeService implements OnModuleInit {
     const redirectUri = this.readString(input.redirectUri);
     const state = this.readString(input.state);
     if (!code || !redirectUri || !state) {
-      throw new BadRequestException('Thiếu code/state/redirectUri từ Facebook OAuth.');
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.FACEBOOK_OAUTH_PAYLOAD_INVALID);
     }
 
     const tokenResponse = await this.graphGet('/oauth/access_token', {
@@ -117,7 +125,9 @@ export class FacebookPageRuntimeService implements OnModuleInit {
       code,
     });
     const userToken = this.readString((tokenResponse as Record<string, unknown>)?.access_token);
-    if (!userToken) throw new BadRequestException('Không lấy được user access token từ Facebook.');
+    if (!userToken) {
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.FACEBOOK_USER_TOKEN_FAILED);
+    }
 
     const longLivedResponse = await this.graphGet('/oauth/access_token', {
       grant_type: 'fb_exchange_token',
@@ -133,7 +143,7 @@ export class FacebookPageRuntimeService implements OnModuleInit {
     });
     const pages = this.normalizeOAuthPages(pagesResponse);
     if (pages.length === 0) {
-      throw new BadRequestException('Facebook account này chưa trả về Page nào có access token.');
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.FACEBOOK_PAGE_EMPTY);
     }
 
     const sessionId = randomUUID();
@@ -165,9 +175,13 @@ export class FacebookPageRuntimeService implements OnModuleInit {
     const sessionId = this.readString(input.sessionId);
     const pageId = this.readString(input.pageId);
     const session = this.oauthSessions.get(sessionId);
-    if (!session) throw new BadRequestException('Phiên connect Facebook đã hết hạn, vui lòng connect lại.');
+    if (!session) {
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.FACEBOOK_SESSION_EXPIRED);
+    }
     const page = session.pages.find((item) => item.id === pageId);
-    if (!page) throw new BadRequestException('Không tìm thấy Page trong phiên connect Facebook.');
+    if (!page) {
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.FACEBOOK_PAGE_NOT_FOUND);
+    }
 
     const account = await this.messagingService.createFacebookPageAccount({
       pageId: page.id,
@@ -193,6 +207,7 @@ export class FacebookPageRuntimeService implements OnModuleInit {
     recipientId: string,
     content: string,
     attachment?: FacebookAttachmentInput | null,
+    quickReplies: FacebookQuickReplyInput[] = [],
   ): Promise<unknown> {
     const account = await this.messagingService.getAccountForRuntime(accountId);
     const credentials = this.readCredentials(account.credentials);
@@ -203,7 +218,18 @@ export class FacebookPageRuntimeService implements OnModuleInit {
       responses.push(await this.sendGraphMessage(credentials, recipientId, {
         recipient: { id: recipientId },
         messaging_type: 'RESPONSE',
-        message: { text: cleanContent },
+        message: {
+          text: cleanContent,
+          ...(quickReplies.length > 0
+            ? {
+              quick_replies: quickReplies.slice(0, 11).map((reply) => ({
+                content_type: 'text',
+                title: reply.title.slice(0, 20),
+                payload: reply.payload,
+              })),
+            }
+            : {}),
+        },
       }));
     }
 
@@ -225,7 +251,7 @@ export class FacebookPageRuntimeService implements OnModuleInit {
     }
 
     if (responses.length === 0) {
-      throw new BadRequestException('Nhập nội dung hoặc đính kèm trước khi gửi Facebook.');
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.FACEBOOK_SEND_CONTENT_REQUIRED);
     }
 
     return responses.length === 1 ? responses[0] : { responses };
@@ -259,14 +285,14 @@ export class FacebookPageRuntimeService implements OnModuleInit {
 
   async verifyWebhook(mode?: string, token?: string, challenge?: string): Promise<string> {
     if (mode !== 'subscribe' || !token || !challenge) {
-      throw new BadRequestException('Facebook webhook verify payload không hợp lệ.');
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.FACEBOOK_WEBHOOK_PAYLOAD_INVALID);
     }
 
     const configuredToken = process.env.FACEBOOK_WEBHOOK_VERIFY_TOKEN;
     if (configuredToken && configuredToken === token) return challenge;
     if (await this.messagingService.hasFacebookVerifyToken(token)) return challenge;
 
-    throw new BadRequestException('Facebook webhook verify token không khớp.');
+    throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.FACEBOOK_WEBHOOK_TOKEN_MISMATCH);
   }
 
   private async handleMessagingEvent(
@@ -307,7 +333,7 @@ export class FacebookPageRuntimeService implements OnModuleInit {
       externalThreadType: 'user',
       externalMessageId: this.readString(event.message?.mid) || null,
       senderId,
-      senderName: profile.name || senderId,
+      senderName: profile.name || RESPONSE_MESSAGES.MESSAGING.FACEBOOK_CUSTOMER_FALLBACK_NAME,
       content: text || null,
       messageType,
       sentAt: typeof event.timestamp === 'number' ? new Date(event.timestamp) : new Date(),
@@ -337,8 +363,13 @@ export class FacebookPageRuntimeService implements OnModuleInit {
     const userMessage = this.readString(message.content) ||
       (message.messageType === MessagingMessageType.IMAGE ? 'Khách vừa gửi hình ảnh.' : 'Khách vừa gửi tin nhắn mới.');
     const files = imageUrl ? [{ url: imageUrl, mimeType: 'image/jpeg' }] : [];
-    const reply = await this.geminiChatbotService.generateReplyWithFiles(userMessage, history, files) ||
+    const reply = await this.geminiChatbotService.generateReplyWithFiles(userMessage, history, files, {
+      channel: 'facebook_page',
+      supportsButtons: true,
+      supportsLinks: false,
+    }) ||
       'Mình đã nhận được tin nhắn của bạn. Tư vấn viên/bác sĩ sẽ phản hồi sớm nhé.';
+    const quickReplies = this.buildAiQuickReplies(reply);
     const outbound = await this.messagingService.recordAutoReplyOutbound({
       conversationId: message.conversationId,
       content: reply,
@@ -346,7 +377,7 @@ export class FacebookPageRuntimeService implements OnModuleInit {
     });
 
     try {
-      const providerResponse = await this.sendMessage(accountId, recipientId, reply);
+      const providerResponse = await this.sendMessage(accountId, recipientId, reply, null, quickReplies);
       await this.messagingService.updateOutboundDelivery(outbound.message.id, 'sent', null, providerResponse);
     } catch (error) {
       await this.messagingService.updateOutboundDelivery(
@@ -356,6 +387,17 @@ export class FacebookPageRuntimeService implements OnModuleInit {
       );
       this.logger.warn(`Cannot send Facebook AI auto-reply: ${this.getErrorMessage(error)}`);
     }
+  }
+
+  private buildAiQuickReplies(reply: string): FacebookQuickReplyInput[] {
+    const normalized = reply.toLowerCase();
+    if (!normalized.includes('tư vấn viên') && !normalized.includes('bác sĩ')) return [];
+    return [
+      {
+        title: 'Gặp tư vấn viên',
+        payload: 'REQUEST_STAFF_SUPPORT',
+      },
+    ];
   }
 
   private async sendGraphMessage(
@@ -439,7 +481,7 @@ export class FacebookPageRuntimeService implements OnModuleInit {
     const pageName = this.readString(credentials?.pageName);
     const pageAccessToken = this.readString(credentials?.pageAccessToken);
     if (!pageId || !pageName || !pageAccessToken) {
-      throw new BadRequestException('Facebook Page cần pageId, pageName và pageAccessToken.');
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.FACEBOOK_CREDENTIALS_REQUIRED);
     }
     return {
       pageId,
@@ -482,13 +524,17 @@ export class FacebookPageRuntimeService implements OnModuleInit {
 
   private readFacebookAppId(): string {
     const appId = this.readString(process.env.FACEBOOK_APP_ID);
-    if (!appId) throw new BadRequestException('Thiếu FACEBOOK_APP_ID trong backend env.');
+    if (!appId) {
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.FACEBOOK_APP_ID_REQUIRED);
+    }
     return appId;
   }
 
   private readFacebookAppSecret(): string {
     const appSecret = this.readString(process.env.FACEBOOK_APP_SECRET);
-    if (!appSecret) throw new BadRequestException('Thiếu FACEBOOK_APP_SECRET trong backend env.');
+    if (!appSecret) {
+      throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.FACEBOOK_APP_SECRET_REQUIRED);
+    }
     return appSecret;
   }
 

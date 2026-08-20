@@ -39,6 +39,7 @@ import {
   USER_AUTH_REPOSITORY,
 } from './interfaces/user-auth-repository.interface';
 import { JobsService } from '../jobs/jobs.service';
+import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 
 const PASSWORD_RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
 const PASSWORD_RESET_TOKEN_TTL_MINUTES = 30;
@@ -94,7 +95,7 @@ export class AuthService {
       expiresInMinutes: OTP_TTL,
     });
     return {
-      message: 'Send email successfully. Please check your email to verify your account.',
+      message: RESPONSE_MESSAGES.AUTH_VERIFY_EMAIL_SENT,
     };
   }
 
@@ -104,7 +105,7 @@ export class AuthService {
       | undefined;
     if (!searchInCache) {
       return {
-        message: 'Email not found',
+        message: RESPONSE_MESSAGES.AUTH_EMAIL_NOT_FOUND,
       };
     }
     const otp = randomInt(0, 1000000).toString().padStart(6, '0');
@@ -117,7 +118,7 @@ export class AuthService {
       expiresInMinutes: OTP_TTL,
     });
     return {
-      message: 'Send email successfully. Please check your email to verify your account.',
+      message: RESPONSE_MESSAGES.AUTH_VERIFY_EMAIL_SENT,
     };
   }
 
@@ -125,16 +126,16 @@ export class AuthService {
     const otpCacheKey = `verifyOtp:${email}`;
     const cacheOtp = await this.cacheService.get(otpCacheKey);
     if (!cacheOtp) {
-      throw new BadRequestException('OTP not found');
+      throw new BadRequestException(RESPONSE_MESSAGES.AUTH_OTP_NOT_FOUND);
     }
     if (cacheOtp !== otp) {
-      throw new BadRequestException('Invalid OTP');
+      throw new BadRequestException(RESPONSE_MESSAGES.AUTH_OTP_INVALID);
     }
     const registerCacheKey = `register:${email}`;
     const cacheDto = (await this.cacheService.get(registerCacheKey)) as RegisterDto | undefined;
 
     if (!cacheDto) {
-      throw new BadRequestException('Register not found');
+      throw new BadRequestException(RESPONSE_MESSAGES.AUTH_REGISTER_NOT_FOUND);
     }
 
     // xác thực otp thành công, bắt đầu tạo tài khoản
@@ -152,7 +153,7 @@ export class AuthService {
           cacheDto.email.toString().toLowerCase(),
         );
         if (userAuth) {
-          throw new ConflictException('Email already exists');
+          throw new ConflictException(RESPONSE_MESSAGES.AUTH_EMAIL_EXISTS);
         }
         const savedUser = await this.createUserAuth(
           existing.id,
@@ -184,13 +185,17 @@ export class AuthService {
   async login(dto: LoginDto): Promise<AuthResponseDto> {
     const user = await this.userAuthRepository.findByEmail(dto.email.toString().toLowerCase());
 
-    if (!user || user.status !== AccountStatus.ACTIVE) {
-      throw new UnauthorizedException('Invalid credentials');
+    if (
+      !user ||
+      user.status !== AccountStatus.ACTIVE ||
+      user.user?.status !== AccountStatus.ACTIVE
+    ) {
+      throw new UnauthorizedException(RESPONSE_MESSAGES.AUTH_INVALID_CREDENTIALS);
     }
 
     const isValidPassword = await bcrypt.compare(dto.password, user.password);
     if (!isValidPassword) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(RESPONSE_MESSAGES.AUTH_INVALID_CREDENTIALS);
     }
 
     return this.buildAuthResponse(user.user);
@@ -199,14 +204,14 @@ export class AuthService {
   async managementLogin(dto: LoginDto): Promise<AuthResponseDto> {
     const staff = await this.staffRepository.findByEmail(dto.email);
     if (!staff || staff.status !== AccountStatus.ACTIVE) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(RESPONSE_MESSAGES.AUTH_INVALID_CREDENTIALS);
     }
     if (!staff.password) {
-      throw new UnauthorizedException('Account is not configured for password login.');
+      throw new UnauthorizedException(RESPONSE_MESSAGES.AUTH_PASSWORD_LOGIN_NOT_CONFIGURED);
     }
     const isValidPassword = await bcrypt.compare(dto.password, staff.password);
     if (!isValidPassword) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(RESPONSE_MESSAGES.AUTH_INVALID_CREDENTIALS);
     }
 
     return this.createStaffAuthResponse(staff);
@@ -218,7 +223,7 @@ export class AuthService {
   ): Promise<Record<string, unknown>> {
     const staff = await this.staffRepository.updateStaffProfile(staffId, dto);
     if (!staff) {
-      throw new UnauthorizedException('Không tìm thấy tài khoản nhân viên.');
+      throw new UnauthorizedException(RESPONSE_MESSAGES.AUTH_STAFF_INACTIVE);
     }
     const { password: _password, ...safeStaff } = staff;
     return safeStaff;
@@ -227,14 +232,14 @@ export class AuthService {
   async changeManagementPassword(email: string, dto: ChangeManagementPasswordDto): Promise<void> {
     const staff = await this.staffRepository.findByEmailWithPassword(email);
     if (!staff) {
-      throw new UnauthorizedException('Không tìm thấy tài khoản nhân viên.');
+      throw new UnauthorizedException(RESPONSE_MESSAGES.AUTH_STAFF_INACTIVE);
     }
     const isCurrentPasswordValid = await bcrypt.compare(dto.currentPassword, staff.password);
     if (!isCurrentPasswordValid) {
-      throw new BadRequestException('Mật khẩu hiện tại không chính xác.');
+      throw new BadRequestException(RESPONSE_MESSAGES.AUTH_CURRENT_PASSWORD_INVALID);
     }
     if (await bcrypt.compare(dto.newPassword, staff.password)) {
-      throw new BadRequestException('Mật khẩu mới phải khác mật khẩu hiện tại.');
+      throw new BadRequestException(RESPONSE_MESSAGES.AUTH_NEW_PASSWORD_SAME);
     }
     staff.password = await bcrypt.hash(
       dto.newPassword,
@@ -282,11 +287,11 @@ export class AuthService {
       where: { tokenHash: this.hashResetToken(token), usedAt: IsNull() },
     });
     if (!storedToken || storedToken.expiresAt.getTime() <= Date.now()) {
-      throw new BadRequestException('Invalid or expired password reset token');
+      throw new BadRequestException(RESPONSE_MESSAGES.AUTH_PASSWORD_RESET_TOKEN_INVALID);
     }
     const staff = await this.staffRepository.findById(storedToken.staffId);
     if (!staff || staff.status !== AccountStatus.ACTIVE) {
-      throw new BadRequestException('Invalid or inactive staff');
+      throw new BadRequestException(RESPONSE_MESSAGES.AUTH_STAFF_INACTIVE);
     }
     staff.password = await bcrypt.hash(
       password,
@@ -306,11 +311,11 @@ export class AuthService {
       where: { tokenHash: this.hashRefreshToken(refreshToken), revokedAt: IsNull() },
     });
     if (!storedToken || storedToken.expiresAt.getTime() <= Date.now()) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException(RESPONSE_MESSAGES.AUTH_REFRESH_TOKEN_INVALID);
     }
     const staff = await this.staffRepository.findById(storedToken.staffId);
     if (!staff || staff.status !== AccountStatus.ACTIVE) {
-      throw new UnauthorizedException('Invalid or inactive staff');
+      throw new UnauthorizedException(RESPONSE_MESSAGES.AUTH_STAFF_INACTIVE);
     }
     storedToken.revokedAt = new Date();
     await this.staffRefreshTokenRepository.save(storedToken);
@@ -379,7 +384,7 @@ export class AuthService {
       storedToken.expiresAt.getTime() <= Date.now() ||
       storedToken.user.status !== AccountStatus.ACTIVE
     ) {
-      throw new BadRequestException('Invalid or expired password reset token');
+      throw new BadRequestException(RESPONSE_MESSAGES.AUTH_PASSWORD_RESET_TOKEN_INVALID);
     }
 
     // const saltRounds = this.configService.getOrThrow<number>('bcrypt.saltRounds');
@@ -397,7 +402,7 @@ export class AuthService {
   async me(userId: string): Promise<User> {
     const user = await this.usersRepository.findById(userId);
     if (!user) {
-      throw new UnauthorizedException('Invalid user');
+      throw new UnauthorizedException(RESPONSE_MESSAGES.AUTH_USER_INVALID);
     }
 
     return user;
@@ -418,7 +423,7 @@ export class AuthService {
       storedToken.expiresAt.getTime() <= Date.now() ||
       storedToken.user.status !== AccountStatus.ACTIVE
     ) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException(RESPONSE_MESSAGES.AUTH_REFRESH_TOKEN_INVALID);
     }
 
     const newRefreshToken = this.generateRefreshToken();
