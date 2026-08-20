@@ -456,15 +456,19 @@ export class FacebookPageRuntimeService implements OnModuleInit {
   ): Promise<{ name: string | null; avatarUrl: string | null; raw: unknown }> {
     try {
       const params = new URLSearchParams({
-        fields: 'first_name,last_name,name,profile_pic',
+        fields: 'first_name,last_name,profile_pic',
         access_token: credentials.pageAccessToken,
       });
       const response = await fetch(`${GRAPH_BASE_URL}/${encodeURIComponent(userId)}?${params.toString()}`);
       const data = await response.json().catch(() => null) as Record<string, unknown> | null;
-      if (!response.ok || !data) return { name: null, avatarUrl: null, raw: data };
-      const name = this.readString(data.name) ||
-        [this.readString(data.first_name), this.readString(data.last_name)].filter(Boolean).join(' ') ||
-        null;
+      if (!response.ok || !data) {
+        const message = this.extractGraphError(data) || `Facebook User Profile API lỗi (${response.status}).`;
+        this.logger.warn(`Cannot fetch Facebook user profile ${userId}: ${message}`);
+        return { name: null, avatarUrl: null, raw: data };
+      }
+      const name = [this.readString(data.first_name), this.readString(data.last_name)]
+        .filter(Boolean)
+        .join(' ') || null;
       return {
         name,
         avatarUrl: this.readString(data.profile_pic) || null,
