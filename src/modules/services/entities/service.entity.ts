@@ -68,6 +68,14 @@ export class Service {
   @Column({ name: 'requires_doctor_warning', type: 'boolean' })
   requiresDoctorWarning: boolean;
 
+  @ApiProperty({ type: Boolean })
+  @Column({ name: 'allow_doctor_selection', type: 'boolean', default: false })
+  allowDoctorSelection: boolean;
+
+  @ApiProperty({ type: String, required: false, nullable: true })
+  @Column({ name: 'doctor_specialty', type: 'varchar', length: 255, nullable: true })
+  doctorSpecialty: string | null;
+
   @ApiProperty({ enum: ActiveStatus, enumName: 'ActiveStatus' })
   @Column({ name: 'status', type: 'enum', enum: ActiveStatus })
   status: ActiveStatus;

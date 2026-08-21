@@ -13,6 +13,7 @@ export enum NotificationType {
 export enum NotificationReferenceType {
   APPOINTMENT = 'appointment',
   EXAM = 'exam',
+  APPOINTMENT_SERVICE_ITEM = 'appointment_service_item',
   PREGNANCY_PROFILE = 'pregnancy_profile',
   PAYMENT = 'payment',
   PACKAGE = 'package',

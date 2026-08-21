@@ -2,6 +2,7 @@ import { PregnancyProfile } from './../pregnancy-profile/entities/pregnancy-prof
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -13,6 +14,7 @@ import {
   DoctorShiftStatus,
 } from '../../common/constants/status.enum';
 import { FacilityService } from '../facility-services/entities/facility-service.entity';
+import { Room } from '../rooms/entities/room.entity';
 import { DoctorShift } from '../shifts/entities/shift.entity';
 import { SchedulesService } from '../schedules/schedules.service';
 import { CreateAppointmentDto } from './dto/requests/create-appointment.dto';
@@ -22,6 +24,15 @@ import { Appointment } from './entities/appointment.entity';
 import { RescheduleAppointmentDto } from './dto/requests/reschedule-appointment.dto';
 import { SearchAppointmentsDto } from './dto/requests/search-appointment.dto';
 import { SearchProfileQueryDto } from '../pregnancy-profile/dto/request/search-pregnancy-profiles.dto';
+import {
+  AddAppointmentServiceItemsDto,
+  CheckInAppointmentServiceItemDto,
+  SetServiceResultExpectedAtDto,
+} from './dto/requests/appointment-service-item.dto';
+import {
+  AppointmentServiceItem,
+  AppointmentServiceItemStatus,
+} from './entities/appointment-service-item.entity';
 
 const ACTIVE_APPOINTMENT_STATUSES = [
   AppointmentStatus.PENDING_PAYMENT,
@@ -48,6 +59,43 @@ function formatDateTime(date: string, time: string) {
 
 function isPastDateTime(date: string, time: string) {
   return new Date(`${date}T${normalizeTime(time)}`).getTime() <= Date.now();
+}
+
+function normalizeSearchText(value?: string | null) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function getServiceSpecialtyKeyword(serviceTypeCode?: string | null, serviceTypeName?: string | null) {
+  const code = normalizeSearchText(serviceTypeCode).replace(/[^a-z0-9]+/g, '_');
+  const name = normalizeSearchText(serviceTypeName);
+
+  if (code.includes('ultrasound') || name.includes('sieu am')) return 'sieu am';
+  if (code.includes('lab_test') || code.includes('lab') || name.includes('xet nghiem')) {
+    return 'xet nghiem';
+  }
+  if (code.includes('screening') || name.includes('sang loc')) return 'xet nghiem';
+  if (code.includes('procedure') || name.includes('thu thuat')) return 'thu thuat';
+  if (code.includes('consultation') || name.includes('kham')) return 'san phu khoa';
+
+  return '';
+}
+
+function getSpecialtyKeywordFromText(value?: string | null) {
+  const text = normalizeSearchText(value);
+  if (text.includes('phu san') || text.includes('san phu')) return 'san phu khoa';
+  if (text.includes('sieu am')) return 'sieu am';
+  if (text.includes('xet nghiem') || text.includes('sang loc')) return 'xet nghiem';
+  if (text.includes('thu thuat')) return 'thu thuat';
+  if (text.includes('theo doi thai')) return 'san phu khoa';
+  return text;
+}
+
+function isObstetricsSpecialty(value?: string | null) {
+  return getSpecialtyKeywordFromText(value) === 'san phu khoa';
 }
 
 function toDateTimeParts(value: string | Date) {
@@ -144,13 +192,44 @@ export class AppointmentsService {
       const doctorMatchesShift = await manager
         .createQueryBuilder()
         .select('doctor.id', 'id')
+        .addSelect('doctor.specialty', 'specialty')
         .from('doctors', 'doctor')
         .where('doctor.id = :doctorId', { doctorId: dto.doctorId })
         .andWhere('doctor.staff_id = :staffId', { staffId: shift.staffId })
-        .getRawOne<{ id: string }>();
+        .getRawOne<{ id: string; specialty?: string | null }>();
 
       if (!doctorMatchesShift) {
         throw new BadRequestException(RESPONSE_MESSAGES.APPOINTMENTS.DOCTOR_SHIFT_MISMATCH);
+      }
+
+      const serviceSpecialty = await manager
+        .createQueryBuilder()
+        .select('service.allow_doctor_selection', 'allowDoctorSelection')
+        .addSelect('service.doctor_specialty', 'doctorSpecialty')
+        .addSelect('serviceType.code', 'code')
+        .addSelect('serviceType.name', 'name')
+        .from('services', 'service')
+        .innerJoin('service_types', 'serviceType', 'serviceType.id = service.service_type_id')
+        .where('service.id = :serviceId', { serviceId: dto.serviceId })
+        .getRawOne<{
+          allowDoctorSelection?: boolean | number | string | null;
+          doctorSpecialty?: string | null;
+          code?: string | null;
+          name?: string | null;
+        }>();
+      const allowDoctorSelection =
+        serviceSpecialty?.allowDoctorSelection === true ||
+        serviceSpecialty?.allowDoctorSelection === 1 ||
+        serviceSpecialty?.allowDoctorSelection === '1';
+      const specialtyKeyword = allowDoctorSelection
+        ? normalizeSearchText(serviceSpecialty?.doctorSpecialty)
+        : '';
+
+      if (
+        specialtyKeyword &&
+        !normalizeSearchText(doctorMatchesShift.specialty).includes(specialtyKeyword)
+      ) {
+        throw new BadRequestException(RESPONSE_MESSAGES.APPOINTMENTS.DOCTOR_SPECIALTY_MISMATCH);
       }
 
       const activeAppointments = await manager
@@ -351,8 +430,14 @@ export class AppointmentsService {
     query: SearchAppointmentsDto,
     actorId: string,
     scopedFacilityId?: string | null,
+    actorIsDoctor = false,
   ) {
     const qb = this.buildManagementQuery();
+    if (actorIsDoctor) {
+      await this.assertObstetricsDoctor(actorId);
+      qb.andWhere('appointment.doctor_id = :actorId', { actorId });
+      qb.andWhere('appointment.checked_in_at IS NOT NULL');
+    }
 
     if (scopedFacilityId) {
       qb.andWhere('appointment.facility_id = :scopedFacilityId', { scopedFacilityId });
@@ -393,8 +478,18 @@ export class AppointmentsService {
     return rows.map((row) => this.normalizeManagementAppointment(row));
   }
 
-  async findManagementById(id: string, scopedFacilityId?: string | null) {
+  async findManagementById(
+    id: string,
+    scopedFacilityId?: string | null,
+    actorId?: string,
+    actorIsDoctor = false,
+  ) {
+    if (actorIsDoctor && actorId) await this.assertObstetricsDoctor(actorId);
     const qb = this.buildManagementQuery().andWhere('appointment.id = :id', { id });
+    if (actorIsDoctor && actorId) {
+      qb.andWhere('appointment.doctor_id = :actorId', { actorId });
+      qb.andWhere('appointment.checked_in_at IS NOT NULL');
+    }
     if (scopedFacilityId) {
       qb.andWhere('appointment.facility_id = :scopedFacilityId', { scopedFacilityId });
     }
@@ -402,6 +497,301 @@ export class AppointmentsService {
 
     if (!row) throw new NotFoundException(RESPONSE_MESSAGES.APPOINTMENTS.NOT_FOUND);
     return this.normalizeManagementAppointment(row);
+  }
+
+  async findServiceItems(
+    appointmentId: string,
+    scopedFacilityId?: string | null,
+    actorId?: string,
+    actorIsDoctor = false,
+  ) {
+    if (actorIsDoctor && actorId) await this.assertObstetricsDoctor(actorId);
+    await this.findAppointmentOrFail(
+      appointmentId,
+      scopedFacilityId,
+      undefined,
+      actorIsDoctor ? actorId : undefined,
+      actorIsDoctor,
+    );
+    return this.buildServiceItemsQuery(appointmentId).getRawMany();
+  }
+
+  async findSpecialistServiceItems(actorId: string, scopedFacilityId?: string | null) {
+    const qb = this.buildServiceItemsQuery().andWhere('item.doctor_id = :actorId', { actorId });
+
+    if (scopedFacilityId) {
+      qb.andWhere('appointment.facility_id = :scopedFacilityId', { scopedFacilityId });
+    }
+
+    return qb.getRawMany();
+  }
+
+  async addServiceItems(
+    appointmentId: string,
+    dto: AddAppointmentServiceItemsDto,
+    scopedFacilityId?: string | null,
+    actorId?: string,
+    actorIsDoctor = false,
+  ) {
+    if (actorIsDoctor && actorId) await this.assertObstetricsDoctor(actorId);
+    return this.dataSource.transaction(async (manager) => {
+      const appointment = await this.findAppointmentOrFail(
+        appointmentId,
+        scopedFacilityId,
+        manager,
+        actorIsDoctor ? actorId : undefined,
+        actorIsDoctor,
+      );
+      const maxSequence = await manager
+        .getRepository(AppointmentServiceItem)
+        .createQueryBuilder('item')
+        .select('COALESCE(MAX(item.sequence), 0)', 'max')
+        .where('item.appointmentId = :appointmentId', { appointmentId })
+        .getRawOne<{ max: string | number }>();
+
+      let sequence = Number(maxSequence?.max ?? 0);
+      const created: AppointmentServiceItem[] = [];
+      for (const item of dto.items) {
+        const facilityService = await manager.getRepository(FacilityService).findOne({
+          where: {
+            facilityId: appointment.facilityId,
+            serviceId: item.serviceId,
+            status: ActiveStatus.ACTIVE,
+          },
+        });
+        if (!facilityService) {
+          throw new BadRequestException(
+            RESPONSE_MESSAGES.APPOINTMENTS.SERVICE_NOT_AVAILABLE_AT_FACILITY,
+          );
+        }
+        await this.ensureServiceRoomAvailable(manager, item.roomId, appointment.facilityId);
+        await this.ensureDoctorShiftForServiceRoom(
+          manager,
+          item.doctorId,
+          appointment.facilityId,
+          item.roomId,
+          toDateTimeParts(appointment.scheduledStart).date,
+        );
+        sequence += 1;
+        created.push(
+          manager.getRepository(AppointmentServiceItem).create({
+            appointmentId,
+            serviceId: item.serviceId,
+            facilityServiceId: facilityService.id,
+            doctorId: item.doctorId,
+            roomId: item.roomId,
+            sequence,
+            status: AppointmentServiceItemStatus.ORDERED,
+            checkedInAt: null,
+            calledAt: null,
+            startedAt: null,
+            resultExpectedAt: null,
+            resultUploadedAt: null,
+            completedAt: null,
+            note: item.note?.trim() || null,
+          }),
+        );
+      }
+
+      await manager.getRepository(AppointmentServiceItem).save(created);
+      return this.findServiceItems(appointmentId, scopedFacilityId);
+    });
+  }
+
+  async checkInServiceItem(
+    appointmentId: string,
+    itemId: string,
+    dto: CheckInAppointmentServiceItemDto,
+    scopedFacilityId?: string | null,
+    actorId?: string,
+    actorIsDoctor = false,
+  ) {
+    const item = await this.findServiceItemOrFail(appointmentId, itemId, scopedFacilityId);
+    if (actorIsDoctor && actorId) await this.assertSpecialistCanAccessItem(itemId, actorId);
+    this.assertServiceItemMutable(item);
+    if (dto.roomId) {
+      const appointment = await this.findAppointmentOrFail(appointmentId, scopedFacilityId);
+      await this.ensureServiceRoomAvailable(
+        this.dataSource.manager,
+        dto.roomId,
+        appointment.facilityId,
+      );
+    }
+    item.doctorId = dto.doctorId ?? item.doctorId;
+    item.roomId = dto.roomId ?? item.roomId;
+    item.checkedInAt = new Date();
+    item.status = AppointmentServiceItemStatus.WAITING;
+    await this.dataSource.getRepository(AppointmentServiceItem).save(item);
+    await this.updateAppointmentInProgress(appointmentId);
+    return this.getServiceItemDetail(appointmentId, itemId, scopedFacilityId);
+  }
+
+  async callServiceItem(
+    appointmentId: string,
+    itemId: string,
+    scopedFacilityId?: string | null,
+    actorId?: string,
+    actorIsDoctor = false,
+  ) {
+    const item = await this.findServiceItemOrFail(appointmentId, itemId, scopedFacilityId);
+    if (actorIsDoctor && actorId) await this.assertSpecialistCanAccessItem(itemId, actorId);
+    this.assertServiceItemMutable(item);
+    item.calledAt = new Date();
+    item.status = AppointmentServiceItemStatus.CALLED;
+    await this.dataSource.getRepository(AppointmentServiceItem).save(item);
+    return this.getServiceItemDetail(appointmentId, itemId, scopedFacilityId);
+  }
+
+  async startServiceItem(
+    appointmentId: string,
+    itemId: string,
+    scopedFacilityId?: string | null,
+    actorId?: string,
+    actorIsDoctor = false,
+  ) {
+    const item = await this.findServiceItemOrFail(appointmentId, itemId, scopedFacilityId);
+    if (actorIsDoctor && actorId) await this.assertSpecialistCanAccessItem(itemId, actorId);
+    this.assertServiceItemMutable(item);
+    item.startedAt = new Date();
+    item.status = AppointmentServiceItemStatus.IN_PROGRESS;
+    await this.dataSource.getRepository(AppointmentServiceItem).save(item);
+    return this.getServiceItemDetail(appointmentId, itemId, scopedFacilityId);
+  }
+
+  async setServiceResultExpectedAt(
+    appointmentId: string,
+    itemId: string,
+    dto: SetServiceResultExpectedAtDto,
+    scopedFacilityId?: string | null,
+    actorId?: string,
+    actorIsDoctor = false,
+  ) {
+    const item = await this.findServiceItemOrFail(appointmentId, itemId, scopedFacilityId);
+    if (actorIsDoctor && actorId) await this.assertSpecialistCanAccessItem(itemId, actorId);
+    this.assertServiceItemMutable(item);
+    item.resultExpectedAt = new Date(dto.resultExpectedAt);
+    item.status = AppointmentServiceItemStatus.WAITING_RESULT;
+    await this.dataSource.getRepository(AppointmentServiceItem).save(item);
+    return this.getServiceItemDetail(appointmentId, itemId, scopedFacilityId);
+  }
+
+  async completeServiceItem(
+    appointmentId: string,
+    itemId: string,
+    scopedFacilityId?: string | null,
+    actorId?: string,
+    actorIsDoctor = false,
+  ) {
+    const item = await this.findServiceItemOrFail(appointmentId, itemId, scopedFacilityId);
+    if (actorIsDoctor && actorId) await this.assertSpecialistCanAccessItem(itemId, actorId);
+    item.completedAt = new Date();
+    item.status = AppointmentServiceItemStatus.COMPLETED;
+    await this.dataSource.getRepository(AppointmentServiceItem).save(item);
+    return this.getServiceItemDetail(appointmentId, itemId, scopedFacilityId);
+  }
+
+  async findPatientServiceResults(appointmentId: string, patientId: string) {
+    await this.findPatientAppointmentOrFail(appointmentId, patientId);
+    return this.buildServiceItemsQuery(appointmentId).getRawMany();
+  }
+
+  async getPatientServiceQueue(appointmentId: string, itemId: string, patientId: string) {
+    await this.findPatientAppointmentOrFail(appointmentId, patientId);
+    return this.getServiceQueue(appointmentId, itemId);
+  }
+
+  private async getServiceItemDetail(
+    appointmentId: string,
+    itemId: string,
+    scopedFacilityId?: string | null,
+  ) {
+    await this.findAppointmentOrFail(appointmentId, scopedFacilityId);
+    const item = await this.buildServiceItemsQuery(appointmentId)
+      .andWhere('item.id = :itemId', { itemId })
+      .getRawOne();
+    if (!item) throw new NotFoundException(RESPONSE_MESSAGES.APPOINTMENTS.NOT_FOUND);
+    return item;
+  }
+
+  private async getServiceQueue(appointmentId: string, itemId: string) {
+    const item = await this.dataSource
+      .getRepository(AppointmentServiceItem)
+      .createQueryBuilder('item')
+      .innerJoin('item.appointment', 'appointment')
+      .leftJoin('item.facilityService', 'facilityService')
+      .leftJoin('item.service', 'service')
+      .where('item.id = :itemId', { itemId })
+      .andWhere('item.appointmentId = :appointmentId', { appointmentId })
+      .select('item.id', 'id')
+      .addSelect('item.serviceId', 'serviceId')
+      .addSelect('item.roomId', 'roomId')
+      .addSelect('appointment.facilityId', 'facilityId')
+      .addSelect('DATE(appointment.scheduledStart)', 'appointmentDate')
+      .addSelect(
+        'COALESCE(facilityService.durationMinutes, service.defaultDurationMinutes)',
+        'durationMinutes',
+      )
+      .addSelect('item.checkedInAt', 'checkedInAt')
+      .getRawOne<{
+        id: string;
+        serviceId: string;
+        roomId: string;
+        facilityId: string;
+        appointmentDate: string;
+        durationMinutes: string | number;
+        checkedInAt: Date | null;
+      }>();
+    if (!item) throw new NotFoundException(RESPONSE_MESSAGES.APPOINTMENTS.NOT_FOUND);
+
+    const waitingStatuses = [
+      AppointmentServiceItemStatus.WAITING,
+      AppointmentServiceItemStatus.CALLED,
+    ];
+    const queueQb = this.dataSource
+      .getRepository(AppointmentServiceItem)
+      .createQueryBuilder('queueItem')
+      .innerJoin('queueItem.appointment', 'queueAppointment')
+      .where('queueAppointment.facilityId = :facilityId', { facilityId: item.facilityId })
+      .andWhere('queueItem.serviceId = :serviceId', { serviceId: item.serviceId })
+      .andWhere('queueItem.roomId = :roomId', { roomId: item.roomId })
+      .andWhere('DATE(queueAppointment.scheduledStart) = :appointmentDate', {
+        appointmentDate: item.appointmentDate,
+      });
+
+    const [waitingTotal, currentServing] = await Promise.all([
+      queueQb
+        .clone()
+        .andWhere('queueItem.status IN (:...waitingStatuses)', { waitingStatuses })
+        .getCount(),
+      queueQb
+        .clone()
+        .andWhere('queueItem.status = :status', {
+          status: AppointmentServiceItemStatus.IN_PROGRESS,
+        })
+        .getCount(),
+    ]);
+
+    const ahead = item.checkedInAt
+      ? await queueQb
+          .clone()
+          .andWhere('queueItem.status IN (:...waitingStatuses)', { waitingStatuses })
+          .andWhere('queueItem.checkedInAt < :checkedInAt', { checkedInAt: item.checkedInAt })
+          .getCount()
+      : waitingTotal;
+    const position = item.checkedInAt ? ahead + 1 : null;
+    const durationMinutes = Number(item.durationMinutes ?? 0);
+    const estimatedWaitMinutes = durationMinutes * (currentServing + Math.max(ahead, 0));
+
+    return {
+      appointmentServiceItemId: item.id,
+      serviceId: item.serviceId,
+      roomId: item.roomId,
+      position,
+      waitingTotal,
+      currentServing,
+      durationMinutes,
+      estimatedWaitMinutes,
+    };
   }
 
   async checkIn(id: string, dto: CheckInAppointmentDto, scopedFacilityId?: string | null) {
@@ -553,6 +943,222 @@ export class AppointmentsService {
     if (scopedFacilityId && String(appointment.facilityId) !== String(scopedFacilityId)) {
       throw new NotFoundException(RESPONSE_MESSAGES.APPOINTMENTS.NOT_FOUND_IN_FACILITY);
     }
+  }
+
+  private async findAppointmentOrFail(
+    id: string,
+    scopedFacilityId?: string | null,
+    manager: EntityManager = this.dataSource.manager,
+    doctorId?: string,
+    requireCheckedIn = false,
+  ) {
+    const appointment = await manager.getRepository(Appointment).findOne({ where: { id } });
+    if (!appointment) throw new NotFoundException(RESPONSE_MESSAGES.APPOINTMENTS.NOT_FOUND);
+    this.assertAppointmentFacility(appointment, scopedFacilityId);
+    if (doctorId && String(appointment.doctorId) !== String(doctorId)) {
+      throw new NotFoundException(RESPONSE_MESSAGES.APPOINTMENTS.NOT_FOUND);
+    }
+    if (requireCheckedIn && !appointment.checkedInAt) {
+      throw new NotFoundException(RESPONSE_MESSAGES.APPOINTMENTS.NOT_FOUND);
+    }
+    return appointment;
+  }
+
+  private async getDoctorSpecialty(staffId: string) {
+    const doctor = await this.dataSource
+      .createQueryBuilder()
+      .select('doctor.specialty', 'specialty')
+      .from('doctors', 'doctor')
+      .where('doctor.staff_id = :staffId', { staffId })
+      .andWhere('doctor.status = :status', { status: ActiveStatus.ACTIVE })
+      .getRawOne<{ specialty?: string | null }>();
+
+    return doctor?.specialty?.trim() || null;
+  }
+
+  private async assertObstetricsDoctor(staffId: string) {
+    const specialty = await this.getDoctorSpecialty(staffId);
+    if (!isObstetricsSpecialty(specialty)) {
+      throw new ForbiddenException(
+        'Chỉ bác sĩ phụ sản/sản phụ khoa được xem lịch đặt khám và tạo chỉ định dịch vụ.',
+      );
+    }
+  }
+
+  private async assertSpecialistCanAccessItem(itemId: string, staffId: string) {
+    const item = await this.dataSource
+      .createQueryBuilder()
+      .select('item.doctor_id', 'doctorStaffId')
+      .from('appointment_service_items', 'item')
+      .where('item.id = :itemId', { itemId })
+      .getRawOne<{ doctorStaffId?: string | null }>();
+
+    if (!item?.doctorStaffId || String(item.doctorStaffId) !== String(staffId)) {
+      throw new ForbiddenException('Bạn chỉ được thao tác chỉ định được giao cho mình.');
+    }
+  }
+
+  private async findPatientAppointmentOrFail(id: string, patientId: string) {
+    const appointment = await this.dataSource.getRepository(Appointment).findOne({
+      where: { id, patientId },
+    });
+    if (!appointment) throw new NotFoundException(RESPONSE_MESSAGES.APPOINTMENTS.NOT_FOUND);
+    return appointment;
+  }
+
+  private async findServiceItemOrFail(
+    appointmentId: string,
+    itemId: string,
+    scopedFacilityId?: string | null,
+  ) {
+    await this.findAppointmentOrFail(appointmentId, scopedFacilityId);
+    const item = await this.dataSource.getRepository(AppointmentServiceItem).findOne({
+      where: { id: itemId, appointmentId },
+    });
+    if (!item) throw new NotFoundException(RESPONSE_MESSAGES.APPOINTMENTS.NOT_FOUND);
+    return item;
+  }
+
+  private async ensureServiceRoomAvailable(
+    manager: EntityManager,
+    roomId: string,
+    facilityId: string,
+  ) {
+    const room = await manager.getRepository(Room).findOne({
+      where: {
+        id: roomId,
+        facilityId,
+        status: ActiveStatus.ACTIVE,
+      },
+    });
+    if (!room || room.deletedAt) {
+      throw new BadRequestException('Phòng thực hiện dịch vụ không khả dụng tại cơ sở này.');
+    }
+    return room;
+  }
+
+  private async ensureDoctorShiftForServiceRoom(
+    manager: EntityManager,
+    staffId: string,
+    facilityId: string,
+    roomId: string,
+    date: string,
+  ) {
+    const shift = await manager.getRepository(DoctorShift).findOne({
+      where: {
+        staffId,
+        facilityId,
+        roomId,
+        shiftDate: date,
+        status: DoctorShiftStatus.AVAILABLE,
+      },
+    });
+    if (!shift) {
+      throw new BadRequestException(
+        'Bác sĩ chuyên khoa không có ca trực tại phòng này trong ngày lịch hẹn.',
+      );
+    }
+    return shift;
+  }
+
+  private assertServiceItemMutable(item: AppointmentServiceItem) {
+    if (
+      [
+        AppointmentServiceItemStatus.CANCELLED,
+        AppointmentServiceItemStatus.COMPLETED,
+        AppointmentServiceItemStatus.RESULT_UPLOADED,
+      ].includes(item.status)
+    ) {
+      throw new BadRequestException('Chỉ định dịch vụ này không thể cập nhật trạng thái hiện tại.');
+    }
+  }
+
+  private async updateAppointmentInProgress(appointmentId: string) {
+    const appointment = await this.dataSource.getRepository(Appointment).findOne({
+      where: { id: appointmentId },
+    });
+    if (!appointment) return;
+    if (
+      [
+        AppointmentStatus.BOOKED,
+        AppointmentStatus.CONFIRMED,
+        AppointmentStatus.CHECKED_IN,
+      ].includes(appointment.status)
+    ) {
+      appointment.status = AppointmentStatus.IN_PROGRESS;
+      await this.dataSource.getRepository(Appointment).save(appointment);
+    }
+  }
+
+  private buildServiceItemsQuery(appointmentId?: string) {
+    const query = this.dataSource
+      .createQueryBuilder()
+      .select('item.id', 'id')
+      .addSelect('item.appointment_id', 'appointmentId')
+      .addSelect('item.service_id', 'serviceId')
+      .addSelect('item.facility_service_id', 'facilityServiceId')
+      .addSelect('item.doctor_id', 'doctorStaffId')
+      .addSelect('item.room_id', 'roomId')
+      .addSelect('item.sequence', 'sequence')
+      .addSelect('item.status', 'status')
+      .addSelect('item.checked_in_at', 'checkedInAt')
+      .addSelect('item.called_at', 'calledAt')
+      .addSelect('item.started_at', 'startedAt')
+      .addSelect('item.result_expected_at', 'resultExpectedAt')
+      .addSelect('item.result_uploaded_at', 'resultUploadedAt')
+      .addSelect('item.completed_at', 'completedAt')
+      .addSelect('item.note', 'note')
+      .addSelect('appointment.facility_id', 'facilityId')
+      .addSelect('appointment.patient_id', 'patientId')
+      .addSelect('appointment.scheduled_start', 'scheduledStart')
+      .addSelect('appointment.scheduled_end', 'scheduledEnd')
+      .addSelect('appointment.status', 'appointmentStatus')
+      .addSelect('patient.name', 'patientName')
+      .addSelect('patient.phone', 'patientPhone')
+      .addSelect('facility.name', 'facilityName')
+      .addSelect('service.name', 'serviceName')
+      .addSelect(
+        'COALESCE(facilityService.duration_minutes, service.default_duration_minutes)',
+        'durationMinutes',
+      )
+      .addSelect('room.name', 'roomName')
+      .addSelect('doctor.id', 'doctorId')
+      .addSelect('doctor.title', 'doctorTitle')
+      .addSelect('doctor.specialty', 'doctorSpecialty')
+      .addSelect('staff.name', 'doctorName')
+      .addSelect('medicalRecord.id', 'medicalRecordId')
+      .addSelect('medicalRecord.diagnosis', 'diagnosis')
+      .addSelect('medicalRecord.conclusion', 'conclusion')
+      .addSelect('medicalRecord.recommendation', 'recommendation')
+      .addSelect('medicalRecord.next_appointment_suggested_at', 'nextAppointmentSuggestedAt')
+      .from('appointment_service_items', 'item')
+      .leftJoin('appointments', 'appointment', 'appointment.id = item.appointment_id')
+      .leftJoin('users', 'patient', 'patient.id = appointment.patient_id')
+      .leftJoin('facilities', 'facility', 'facility.id = appointment.facility_id')
+      .leftJoin('services', 'service', 'service.id = item.service_id')
+      .leftJoin(
+        'facility_services',
+        'facilityService',
+        'facilityService.id = item.facility_service_id',
+      )
+      .leftJoin('rooms', 'room', 'room.id = item.room_id')
+      .leftJoin('staffs', 'staff', 'staff.id = item.doctor_id')
+      .leftJoin('doctors', 'doctor', 'doctor.staff_id = staff.id')
+      .leftJoin(
+        'medical_records',
+        'medicalRecord',
+        'medicalRecord.appointment_service_item_id = item.id',
+      )
+      .orderBy('item.sequence', 'ASC')
+      .addOrderBy('item.id', 'ASC');
+
+    if (appointmentId) {
+      query.where('item.appointment_id = :appointmentId', { appointmentId });
+    } else {
+      query.where('1 = 1').orderBy('appointment.scheduled_start', 'DESC');
+    }
+
+    return query;
   }
 
   private buildManagementQuery() {

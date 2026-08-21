@@ -2,6 +2,7 @@ import { MedicalFile } from './../../../database/entities/medical-file.entity';
 import { DeepPartial } from 'typeorm';
 import { PaginationResult } from '../../../common/helpers/pagination';
 import { Appointment } from '../../appointments/entities/appointment.entity';
+import { AppointmentServiceItem } from '../../appointments/entities/appointment-service-item.entity';
 import { SearchMedicalRecordDto } from '../dto/requests/search-medical-record.dto';
 import { MedicalRecord } from '../entities/medical-record.entity';
 
@@ -13,7 +14,13 @@ export interface IMedicalRecordRepository {
   remove(record: MedicalRecord): Promise<void>;
   findById(id: string): Promise<MedicalRecord | null>;
   findByAppointmentId(appointmentId: string): Promise<MedicalRecord | null>;
+  findByAppointmentServiceItemId(appointmentServiceItemId: string): Promise<MedicalRecord | null>;
   findAppointmentById(id: string): Promise<Appointment | null>;
+  findAppointmentServiceItemById(
+    id: string,
+    appointmentId: string,
+  ): Promise<AppointmentServiceItem | null>;
+  markAppointmentServiceItemResultUploaded(id: string): Promise<void>;
   findAll(filters?: SearchMedicalRecordDto): Promise<MedicalRecord[]>;
   findAllPaginated(filters?: SearchMedicalRecordDto): Promise<PaginationResult<MedicalRecord>>;
   countFiles(recordId: string): Promise<number>;

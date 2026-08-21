@@ -7,9 +7,13 @@ import { AppointmentsController } from './appointments.controller';
 import { ManagementAppointmentsController } from './management-appointments.controller';
 import { AppointmentsService } from './appointments.service';
 import { Appointment } from './entities/appointment.entity';
+import { AppointmentServiceItem } from './entities/appointment-service-item.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Appointment, FacilityService, DoctorShift]), SchedulesModule],
+  imports: [
+    TypeOrmModule.forFeature([Appointment, AppointmentServiceItem, FacilityService, DoctorShift]),
+    SchedulesModule,
+  ],
   controllers: [AppointmentsController, ManagementAppointmentsController],
   providers: [AppointmentsService],
   exports: [AppointmentsService],

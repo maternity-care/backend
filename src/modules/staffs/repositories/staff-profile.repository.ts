@@ -40,14 +40,14 @@ export class StaffProfileRepository implements IStaffProfileRepository {
   async findById(id: string): Promise<Staff | null> {
     return this.repository.findOne({
       where: { id },
-      relations: { roles: { permissions: true }, permissions: { permission: true } },
+      relations: { roles: { permissions: true }, permissions: { permission: true }, doctor: true, facility: true },
     });
   }
 
   async findByEmail(email: string): Promise<Staff | null> {
     return this.repository.findOne({
       where: { email },
-      relations: { roles: { permissions: true } },
+      relations: { roles: { permissions: true }, permissions: { permission: true }, doctor: true, facility: true },
     });
   }
 

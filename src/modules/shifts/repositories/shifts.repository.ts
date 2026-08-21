@@ -324,6 +324,7 @@ export class ShiftsRepository implements IShiftsRepository {
     startDate: string,
     endDate: string,
     doctorId?: string,
+    specialty?: string,
   ): Promise<ShiftWithDetails[]> {
     const query = this.buildDetailsQuery()
       .where('shift.facilityId = :facilityId', { facilityId })
@@ -334,6 +335,11 @@ export class ShiftsRepository implements IShiftsRepository {
       .addOrderBy('shift.startTime', 'ASC');
 
     if (doctorId) query.andWhere('doctor.id = :doctorId', { doctorId });
+    if (specialty?.trim()) {
+      query.andWhere('doctor.specialty LIKE :specialty', {
+        specialty: `%${specialty.trim()}%`,
+      });
+    }
     return query.getRawMany<ShiftWithDetails>();
   }
 
@@ -709,6 +715,11 @@ export class ShiftsRepository implements IShiftsRepository {
     if (filters?.facilityId) query.andWhere('shift.facilityId = :facilityId', { facilityId: filters.facilityId });
     if (filters?.roomId) query.andWhere('shift.roomId = :roomId', { roomId: filters.roomId });
     if (filters?.status) query.andWhere('shift.status = :status', { status: filters.status });
+    if (filters?.specialty?.trim()) {
+      query.andWhere('doctor.specialty LIKE :specialty', {
+        specialty: `%${filters.specialty.trim()}%`,
+      });
+    }
     if (filters?.dateFrom) query.andWhere('shift.shiftDate >= :dateFrom', { dateFrom: filters.dateFrom });
     if (filters?.dateTo) query.andWhere('shift.shiftDate <= :dateTo', { dateTo: filters.dateTo });
     return query;

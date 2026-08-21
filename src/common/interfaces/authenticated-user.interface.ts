@@ -18,6 +18,11 @@ export interface AuthenticatedPermissionOverride {
 
 export interface AuthenticatedUser {
   id: string;
+  doctor?: {
+    id: string;
+    specialty?: string | null;
+    title?: string | null;
+  } | null;
   name?: string;
   email?: string;
   phone?: string | null;

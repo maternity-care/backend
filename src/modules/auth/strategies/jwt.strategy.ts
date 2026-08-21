@@ -94,6 +94,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     return {
       id: staff.id,
+      doctor: staff.doctor
+        ? {
+            id: staff.doctor.id,
+            specialty: staff.doctor.specialty,
+            title: staff.doctor.title,
+          }
+        : null,
       name: staff.name,
       email: staff.email,
       phone: staff.phone,

@@ -58,6 +58,12 @@ export class ServiceResponseDto {
   @ApiProperty()
   requiresDoctorWarning: boolean | number;
 
+  @ApiProperty()
+  allowDoctorSelection: boolean | number;
+
+  @ApiPropertyOptional({ nullable: true })
+  doctorSpecialty?: string | null;
+
   @ApiProperty({ enum: ActiveStatus })
   status: ActiveStatus;
 

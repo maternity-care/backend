@@ -51,6 +51,7 @@ export const RESPONSE_MESSAGES = {
   TEST_JOB_CREATED: 'Tạo tác vụ kiểm thử thành công',
   APPOINTMENTS: {
     CREATED: 'Đặt lịch thành công.',
+    UPDATED: 'Cập nhật lịch khám thành công.',
     GET_LIST_SUCCESS: 'Lấy danh sách lịch đặt thành công.',
     GET_SUCCESS: 'Lấy chi tiết lịch đặt thành công.',
     CHECKED_IN: 'Check-in lịch khám thành công.',
@@ -64,6 +65,7 @@ export const RESPONSE_MESSAGES = {
     PROFILE_NOT_BELONG_TO_PATIENT: 'Hồ sơ thai kỳ không thuộc user đặt lịch.',
     SLOT_OUTSIDE_SHIFT: 'Slot đã chọn không nằm trong ca trực của bác sĩ.',
     DOCTOR_SHIFT_MISMATCH: 'Bác sĩ đã chọn không khớp với ca trực.',
+    DOCTOR_SPECIALTY_MISMATCH: 'Bác sĩ đã chọn không đúng chuyên khoa của dịch vụ.',
     SLOT_JUST_BOOKED: 'Slot này vừa có người đặt. Bạn chọn khung giờ khác nhé.',
     END_TIME_AFTER_START_TIME: 'Giờ kết thúc phải sau giờ bắt đầu.',
     DOCTOR_SHIFT_NOT_AVAILABLE: 'Bác sĩ không có ca trực phù hợp với khung giờ này.',
@@ -178,7 +180,8 @@ export const RESPONSE_MESSAGES = {
     STATUS_UPDATED: 'Cập nhật trạng thái cơ sở thành công',
     NOT_FOUND: 'Cơ sở y tế không tồn tại',
     ALREADY_EXISTS: 'Cơ sở y tế đã tồn tại',
-    OWNER_INVALID: 'Người phụ trách không tồn tại, đang ngừng hoạt động hoặc không có vai trò quản trị cơ sở',
+    OWNER_INVALID:
+      'Người phụ trách không tồn tại, đang ngừng hoạt động hoặc không có vai trò quản trị cơ sở',
     DATE_RANGE_INVALID: 'Ngày bắt đầu phải trước hoặc trùng ngày kết thúc',
     SCHEDULE_DAY_DUPLICATED: 'Một ngày không được khai báo trùng trong nhiều khung giờ',
     OPERATING_HOURS_HAS_IMPACTED_SHIFTS:
@@ -262,8 +265,10 @@ export const RESPONSE_MESSAGES = {
     ROLE_ID_INVALID: 'Mã vai trò phải là số nguyên dương',
     ROOM_ID_INVALID: 'Mã phòng phải là số nguyên dương',
     SLOT_ID_INVALID: 'Mã khung ca phải là số nguyên dương',
-    STAFF_ROLE_INVALID: 'Nhân viên không hoạt động, không thuộc cơ sở này hoặc không có vai trò đã chọn',
-    STAFF_DOCTOR_PROFILE_REQUIRED: 'Nhân viên trực vai trò bác sĩ phải có hồ sơ bác sĩ đang hoạt động',
+    STAFF_ROLE_INVALID:
+      'Nhân viên không hoạt động, không thuộc cơ sở này hoặc không có vai trò đã chọn',
+    STAFF_DOCTOR_PROFILE_REQUIRED:
+      'Nhân viên trực vai trò bác sĩ phải có hồ sơ bác sĩ đang hoạt động',
     ROOM_INVALID: 'Phòng không hoạt động hoặc không thuộc cơ sở của ca trực',
     ROOM_REQUIRED_FOR_ROLE: 'Vai trò này cần chọn phòng khi tạo ca trực',
     FACILITY_INACTIVE: 'Không thể xếp ca tại cơ sở không hoạt động',
@@ -275,7 +280,8 @@ export const RESPONSE_MESSAGES = {
     DURATION_INVALID: 'Thời lượng ca trực phải từ 15 phút đến 12 giờ',
     PAST_DATE_INVALID: 'Không thể tạo hoặc kiểm tra ca trực trong quá khứ',
     CREATE_WEEK_INVALID: 'Chỉ được tạo một ca trực từ ngày mai đến hết Chủ nhật tuần kế tiếp',
-    BULK_CREATE_WEEK_INVALID: 'Tạo ca trực hàng loạt phải chọn đúng tuần kế tiếp, từ thứ Hai đến Chủ nhật',
+    BULK_CREATE_WEEK_INVALID:
+      'Tạo ca trực hàng loạt phải chọn đúng tuần kế tiếp, từ thứ Hai đến Chủ nhật',
     OFF_SHIFT_CANNOT_HAVE_ROOM: 'Ca nghỉ không được gán phòng',
     FACILITY_CLOSED_ON_DATE: 'Cơ sở đóng cửa trong ngày được chọn',
     FACILITY_HOURS_NOT_CONFIGURED: 'Cơ sở chưa cấu hình đầy đủ giờ hoạt động cho ngày được chọn',
@@ -303,14 +309,16 @@ export const RESPONSE_MESSAGES = {
     CREATE_STATUS_INVALID: 'Ca mới chỉ có thể ở trạng thái available hoặc off',
     BULK_STATUS_INVALID: 'Ca tạo hàng loạt chỉ có thể ở trạng thái available hoặc off',
     SHIFT_DATE_FORMAT_INVALID: 'Ngày trực phải có định dạng YYYY-MM-DD',
-    WORKING_DAYS_INVALID: 'Ngày làm việc phải là một hoặc nhiều giá trị từ MON đến SUN và không được trùng nhau',
+    WORKING_DAYS_INVALID:
+      'Ngày làm việc phải là một hoặc nhiều giá trị từ MON đến SUN và không được trùng nhau',
     MAX_APPOINTMENTS_INVALID: 'Số lịch tối đa phải là số nguyên từ 1 đến 100',
     BULK_ASSIGNMENTS_REQUIRED: 'Mỗi khung ca phải có ít nhất một nhân sự được phân công',
     BULK_DURATION_INVALID: 'Số ngày tạo lịch phải là số nguyên từ 7 đến 93',
     SHIFT_HAS_APPOINTMENTS_PROTECTED_UPDATE:
       'Ca trực đã có lịch hẹn, không thể đổi bác sĩ, nhân sự, vai trò, cơ sở, ngày, giờ hoặc khung ca; hãy hủy ca để mở luồng xử lý lịch hẹn bị ảnh hưởng',
     MAX_APPOINTMENTS_BELOW_BOOKED: 'Số lịch tối đa không được nhỏ hơn số lịch đã đặt',
-    BOOKED_SHIFT_OFF_INVALID: 'Ca trực đã có lịch hẹn, không thể chuyển thành ca nghỉ; hãy hủy ca để xử lý lịch hẹn bị ảnh hưởng',
+    BOOKED_SHIFT_OFF_INVALID:
+      'Ca trực đã có lịch hẹn, không thể chuyển thành ca nghỉ; hãy hủy ca để xử lý lịch hẹn bị ảnh hưởng',
   },
   SHIFT_SLOTS: {
     GET_LIST_SUCCESS: 'Lấy danh sách khung ca thành công',

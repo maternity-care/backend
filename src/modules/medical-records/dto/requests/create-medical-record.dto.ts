@@ -19,6 +19,15 @@ export class CreateMedicalRecordDto {
   @Matches(BIGINT_ID_PATTERN, { message: 'appointmentId phải là số nguyên dương' })
   appointmentId: string;
 
+  @ApiPropertyOptional({
+    example: '1',
+    description: 'ID chỉ định dịch vụ; dùng để map kết quả theo từng dịch vụ trong lịch hẹn',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(BIGINT_ID_PATTERN, { message: 'appointmentServiceItemId phải là số nguyên dương' })
+  appointmentServiceItemId?: string | null;
+
   @ApiProperty({ example: '1' })
   @IsString()
   @Matches(BIGINT_ID_PATTERN, { message: 'pregnancyProfileId phải là số nguyên dương' })

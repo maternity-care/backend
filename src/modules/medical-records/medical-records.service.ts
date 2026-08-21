@@ -7,6 +7,12 @@ import {
 } from '@nestjs/common';
 import { IRedisCacheService, REDIS_CACHE_SERVICE } from '../../common/cache/redis-cache.interface';
 import { RealtimeEventsService } from '../realtime/realtime-events.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { MessagingService } from '../messaging/messaging.service';
+import {
+  NotificationReferenceType,
+  NotificationType,
+} from '../../common/constants/notification.enum';
 import { CreateMedicalRecordDto } from './dto/requests/create-medical-record.dto';
 import { RegisterPendingMedicalFileDto } from './dto/requests/pending-medical-file.dto';
 import { SearchMedicalRecordDto } from './dto/requests/search-medical-record.dto';
@@ -29,10 +35,14 @@ export class MedicalRecordsService implements IMedicalRecordService {
     @Inject(REDIS_CACHE_SERVICE)
     private readonly cacheService: IRedisCacheService,
     private readonly realtimeEvents: RealtimeEventsService,
+    private readonly notificationsService: NotificationsService,
+    private readonly messagingService: MessagingService,
   ) {}
 
   async create(dto: CreateMedicalRecordDto): Promise<MedicalRecord> {
-    const medicalRecord = await this.repository.findByAppointmentId(dto.appointmentId);
+    const medicalRecord = dto.appointmentServiceItemId
+      ? await this.repository.findByAppointmentServiceItemId(dto.appointmentServiceItemId)
+      : await this.repository.findByAppointmentId(dto.appointmentId);
     if (medicalRecord) {
       // đã có, cập nhật
       medicalRecord.diagnosis = dto?.diagnosis ?? medicalRecord.diagnosis;
@@ -49,12 +59,28 @@ export class MedicalRecordsService implements IMedicalRecordService {
           dto.files?.map((file) => ({ ...file, medicalRecordId: medicalRecord.id })),
         );
         await this.clearPendingFiles(dto.appointmentId);
+        if (dto.appointmentServiceItemId) {
+          const appointment = await this.repository.findAppointmentById(dto.appointmentId);
+          if (appointment) {
+            await this.markServiceItemResultUploaded(dto.appointmentServiceItemId);
+            await this.notifyExamResultUploaded(
+              appointment.patientId,
+              dto.appointmentId,
+              dto.appointmentServiceItemId,
+            );
+          }
+        }
       }
 
       return this.findById(medicalRecord.id);
     }
 
-    await this.validateAppointmentData(dto.appointmentId, dto.pregnancyProfileId, dto.doctorId);
+    const appointment = await this.validateAppointmentData(
+      dto.appointmentId,
+      dto.pregnancyProfileId,
+      dto.doctorId,
+      dto.appointmentServiceItemId,
+    );
 
     const record = this.repository.create({
       ...dto,
@@ -72,6 +98,14 @@ export class MedicalRecordsService implements IMedicalRecordService {
     await this.repository.createMedicalFiles(medicalFiles);
     if (medicalFiles.length > 0) {
       await this.clearPendingFiles(dto.appointmentId);
+    }
+    if (dto.appointmentServiceItemId) {
+      await this.markServiceItemResultUploaded(dto.appointmentServiceItemId);
+      await this.notifyExamResultUploaded(
+        appointment.patientId,
+        dto.appointmentId,
+        dto.appointmentServiceItemId,
+      );
     }
     // TODO: đặt lịch và thông báo cho bệnh nhân
     if (dto?.nextAppointmentSuggestedAt) {
@@ -101,10 +135,17 @@ export class MedicalRecordsService implements IMedicalRecordService {
   async update(id: string, dto: UpdateMedicalRecordDto): Promise<MedicalRecord> {
     const record = await this.findById(id);
     const appointmentId = dto.appointmentId ?? record.appointmentId;
+    const appointmentServiceItemId =
+      dto.appointmentServiceItemId ?? record.appointmentServiceItemId;
     const pregnancyProfileId = dto.pregnancyProfileId ?? record.pregnancyProfileId;
     const doctorId = dto.doctorId ?? record.doctorId;
 
-    await this.validateAppointmentData(appointmentId, pregnancyProfileId, doctorId);
+    await this.validateAppointmentData(
+      appointmentId,
+      pregnancyProfileId,
+      doctorId,
+      appointmentServiceItemId,
+    );
 
     if (appointmentId !== record.appointmentId) {
       const existing = await this.repository.findByAppointmentId(appointmentId);
@@ -193,7 +234,8 @@ export class MedicalRecordsService implements IMedicalRecordService {
     appointmentId: string,
     pregnancyProfileId: string,
     doctorId: string,
-  ): Promise<void> {
+    appointmentServiceItemId?: string | null,
+  ) {
     const appointment = await this.repository.findAppointmentById(appointmentId);
     if (!appointment) {
       throw new NotFoundException(MEDICAL_RECORD_MESSAGES.APPOINTMENT_NOT_FOUND);
@@ -204,6 +246,45 @@ export class MedicalRecordsService implements IMedicalRecordService {
     ) {
       throw new BadRequestException(MEDICAL_RECORD_MESSAGES.APPOINTMENT_DATA_MISMATCH);
     }
+    if (appointmentServiceItemId) {
+      const serviceItem = await this.repository.findAppointmentServiceItemById(
+        appointmentServiceItemId,
+        appointmentId,
+      );
+      if (!serviceItem) {
+        throw new BadRequestException(MEDICAL_RECORD_MESSAGES.APPOINTMENT_DATA_MISMATCH);
+      }
+      if (serviceItem.doctorId && serviceItem.doctorId !== doctorId) {
+        throw new BadRequestException(MEDICAL_RECORD_MESSAGES.APPOINTMENT_DATA_MISMATCH);
+      }
+    }
+    return appointment;
+  }
+
+  private async markServiceItemResultUploaded(appointmentServiceItemId: string) {
+    await this.repository.markAppointmentServiceItemResultUploaded(appointmentServiceItemId);
+  }
+
+  private async notifyExamResultUploaded(
+    patientId: string,
+    appointmentId: string,
+    appointmentServiceItemId: string,
+  ) {
+    const title = 'Đã có kết quả dịch vụ';
+    const content = `Kết quả của một chỉ định trong lịch hẹn #${appointmentId} đã được cập nhật.`;
+    await this.notificationsService.createForUserIfMissing(patientId, {
+      reference: `exam_result:appointment_service_item:${appointmentServiceItemId}`,
+      type: NotificationType.EXAM_RESULT,
+      title,
+      content,
+      referenceType: NotificationReferenceType.APPOINTMENT_SERVICE_ITEM,
+      referenceId: appointmentServiceItemId,
+    });
+    await this.messagingService.notifyUserByPreferredChannel(patientId, content, {
+      referenceType: 'appointment_service_item',
+      referenceId: appointmentServiceItemId,
+      appointmentId,
+    });
   }
 
   private validateDateRange(filters?: SearchMedicalRecordDto): void {

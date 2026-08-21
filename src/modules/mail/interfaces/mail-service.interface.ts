@@ -58,6 +58,12 @@ export interface SendMissingNextWeekScheduleEmailInput {
   weekEnd: string;
 }
 
+export interface SendExamResultEmailInput {
+  to: string;
+  name: string;
+  content: string;
+}
+
 export interface IMailService {
   sendPasswordResetEmail(input: SendPasswordResetEmailInput): Promise<void>;
   sendCreatedAccountEmail(input: CreatedAccountInterface): Promise<void>;
@@ -67,4 +73,5 @@ export interface IMailService {
   sendAppointmentDisruptionEmail(input: SendAppointmentDisruptionEmailInput): Promise<void>;
   sendAppointmentDoctorChangedEmail(input: SendAppointmentDoctorChangedEmailInput): Promise<void>;
   sendMissingNextWeekScheduleEmail(input: SendMissingNextWeekScheduleEmailInput): Promise<void>;
+  sendExamResultEmail(input: SendExamResultEmailInput): Promise<void>;
 }
