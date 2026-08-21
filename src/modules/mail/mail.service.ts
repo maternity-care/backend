@@ -8,6 +8,7 @@ import {
   SendPasswordResetEmailInput,
   SendAppointmentDisruptionEmailInput,
   SendAppointmentDoctorChangedEmailInput,
+  SendExamResultEmailInput,
   SendMissingNextWeekScheduleEmailInput,
 } from './interfaces/mail-service.interface';
 import { passwordResetTemplate } from './templates/password-reset.template';
@@ -143,7 +144,9 @@ export class MailService implements IMailService {
     });
   }
 
-  async sendAppointmentDoctorChangedEmail(input: SendAppointmentDoctorChangedEmailInput): Promise<void> {
+  async sendAppointmentDoctorChangedEmail(
+    input: SendAppointmentDoctorChangedEmailInput,
+  ): Promise<void> {
     const template = appointmentDoctorChangedTemplate(input);
     await this.sendMail({
       to: input.to,
@@ -162,6 +165,15 @@ export class MailService implements IMailService {
       subject: template.subject,
       text: template.text,
       html: template.html,
+    });
+  }
+
+  async sendExamResultEmail(input: SendExamResultEmailInput): Promise<void> {
+    await this.sendMail({
+      to: input.to,
+      subject: 'Đã có kết quả dịch vụ',
+      text: `Xin chào ${input.name},\n\n${input.content}`,
+      html: `<p>Xin chào ${input.name},</p><p>${input.content}</p>`,
     });
   }
 }

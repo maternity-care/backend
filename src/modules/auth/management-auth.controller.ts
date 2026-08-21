@@ -58,7 +58,19 @@ export class ManagementAuthController {
   @UseGuards(JwtAuthGuard)
   async me(@CurrentUser() staff: AuthenticatedUser) {
     const data = await this.staffManagementService.findById(staff.id, staff);
-    return { message: RESPONSE_MESSAGES.AUTH_PROFILE_RETRIEVED, data };
+    return {
+      message: RESPONSE_MESSAGES.AUTH_PROFILE_RETRIEVED,
+      data: data
+        ? {
+            ...data,
+            doctor:
+              (data as { doctor?: unknown }).doctor ??
+              (data as { staffProfile?: { doctor?: unknown } }).staffProfile?.doctor ??
+              staff.doctor ??
+              null,
+          }
+        : data,
+    };
   }
 
   @Patch('profile')

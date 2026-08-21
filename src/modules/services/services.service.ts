@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import {
   ActiveStatus,
@@ -43,6 +43,7 @@ export class ServicesService {
     await this.ensureUniqueName(dto.name);
     await this.serviceTypesService.findActiveById(dto.serviceTypeId);
     const code = await this.generateCode(dto.name);
+    const doctorSelection = this.resolveDoctorSelection(null, dto);
 
     const serviceData = {
       ...dto,
@@ -50,7 +51,9 @@ export class ServicesService {
       facilityAssignments: undefined,
       saleMode: dto.saleMode ?? ServiceSaleMode.BOTH,
       description: dto.description ?? '',
-      requiresDoctorWarning: dto.requiresDoctorWarning ? true : false,
+      requiresDoctorWarning: doctorSelection.allowDoctorSelection,
+      allowDoctorSelection: doctorSelection.allowDoctorSelection,
+      doctorSpecialty: doctorSelection.doctorSpecialty,
     };
 
     if (!dto.facilityAssignments || dto.facilityAssignments.length === 0) {
@@ -125,13 +128,14 @@ export class ServicesService {
     if (dto.serviceTypeId && dto.serviceTypeId !== service.serviceTypeId) {
       await this.serviceTypesService.findActiveById(dto.serviceTypeId);
     }
+    const doctorSelection = this.resolveDoctorSelection(service, dto);
 
     Object.assign(service, {
       ...dto,
       description: dto.description ?? service.description,
-      ...(dto.requiresDoctorWarning === undefined
-        ? {}
-        : { requiresDoctorWarning: dto.requiresDoctorWarning ? 1 : 0 }),
+      requiresDoctorWarning: doctorSelection.allowDoctorSelection ? 1 : 0,
+      allowDoctorSelection: doctorSelection.allowDoctorSelection,
+      doctorSpecialty: doctorSelection.doctorSpecialty,
     });
     return this.repository.save(service);
   }
@@ -160,5 +164,30 @@ export class ServicesService {
     if (await this.repository.findByName(name)) {
       throw new ConflictException(SERVICE_CONSTANT.NAME_EXISTS);
     }
+  }
+
+  private resolveDoctorSelection(
+    current: Pick<Service, 'allowDoctorSelection' | 'requiresDoctorWarning' | 'doctorSpecialty'> | null,
+    dto: Pick<CreateServiceDto, 'allowDoctorSelection' | 'requiresDoctorWarning' | 'doctorSpecialty'>,
+  ): { allowDoctorSelection: boolean; doctorSpecialty: string | null } {
+    const allowDoctorSelection =
+      dto.allowDoctorSelection ??
+      dto.requiresDoctorWarning ??
+      current?.allowDoctorSelection ??
+      current?.requiresDoctorWarning ??
+      false;
+    const doctorSpecialty =
+      dto.doctorSpecialty === undefined
+        ? current?.doctorSpecialty ?? null
+        : dto.doctorSpecialty?.trim() || null;
+
+    if (allowDoctorSelection && !doctorSpecialty) {
+      throw new BadRequestException(SERVICE_CONSTANT.DOCTOR_SPECIALTY_REQUIRED);
+    }
+
+    return {
+      allowDoctorSelection: Boolean(allowDoctorSelection),
+      doctorSpecialty: allowDoctorSelection ? doctorSpecialty : null,
+    };
   }
 }

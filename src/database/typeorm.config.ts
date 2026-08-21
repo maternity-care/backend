@@ -6,6 +6,7 @@ import { DataSource, DataSourceOptions } from 'typeorm';
 import { config } from 'dotenv';
 import { join } from 'path';
 import { Appointment } from '../modules/appointments/entities/appointment.entity';
+import { AppointmentServiceItem } from '../modules/appointments/entities/appointment-service-item.entity';
 import { AppointmentReminder } from './entities/appointment-reminder.entity';
 import { AppointmentStatusLog } from './entities/appointment-status-log.entity';
 import { Article } from './entities/article.entity';
@@ -79,6 +80,8 @@ import { AddMessagingModule1787100000000 } from './migrations/1787100000000-AddM
 import { AddMessagingTags1787200000000 } from './migrations/1787200000000-AddMessagingTags';
 import { AddMessagingCustomerIdentities1787300000000 } from './migrations/1787300000000-AddMessagingCustomerIdentities';
 import { MigrateChatbotToMessaging1787400000000 } from './migrations/1787400000000-MigrateChatbotToMessaging';
+import { AddAppointmentServiceItems1787500000000 } from './migrations/1787500000000-AddAppointmentServiceItems';
+import { AddServiceDoctorSelection1787600000000 } from './migrations/1787600000000-AddServiceDoctorSelection';
 
 config();
 
@@ -121,6 +124,7 @@ export const typeOrmConfig: DataSourceOptions = {
     RoomType,
     UserAuth,
     Appointment,
+    AppointmentServiceItem,
     AppointmentReminder,
     AppointmentStatusLog,
     Article,
@@ -173,6 +177,8 @@ export const typeOrmConfig: DataSourceOptions = {
     AddMessagingTags1787200000000,
     AddMessagingCustomerIdentities1787300000000,
     MigrateChatbotToMessaging1787400000000,
+    AddAppointmentServiceItems1787500000000,
+    AddServiceDoctorSelection1787600000000,
   ],
   charset: 'utf8mb4_unicode_ci',
 };

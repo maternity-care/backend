@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DeepPartial, Repository, SelectQueryBuilder } from 'typeorm';
+import { DeepPartial, IsNull, Repository, SelectQueryBuilder } from 'typeorm';
 import { paginate } from '../../../common/helpers/pagination';
 import { searchBuilder } from '../../../common/helpers/search-builder';
 import { MedicalFile } from '../../../database/entities/medical-file.entity';
 import { Appointment } from '../../appointments/entities/appointment.entity';
+import {
+  AppointmentServiceItem,
+  AppointmentServiceItemStatus,
+} from '../../appointments/entities/appointment-service-item.entity';
 import { SearchMedicalRecordDto } from '../dto/requests/search-medical-record.dto';
 import { MedicalRecord } from '../entities/medical-record.entity';
 import { IMedicalRecordRepository } from '../interface/medical-record-repository.interface';
@@ -48,11 +52,37 @@ export class MedicalRecordRepository implements IMedicalRecordRepository {
   }
 
   findByAppointmentId(appointmentId: string): Promise<MedicalRecord | null> {
-    return this.repository.findOne({ where: { appointmentId } });
+    return this.repository.findOne({
+      where: { appointmentId, appointmentServiceItemId: IsNull() },
+    });
+  }
+
+  findByAppointmentServiceItemId(appointmentServiceItemId: string): Promise<MedicalRecord | null> {
+    return this.repository.findOne({ where: { appointmentServiceItemId } });
   }
 
   findAppointmentById(id: string): Promise<Appointment | null> {
     return this.repository.manager.findOne(Appointment, { where: { id } });
+  }
+
+  findAppointmentServiceItemById(
+    id: string,
+    appointmentId: string,
+  ): Promise<AppointmentServiceItem | null> {
+    return this.repository.manager.findOne(AppointmentServiceItem, {
+      where: { id, appointmentId },
+    });
+  }
+
+  async markAppointmentServiceItemResultUploaded(id: string): Promise<void> {
+    await this.repository.manager.update(
+      AppointmentServiceItem,
+      { id },
+      {
+        status: AppointmentServiceItemStatus.RESULT_UPLOADED,
+        resultUploadedAt: new Date(),
+      },
+    );
   }
 
   findAll(filters?: SearchMedicalRecordDto): Promise<MedicalRecord[]> {

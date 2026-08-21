@@ -15,6 +15,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { ActiveStatus } from '../../../../common/constants/status.enum';
@@ -123,6 +124,28 @@ export class CreateServiceDto {
   @Type(() => Boolean)
   @IsBoolean({ message: SERVICE_CONSTANT.DOCTOR_REQUIREMENT_INVALID })
   requiresDoctorWarning?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    default: false,
+    description: 'Bật nếu người đặt lịch được chọn bác sĩ thực hiện dịch vụ này',
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean({ message: SERVICE_CONSTANT.DOCTOR_SELECTION_INVALID })
+  allowDoctorSelection?: boolean;
+
+  @ApiPropertyOptional({
+    example: 'Siêu âm sản khoa',
+    nullable: true,
+    description: 'Bắt buộc khi allowDoctorSelection = true',
+  })
+  @ValidateIf((dto: CreateServiceDto) => dto.allowDoctorSelection === true)
+  @Transform(({ value }) => trimText(value))
+  @IsString({ message: SERVICE_CONSTANT.DOCTOR_SPECIALTY_INVALID })
+  @IsNotEmpty({ message: SERVICE_CONSTANT.DOCTOR_SPECIALTY_REQUIRED })
+  @MaxLength(255, { message: SERVICE_CONSTANT.DOCTOR_SPECIALTY_INVALID })
+  doctorSpecialty?: string | null;
 
   @ApiProperty({ enum: ActiveStatus, example: ActiveStatus.ACTIVE })
   @IsEnum(ActiveStatus, { message: SERVICE_CONSTANT.STATUS_INVALID })

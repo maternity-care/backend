@@ -351,13 +351,24 @@ export class ShiftsService {
   }
 
   /** Public booking chỉ cần ca trực có bác sĩ, không trả ca vận hành/nurse/staff khác. */
-  async getPublicWeeklyDoctorSchedule(facilityId: string, weekStart?: string, doctorId?: string) {
+  async getPublicWeeklyDoctorSchedule(
+    facilityId: string,
+    weekStart?: string,
+    doctorId?: string,
+    specialty?: string,
+  ) {
     const { start, end } = await this.validator.prepareWeeklyRange(
       facilityId,
       weekStart,
       doctorId,
     );
-    const shifts = await this.repository.findWeeklyDoctorShiftsWithDetails(facilityId, start, end, doctorId);
+    const shifts = await this.repository.findWeeklyDoctorShiftsWithDetails(
+      facilityId,
+      start,
+      end,
+      doctorId,
+      specialty,
+    );
     return {
       facilityId,
       weekStart: start,

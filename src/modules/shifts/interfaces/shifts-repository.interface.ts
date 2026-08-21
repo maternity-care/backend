@@ -47,6 +47,7 @@ export interface IShiftsRepository {
     startDate: string,
     endDate: string,
     doctorId?: string,
+    specialty?: string,
   ): Promise<ShiftWithDetails[]>;
   findTemplateWeekWithDetails(
     facilityId: string,

@@ -33,7 +33,12 @@ export class PublicShiftsController {
 
     return {
       message: RESPONSE_MESSAGES.SHIFTS.WEEKLY_SUCCESS,
-      data: await this.service.getPublicWeeklyDoctorSchedule(query.facilityId, query.weekStart, query.doctorId),
+      data: await this.service.getPublicWeeklyDoctorSchedule(
+        query.facilityId,
+        query.weekStart,
+        query.doctorId,
+        query.specialty,
+      ),
     };
   }
 }

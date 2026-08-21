@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MedicalFile } from '../../database/entities/medical-file.entity';
 import { Appointment } from '../appointments/entities/appointment.entity';
+import { AppointmentServiceItem } from '../appointments/entities/appointment-service-item.entity';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { MessagingModule } from '../messaging/messaging.module';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { MedicalRecord } from './entities/medical-record.entity';
 import { HelperUploadSecretGuard } from './guards/helper-upload-secret.guard';
@@ -15,9 +18,11 @@ import { UploadsModule } from '../uploads/uploads.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([MedicalRecord, MedicalFile, Appointment]),
+    TypeOrmModule.forFeature([MedicalRecord, MedicalFile, Appointment, AppointmentServiceItem]),
     RealtimeModule,
     UploadsModule,
+    NotificationsModule,
+    MessagingModule,
   ],
   controllers: [MedicalRecordsController, HelperMedicalImagesController],
   providers: [

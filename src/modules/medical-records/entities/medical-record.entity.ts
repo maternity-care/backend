@@ -12,6 +12,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Appointment } from '../../appointments/entities/appointment.entity';
+import { AppointmentServiceItem } from '../../appointments/entities/appointment-service-item.entity';
 import { MedicalFile } from '../../../database/entities/medical-file.entity';
 
 @Entity('medical_records')
@@ -24,6 +25,11 @@ export class MedicalRecord {
   @ManyToOne(() => Appointment, { onDelete: 'RESTRICT', nullable: false })
   @JoinColumn({ name: 'appointment_id' })
   appointment: Appointment;
+
+  @ApiPropertyOptional({ type: () => AppointmentServiceItem, nullable: true })
+  @ManyToOne(() => AppointmentServiceItem, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'appointment_service_item_id' })
+  appointmentServiceItem: AppointmentServiceItem | null;
 
   @ApiProperty({ type: () => Staff })
   @ManyToOne(() => Staff, { onDelete: 'RESTRICT', nullable: false })
@@ -38,6 +44,10 @@ export class MedicalRecord {
   @ApiProperty({ type: String })
   @Column({ name: 'appointment_id', type: 'bigint' })
   appointmentId: string;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @Column({ name: 'appointment_service_item_id', type: 'bigint', nullable: true })
+  appointmentServiceItemId: string | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'pregnancy_profile_id', type: 'bigint' })

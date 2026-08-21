@@ -867,9 +867,16 @@ async function insertDoctor() {
     'Phòng thủ thuật',
   ];
 
-  const roomTypeIds = roomTypes
-    .filter((roomType) => needDoctorRooms.includes(roomType.name))
-    .map((roomType) => roomType.id);
+  const roomTypesForDoctors = roomTypes.filter((roomType) =>
+    needDoctorRooms.includes(roomType.name),
+  );
+  const specialtyByRoomTypeName: Record<string, string> = {
+    'Phòng khám sản': 'Sản phụ khoa',
+    'Phòng khám tổng quát': 'Theo dõi thai kỳ',
+    'Phòng siêu âm': 'Siêu âm sản khoa',
+    'Phòng xét nghiệm': 'Xét nghiệm sản khoa',
+    'Phòng thủ thuật': 'Thủ thuật sản khoa',
+  };
 
   const titleList = [
     { title: 'Bác sĩ', year: 1 },
@@ -884,20 +891,26 @@ async function insertDoctor() {
   const doctors = staffs.map((staff, index) => {
     const indexRandom = Math.floor(Math.random() * titleList.length);
     const title = titleList[indexRandom];
+    const workingRoomType = roomTypesForDoctors[index % roomTypesForDoctors.length];
+    const specialty = specialtyByRoomTypeName[workingRoomType?.name] ?? 'Sản phụ khoa';
     const yearEx: Record<number, string> = {
       1: 'hơn 3 năm',
       2: 'hơn 8 năm',
       3: 'hơn 15 năm',
       4: 'hơn 25 năm',
     };
+    const experienceText = yearEx[Number(title.year)];
     return {
       staffId: staff.id,
       licenseNo: `CCHN-OBGYN-2601${index + 10}`,
       title: title.title,
-      specialty: 'Sản phụ khoa',
-      workingRoomTypeId: roomTypeIds[index % roomTypeIds.length],
+      specialty,
+      workingRoomTypeId: workingRoomType?.id,
       yearsOfExperience: title.year,
-      bio: `${title.title} ${staff.name} có ${yearEx[Number(title.year)]} kinh nghiệm trong lĩnh vực sản phụ khoa, tận tâm tư vấn, thăm khám và đồng hành cùng mẹ bầu trong suốt thai kỳ, hướng đến sự an toàn và chăm sóc phù hợp cho mẹ và bé.`,
+      bio:
+        `${title.title} ${staff.name} có ${experienceText} kinh nghiệm trong lĩnh vực ` +
+        `${specialty.toLowerCase()}, tận tâm tư vấn, thăm khám và đồng hành cùng mẹ bầu ` +
+        'trong suốt thai kỳ, hướng đến sự an toàn và chăm sóc phù hợp cho mẹ và bé.',
       status: ActiveStatus.ACTIVE,
       createdAt: new Date(new Date().getTime() - 5 * 365 * 24 * 60 * 60 * 1000),
       updatedAt: new Date(new Date().getTime() - 5 * 365 * 24 * 60 * 60 * 1000),
@@ -3128,6 +3141,10 @@ async function insertShifts() {
     relations: { roles: true },
     where: { roles: { name: In([RoleEnum.DOCTOR, RoleEnum.NURSE, RoleEnum.STAFF]) } },
   });
+  const doctorProfiles = await doctorRepository.find();
+  const doctorProfileByStaffId = new Map(
+    doctorProfiles.map((doctor) => [String(doctor.staffId), doctor]),
+  );
   const shiftSlots = await shiftSlotRepository.find();
   const rooms = await roomRepository.find({ relations: { roomType: true } });
   const selectedRoomType = [
@@ -3191,8 +3208,14 @@ async function insertShifts() {
             shiftSlotIndex++
           ) {
             const shiftSlot = shiftSlotOfFacility[shiftSlotIndex];
-            const randomDoctorIndex = Math.floor(Math.random() * doctorsInFacility.length);
-            const staff = doctorsInFacility[randomDoctorIndex];
+            const doctorsForRoom = doctorsInFacility.filter((doctor) => {
+              const profile = doctorProfileByStaffId.get(String(doctor.id));
+              return String(profile?.workingRoomTypeId) === String(room.roomTypeId);
+            });
+            const assignableDoctors =
+              doctorsForRoom.length > 0 ? doctorsForRoom : doctorsInFacility;
+            const randomDoctorIndex = Math.floor(Math.random() * assignableDoctors.length);
+            const staff = assignableDoctors[randomDoctorIndex];
             const newShift = {
               staffId: staff.id,
               roleId: staff.roles[0]?.id ?? null,

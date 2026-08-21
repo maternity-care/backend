@@ -45,6 +45,11 @@ export class SearchDoctorShiftDto {
   @IsEnum(DoctorShiftStatus)
   status?: DoctorShiftStatus;
 
+  @ApiPropertyOptional({ description: 'Lọc bác sĩ theo chuyên khoa' })
+  @IsOptional()
+  @IsString()
+  specialty?: string;
+
   @ApiPropertyOptional({ minimum: 1 })
   @IsOptional()
   @Type(() => Number)
@@ -113,6 +118,11 @@ export class WeeklyDoctorShiftDto {
   @IsString()
   @Matches(POSITIVE_ID_PATTERN)
   doctorId?: string;
+
+  @ApiPropertyOptional({ description: 'Lọc bác sĩ theo chuyên khoa, ví dụ Siêu âm hoặc Xét nghiệm' })
+  @IsOptional()
+  @IsString()
+  specialty?: string;
 
   @ApiPropertyOptional({ description: 'Ngày đầu tuần, định dạng YYYY-MM-DD; mặc định tuần hiện tại' })
   @IsOptional()

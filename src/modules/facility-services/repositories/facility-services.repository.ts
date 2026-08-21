@@ -214,6 +214,8 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
       .addSelect('service.base_price', 'serviceBasePrice')
       .addSelect('service.default_duration_minutes', 'serviceDefaultDurationMinutes')
       .addSelect('service.requires_doctor_warning', 'serviceRequiresDoctorWarning')
+      .addSelect('service.allow_doctor_selection', 'serviceAllowDoctorSelection')
+      .addSelect('service.doctor_specialty', 'serviceDoctorSpecialty')
       .addSelect('service.status', 'serviceStatus');
   }
 
@@ -298,6 +300,8 @@ export class FacilityServicesRepository implements IFacilityServicesRepository {
         basePrice: String(row.serviceBasePrice),
         defaultDurationMinutes: Number(row.serviceDefaultDurationMinutes),
         requiresDoctorWarning: row.serviceRequiresDoctorWarning as number,
+        allowDoctorSelection: row.serviceAllowDoctorSelection as number,
+        doctorSpecialty: row.serviceDoctorSpecialty as string | null,
         status: row.serviceStatus as ActiveStatus,
       },
     };

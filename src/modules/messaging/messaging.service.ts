@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import AdmZip from 'adm-zip';
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
@@ -33,6 +29,7 @@ import { ImportZaloAccountDto } from './dto/import-zalo-account.dto';
 import { UpdateMessagingAccountDto } from './dto/update-messaging-account.dto';
 import { MessagingEventsService } from './messaging-events.service';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
+import { IMailService, MAIL_SERVICE } from '../mail/interfaces/mail-service.interface';
 
 type ZaloCredentials = {
   imei: string;
@@ -105,6 +102,8 @@ export class MessagingService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly events: MessagingEventsService,
+    @Inject(MAIL_SERVICE)
+    private readonly mailService: IMailService,
   ) {}
 
   async listAccounts(): Promise<MessagingChannelAccount[]> {
@@ -162,11 +161,13 @@ export class MessagingService {
         externalAccountId: pageId,
       },
     });
-    const account = existing ?? this.accountRepository.create({
-      channel: MessagingChannel.FACEBOOK_PAGE,
-      externalAccountId: pageId,
-      status: MessagingAccountStatus.DISCONNECTED,
-    });
+    const account =
+      existing ??
+      this.accountRepository.create({
+        channel: MessagingChannel.FACEBOOK_PAGE,
+        externalAccountId: pageId,
+        status: MessagingAccountStatus.DISCONNECTED,
+      });
 
     account.displayName = pageName;
     account.autoStart = Boolean(dto.autoStart);
@@ -185,7 +186,10 @@ export class MessagingService {
     return this.maskAccount(saved);
   }
 
-  async updateAccount(id: string, dto: UpdateMessagingAccountDto): Promise<MessagingChannelAccount> {
+  async updateAccount(
+    id: string,
+    dto: UpdateMessagingAccountDto,
+  ): Promise<MessagingChannelAccount> {
     const account = await this.getAccountEntity(id);
     if (dto.displayName !== undefined) account.displayName = dto.displayName.trim();
     if (dto.proxyUrl !== undefined) account.proxyUrl = dto.proxyUrl?.trim() || null;
@@ -210,10 +214,14 @@ export class MessagingService {
     this.events.emitToStaff('messages:account.deleted', { id });
   }
 
-  async importZaloAccount(file: { buffer: Buffer; originalname?: string }, dto: ImportZaloAccountDto): Promise<MessagingChannelAccount> {
+  async importZaloAccount(
+    file: { buffer: Buffer; originalname?: string },
+    dto: ImportZaloAccountDto,
+  ): Promise<MessagingChannelAccount> {
     const payload = this.readImportPayload(file);
     const credentials = this.normalizeZaloCredentials(payload);
-    const displayName = dto.displayName?.trim() || this.getImportedDisplayName(payload) || 'Zalo cá nhân';
+    const displayName =
+      dto.displayName?.trim() || this.getImportedDisplayName(payload) || 'Zalo cá nhân';
 
     const existing = await this.accountRepository.findOne({
       where: {
@@ -222,15 +230,19 @@ export class MessagingService {
       },
     });
 
-    const account = existing ?? this.accountRepository.create({
-      channel: MessagingChannel.ZALO_PERSONAL,
-      status: MessagingAccountStatus.DISCONNECTED,
-    });
+    const account =
+      existing ??
+      this.accountRepository.create({
+        channel: MessagingChannel.ZALO_PERSONAL,
+        status: MessagingAccountStatus.DISCONNECTED,
+      });
 
     account.displayName = displayName;
     account.externalAccountId = credentials.imei;
-    account.proxyUrl = dto.proxyUrl?.trim() || this.readString(payload.proxyUrl) || account.proxyUrl || null;
-    account.autoStart = dto.autoStart ?? this.readBoolean(payload.autoStart) ?? account.autoStart ?? false;
+    account.proxyUrl =
+      dto.proxyUrl?.trim() || this.readString(payload.proxyUrl) || account.proxyUrl || null;
+    account.autoStart =
+      dto.autoStart ?? this.readBoolean(payload.autoStart) ?? account.autoStart ?? false;
     account.credentials = credentials as Record<string, unknown>;
     account.credentialFormat = MessagingImportFormat.ZALO_EXTRACTOR;
     account.lastError = null;
@@ -259,7 +271,9 @@ export class MessagingService {
     const accounts = await this.accountRepository.find({
       where: { channel: MessagingChannel.FACEBOOK_PAGE },
     });
-    return accounts.some((account) => this.readString(account.credentials?.verifyToken) === cleanToken);
+    return accounts.some(
+      (account) => this.readString(account.credentials?.verifyToken) === cleanToken,
+    );
   }
 
   async setAccountStatus(
@@ -303,7 +317,11 @@ export class MessagingService {
     return this.tagRepository.find({ order: { sortOrder: 'ASC', createdAt: 'ASC' } });
   }
 
-  async createTag(input: { name?: string; color?: string; sortOrder?: number }): Promise<MessagingTag> {
+  async createTag(input: {
+    name?: string;
+    color?: string;
+    sortOrder?: number;
+  }): Promise<MessagingTag> {
     const tag = await this.tagRepository.save(
       this.tagRepository.create({
         name: this.normalizeTagName(input.name),
@@ -315,11 +333,15 @@ export class MessagingService {
     return tag;
   }
 
-  async updateTag(id: string, input: { name?: string; color?: string; sortOrder?: number }): Promise<MessagingTag> {
+  async updateTag(
+    id: string,
+    input: { name?: string; color?: string; sortOrder?: number },
+  ): Promise<MessagingTag> {
     const tag = await this.getTagEntity(id);
     if (input.name !== undefined) tag.name = this.normalizeTagName(input.name);
     if (input.color !== undefined) tag.color = this.normalizeTagColor(input.color);
-    if (input.sortOrder !== undefined && Number.isFinite(input.sortOrder)) tag.sortOrder = Number(input.sortOrder);
+    if (input.sortOrder !== undefined && Number.isFinite(input.sortOrder))
+      tag.sortOrder = Number(input.sortOrder);
     const saved = await this.tagRepository.save(tag);
     this.events.emitToStaff('messages:tags.updated', await this.listTags());
     return saved;
@@ -445,11 +467,18 @@ export class MessagingService {
 
   async updateConversationCustomer(
     conversationId: string,
-    input: { displayName?: string; phone?: string; email?: string; address?: string; userId?: string | null },
+    input: {
+      displayName?: string;
+      phone?: string;
+      email?: string;
+      address?: string;
+      userId?: string | null;
+    },
   ): Promise<MessagingCustomerIdentity> {
     const conversation = await this.getConversationEntity(conversationId);
     const identity = await this.getOrCreateCustomerIdentity(conversation);
-    if (input.displayName !== undefined) identity.displayName = this.readString(input.displayName) || null;
+    if (input.displayName !== undefined)
+      identity.displayName = this.readString(input.displayName) || null;
     if (input.phone !== undefined) identity.phone = this.readString(input.phone) || null;
     if (input.email !== undefined) identity.email = this.readString(input.email) || null;
     if (input.address !== undefined) identity.address = this.readString(input.address) || null;
@@ -459,7 +488,10 @@ export class MessagingService {
     return saved;
   }
 
-  async mapConversationUser(conversationId: string, userId: string | null): Promise<MessagingCustomerIdentity> {
+  async mapConversationUser(
+    conversationId: string,
+    userId: string | null,
+  ): Promise<MessagingCustomerIdentity> {
     const conversation = await this.getConversationEntity(conversationId);
     const identity = await this.getOrCreateCustomerIdentity(conversation);
     if (!userId) {
@@ -482,7 +514,10 @@ export class MessagingService {
     identity.address = identity.address || user.address || null;
     const saved = await this.customerIdentityRepository.save(identity);
     await this.syncConversationCustomerMetadata(conversation, saved);
-    return this.customerIdentityRepository.findOneOrFail({ where: { id: saved.id }, relations: { user: true } });
+    return this.customerIdentityRepository.findOneOrFail({
+      where: { id: saved.id },
+      relations: { user: true },
+    });
   }
 
   async quickCreateUserForConversation(conversationId: string): Promise<MessagingCustomerIdentity> {
@@ -529,6 +564,74 @@ export class MessagingService {
     });
   }
 
+  async notifyUserByPreferredChannel(
+    userId: string,
+    content: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<{
+    channel: MessagingChannel | 'email';
+    messageId?: string;
+    emailQueued?: boolean;
+  } | null> {
+    const identities = await this.customerIdentityRepository.find({
+      where: { userId },
+      order: { updatedAt: 'DESC' },
+    });
+    const preferredChannels = [
+      MessagingChannel.ZALO_PERSONAL,
+      MessagingChannel.ZALO_OA,
+      MessagingChannel.FACEBOOK_PAGE,
+    ];
+    const identity = preferredChannels
+      .map((channel) => identities.find((item) => item.channel === channel && item.accountId))
+      .find(Boolean);
+
+    if (!identity?.accountId) {
+      return this.notifyUserByEmail(userId, content);
+    }
+
+    const conversation = await this.conversationRepository.findOne({
+      where: {
+        accountId: identity.accountId,
+        externalThreadId: identity.externalUserId,
+      },
+      relations: { account: true },
+    });
+    if (!conversation) {
+      return this.notifyUserByEmail(userId, content);
+    }
+
+    const outbound = await this.recordOutbound(
+      conversation.id,
+      { id: 'system:exam-result', name: 'Hệ thống' },
+      content,
+    );
+    outbound.message.metadata = {
+      ...(outbound.message.metadata ?? {}),
+      ...(metadata ?? {}),
+      source: 'exam_result_notification',
+      preferredChannel: identity.channel,
+    };
+    const saved = await this.messageRepository.save(outbound.message);
+    this.events.emitConversation(saved.conversationId, 'messages:message.updated', saved);
+    this.events.emitToStaff('messages:message.updated', saved);
+    return { channel: identity.channel, messageId: saved.id };
+  }
+
+  private async notifyUserByEmail(
+    userId: string,
+    content: string,
+  ): Promise<{ channel: 'email'; emailQueued: boolean } | null> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user?.email) return null;
+    await this.mailService.sendExamResultEmail({
+      to: user.email,
+      name: user.name || 'bạn',
+      content,
+    });
+    return { channel: 'email', emailQueued: true };
+  }
+
   async recordIncoming(input: IncomingMessageInput): Promise<{
     conversation: MessagingConversation;
     message: MessagingMessage;
@@ -561,7 +664,8 @@ export class MessagingService {
       ...(input.metadata ?? {}),
     };
     conversation.customerName = input.senderName ?? conversation.customerName;
-    conversation.customerExternalId = input.senderId ?? conversation.customerExternalId ?? input.externalThreadId;
+    conversation.customerExternalId =
+      input.senderId ?? conversation.customerExternalId ?? input.externalThreadId;
     conversation.metadata = nextMetadata;
     conversation.lastMessagePreview = content ?? this.messageTypePreview(input.messageType);
     conversation.lastMessageAt = input.sentAt ?? new Date();
@@ -588,7 +692,10 @@ export class MessagingService {
     const [hydratedConversation] = await this.hydrateConversationTags([conversation]);
     this.events.emitToStaff('messages:conversation.updated', hydratedConversation);
     this.events.emitConversation(conversation.id, 'messages:message.new', message);
-    this.events.emitToStaff('messages:message.new', { conversation: hydratedConversation, message });
+    this.events.emitToStaff('messages:message.new', {
+      conversation: hydratedConversation,
+      message,
+    });
 
     return { conversation: hydratedConversation, message };
   }
@@ -606,7 +713,9 @@ export class MessagingService {
     const now = new Date();
     const cleanContent = content.trim();
     const messageType = attachment
-      ? (attachment.mimeType?.startsWith('image/') ? MessagingMessageType.IMAGE : MessagingMessageType.FILE)
+      ? attachment.mimeType?.startsWith('image/')
+        ? MessagingMessageType.IMAGE
+        : MessagingMessageType.FILE
       : MessagingMessageType.TEXT;
     const preview = cleanContent || attachment?.name || this.messageTypePreview(messageType);
     const message = await this.messageRepository.save(
@@ -703,22 +812,40 @@ export class MessagingService {
     const message = await this.messageRepository.findOne({ where: { id: messageId } });
     if (!message) throw new NotFoundException(RESPONSE_MESSAGES.MESSAGING.MESSAGE_NOT_FOUND);
 
-    const zaloMsgId = this.extractProviderString(providerResponse, ['msgId', 'message.msgId', 'attachment.0.msgId']) ??
-      this.readMetadataString(message.metadata, 'zaloMsgId');
-    const zaloCliMsgId = this.extractProviderString(providerResponse, ['cliMsgId', '_cliMsgId', '_clientIds.0', 'message.cliMsgId', 'attachment.0.cliMsgId']) ??
-      this.readMetadataString(message.metadata, 'zaloCliMsgId');
-    const facebookMessageId = this.extractProviderString(providerResponse, ['message_id', 'responses.0.message_id', 'responses.1.message_id']) ??
-      this.readMetadataString(message.metadata, 'facebookMessageId');
+    const zaloMsgId =
+      this.extractProviderString(providerResponse, [
+        'msgId',
+        'message.msgId',
+        'attachment.0.msgId',
+      ]) ?? this.readMetadataString(message.metadata, 'zaloMsgId');
+    const zaloCliMsgId =
+      this.extractProviderString(providerResponse, [
+        'cliMsgId',
+        '_cliMsgId',
+        '_clientIds.0',
+        'message.cliMsgId',
+        'attachment.0.cliMsgId',
+      ]) ?? this.readMetadataString(message.metadata, 'zaloCliMsgId');
+    const facebookMessageId =
+      this.extractProviderString(providerResponse, [
+        'message_id',
+        'responses.0.message_id',
+        'responses.1.message_id',
+      ]) ?? this.readMetadataString(message.metadata, 'facebookMessageId');
     const metadata = {
       ...(message.metadata ?? {}),
       deliveryStatus: status,
-      deliveryError: status === 'failed' ? error ?? 'Không gửi được tin nhắn.' : null,
-      deliveredAt: status === 'sent' ? new Date().toISOString() : message.metadata?.deliveredAt ?? null,
-      failedAt: status === 'failed' ? new Date().toISOString() : message.metadata?.failedAt ?? null,
+      deliveryError: status === 'failed' ? (error ?? 'Không gửi được tin nhắn.') : null,
+      deliveredAt:
+        status === 'sent' ? new Date().toISOString() : (message.metadata?.deliveredAt ?? null),
+      failedAt:
+        status === 'failed' ? new Date().toISOString() : (message.metadata?.failedAt ?? null),
       zaloSendResponse: providerResponse ?? message.metadata?.zaloSendResponse ?? null,
       zaloMsgId: zaloMsgId ?? null,
       zaloCliMsgId: zaloCliMsgId ?? null,
-      facebookSendResponse: facebookMessageId ? providerResponse : message.metadata?.facebookSendResponse ?? null,
+      facebookSendResponse: facebookMessageId
+        ? providerResponse
+        : (message.metadata?.facebookSendResponse ?? null),
       facebookMessageId: facebookMessageId ?? null,
     };
     if (status === 'sent' && zaloMsgId) message.externalMessageId = zaloMsgId;
@@ -730,13 +857,18 @@ export class MessagingService {
     return saved;
   }
 
-  async getOutboundMessageForUndo(conversationId: string, messageId: string): Promise<{
+  async getOutboundMessageForUndo(
+    conversationId: string,
+    messageId: string,
+  ): Promise<{
     conversation: MessagingConversation;
     message: MessagingMessage;
     payload: { msgId: string | number; cliMsgId: string | number };
   }> {
     const conversation = await this.getConversationEntity(conversationId);
-    const message = await this.messageRepository.findOne({ where: { id: messageId, conversationId } });
+    const message = await this.messageRepository.findOne({
+      where: { id: messageId, conversationId },
+    });
     if (!message) throw new NotFoundException(RESPONSE_MESSAGES.MESSAGING.MESSAGE_NOT_FOUND);
     if (message.direction !== MessagingMessageDirection.OUTBOUND) {
       throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.OUTBOUND_ONLY_UNSEND);
@@ -746,18 +878,29 @@ export class MessagingService {
     }
 
     const response = message.metadata?.zaloSendResponse;
-    const msgId = this.readMetadataString(message.metadata, 'zaloMsgId') ??
+    const msgId =
+      this.readMetadataString(message.metadata, 'zaloMsgId') ??
       message.externalMessageId ??
       this.extractProviderString(response, ['msgId', 'message.msgId', 'attachment.0.msgId']);
-    const cliMsgId = this.readMetadataString(message.metadata, 'zaloCliMsgId') ??
-      this.extractProviderString(response, ['cliMsgId', '_cliMsgId', '_clientIds.0', 'message.cliMsgId', 'attachment.0.cliMsgId']);
+    const cliMsgId =
+      this.readMetadataString(message.metadata, 'zaloCliMsgId') ??
+      this.extractProviderString(response, [
+        'cliMsgId',
+        '_cliMsgId',
+        '_clientIds.0',
+        'message.cliMsgId',
+        'attachment.0.cliMsgId',
+      ]);
     if (!msgId || !cliMsgId) {
       throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.ZALO_RECALL_ID_MISSING);
     }
     return { conversation, message, payload: { msgId, cliMsgId } };
   }
 
-  async markOutboundRecalled(messageId: string, providerResponse?: unknown): Promise<MessagingMessage> {
+  async markOutboundRecalled(
+    messageId: string,
+    providerResponse?: unknown,
+  ): Promise<MessagingMessage> {
     const message = await this.messageRepository.findOne({ where: { id: messageId } });
     if (!message) throw new NotFoundException(RESPONSE_MESSAGES.MESSAGING.MESSAGE_NOT_FOUND);
     const now = new Date().toISOString();
@@ -794,7 +937,10 @@ export class MessagingService {
     conversation.metadata = this.appendConversationHistory(
       {
         ...(conversation.metadata ?? {}),
-        chatbotStatus: conversation.channel === MessagingChannel.WEB_CHAT ? 'closed' : conversation.metadata?.chatbotStatus,
+        chatbotStatus:
+          conversation.channel === MessagingChannel.WEB_CHAT
+            ? 'closed'
+            : conversation.metadata?.chatbotStatus,
         claimExpiresAt: null,
       },
       {
@@ -804,18 +950,25 @@ export class MessagingService {
         at: new Date().toISOString(),
       },
     );
-    const [saved] = await this.hydrateConversationTags([await this.conversationRepository.save(conversation)]);
+    const [saved] = await this.hydrateConversationTags([
+      await this.conversationRepository.save(conversation),
+    ]);
     this.events.emitToStaff('messages:conversation.updated', saved);
     this.events.emitConversation(saved.id, 'messages:conversation.updated', saved);
     return saved;
   }
 
-  async getOutboundMessageForRetry(conversationId: string, messageId: string): Promise<{
+  async getOutboundMessageForRetry(
+    conversationId: string,
+    messageId: string,
+  ): Promise<{
     conversation: MessagingConversation;
     message: MessagingMessage;
   }> {
     const conversation = await this.getConversationEntity(conversationId);
-    const message = await this.messageRepository.findOne({ where: { id: messageId, conversationId } });
+    const message = await this.messageRepository.findOne({
+      where: { id: messageId, conversationId },
+    });
     if (!message) throw new NotFoundException(RESPONSE_MESSAGES.MESSAGING.MESSAGE_NOT_FOUND);
     if (message.direction !== MessagingMessageDirection.OUTBOUND) {
       throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.OUTBOUND_ONLY_RETRY);
@@ -823,22 +976,32 @@ export class MessagingService {
     return { conversation, message };
   }
 
-  async markConversationRead(conversationId: string, actor?: MessagingActor | null): Promise<MessagingConversation> {
+  async markConversationRead(
+    conversationId: string,
+    actor?: MessagingActor | null,
+  ): Promise<MessagingConversation> {
     const conversation = await this.getConversationEntity(conversationId);
     conversation.unreadCount = 0;
     if (actor?.id) {
       conversation.metadata = {
         ...(conversation.metadata ?? {}),
-        seenBy: this.upsertMetadataList(conversation.metadata, 'seenBy', {
-          id: actor.id,
-          name: actor.name ?? actor.email ?? 'Nhân viên',
-          email: actor.email ?? null,
-          avatar: actor.avatar ?? null,
-          seenAt: new Date().toISOString(),
-        }, 'id'),
+        seenBy: this.upsertMetadataList(
+          conversation.metadata,
+          'seenBy',
+          {
+            id: actor.id,
+            name: actor.name ?? actor.email ?? 'Nhân viên',
+            email: actor.email ?? null,
+            avatar: actor.avatar ?? null,
+            seenAt: new Date().toISOString(),
+          },
+          'id',
+        ),
       };
     }
-    const [saved] = await this.hydrateConversationTags([await this.conversationRepository.save(conversation)]);
+    const [saved] = await this.hydrateConversationTags([
+      await this.conversationRepository.save(conversation),
+    ]);
     this.events.emitToStaff('messages:conversation.updated', saved);
     return saved;
   }
@@ -869,7 +1032,9 @@ export class MessagingService {
         : `Bỏ phân công${previousName ? ` từ ${previousName}` : ''}`,
       at: new Date().toISOString(),
     });
-    const [saved] = await this.hydrateConversationTags([await this.conversationRepository.save(conversation)]);
+    const [saved] = await this.hydrateConversationTags([
+      await this.conversationRepository.save(conversation),
+    ]);
     this.events.emitToStaff('messages:conversation.updated', saved);
     return saved;
   }
@@ -886,12 +1051,13 @@ export class MessagingService {
     });
     const currentTagIds = currentRows.map((row) => String(row.tagId));
     const nextTagIds = this.normalizeIds(tagIds).slice(0, 20);
-    const tags = nextTagIds.length > 0
-      ? await this.tagRepository.find({ where: { id: In(nextTagIds) } })
-      : [];
+    const tags =
+      nextTagIds.length > 0 ? await this.tagRepository.find({ where: { id: In(nextTagIds) } }) : [];
     const normalizedTagIds = tags.map((tag) => String(tag.id));
     const nextTagNames = tags.map((tag) => tag.name);
-    const currentTagNames = currentRows.map((row) => row.tag?.name).filter((name): name is string => Boolean(name));
+    const currentTagNames = currentRows
+      .map((row) => row.tag?.name)
+      .filter((name): name is string => Boolean(name));
     const added = tags.filter((tag) => !currentTagIds.includes(String(tag.id)));
     const removed = currentRows.filter((row) => !normalizedTagIds.includes(String(row.tagId)));
     let metadata: Record<string, unknown> = {
@@ -923,11 +1089,15 @@ export class MessagingService {
     await this.conversationTagRepository.delete({ conversationId });
     if (normalizedTagIds.length > 0) {
       await this.conversationTagRepository.save(
-        normalizedTagIds.map((tagId) => this.conversationTagRepository.create({ conversationId, tagId })),
+        normalizedTagIds.map((tagId) =>
+          this.conversationTagRepository.create({ conversationId, tagId }),
+        ),
       );
     }
 
-    const [saved] = await this.hydrateConversationTags([await this.conversationRepository.save(conversation)]);
+    const [saved] = await this.hydrateConversationTags([
+      await this.conversationRepository.save(conversation),
+    ]);
     this.events.emitToStaff('messages:conversation.updated', saved);
     return saved;
   }
@@ -954,29 +1124,31 @@ export class MessagingService {
     const attachmentUrl =
       this.readMetadataString(message.metadata, 'imageUrl') ??
       this.readMetadataString(message.metadata, 'attachmentUrl');
-    const attachmentName = this.readMetadataString(message.metadata, 'attachmentName') ??
+    const attachmentName =
+      this.readMetadataString(message.metadata, 'attachmentName') ??
       this.readMetadataString(message.metadata, 'attachmentTitle');
     const attachmentMimeType = this.readMetadataString(message.metadata, 'attachmentMimeType');
     const isAutoReply = Boolean(message.metadata?.autoReply);
-    const content = message.content ??
-      attachmentName ??
-      this.messageTypePreview(message.messageType);
+    const content =
+      message.content ?? attachmentName ?? this.messageTypePreview(message.messageType);
 
     return {
       id: String(message.id),
       conversationId: String(message.conversationId),
-      sender: message.direction === MessagingMessageDirection.INBOUND
-        ? 'user'
-        : isAutoReply
-          ? 'bot'
-          : message.senderType === MessagingSenderType.SYSTEM
-            ? 'system'
-            : 'staff',
-      messageType: message.messageType === MessagingMessageType.IMAGE
-        ? 'image'
-        : message.messageType === MessagingMessageType.FILE
-          ? 'file'
-          : 'text',
+      sender:
+        message.direction === MessagingMessageDirection.INBOUND
+          ? 'user'
+          : isAutoReply
+            ? 'bot'
+            : message.senderType === MessagingSenderType.SYSTEM
+              ? 'system'
+              : 'staff',
+      messageType:
+        message.messageType === MessagingMessageType.IMAGE
+          ? 'image'
+          : message.messageType === MessagingMessageType.FILE
+            ? 'file'
+            : 'text',
       content,
       senderName: message.senderName ?? undefined,
       fileUrl: attachmentUrl,
@@ -994,13 +1166,16 @@ export class MessagingService {
     identityKey: string,
   ): Record<string, unknown>[] {
     const current = Array.isArray(metadata?.[key])
-      ? metadata?.[key] as Record<string, unknown>[]
+      ? (metadata?.[key] as Record<string, unknown>[])
       : [];
     const next = current.filter((entry) => entry?.[identityKey] !== item[identityKey]);
     return [...next, item].slice(-30);
   }
 
-  private readImportPayload(file: { buffer: Buffer; originalname?: string }): Record<string, unknown> {
+  private readImportPayload(file: {
+    buffer: Buffer;
+    originalname?: string;
+  }): Record<string, unknown> {
     if (!file?.buffer?.length) {
       throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.IMPORT_FILE_INVALID);
     }
@@ -1011,7 +1186,8 @@ export class MessagingService {
       const entry = zip
         .getEntries()
         .find((item) => !item.isDirectory && item.entryName.toLowerCase().endsWith('.json'));
-      if (!entry) throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.IMPORT_ZIP_JSON_MISSING);
+      if (!entry)
+        throw new BadRequestException(RESPONSE_MESSAGES.MESSAGING.IMPORT_ZIP_JSON_MISSING);
       return this.parseJson(entry.getData().toString('utf8'));
     }
 
@@ -1031,9 +1207,10 @@ export class MessagingService {
   }
 
   private normalizeZaloCredentials(payload: Record<string, unknown>): ZaloCredentials {
-    const source = (payload.credentials && typeof payload.credentials === 'object')
-      ? payload.credentials as Record<string, unknown>
-      : payload;
+    const source =
+      payload.credentials && typeof payload.credentials === 'object'
+        ? (payload.credentials as Record<string, unknown>)
+        : payload;
 
     const imei = this.readString(source.imei);
     const userAgent = this.readString(source.userAgent ?? source.useragent ?? source['user-agent']);
@@ -1055,7 +1232,10 @@ export class MessagingService {
     return typeof value === 'string' ? value.trim() : '';
   }
 
-  private readMetadataString(metadata: Record<string, unknown> | null | undefined, key: string): string | null {
+  private readMetadataString(
+    metadata: Record<string, unknown> | null | undefined,
+    key: string,
+  ): string | null {
     const value = metadata?.[key];
     const text = typeof value === 'number' ? String(value) : this.readString(value);
     return text || null;
@@ -1092,7 +1272,9 @@ export class MessagingService {
     return undefined;
   }
 
-  private async hydrateConversationTags(conversations: MessagingConversation[]): Promise<MessagingConversation[]> {
+  private async hydrateConversationTags(
+    conversations: MessagingConversation[],
+  ): Promise<MessagingConversation[]> {
     const conversationIds = conversations.map((conversation) => conversation.id);
     if (conversationIds.length === 0) return conversations;
 
@@ -1112,7 +1294,9 @@ export class MessagingService {
     return conversations.map((conversation) => {
       const tags = tagMap.get(String(conversation.id)) ?? [];
       const tagItems = tags
-        .sort((left, right) => (left.sortOrder - right.sortOrder) || left.name.localeCompare(right.name))
+        .sort(
+          (left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name),
+        )
         .map((tag) => ({ id: String(tag.id), name: tag.name, color: tag.color }));
       return {
         ...conversation,
@@ -1150,11 +1334,9 @@ export class MessagingService {
   }
 
   private normalizeIds(values: string[]): string[] {
-    return Array.from(new Set(
-      values
-        .map((value) => String(value).trim())
-        .filter((value) => /^\d+$/.test(value)),
-    ));
+    return Array.from(
+      new Set(values.map((value) => String(value).trim()).filter((value) => /^\d+$/.test(value))),
+    );
   }
 
   private async getAccountEntity(id: string): Promise<MessagingChannelAccount> {
@@ -1168,11 +1350,14 @@ export class MessagingService {
       where: { id },
       relations: { account: true },
     });
-    if (!conversation) throw new NotFoundException(RESPONSE_MESSAGES.MESSAGING.CONVERSATION_NOT_FOUND);
+    if (!conversation)
+      throw new NotFoundException(RESPONSE_MESSAGES.MESSAGING.CONVERSATION_NOT_FOUND);
     return conversation;
   }
 
-  private async getOrCreateCustomerIdentity(conversation: MessagingConversation): Promise<MessagingCustomerIdentity> {
+  private async getOrCreateCustomerIdentity(
+    conversation: MessagingConversation,
+  ): Promise<MessagingCustomerIdentity> {
     const externalUserId = conversation.customerExternalId || conversation.externalThreadId;
     let identity = await this.customerIdentityRepository.findOne({
       where: {
