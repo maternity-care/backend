@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -11,10 +11,10 @@ import { LogoutDto } from './dto/request/logout.dto';
 import { RefreshTokenDto } from './dto/request/refresh-token.dto';
 import { RegisterDto } from './dto/request/register.dto';
 import { ResetPasswordDto } from './dto/request/reset-password.dto';
-import { ForgotPasswordResponseDto } from './dto/response/forgot-password-response.dto';
 import { AuthService } from './auth.service';
 import { VerifyOtpDto } from './dto/request/verify-otp.dto';
 import { ResendOtpDto } from './dto/request/resend-otp.dto';
+import { ChangePasswordDto } from './dto/request/change-password.dto';
 
 @ApiTags('User - Auth')
 @Controller('auth')
@@ -55,10 +55,10 @@ export class AuthController {
 
   @Post('forgot-password')
   @ApiOperation({ summary: 'Request password reset' })
-  @ApiResponse({ status: 200, type: ForgotPasswordResponseDto })
+  @ApiResponse({ status: 200 })
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
-    const data = await this.authService.forgotPassword(dto.email);
-    return { message: RESPONSE_MESSAGES.PASSWORD_RESET_REQUESTED, data };
+    await this.authService.forgotPassword(dto.email);
+    return { message: RESPONSE_MESSAGES.PASSWORD_RESET_REQUESTED, data: null };
   }
 
   @Post('reset-password')
@@ -93,5 +93,18 @@ export class AuthController {
   async me(@CurrentUser() user: AuthenticatedUser) {
     console.log(user);
     return { message: RESPONSE_MESSAGES.AUTH_PROFILE_RETRIEVED, data: user };
+  }
+
+  @Patch('change-password')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Change current user password' })
+  @ApiResponse({ status: 200 })
+  async changePassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    await this.authService.changePassword(user.id, dto);
+    return { message: RESPONSE_MESSAGES.PASSWORD_CHANGED, data: null };
   }
 }

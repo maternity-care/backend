@@ -7,6 +7,6 @@ export default () => ({
     username: process.env.MAIL_USERNAME ?? '',
     password: process.env.MAIL_PASSWORD ?? '',
     fromName: process.env.MAIL_FROM_NAME ?? process.env.APP_NAME ?? 'Maternity Care',
-    fromAddress: process.env.MAIL_FROM_ADDRESS ?? 'no-reply@example.com',
+    fromAddress: process.env.MAIL_FROM_ADDRESS ?? process.env.MAIL_USERNAME ?? 'no-reply@example.com',
   },
 });

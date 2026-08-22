@@ -14,6 +14,23 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
     private readonly repository: Repository<PregnancyProfile>,
   ) {}
 
+  private readonly detailRelations = {
+    user: true,
+    medicalRecords: {
+      appointment: {
+        service: true,
+        doctor: true,
+      },
+      files: true,
+      doctor: true,
+      appointmentServiceItem: {
+        service: true,
+        doctor: true,
+        room: true,
+      },
+    },
+  } as const;
+
   create(data: DeepPartial<PregnancyProfile>): PregnancyProfile {
     return this.repository.create(data);
   }
@@ -35,12 +52,7 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
   async findById(id: string): Promise<PregnancyProfile | null> {
     const profile = await this.repository.findOne({
       where: { id },
-      relations: {
-        user: true,
-        medicalRecords: {
-          files: true,
-        },
-      },
+      relations: this.detailRelations,
       order: {
         medicalRecords: {
           createdAt: 'DESC',
@@ -75,7 +87,7 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
   async findByPatientId(patientId: string): Promise<PregnancyProfile[]> {
     const profile = await this.repository.find({
       where: { patientId },
-      relations: { user: true, medicalRecords: { files: true } },
+      relations: this.detailRelations,
       order: { id: 'DESC' },
     });
     if (!profile) {
@@ -170,7 +182,7 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
     }
 
     const [data, total] = await this.repository.findAndCount({
-      relations: { user: true, medicalRecords: { files: true } },
+      relations: this.detailRelations,
       where: {
         ...where,
         user: {

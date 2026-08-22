@@ -434,7 +434,6 @@ export class AppointmentsService {
   ) {
     const qb = this.buildManagementQuery();
     if (actorIsDoctor) {
-      await this.assertObstetricsDoctor(actorId);
       qb.andWhere('appointment.doctor_id = :actorId', { actorId });
       qb.andWhere('appointment.checked_in_at IS NOT NULL');
     }
@@ -484,7 +483,6 @@ export class AppointmentsService {
     actorId?: string,
     actorIsDoctor = false,
   ) {
-    if (actorIsDoctor && actorId) await this.assertObstetricsDoctor(actorId);
     const qb = this.buildManagementQuery().andWhere('appointment.id = :id', { id });
     if (actorIsDoctor && actorId) {
       qb.andWhere('appointment.doctor_id = :actorId', { actorId });
@@ -517,13 +515,19 @@ export class AppointmentsService {
   }
 
   async findSpecialistServiceItems(actorId: string, scopedFacilityId?: string | null) {
-    const qb = this.buildServiceItemsQuery().andWhere('item.doctor_id = :actorId', { actorId });
+    const actorSpecialty = getSpecialtyKeywordFromText(await this.getDoctorSpecialty(actorId));
+    const qb = this.buildServiceItemsQuery().andWhere('appointment.checked_in_at IS NOT NULL');
 
     if (scopedFacilityId) {
       qb.andWhere('appointment.facility_id = :scopedFacilityId', { scopedFacilityId });
     }
 
-    return qb.getRawMany();
+    const rows = await qb.getRawMany<Record<string, unknown>>();
+    return rows.filter((row) => {
+      const isAssignedDoctor = String(row.doctorStaffId ?? '') === String(actorId);
+      const itemDoctorSpecialty = getSpecialtyKeywordFromText(row.doctorSpecialty as string | null);
+      return isAssignedDoctor || (!!actorSpecialty && itemDoctorSpecialty === actorSpecialty);
+    });
   }
 
   async addServiceItems(
@@ -1110,18 +1114,26 @@ export class AppointmentsService {
       .addSelect('item.note', 'note')
       .addSelect('appointment.facility_id', 'facilityId')
       .addSelect('appointment.patient_id', 'patientId')
+      .addSelect('appointment.pregnancy_profile_id', 'pregnancyProfileId')
+      .addSelect('appointment.service_id', 'bookedServiceId')
       .addSelect('appointment.scheduled_start', 'scheduledStart')
       .addSelect('appointment.scheduled_end', 'scheduledEnd')
       .addSelect('appointment.status', 'appointmentStatus')
       .addSelect('patient.name', 'patientName')
       .addSelect('patient.phone', 'patientPhone')
+      .addSelect('patient.email', 'patientEmail')
       .addSelect('facility.name', 'facilityName')
       .addSelect('service.name', 'serviceName')
+      .addSelect('appointmentService.name', 'bookedServiceName')
       .addSelect(
         'COALESCE(facilityService.duration_minutes, service.default_duration_minutes)',
         'durationMinutes',
       )
       .addSelect('room.name', 'roomName')
+      .addSelect('orderingDoctor.id', 'orderingDoctorId')
+      .addSelect('orderingDoctor.title', 'orderingDoctorTitle')
+      .addSelect('orderingDoctor.specialty', 'orderingDoctorSpecialty')
+      .addSelect('orderingStaff.name', 'orderingDoctorName')
       .addSelect('doctor.id', 'doctorId')
       .addSelect('doctor.title', 'doctorTitle')
       .addSelect('doctor.specialty', 'doctorSpecialty')
@@ -1135,6 +1147,7 @@ export class AppointmentsService {
       .leftJoin('appointments', 'appointment', 'appointment.id = item.appointment_id')
       .leftJoin('users', 'patient', 'patient.id = appointment.patient_id')
       .leftJoin('facilities', 'facility', 'facility.id = appointment.facility_id')
+      .leftJoin('services', 'appointmentService', 'appointmentService.id = appointment.service_id')
       .leftJoin('services', 'service', 'service.id = item.service_id')
       .leftJoin(
         'facility_services',
@@ -1142,12 +1155,25 @@ export class AppointmentsService {
         'facilityService.id = item.facility_service_id',
       )
       .leftJoin('rooms', 'room', 'room.id = item.room_id')
+      .leftJoin('staffs', 'orderingStaff', 'orderingStaff.id = appointment.doctor_id')
+      .leftJoin('doctors', 'orderingDoctor', 'orderingDoctor.staff_id = orderingStaff.id')
       .leftJoin('staffs', 'staff', 'staff.id = item.doctor_id')
       .leftJoin('doctors', 'doctor', 'doctor.staff_id = staff.id')
       .leftJoin(
+        (subQuery) =>
+          subQuery
+            .select('latestRecord.appointment_service_item_id', 'appointment_service_item_id')
+            .addSelect('MAX(latestRecord.id)', 'medical_record_id')
+            .from('medical_records', 'latestRecord')
+            .where('latestRecord.appointment_service_item_id IS NOT NULL')
+            .groupBy('latestRecord.appointment_service_item_id'),
+        'latestMedicalRecord',
+        'latestMedicalRecord.appointment_service_item_id = item.id',
+      )
+      .leftJoin(
         'medical_records',
         'medicalRecord',
-        'medicalRecord.appointment_service_item_id = item.id',
+        'medicalRecord.id = latestMedicalRecord.medical_record_id',
       )
       .orderBy('item.sequence', 'ASC')
       .addOrderBy('item.id', 'ASC');
@@ -1182,15 +1208,22 @@ export class AppointmentsService {
       .addSelect('patient.email', 'patientEmail')
       .addSelect('facility.name', 'facilityName')
       .addSelect('service.name', 'serviceName')
+      .addSelect('COALESCE(facilityService.price, service.base_price)', 'servicePrice')
       .addSelect('room.name', 'roomName')
       .addSelect('doctor.id', 'doctorId')
       .addSelect('doctor.title', 'doctorTitle')
+      .addSelect('doctor.specialty', 'doctorSpecialty')
       .addSelect('staff.name', 'doctorName')
       .addSelect('profile.code', 'pregnancyProfileCode')
       .from('appointments', 'appointment')
       .leftJoin('users', 'patient', 'patient.id = appointment.patient_id')
       .leftJoin('facilities', 'facility', 'facility.id = appointment.facility_id')
       .leftJoin('services', 'service', 'service.id = appointment.service_id')
+      .leftJoin(
+        'facility_services',
+        'facilityService',
+        'facilityService.facility_id = appointment.facility_id AND facilityService.service_id = appointment.service_id',
+      )
       .leftJoin('rooms', 'room', 'room.id = appointment.room_id')
       .leftJoin('staffs', 'staff', 'staff.id = appointment.doctor_id')
       .leftJoin('doctors', 'doctor', 'doctor.staff_id = staff.id')

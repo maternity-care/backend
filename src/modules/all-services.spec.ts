@@ -187,7 +187,7 @@ describe('module services', () => {
     });
 
     const queue = { add: jest.fn().mockResolvedValue({ id: 'job-1' }) };
-    const jobsService = new JobsService(queue as never, queue as never);
+    const jobsService = new JobsService(queue as never, queue as never, queue as never);
     await expect(jobsService.createTestJob({ message: 'hello' })).resolves.toEqual({
       jobId: 'job-1',
     });

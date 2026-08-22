@@ -25,6 +25,7 @@ export const RESPONSE_MESSAGES = {
   PROFILE_UPDATED: 'Cập nhật hồ sơ thành công',
   MANAGEMENT_PROFILE_UPDATED: 'Cập nhật hồ sơ thành công.',
   MANAGEMENT_PASSWORD_CHANGED: 'Đổi mật khẩu thành công.',
+  PASSWORD_CHANGED: 'Đổi mật khẩu thành công.',
   USERS_RETRIEVED: 'Lấy danh sách tài khoản thành công',
   USER_CREATED: 'Tạo tài khoản thành công',
   USER_RETRIEVED: 'Lấy thông tin tài khoản thành công',
