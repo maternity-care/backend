@@ -21,7 +21,7 @@ import { ZaloPersonalRuntimeService } from './adapters/zalo-personal-runtime.ser
 
 @Module({
   imports: [
-    AuthModule,
+    forwardRef(() => AuthModule),
     MailModule,
     forwardRef(() => ChatbotModule),
     TypeOrmModule.forFeature([

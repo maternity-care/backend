@@ -122,6 +122,11 @@ export class MedicalRecordRepository implements IMedicalRecordRepository {
         appointmentId: filters.appointmentId,
       });
     }
+    if (filters?.appointmentServiceItemId) {
+      query.andWhere('medicalRecord.appointmentServiceItemId = :appointmentServiceItemId', {
+        appointmentServiceItemId: filters.appointmentServiceItemId,
+      });
+    }
     if (filters?.pregnancyProfileId) {
       query.andWhere('medicalRecord.pregnancyProfileId = :pregnancyProfileId', {
         pregnancyProfileId: filters.pregnancyProfileId,

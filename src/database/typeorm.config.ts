@@ -82,6 +82,7 @@ import { AddMessagingCustomerIdentities1787300000000 } from './migrations/178730
 import { MigrateChatbotToMessaging1787400000000 } from './migrations/1787400000000-MigrateChatbotToMessaging';
 import { AddAppointmentServiceItems1787500000000 } from './migrations/1787500000000-AddAppointmentServiceItems';
 import { AddServiceDoctorSelection1787600000000 } from './migrations/1787600000000-AddServiceDoctorSelection';
+import { AddAppointmentServiceItemNotificationReference1787700000000 } from './migrations/1787700000000-AddAppointmentServiceItemNotificationReference';
 
 config();
 
@@ -179,6 +180,7 @@ export const typeOrmConfig: DataSourceOptions = {
     MigrateChatbotToMessaging1787400000000,
     AddAppointmentServiceItems1787500000000,
     AddServiceDoctorSelection1787600000000,
+    AddAppointmentServiceItemNotificationReference1787700000000,
   ],
   charset: 'utf8mb4_unicode_ci',
 };

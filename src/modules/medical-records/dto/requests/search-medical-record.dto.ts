@@ -22,6 +22,12 @@ export class SearchMedicalRecordDto {
   @IsOptional()
   @IsString()
   @Matches(BIGINT_ID_PATTERN)
+  appointmentServiceItemId?: string;
+
+  @ApiPropertyOptional({ example: '1' })
+  @IsOptional()
+  @IsString()
+  @Matches(BIGINT_ID_PATTERN)
   pregnancyProfileId?: string;
 
   @ApiPropertyOptional({ example: '1' })

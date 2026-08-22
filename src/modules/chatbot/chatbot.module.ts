@@ -14,7 +14,7 @@ import { GeminiChatbotService } from './gemini-chatbot.service';
 
 @Module({
   imports: [
-    AuthModule,
+    forwardRef(() => AuthModule),
     forwardRef(() => MessagingModule),
     TypeOrmModule.forFeature([MessagingChannelAccount, MessagingConversation, MessagingCustomerIdentity, MessagingMessage, Staff]),
     UploadsModule,

@@ -34,6 +34,7 @@ import { StaffPasswordResetToken } from './entities/staff-password-reset-token.e
 import { AccountStatus } from '../../common/constants/status.enum';
 import { UpdateManagementProfileDto } from './dto/request/update-management-profile.dto';
 import { ChangeManagementPasswordDto } from './dto/request/change-management-password.dto';
+import { ChangePasswordDto } from './dto/request/change-password.dto';
 import {
   IUserAuthRepository,
   USER_AUTH_REPOSITORY,
@@ -199,6 +200,35 @@ export class AuthService {
     }
 
     return this.buildAuthResponse(user.user);
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
+    const userAuth = await this.userAuthRepository.findByUserId(userId);
+    if (
+      !userAuth ||
+      userAuth.status !== AccountStatus.ACTIVE ||
+      userAuth.user?.status !== AccountStatus.ACTIVE
+    ) {
+      throw new UnauthorizedException(RESPONSE_MESSAGES.AUTH_USER_INACTIVE);
+    }
+
+    const isCurrentPasswordValid = await bcrypt.compare(dto.currentPassword, userAuth.password);
+    if (!isCurrentPasswordValid) {
+      throw new BadRequestException(RESPONSE_MESSAGES.AUTH_CURRENT_PASSWORD_INVALID);
+    }
+    if (await bcrypt.compare(dto.newPassword, userAuth.password)) {
+      throw new BadRequestException(RESPONSE_MESSAGES.AUTH_NEW_PASSWORD_SAME);
+    }
+
+    userAuth.password = await bcrypt.hash(
+      dto.newPassword,
+      this.configService.getOrThrow<number>('bcrypt.saltRounds'),
+    );
+    await this.userAuthRepository.save(userAuth);
+    await this.refreshTokenRepository.update(
+      { userId: userAuth.userId, revokedAt: IsNull() },
+      { revokedAt: new Date() },
+    );
   }
 
   async managementLogin(dto: LoginDto): Promise<AuthResponseDto> {
@@ -387,11 +417,17 @@ export class AuthService {
       throw new BadRequestException(RESPONSE_MESSAGES.AUTH_PASSWORD_RESET_TOKEN_INVALID);
     }
 
-    // const saltRounds = this.configService.getOrThrow<number>('bcrypt.saltRounds');
-    // storedToken.user.password = await bcrypt.hash(password, saltRounds);
+    const userAuth = await this.userAuthRepository.findByUserId(storedToken.userId);
+    if (!userAuth || userAuth.status !== AccountStatus.ACTIVE) {
+      throw new BadRequestException(RESPONSE_MESSAGES.AUTH_USER_INACTIVE);
+    }
+    userAuth.password = await bcrypt.hash(
+      password,
+      this.configService.getOrThrow<number>('bcrypt.saltRounds'),
+    );
     storedToken.usedAt = new Date();
 
-    await this.usersRepository.save(storedToken.user);
+    await this.userAuthRepository.save(userAuth);
     await this.passwordResetTokenRepository.save(storedToken);
     await this.refreshTokenRepository.update(
       { userId: storedToken.userId, revokedAt: IsNull() },

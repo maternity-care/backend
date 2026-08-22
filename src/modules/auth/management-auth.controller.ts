@@ -31,8 +31,8 @@ export class ManagementAuthController {
 
   @Post('forgot-password')
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
-    const data = await this.authService.managementForgotPassword(dto.email);
-    return { message: RESPONSE_MESSAGES.PASSWORD_RESET_REQUESTED, data };
+    await this.authService.managementForgotPassword(dto.email);
+    return { message: RESPONSE_MESSAGES.PASSWORD_RESET_REQUESTED, data: null };
   }
 
   @Post('reset-password')

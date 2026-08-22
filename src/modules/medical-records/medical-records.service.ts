@@ -3,16 +3,12 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { IRedisCacheService, REDIS_CACHE_SERVICE } from '../../common/cache/redis-cache.interface';
 import { RealtimeEventsService } from '../realtime/realtime-events.service';
-import { NotificationsService } from '../notifications/notifications.service';
-import { MessagingService } from '../messaging/messaging.service';
-import {
-  NotificationReferenceType,
-  NotificationType,
-} from '../../common/constants/notification.enum';
+import { JobsService } from '../jobs/jobs.service';
 import { CreateMedicalRecordDto } from './dto/requests/create-medical-record.dto';
 import { RegisterPendingMedicalFileDto } from './dto/requests/pending-medical-file.dto';
 import { SearchMedicalRecordDto } from './dto/requests/search-medical-record.dto';
@@ -27,6 +23,7 @@ import { MEDICAL_RECORD_MESSAGES } from './medical-record.constant';
 
 @Injectable()
 export class MedicalRecordsService implements IMedicalRecordService {
+  private readonly logger = new Logger(MedicalRecordsService.name);
   private readonly pendingFileTtlSeconds = 24 * 60 * 60;
 
   constructor(
@@ -35,13 +32,12 @@ export class MedicalRecordsService implements IMedicalRecordService {
     @Inject(REDIS_CACHE_SERVICE)
     private readonly cacheService: IRedisCacheService,
     private readonly realtimeEvents: RealtimeEventsService,
-    private readonly notificationsService: NotificationsService,
-    private readonly messagingService: MessagingService,
+    private readonly jobsService: JobsService,
   ) {}
 
   async create(dto: CreateMedicalRecordDto): Promise<MedicalRecord> {
     const medicalRecord = dto.appointmentServiceItemId
-      ? await this.repository.findByAppointmentServiceItemId(dto.appointmentServiceItemId)
+      ? null
       : await this.repository.findByAppointmentId(dto.appointmentId);
     if (medicalRecord) {
       // đã có, cập nhật
@@ -63,7 +59,7 @@ export class MedicalRecordsService implements IMedicalRecordService {
           const appointment = await this.repository.findAppointmentById(dto.appointmentId);
           if (appointment) {
             await this.markServiceItemResultUploaded(dto.appointmentServiceItemId);
-            await this.notifyExamResultUploaded(
+            await this.enqueueExamResultNotification(
               appointment.patientId,
               dto.appointmentId,
               dto.appointmentServiceItemId,
@@ -101,7 +97,7 @@ export class MedicalRecordsService implements IMedicalRecordService {
     }
     if (dto.appointmentServiceItemId) {
       await this.markServiceItemResultUploaded(dto.appointmentServiceItemId);
-      await this.notifyExamResultUploaded(
+      await this.enqueueExamResultNotification(
         appointment.patientId,
         dto.appointmentId,
         dto.appointmentServiceItemId,
@@ -240,10 +236,7 @@ export class MedicalRecordsService implements IMedicalRecordService {
     if (!appointment) {
       throw new NotFoundException(MEDICAL_RECORD_MESSAGES.APPOINTMENT_NOT_FOUND);
     }
-    if (
-      appointment.pregnancyProfileId !== pregnancyProfileId ||
-      appointment.doctorId !== doctorId
-    ) {
+    if (appointment.pregnancyProfileId !== pregnancyProfileId) {
       throw new BadRequestException(MEDICAL_RECORD_MESSAGES.APPOINTMENT_DATA_MISMATCH);
     }
     if (appointmentServiceItemId) {
@@ -254,9 +247,13 @@ export class MedicalRecordsService implements IMedicalRecordService {
       if (!serviceItem) {
         throw new BadRequestException(MEDICAL_RECORD_MESSAGES.APPOINTMENT_DATA_MISMATCH);
       }
-      if (serviceItem.doctorId && serviceItem.doctorId !== doctorId) {
+      if (serviceItem.doctorId !== doctorId) {
         throw new BadRequestException(MEDICAL_RECORD_MESSAGES.APPOINTMENT_DATA_MISMATCH);
       }
+      return appointment;
+    }
+    if (appointment.doctorId !== doctorId) {
+      throw new BadRequestException(MEDICAL_RECORD_MESSAGES.APPOINTMENT_DATA_MISMATCH);
     }
     return appointment;
   }
@@ -265,26 +262,23 @@ export class MedicalRecordsService implements IMedicalRecordService {
     await this.repository.markAppointmentServiceItemResultUploaded(appointmentServiceItemId);
   }
 
-  private async notifyExamResultUploaded(
+  private async enqueueExamResultNotification(
     patientId: string,
     appointmentId: string,
     appointmentServiceItemId: string,
   ) {
-    const title = 'Đã có kết quả dịch vụ';
-    const content = `Kết quả của một chỉ định trong lịch hẹn #${appointmentId} đã được cập nhật.`;
-    await this.notificationsService.createForUserIfMissing(patientId, {
-      reference: `exam_result:appointment_service_item:${appointmentServiceItemId}`,
-      type: NotificationType.EXAM_RESULT,
-      title,
-      content,
-      referenceType: NotificationReferenceType.APPOINTMENT_SERVICE_ITEM,
-      referenceId: appointmentServiceItemId,
-    });
-    await this.messagingService.notifyUserByPreferredChannel(patientId, content, {
-      referenceType: 'appointment_service_item',
-      referenceId: appointmentServiceItemId,
-      appointmentId,
-    });
+    try {
+      await this.jobsService.enqueueExamResultNotification({
+        patientId,
+        appointmentId,
+        appointmentServiceItemId,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown queue error';
+      this.logger.warn(
+        `Không enqueue được job thông báo kết quả cho chỉ định ${appointmentServiceItemId}: ${message}`,
+      );
+    }
   }
 
   private validateDateRange(filters?: SearchMedicalRecordDto): void {

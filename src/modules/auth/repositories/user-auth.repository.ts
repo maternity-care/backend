@@ -14,6 +14,13 @@ export class UserAuthRepository implements IUserAuthRepository {
     const user = await this.repository.findOneBy({ id });
     return user;
   }
+  async findByUserId(userId: string): Promise<UserAuth | null> {
+    const user = await this.repository.findOne({
+      where: { userId },
+      relations: { user: true },
+    });
+    return user;
+  }
   async findByEmail(email: string): Promise<UserAuth | null> {
     const user = await this.repository.findOne({
       where: { email },
