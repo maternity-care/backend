@@ -18,7 +18,10 @@ export class SuspendResourceDto {
     description: 'Ly do tam ngung de quan ly/FE hien thi.',
   })
   @IsOptional()
-  @Transform(({ value }) => trimText(value))
+  @Transform(({ value }) => {
+    const trimmed = trimText(value);
+    return trimmed ? trimmed : undefined;
+  })
   @IsString()
   @MinLength(3)
   @MaxLength(500)
