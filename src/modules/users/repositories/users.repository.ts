@@ -170,13 +170,16 @@ export class UsersRepository implements IUsersRepository {
     };
   }
 
-  async findAllNoPregnant(doctorId: string): Promise<User[]> {
+  async findAllNoPregnant(query: SearchUserDto & { doctorId?: string }): Promise<User[]> {
     try {
-      const users = this.repository
+      const keyword = query.search?.trim();
+      const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
+      const page = Math.max(Number(query.page) || 1, 1);
+      const qb = this.repository
         .createQueryBuilder('user')
         .innerJoin(Appointment, 'appointment', 'appointment.patientId = user.id')
         .leftJoinAndSelect('user.pregnancyProfiles', 'pregnancyProfile')
-        .where('appointment.doctorId', { doctorId })
+        .where('1 = 1')
         .andWhere((qb) => {
           const activeProfileSubQuery = qb
             .subQuery()
@@ -190,8 +193,26 @@ export class UsersRepository implements IUsersRepository {
         })
         .setParameter('activeStatus', PregnancyProfileStatus.ACTIVE)
         .distinct(true)
-        .getMany();
-      return users;
+        .orderBy('user.id', 'DESC')
+        .skip((page - 1) * limit)
+        .take(limit);
+
+      if (query.doctorId) {
+        qb.andWhere('appointment.doctorId = :doctorId', { doctorId: query.doctorId });
+      }
+
+      if (query.facilityId) {
+        qb.andWhere('appointment.facilityId = :facilityId', { facilityId: query.facilityId });
+      }
+
+      if (keyword) {
+        qb.andWhere(
+          '(user.name LIKE :keyword OR user.email LIKE :keyword OR user.phone LIKE :keyword OR user.cccd LIKE :keyword)',
+          { keyword: `%${keyword}%` },
+        );
+      }
+
+      return qb.getMany();
     } catch (error) {
       console.log('error', error);
       return [];

@@ -4,11 +4,15 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
+import { NotificationReferenceType, NotificationType } from '../../common/constants/notification.enum';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
+import { RoleEnum } from '../../common/constants/role.enum';
 import {
+  AccountStatus,
   ActiveStatus,
   AppointmentStatus,
   DoctorShiftStatus,
@@ -33,6 +37,8 @@ import {
   AppointmentServiceItem,
   AppointmentServiceItemStatus,
 } from './entities/appointment-service-item.entity';
+import { NotificationsService } from '../notifications/notifications.service';
+import { RealtimeEventsService } from '../realtime/realtime-events.service';
 
 const ACTIVE_APPOINTMENT_STATUSES = [
   AppointmentStatus.PENDING_PAYMENT,
@@ -135,9 +141,13 @@ function overlaps(startA: string, endA: string, startB: string | Date, endB: str
 
 @Injectable()
 export class AppointmentsService {
+  private readonly logger = new Logger(AppointmentsService.name);
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly schedulesService: SchedulesService,
+    private readonly notificationsService: NotificationsService,
+    private readonly realtimeEventsService: RealtimeEventsService,
   ) {}
 
   async createForPatient(patientId: string, dto: CreateAppointmentDto) {
@@ -151,7 +161,7 @@ export class AppointmentsService {
       throw new BadRequestException(RESPONSE_MESSAGES.APPOINTMENTS.PAST_SLOT_INVALID);
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const savedAppointment = await this.dataSource.transaction(async (manager) => {
       const [facilityService, shift] = await Promise.all([
         manager.getRepository(FacilityService).findOne({
           where: {
@@ -312,6 +322,8 @@ export class AppointmentsService {
 
       return savedAppointment;
     });
+    await this.notifyFacilityStaffAppointmentCreated(savedAppointment.id);
+    return savedAppointment;
   }
 
   async getPregnancyProfilesOfDoctor(
@@ -627,6 +639,7 @@ export class AppointmentsService {
     item.status = AppointmentServiceItemStatus.WAITING;
     await this.dataSource.getRepository(AppointmentServiceItem).save(item);
     await this.updateAppointmentInProgress(appointmentId);
+    await this.notifyDoctorServiceItemCheckedIn(appointmentId, itemId);
     return this.getServiceItemDetail(appointmentId, itemId, scopedFacilityId);
   }
 
@@ -799,7 +812,7 @@ export class AppointmentsService {
   }
 
   async checkIn(id: string, dto: CheckInAppointmentDto, scopedFacilityId?: string | null) {
-    return this.dataSource.transaction(async (manager) => {
+    const checkedInAppointment = await this.dataSource.transaction(async (manager) => {
       const appointment = await manager.getRepository(Appointment).findOne({ where: { id } });
       if (!appointment) throw new NotFoundException(RESPONSE_MESSAGES.APPOINTMENTS.NOT_FOUND);
       this.assertAppointmentFacility(appointment, scopedFacilityId);
@@ -843,6 +856,8 @@ export class AppointmentsService {
       await manager.getRepository(Appointment).save(appointment);
       return this.findManagementById(id, scopedFacilityId);
     });
+    await this.notifyDoctorAppointmentCheckedIn(id);
+    return checkedInAppointment;
   }
 
   async reschedule(id: string, dto: RescheduleAppointmentDto, scopedFacilityId?: string | null) {
@@ -1361,5 +1376,180 @@ export class AppointmentsService {
        WHERE appointment_id = ? AND source = 'appointment'`,
       [scheduleStatus, reason?.trim() || null, appointmentId],
     );
+  }
+
+  private async notifyFacilityStaffAppointmentCreated(appointmentId: string) {
+    try {
+      const details = await this.getAppointmentNotificationDetails(appointmentId);
+      if (!details?.facilityId) return;
+
+      const recipients = await this.getFacilityAppointmentStaffRecipients(details.facilityId);
+      await Promise.all(
+        recipients.map((staffId) =>
+          this.createAndEmitStaffNotification(staffId, {
+            reference: `appointment:created:${appointmentId}`,
+            type: NotificationType.APPOINTMENT,
+            title: 'Có lịch đặt khám mới',
+            content: `${details.patientName ?? 'Thai phụ'} vừa đặt ${
+              details.serviceName ?? 'dịch vụ khám'
+            } lúc ${this.formatNotificationDateTime(details.scheduledStart)} tại ${
+              details.facilityName ?? 'cơ sở'
+            }.`,
+            referenceType: NotificationReferenceType.APPOINTMENT,
+            referenceId: appointmentId,
+          }),
+        ),
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Không gửi được thông báo lịch đặt mới #${appointmentId}: ${this.getErrorMessage(error)}`,
+      );
+    }
+  }
+
+  private async notifyDoctorAppointmentCheckedIn(appointmentId: string) {
+    try {
+      const details = await this.getAppointmentNotificationDetails(appointmentId);
+      if (!details?.doctorId) return;
+
+      await this.createAndEmitStaffNotification(details.doctorId, {
+        reference: `appointment:checked-in:${appointmentId}`,
+        type: NotificationType.APPOINTMENT,
+        title: 'Thai phụ đã check-in',
+        content: `${details.patientName ?? 'Thai phụ'} đã check-in lịch #${appointmentId} lúc ${
+          this.formatNotificationDateTime(details.scheduledStart)
+        }.`,
+        referenceType: NotificationReferenceType.APPOINTMENT,
+        referenceId: appointmentId,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Không gửi được thông báo check-in lịch #${appointmentId}: ${this.getErrorMessage(error)}`,
+      );
+    }
+  }
+
+  private async notifyDoctorServiceItemCheckedIn(appointmentId: string, itemId: string) {
+    try {
+      const details = await this.getServiceItemNotificationDetails(itemId);
+      if (!details?.doctorId) return;
+
+      await this.createAndEmitStaffNotification(details.doctorId, {
+        reference: `appointment-service-item:checked-in:${itemId}`,
+        type: NotificationType.APPOINTMENT,
+        title: 'Chỉ định đã được check-in',
+        content: `${details.patientName ?? 'Thai phụ'} đã check-in ${
+          details.serviceName ?? 'chỉ định'
+        } thuộc lịch #${appointmentId}.`,
+        referenceType: NotificationReferenceType.APPOINTMENT_SERVICE_ITEM,
+        referenceId: itemId,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Không gửi được thông báo check-in chỉ định #${itemId}: ${this.getErrorMessage(error)}`,
+      );
+    }
+  }
+
+  private async createAndEmitStaffNotification(
+    staffId: string,
+    input: Parameters<NotificationsService['createForStaffIfMissing']>[1],
+  ) {
+    const notification = await this.notificationsService.createForStaffIfMissing(staffId, input);
+    this.realtimeEventsService.emitNotification('staff', staffId, {
+      id: notification.id,
+      type: notification.type,
+      title: notification.title,
+      content: notification.content,
+      isRead: notification.isRead,
+      referenceType: notification.referenceType,
+      referenceId: notification.referenceId,
+      createdAt: notification.createdAt,
+    });
+  }
+
+  private async getFacilityAppointmentStaffRecipients(facilityId: string): Promise<string[]> {
+    const rows = await this.dataSource
+      .createQueryBuilder()
+      .select('DISTINCT staff.id', 'staffId')
+      .from('staffs', 'staff')
+      .innerJoin('staff_roles', 'staffRole', 'staffRole.staff_id = staff.id')
+      .innerJoin('roles', 'role', 'role.id = staffRole.role_id')
+      .where('staff.status = :status', { status: AccountStatus.ACTIVE })
+      .andWhere(
+        '((staff.facility_id = :facilityId AND role.name IN (:...facilityRoles)) OR role.name = :superAdminRole)',
+        {
+          facilityId,
+          facilityRoles: [RoleEnum.ADMIN, RoleEnum.STAFF, RoleEnum.NURSE],
+          superAdminRole: RoleEnum.SUPER_ADMIN,
+        },
+      )
+      .getRawMany<{ staffId: string | number }>();
+
+    return Array.from(new Set(rows.map((row) => String(row.staffId)).filter(Boolean)));
+  }
+
+  private async getAppointmentNotificationDetails(appointmentId: string) {
+    return this.dataSource
+      .createQueryBuilder()
+      .select('appointment.id', 'appointmentId')
+      .addSelect('appointment.facility_id', 'facilityId')
+      .addSelect('appointment.doctor_id', 'doctorId')
+      .addSelect('appointment.scheduled_start', 'scheduledStart')
+      .addSelect('patient.name', 'patientName')
+      .addSelect('patient.phone', 'patientPhone')
+      .addSelect('service.name', 'serviceName')
+      .addSelect('facility.name', 'facilityName')
+      .from('appointments', 'appointment')
+      .leftJoin('users', 'patient', 'patient.id = appointment.patient_id')
+      .leftJoin('services', 'service', 'service.id = appointment.service_id')
+      .leftJoin('facilities', 'facility', 'facility.id = appointment.facility_id')
+      .where('appointment.id = :appointmentId', { appointmentId })
+      .getRawOne<{
+        appointmentId: string;
+        facilityId: string;
+        doctorId: string;
+        scheduledStart: string | Date;
+        patientName?: string | null;
+        patientPhone?: string | null;
+        serviceName?: string | null;
+        facilityName?: string | null;
+      }>();
+  }
+
+  private async getServiceItemNotificationDetails(itemId: string) {
+    return this.dataSource
+      .createQueryBuilder()
+      .select('item.id', 'itemId')
+      .addSelect('item.doctor_id', 'doctorId')
+      .addSelect('patient.name', 'patientName')
+      .addSelect('service.name', 'serviceName')
+      .from('appointment_service_items', 'item')
+      .leftJoin('appointments', 'appointment', 'appointment.id = item.appointment_id')
+      .leftJoin('users', 'patient', 'patient.id = appointment.patient_id')
+      .leftJoin('services', 'service', 'service.id = item.service_id')
+      .where('item.id = :itemId', { itemId })
+      .getRawOne<{
+        itemId: string;
+        doctorId: string | null;
+        patientName?: string | null;
+        serviceName?: string | null;
+      }>();
+  }
+
+  private formatNotificationDateTime(value?: string | Date | null) {
+    if (!value) return 'chưa rõ thời gian';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(
+      2,
+      '0',
+    )}/${date.getFullYear()} ${String(date.getHours()).padStart(2, '0')}:${String(
+      date.getMinutes(),
+    ).padStart(2, '0')}`;
+  }
+
+  private getErrorMessage(error: unknown) {
+    return error instanceof Error ? error.message : String(error);
   }
 }

@@ -46,9 +46,9 @@ export class Facility {
   @Column({ name: 'code', type: 'varchar', length: 50 })
   code: string;
 
-  @ApiProperty({ type: String })
-  @Column({ name: 'owner_id', type: 'bigint' })
-  ownerId: string;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @Column({ name: 'owner_id', type: 'bigint', nullable: true })
+  ownerId: string | null;
 
   @ApiProperty({ type: String })
   @Column({ name: 'phone', type: 'varchar', length: 20 })

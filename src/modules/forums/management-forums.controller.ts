@@ -25,6 +25,13 @@ import { UpdateForumCommentDto } from './dto/requests/update-forum-comment.dto';
 import { ForumReportsService } from './forum-reports.service';
 import { ForumsService } from './forums.service';
 
+const forumReportManagerRoles = [
+  RoleEnum.SUPER_ADMIN,
+  RoleEnum.ADMIN,
+  RoleEnum.MODERATOR,
+  RoleEnum.STAFF,
+];
+
 @ApiTags('Management - Forums')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
@@ -151,21 +158,24 @@ export class ManagementForumsController {
   }
 
   @Get('reports')
-  @Permissions(PermissionEnum.FORUM_REPORT_VIEW)
+  @Roles(...forumReportManagerRoles)
+  @Permissions(PermissionEnum.FORUM_VIEW)
   @ApiOperation({ summary: 'List content reports' })
   async getReports(@Query() query: ForumReportQueryDto) {
     return { message: 'Thành công', data: await this.forumReportsService.findReports(query) };
   }
 
   @Get('reports/groups')
-  @Permissions(PermissionEnum.FORUM_REPORT_VIEW)
+  @Roles(...forumReportManagerRoles)
+  @Permissions(PermissionEnum.FORUM_VIEW)
   @ApiOperation({ summary: 'List content reports grouped by reported content' })
   async getReportGroups(@Query() query: ForumReportQueryDto) {
     return { message: 'Thành công', data: await this.forumReportsService.findReportGroups(query) };
   }
 
   @Patch('reports/groups/:targetType/:targetId/resolve')
-  @Permissions(PermissionEnum.FORUM_REPORT_RESOLVE)
+  @Roles(...forumReportManagerRoles)
+  @Permissions(PermissionEnum.FORUM_MODERATE)
   @ApiOperation({ summary: 'Resolve all reports of the same post/comment' })
   async resolveReportGroup(
     @CurrentUser() user: AuthenticatedUser,
@@ -180,7 +190,8 @@ export class ManagementForumsController {
   }
 
   @Patch('reports/:id/resolve')
-  @Permissions(PermissionEnum.FORUM_REPORT_RESOLVE)
+  @Roles(...forumReportManagerRoles)
+  @Permissions(PermissionEnum.FORUM_MODERATE)
   @ApiOperation({ summary: 'Resolve content report' })
   async resolveReport(
     @CurrentUser() user: AuthenticatedUser,

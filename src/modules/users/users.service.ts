@@ -24,6 +24,7 @@ import { UserAuthRepository } from '../auth/repositories/user-auth.repository';
 import { UpdatePregnantUserDto } from './dto/request/update-pregnant-user.dto';
 import { JobsService } from '../jobs/jobs.service';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
+import { RoleEnum } from '../../common/constants/role.enum';
 
 @Injectable()
 export class UsersService implements IUsersService {
@@ -236,7 +237,21 @@ export class UsersService implements IUsersService {
     return this.usersRepository.searchUsers(query);
   }
 
-  async findAllNoPregnant(doctorId: string): Promise<User[]> {
-    return this.usersRepository.findAllNoPregnant(doctorId);
+  async findAllNoPregnant(query: SearchUserDto, actor: AuthenticatedUser): Promise<User[]> {
+    const roleNames = new Set([
+      ...(actor.roles ?? []).map((role) => role.name),
+      ...(actor.facilities ?? []).flatMap((facility) => [
+        ...(facility.roles ?? []).map((role) => role.name),
+        facility.role?.name,
+      ]),
+    ].filter(Boolean));
+    const doctorId = roleNames.has(RoleEnum.DOCTOR) ? actor.id : undefined;
+    const facilityId = isSuperAdmin(actor) ? query.facilityId : getActiveFacilityId(actor) ?? undefined;
+
+    return this.usersRepository.findAllNoPregnant({
+      ...query,
+      doctorId,
+      facilityId,
+    });
   }
 }

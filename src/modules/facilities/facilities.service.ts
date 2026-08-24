@@ -195,7 +195,7 @@ export class FacilitiesService {
 
   // Xóa ngày đóng cửa của cơ sở y tế
   //kiểm tra chủ cơ sở tồn tại
-  private async ensureOwnerCanManageFacility(ownerId?: string): Promise<void> {
+  private async ensureOwnerCanManageFacility(ownerId?: string | null): Promise<void> {
     if (!ownerId) return;
 
     const ownerExists = await this.facilitiesRepository.existsActiveOwner(ownerId);
