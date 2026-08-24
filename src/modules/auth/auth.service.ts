@@ -186,12 +186,11 @@ export class AuthService {
   async login(dto: LoginDto): Promise<AuthResponseDto> {
     const user = await this.userAuthRepository.findByEmail(dto.email.toString().toLowerCase());
 
-    if (
-      !user ||
-      user.status !== AccountStatus.ACTIVE ||
-      user.user?.status !== AccountStatus.ACTIVE
-    ) {
+    if (!user) {
       throw new UnauthorizedException(RESPONSE_MESSAGES.AUTH_INVALID_CREDENTIALS);
+    }
+    if (user.status !== AccountStatus.ACTIVE || user.user?.status !== AccountStatus.ACTIVE) {
+      throw new UnauthorizedException(RESPONSE_MESSAGES.AUTH_USER_INACTIVE);
     }
 
     const isValidPassword = await bcrypt.compare(dto.password, user.password);
@@ -233,8 +232,11 @@ export class AuthService {
 
   async managementLogin(dto: LoginDto): Promise<AuthResponseDto> {
     const staff = await this.staffRepository.findByEmail(dto.email);
-    if (!staff || staff.status !== AccountStatus.ACTIVE) {
+    if (!staff) {
       throw new UnauthorizedException(RESPONSE_MESSAGES.AUTH_INVALID_CREDENTIALS);
+    }
+    if (staff.status !== AccountStatus.ACTIVE) {
+      throw new UnauthorizedException(RESPONSE_MESSAGES.AUTH_STAFF_INACTIVE);
     }
     if (!staff.password) {
       throw new UnauthorizedException(RESPONSE_MESSAGES.AUTH_PASSWORD_LOGIN_NOT_CONFIGURED);
