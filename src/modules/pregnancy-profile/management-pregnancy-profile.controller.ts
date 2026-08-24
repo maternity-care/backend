@@ -22,6 +22,8 @@ import { UpdatePregnancyProfileDto } from './dto/request/update-pregnancy-profil
 import { PregnancyProfileResponseDto } from './dto/response/pregnancy-profile-response.dto';
 import { PermissionEnum } from '../../common/constants/permission.enum';
 import { SearchProfileQueryDto } from './dto/request/search-pregnancy-profiles.dto';
+import { RoleEnum } from '../../common/constants/role.enum';
+import { PregnancyProfile } from './entities/pregnancy-profile.entity';
 
 @ApiTags('Management - Pregnancy Profiles')
 @ApiBearerAuth()
@@ -29,6 +31,47 @@ import { SearchProfileQueryDto } from './dto/request/search-pregnancy-profiles.d
 @Controller('management/pregnancy-profiles')
 export class ManagementPregnancyProfileController {
   constructor(private readonly pregnancyProfileService: PregnancyProfileService) {}
+
+  private getRoleNames(user: AuthenticatedUser): string[] {
+    return [
+      ...(user.roles ?? []),
+      ...(user.facilityRoles ?? []),
+      user.facilityRole,
+      ...(user.facilities ?? []).flatMap((facility) => [
+        ...(facility.roles ?? []),
+        facility.role,
+      ]),
+    ]
+      .filter((role): role is NonNullable<typeof role> => Boolean(role))
+      .map((role) => role.name);
+  }
+
+  private shouldHideMedicalRecords(user: AuthenticatedUser): boolean {
+    const roles = new Set(this.getRoleNames(user));
+
+    return (
+      roles.has(RoleEnum.STAFF) &&
+      !roles.has(RoleEnum.DOCTOR) &&
+      !roles.has(RoleEnum.ADMIN) &&
+      !roles.has(RoleEnum.SUPER_ADMIN)
+    );
+  }
+
+  private stripMedicalRecordsForStaff<T extends PregnancyProfile | PregnancyProfile[]>(
+    value: T,
+    user: AuthenticatedUser,
+  ): T {
+    if (!this.shouldHideMedicalRecords(user)) {
+      return value;
+    }
+
+    const strip = (profile: PregnancyProfile): PregnancyProfile => ({
+      ...profile,
+      medicalRecords: [],
+    });
+
+    return (Array.isArray(value) ? value.map(strip) : strip(value)) as T;
+  }
 
   @Post('patients/:patientId')
   @Permissions(PermissionEnum.PREGNANCY_CREATE)
@@ -47,27 +90,42 @@ export class ManagementPregnancyProfileController {
   @Permissions(PermissionEnum.PREGNANCY_VIEW)
   @ApiOperation({ summary: 'List pregnancy profiles' })
   @ApiResponse({ status: 200, type: [PregnancyProfileResponseDto] })
-  async findAll(@Query() query: SearchProfileQueryDto) {
+  async findAll(@CurrentUser() user: AuthenticatedUser, @Query() query: SearchProfileQueryDto) {
     const profiles = await this.pregnancyProfileService.searchProfiles(query);
-    return { message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.GET_LIST_SUCCESS, data: profiles };
+    return {
+      message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.GET_LIST_SUCCESS,
+      data: {
+        ...profiles,
+        data: this.stripMedicalRecordsForStaff(profiles.data, user),
+      },
+    };
   }
 
   @Get('patients/:patientId')
   @Permissions(PermissionEnum.PREGNANCY_VIEW)
   @ApiOperation({ summary: 'List pregnancy profiles for a patient' })
   @ApiResponse({ status: 200, type: [PregnancyProfileResponseDto] })
-  async findByPatientId(@Param('patientId') patientId: string) {
+  async findByPatientId(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('patientId') patientId: string,
+  ) {
     const profiles = await this.pregnancyProfileService.findByPatientId(patientId);
-    return { message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.GET_SUCCESS, data: profiles };
+    return {
+      message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.GET_SUCCESS,
+      data: this.stripMedicalRecordsForStaff(profiles, user),
+    };
   }
 
   @Get(':id')
   @Permissions(PermissionEnum.PREGNANCY_VIEW)
   @ApiOperation({ summary: 'Get pregnancy profile detail' })
   @ApiResponse({ status: 200, type: PregnancyProfileResponseDto })
-  async findOne(@Param('id') id: string) {
+  async findOne(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     const profile = await this.pregnancyProfileService.findById(id);
-    return { message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.GET_SUCCESS, data: profile };
+    return {
+      message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.GET_SUCCESS,
+      data: this.stripMedicalRecordsForStaff(profile, user),
+    };
   }
 
   @Patch(':id')
