@@ -46,8 +46,8 @@ export class FacilityResponseDto {
   @ApiProperty()
   code: string;
 
-  @ApiProperty()
-  ownerId: string;
+  @ApiPropertyOptional({ nullable: true })
+  ownerId?: string | null;
 
   @ApiPropertyOptional()
   ownerName?: string;

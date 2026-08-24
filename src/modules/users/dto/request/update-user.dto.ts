@@ -8,6 +8,7 @@ import {
   IsOptional,
   Matches,
   IsString,
+  MinLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -30,6 +31,12 @@ export class UpdateUserDto {
   @IsString()
   @IsOptional()
   avatar?: string;
+
+  @ApiPropertyOptional({ minLength: 6 })
+  @IsString()
+  @MinLength(6)
+  @IsOptional()
+  password?: string;
 
   @ApiPropertyOptional()
   @Matches(/^(?:\+84|0)[35789]\d{8}$/, {

@@ -249,6 +249,12 @@ export class StaffManagementService {
     staff.phone = dto.phone ?? staff.phone;
     staff.status = dto.status ?? staff.status;
     staff.avatar = dto.avatar ?? staff.avatar;
+    if (dto.password?.trim()) {
+      staff.password = await bcrypt.hash(
+        dto.password.trim(),
+        this.configService.getOrThrow<number>('bcrypt.saltRounds'),
+      );
+    }
     await this.staffProfileRepository.save(staff);
     await this.syncPermissionOverrides(staff.id, dto.permissionOverrides);
 

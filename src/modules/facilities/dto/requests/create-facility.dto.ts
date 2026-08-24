@@ -39,10 +39,11 @@ export class CreateFacilityDto {
   @MaxLength(255)
   name: string;
 
-  @ApiProperty({ example: '1', description: 'Staff id cua nguoi phu trach/chu co so' })
+  @ApiPropertyOptional({ example: '1', nullable: true, description: 'Staff id cua nguoi phu trach/chu co so' })
+  @IsOptional()
   @IsString()
   @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.FACILITIES.OWNER_ID_INVALID })
-  ownerId: string;
+  ownerId?: string | null;
 
   @ApiProperty({ example: '02873001234' })
   @Transform(({ value }) => trimValue(value))
