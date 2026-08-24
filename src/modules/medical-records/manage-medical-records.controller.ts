@@ -11,6 +11,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { RoleEnum } from '../../common/constants/role.enum';
+import { RolesGuard } from '../../common/guards/roles.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateMedicalRecordDto } from './dto/requests/create-medical-record.dto';
 import { ListPendingMedicalFilesDto } from './dto/requests/pending-medical-file.dto';
@@ -22,7 +25,8 @@ import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interfa
 
 @ApiTags('Management - Medical Records')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(RoleEnum.SUPER_ADMIN, RoleEnum.ADMIN, RoleEnum.DOCTOR)
 @Controller('management/medical-records')
 export class MedicalRecordsController {
   constructor(private readonly service: MedicalRecordsService) {}
