@@ -135,7 +135,7 @@ export class StaffManagementService {
 
   async create(dto: AdminCreateUserDto, actor: AuthenticatedUser) {
     this.assertSingleFacilityAssignment(dto.facilityAssignments);
-    this.assertNoSuperAdminAssignment(dto.facilityAssignments);
+    this.assertCanAssignSuperAdmin(dto.facilityAssignments, actor);
     const facilityAssignments = this.getScopedAssignments(dto.facilityAssignments, actor);
     const assignments = await this.resolveFacilityAssignments(facilityAssignments);
     const hasDoctorRole = facilityAssignments.some((assignment) =>
@@ -217,7 +217,7 @@ export class StaffManagementService {
     await this.assertStaffAccess(id, actor);
     if (dto.facilityAssignments) {
       this.assertSingleFacilityAssignment(dto.facilityAssignments);
-      this.assertNoSuperAdminAssignment(dto.facilityAssignments);
+      this.assertCanAssignSuperAdmin(dto.facilityAssignments, actor);
     }
     const facilityAssignments = dto.facilityAssignments
       ? this.getScopedAssignments(dto.facilityAssignments, actor)
@@ -422,13 +422,16 @@ export class StaffManagementService {
     return (staff.roles ?? []).some((role) => role.name === roleName);
   }
 
-  private assertNoSuperAdminAssignment(assignments?: FacilityStaffAssignmentDto[]): void {
-    if (
-      assignments?.some((assignment) =>
-        assignment.roles.some((role) => String(role) === RoleEnum.SUPER_ADMIN),
-      )
-    ) {
-      throw new ForbiddenException('Không được gán Super Admin từ màn quản lý nhân viên.');
+  private assertCanAssignSuperAdmin(
+    assignments: FacilityStaffAssignmentDto[] | undefined,
+    actor: AuthenticatedUser,
+  ): void {
+    const hasSuperAdmin = assignments?.some((assignment) =>
+      assignment.roles.some((role) => String(role) === RoleEnum.SUPER_ADMIN),
+    );
+
+    if (hasSuperAdmin && !isSuperAdmin(actor)) {
+      throw new ForbiddenException('Chỉ Super Admin mới được gán vai trò Super Admin.');
     }
   }
 
@@ -535,6 +538,7 @@ export class StaffManagementService {
 
   private getPositionCodePrefix(assignments: FacilityStaffAssignmentDto[]): string {
     const roles = new Set(assignments.flatMap((assignment) => assignment.roles));
+    if (roles.has(RoleEnum.SUPER_ADMIN)) return 'SA';
     if (roles.has(RoleEnum.ADMIN)) return 'AD';
     if (roles.has(RoleEnum.DOCTOR)) return 'DR';
     if (roles.has(RoleEnum.NURSE)) return 'NU';

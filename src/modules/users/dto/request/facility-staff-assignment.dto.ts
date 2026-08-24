@@ -12,5 +12,11 @@ export class FacilityStaffAssignmentDto {
   @IsArray()
   @ArrayNotEmpty()
   @IsIn(STAFF_POSITION_ROLES, { each: true })
-  roles: Array<RoleEnum.ADMIN | RoleEnum.DOCTOR | RoleEnum.NURSE | RoleEnum.STAFF>;
+  roles: Array<
+    | RoleEnum.SUPER_ADMIN
+    | RoleEnum.ADMIN
+    | RoleEnum.DOCTOR
+    | RoleEnum.NURSE
+    | RoleEnum.STAFF
+  >;
 }

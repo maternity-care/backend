@@ -15,6 +15,7 @@ import { Type } from 'class-transformer';
 import { RoleEnum } from '../../../../common/constants/role.enum';
 
 export const STAFF_POSITION_ROLES = [
+  RoleEnum.SUPER_ADMIN,
   RoleEnum.ADMIN,
   RoleEnum.DOCTOR,
   RoleEnum.NURSE,
@@ -28,7 +29,12 @@ export class CreateStaffProfileDto {
 
   @ApiProperty({ enum: STAFF_POSITION_ROLES })
   @IsIn(STAFF_POSITION_ROLES)
-  position: RoleEnum.ADMIN | RoleEnum.DOCTOR | RoleEnum.NURSE | RoleEnum.STAFF;
+  position:
+    | RoleEnum.SUPER_ADMIN
+    | RoleEnum.ADMIN
+    | RoleEnum.DOCTOR
+    | RoleEnum.NURSE
+    | RoleEnum.STAFF;
 
   @ApiProperty({ type: [String] })
   @IsArray()
