@@ -45,6 +45,7 @@ type FacebookOAuthSession = {
 const GRAPH_VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v20.0';
 const GRAPH_BASE_URL = `https://graph.facebook.com/${GRAPH_VERSION}`;
 const OAUTH_SESSION_TTL_MS = 10 * 60 * 1000;
+const FACEBOOK_TEXT_CHUNK_SIZE = 1800;
 
 @Injectable()
 export class FacebookPageRuntimeService implements OnModuleInit {
@@ -215,22 +216,26 @@ export class FacebookPageRuntimeService implements OnModuleInit {
     const cleanContent = content.trim();
 
     if (cleanContent) {
-      responses.push(await this.sendGraphMessage(credentials, recipientId, {
-        recipient: { id: recipientId },
-        messaging_type: 'RESPONSE',
-        message: {
-          text: cleanContent,
-          ...(quickReplies.length > 0
-            ? {
-              quick_replies: quickReplies.slice(0, 11).map((reply) => ({
-                content_type: 'text',
-                title: reply.title.slice(0, 20),
-                payload: reply.payload,
-              })),
-            }
-            : {}),
-        },
-      }));
+      const chunks = this.splitText(cleanContent, FACEBOOK_TEXT_CHUNK_SIZE);
+      for (const [index, text] of chunks.entries()) {
+        const isLastTextChunk = index === chunks.length - 1;
+        responses.push(await this.sendGraphMessage(credentials, recipientId, {
+          recipient: { id: recipientId },
+          messaging_type: 'RESPONSE',
+          message: {
+            text,
+            ...(isLastTextChunk && quickReplies.length > 0
+              ? {
+                quick_replies: quickReplies.slice(0, 11).map((reply) => ({
+                  content_type: 'text',
+                  title: reply.title.slice(0, 20),
+                  payload: reply.payload,
+                })),
+              }
+              : {}),
+          },
+        }));
+      }
     }
 
     if (attachment?.url) {
@@ -429,6 +434,21 @@ export class FacebookPageRuntimeService implements OnModuleInit {
       throw new Error(message);
     }
     return data ?? { recipientId };
+  }
+
+  private splitText(content: string, maxLength: number): string[] {
+    if (content.length <= maxLength) return [content];
+    const chunks: string[] = [];
+    let remaining = content.trim();
+    while (remaining.length > maxLength) {
+      const window = remaining.slice(0, maxLength);
+      const splitAt = Math.max(window.lastIndexOf('\n'), window.lastIndexOf(' '));
+      const nextIndex = splitAt > Math.floor(maxLength * 0.6) ? splitAt : maxLength;
+      chunks.push(remaining.slice(0, nextIndex).trim());
+      remaining = remaining.slice(nextIndex).trim();
+    }
+    if (remaining) chunks.push(remaining);
+    return chunks;
   }
 
   private async subscribePage(credentials: FacebookPageCredentials): Promise<void> {

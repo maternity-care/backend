@@ -70,6 +70,7 @@ type ProxyAgentConstructor = new (proxy: string) => unknown;
 const DEFAULT_ZALO_WEB_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
 const ZALO_LOGIN_TIMEOUT_MS = 120000;
+const ZALO_TEXT_CHUNK_SIZE = 1800;
 
 @Injectable()
 export class ZaloPersonalRuntimeService implements OnModuleInit {
@@ -184,7 +185,11 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
     content: string,
     attachment?: ZaloAttachmentInput | null,
   ): Promise<unknown> {
-    const session = this.sessions.get(accountId);
+    let session = this.sessions.get(accountId);
+    if (!session) {
+      await this.start(accountId);
+      session = this.sessions.get(accountId);
+    }
     if (!session) throw new Error('Zalo account chưa chạy. Hãy start account trước khi gửi.');
     const source = attachment ? await this.buildAttachmentSource(attachment) : null;
     const clientIds: string[] = [];
@@ -195,11 +200,24 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
       return value;
     };
     try {
-      const response = await session.api.sendMessage(
-        source ? { msg: content, attachments: source } : { msg: content },
-        externalThreadId,
-        externalThreadType === 'group' ? 1 : 0,
-      );
+      const chunks = this.splitText(content.trim(), ZALO_TEXT_CHUNK_SIZE);
+      const responses: unknown[] = [];
+      for (const [index, chunk] of chunks.entries()) {
+        const isLastTextChunk = index === chunks.length - 1;
+        responses.push(await session.api.sendMessage(
+          source && isLastTextChunk ? { msg: chunk, attachments: source } : { msg: chunk },
+          externalThreadId,
+          externalThreadType === 'group' ? 1 : 0,
+        ));
+      }
+      if (source && chunks.length === 0) {
+        responses.push(await session.api.sendMessage(
+          { msg: '', attachments: source },
+          externalThreadId,
+          externalThreadType === 'group' ? 1 : 0,
+        ));
+      }
+      const response = responses.length === 1 ? responses[0] : { responses };
       return {
         ...(typeof response === 'object' && response !== null ? response as Record<string, unknown> : { response }),
         _clientIds: clientIds,
@@ -208,6 +226,22 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
     } finally {
       Date.now = originalDateNow;
     }
+  }
+
+  private splitText(content: string, maxLength: number): string[] {
+    if (!content) return [];
+    if (content.length <= maxLength) return [content];
+    const chunks: string[] = [];
+    let remaining = content;
+    while (remaining.length > maxLength) {
+      const window = remaining.slice(0, maxLength);
+      const splitAt = Math.max(window.lastIndexOf('\n'), window.lastIndexOf(' '));
+      const nextIndex = splitAt > Math.floor(maxLength * 0.6) ? splitAt : maxLength;
+      chunks.push(remaining.slice(0, nextIndex).trim());
+      remaining = remaining.slice(nextIndex).trim();
+    }
+    if (remaining.trim()) chunks.push(remaining.trim());
+    return chunks;
   }
 
   async undoMessage(
