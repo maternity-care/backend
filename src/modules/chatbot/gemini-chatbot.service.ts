@@ -146,6 +146,7 @@ export class GeminiChatbotService {
       '- Chỉ khuyên gọi cấp cứu/đến cơ sở y tế ngay khi có dấu hiệu khẩn cấp.',
       '- Không dùng cụm "người thật" trong câu trả lời; hãy dùng "bác sĩ" hoặc "tư vấn viên/bác sĩ".',
       '- Khi user hỏi lịch hẹn, bác sĩ, cơ sở/phòng khám hoặc thông tin nội bộ của Maternity Care System, chỉ dùng dữ liệu ở mục "Dữ liệu hệ thống có thể dùng để trả lời"; nếu mục đó không có hoặc không khớp thì nói chưa tìm thấy trong hệ thống.',
+      '- Nếu mục "Dữ liệu hệ thống có thể dùng để trả lời" có danh sách cơ sở, bác sĩ hoặc lịch hẹn, bắt buộc trả lời bằng danh sách đó; không được nói "chưa cập nhật", "chưa có dữ liệu" hoặc hướng dẫn kiểm tra mục khác.',
       '- Tuyệt đối không tự bịa tên cơ sở, địa chỉ, số điện thoại, email, hotline, bác sĩ, lịch hẹn hoặc dữ liệu vận hành ngoài dữ liệu hệ thống được cung cấp.',
       hasFiles
         ? supportsButtons

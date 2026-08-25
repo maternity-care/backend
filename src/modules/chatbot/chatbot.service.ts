@@ -37,6 +37,13 @@ const STAFF_CLAIM_TIMEOUT_MS = 5 * 60 * 1000;
 const USER_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_HISTORY_LIMIT = 20;
 const MAX_HISTORY_LIMIT = 50;
+const CHATBOT_TIME_ZONE = 'Asia/Ho_Chi_Minh';
+
+interface ChatbotDateRange {
+  label: string;
+  start: string;
+  end: string;
+}
 
 @Injectable()
 export class ChatbotService {
@@ -621,9 +628,6 @@ export class ChatbotService {
     const wantsAppointment = this.includesAny(normalized, [
       'lich',
       'hen',
-      'bac si',
-      'bsi',
-      'bs ',
       'ca kham',
       'dat lich',
     ]);
@@ -639,6 +643,8 @@ export class ChatbotService {
     if (!wantsFacility && !wantsAppointment && !wantsDoctor) return null;
 
     const scopedFacilityIds = this.resolveRequesterFacilityIds(requester);
+    const dateRange = this.resolveChatbotDateRange(normalized);
+    const requesterUserId = this.resolveRequesterUserId(requester);
     const sections: string[] = [];
 
     if (wantsFacility) {
@@ -648,7 +654,7 @@ export class ChatbotService {
       }
       sections.push(
         [
-          'Cơ sở/phòng khám:',
+          'Cơ sở/phòng khám lấy trực tiếp từ database MariaDB:',
           facilities.length > 0
             ? facilities.map((facility, index) => {
               const address = [facility.address, facility.ward, facility.province].filter(Boolean).join(', ');
@@ -666,7 +672,7 @@ export class ChatbotService {
       }
       sections.push(
         [
-          'Bác sĩ trong hệ thống:',
+          'Bác sĩ lấy trực tiếp từ database MariaDB:',
           doctors.length > 0
             ? doctors.map((doctor, index) => {
               const fullName = [doctor.title, doctor.name].filter(Boolean).join(' ');
@@ -682,11 +688,22 @@ export class ChatbotService {
     }
 
     if (wantsAppointment) {
-      const appointments = await this.loadAppointmentContext(scopedFacilityIds);
+      const appointmentRequesterId =
+        requesterUserId && scopedFacilityIds.length === 0 ? requesterUserId : null;
+      const cannotLookupAppointments =
+        scopedFacilityIds.length === 0 && !appointmentRequesterId;
+      const appointments = cannotLookupAppointments
+        ? []
+        : await this.loadAppointmentContext(scopedFacilityIds, {
+          patientId: appointmentRequesterId,
+          dateRange,
+        });
       sections.push(
         [
-          'Lịch hẹn gần đây/sắp tới:',
-          appointments.length > 0
+          `Lịch hẹn lấy trực tiếp từ database MariaDB${dateRange ? ` (${dateRange.label})` : ' (7 ngày gần đây đến 30 ngày tới)'}:`,
+          cannotLookupAppointments
+            ? 'Không thể tra lịch hẹn khi chưa đăng nhập hoặc chưa chọn cơ sở phù hợp.'
+            : appointments.length > 0
             ? appointments.map((appointment, index) => {
               const doctor = [appointment.doctorTitle, appointment.doctorName].filter(Boolean).join(' ');
               return `${index + 1}. Lịch #${appointment.id} - ${appointment.date} ${appointment.startTime}-${appointment.endTime}; Bác sĩ: ${doctor || 'chưa gắn'}; Dịch vụ: ${appointment.serviceName || 'chưa có'}; Cơ sở: ${appointment.facilityName || 'chưa có'}; Phòng: ${appointment.roomName || 'chưa có'}; Trạng thái: ${appointment.status || 'chưa rõ'}.`;
@@ -696,7 +713,11 @@ export class ChatbotService {
       );
     }
 
-    return sections.join('\n\n').slice(0, 6000);
+    sections.push(
+      'Quy tắc trả lời: nếu danh sách trên có dữ liệu thì phải trả lời bằng dữ liệu đó, không được nói hệ thống chưa cập nhật/chưa có dữ liệu. Không bịa thêm cơ sở, bác sĩ, lịch hẹn ngoài danh sách.',
+    );
+
+    return sections.join('\n\n').slice(0, 7000);
   }
 
   private resolveRequesterFacilityIds(requester?: ChatbotRequester): string[] {
@@ -747,7 +768,13 @@ export class ChatbotService {
     );
   }
 
-  private async loadAppointmentContext(scopedFacilityIds: string[]): Promise<Array<{
+  private async loadAppointmentContext(
+    scopedFacilityIds: string[],
+    options: {
+      patientId?: string | null;
+      dateRange?: ChatbotDateRange | null;
+    } = {},
+  ): Promise<Array<{
     id: string;
     date: string;
     startTime: string;
@@ -760,10 +787,21 @@ export class ChatbotService {
     doctorName: string | null;
   }>> {
     const params: unknown[] = [];
+    const dateRangeSql = options.dateRange
+      ? 'appointment.scheduled_start >= ? AND appointment.scheduled_start < ?'
+      : 'appointment.scheduled_start >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND appointment.scheduled_start < DATE_ADD(CURDATE(), INTERVAL 31 DAY)';
+    if (options.dateRange) {
+      params.push(options.dateRange.start, options.dateRange.end);
+    }
     let scopeSql = '';
     if (scopedFacilityIds.length > 0) {
       scopeSql = `AND appointment.facility_id IN (${scopedFacilityIds.map(() => '?').join(',')})`;
       params.push(...scopedFacilityIds);
+    }
+    let patientSql = '';
+    if (options.patientId) {
+      patientSql = 'AND appointment.patient_id = ?';
+      params.push(options.patientId);
     }
 
     return this.dataSource.query(
@@ -785,9 +823,9 @@ export class ChatbotService {
         LEFT JOIN rooms room ON room.id = appointment.room_id
         LEFT JOIN staffs staff ON staff.id = appointment.doctor_id
         LEFT JOIN doctors doctor ON doctor.staff_id = staff.id
-        WHERE appointment.scheduled_start >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-          AND appointment.scheduled_start < DATE_ADD(CURDATE(), INTERVAL 31 DAY)
+        WHERE ${dateRangeSql}
           ${scopeSql}
+          ${patientSql}
         ORDER BY appointment.scheduled_start ASC
         LIMIT 30
       `,
@@ -841,6 +879,55 @@ export class ChatbotService {
       .replace(/đ/g, 'd')
       .replace(/Đ/g, 'D')
       .toLowerCase();
+  }
+
+  private resolveRequesterUserId(requester?: ChatbotRequester): string | null {
+    const id = String(requester?.id ?? '').trim();
+    return /^\d+$/.test(id) ? id : null;
+  }
+
+  private resolveChatbotDateRange(normalized: string): ChatbotDateRange | null {
+    if (this.includesAny(normalized, ['hom nay', 'today'])) {
+      const today = this.formatVietnamDate(new Date());
+      const tomorrow = this.addDaysToDateString(today, 1);
+      return {
+        label: `hôm nay ${this.formatDisplayDate(today)}`,
+        start: `${today} 00:00:00`,
+        end: `${tomorrow} 00:00:00`,
+      };
+    }
+
+    if (this.includesAny(normalized, ['ngay mai', 'tomorrow'])) {
+      const tomorrow = this.addDaysToDateString(this.formatVietnamDate(new Date()), 1);
+      const dayAfterTomorrow = this.addDaysToDateString(tomorrow, 1);
+      return {
+        label: `ngày mai ${this.formatDisplayDate(tomorrow)}`,
+        start: `${tomorrow} 00:00:00`,
+        end: `${dayAfterTomorrow} 00:00:00`,
+      };
+    }
+
+    return null;
+  }
+
+  private formatVietnamDate(date: Date): string {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: CHATBOT_TIME_ZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
+  }
+
+  private addDaysToDateString(dateString: string, days: number): string {
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day + days));
+    return date.toISOString().slice(0, 10);
+  }
+
+  private formatDisplayDate(dateString: string): string {
+    const [year, month, day] = dateString.split('-');
+    return `${day}/${month}/${year}`;
   }
 
   private getGeminiReadableFiles(payload: ChatbotMessagePayload): Array<{ url: string; mimeType: string }> {
