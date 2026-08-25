@@ -64,6 +64,7 @@ export const RESPONSE_MESSAGES = {
     NOT_FOUND_IN_FACILITY: 'Không tìm thấy lịch đặt khám trong cơ sở hiện tại.',
     CHECK_IN_STATUS_INVALID: 'Lịch này không thể check-in.',
     PROFILE_NOT_BELONG_TO_PATIENT: 'Hồ sơ thai kỳ không thuộc user đặt lịch.',
+    PROFILE_NOT_ACTIVE: 'Hồ sơ thai kỳ đã kết thúc hoặc không còn hoạt động.',
     SLOT_OUTSIDE_SHIFT: 'Slot đã chọn không nằm trong ca trực của bác sĩ.',
     DOCTOR_SHIFT_MISMATCH: 'Bác sĩ đã chọn không khớp với ca trực.',
     DOCTOR_SPECIALTY_MISMATCH: 'Bác sĩ đã chọn không đúng chuyên khoa của dịch vụ.',

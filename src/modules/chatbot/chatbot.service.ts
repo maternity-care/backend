@@ -157,7 +157,10 @@ export class ChatbotService {
       shouldNotifyStaff = !conversation.assignedStaffId;
     } else if (content || geminiReadableFiles.length > 0) {
       const recentMessages = await this.getLatestMessageEntities(conversation.id, 8);
-      const systemContext = await this.buildSystemLookupContext(content ?? '', payload.requester);
+      const systemContext = await this.buildSystemLookupContext(
+        content ?? '',
+        payload.requester ?? this.getRequester(conversation),
+      );
       const geminiReply = await this.geminiChatbotService.generateReplyWithFiles(
         content ?? '',
         recentMessages.map((message) => this.mapMessageForPrompt(message)),
@@ -639,7 +642,10 @@ export class ChatbotService {
     const sections: string[] = [];
 
     if (wantsFacility) {
-      const facilities = await this.loadFacilityContext(scopedFacilityIds);
+      let facilities = await this.loadFacilityContext(scopedFacilityIds);
+      if (facilities.length === 0 && scopedFacilityIds.length > 0) {
+        facilities = await this.loadFacilityContext([]);
+      }
       sections.push(
         [
           'Cơ sở/phòng khám:',
@@ -654,7 +660,10 @@ export class ChatbotService {
     }
 
     if (wantsDoctor) {
-      const doctors = await this.loadDoctorContext(scopedFacilityIds);
+      let doctors = await this.loadDoctorContext(scopedFacilityIds);
+      if (doctors.length === 0 && scopedFacilityIds.length > 0) {
+        doctors = await this.loadDoctorContext([]);
+      }
       sections.push(
         [
           'Bác sĩ trong hệ thống:',

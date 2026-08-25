@@ -16,6 +16,7 @@ import {
   ActiveStatus,
   AppointmentStatus,
   DoctorShiftStatus,
+  PregnancyProfileStatus,
 } from '../../common/constants/status.enum';
 import { FacilityService } from '../facility-services/entities/facility-service.entity';
 import { Room } from '../rooms/entities/room.entity';
@@ -829,13 +830,17 @@ export class AppointmentsService {
       const profile = await manager
         .createQueryBuilder()
         .select('profile.id', 'id')
+        .addSelect('profile.status', 'status')
         .from('pregnancy_profiles', 'profile')
         .where('profile.id = :profileId', { profileId: dto.pregnancyProfileId })
         .andWhere('profile.patient_id = :patientId', { patientId: appointment.patientId })
         .andWhere('profile.deleted_at IS NULL')
-        .getRawOne<{ id: string }>();
+        .getRawOne<{ id: string; status: PregnancyProfileStatus }>();
       if (!profile)
         throw new BadRequestException(RESPONSE_MESSAGES.APPOINTMENTS.PROFILE_NOT_BELONG_TO_PATIENT);
+      if (profile.status !== PregnancyProfileStatus.ACTIVE) {
+        throw new BadRequestException(RESPONSE_MESSAGES.APPOINTMENTS.PROFILE_NOT_ACTIVE);
+      }
 
       if (dto.doctorId) {
         const shift = await this.findShiftForDoctor(
