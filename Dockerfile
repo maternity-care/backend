@@ -16,4 +16,4 @@ COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=builder /app/dist ./dist
 EXPOSE 84
-CMD ["npm", "run", "start:prod"]
+CMD ["sh", "-c", "npm run migration:run:prod && npm run start:prod"]
