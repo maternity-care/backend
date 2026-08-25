@@ -22,6 +22,12 @@ import {
 } from '../../../../common/helpers/dto-transform.helper';
 import { POSITIVE_ID_PATTERN } from './create-facility.dto';
 
+const normalizeOptionalId = (value: unknown): string | undefined => {
+  if (value === null || value === undefined) return undefined;
+  const normalized = String(value).trim();
+  return normalized.length > 0 ? normalized : undefined;
+};
+
 export class UpdateFacilityDto {
   @ApiPropertyOptional()
   @IsOptional()
@@ -33,6 +39,7 @@ export class UpdateFacilityDto {
   name?: string;
 
   @ApiPropertyOptional()
+  @Transform(({ value }) => normalizeOptionalId(value))
   @IsOptional()
   @IsString()
   @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.FACILITIES.OWNER_ID_INVALID })

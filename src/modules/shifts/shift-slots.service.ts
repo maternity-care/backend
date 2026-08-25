@@ -27,6 +27,8 @@ type OperatingHourLike = {
   isClosed?: boolean;
 };
 
+const MAX_SHIFT_SLOT_DURATION_MINUTES = 24 * 60;
+
 @Injectable()
 export class ShiftSlotsService {
   constructor(
@@ -243,8 +245,8 @@ export class ShiftSlotsService {
       throw new BadRequestException(RESPONSE_MESSAGES.SHIFT_SLOTS.END_TIME_AFTER_START_TIME);
     }
     const duration = getTimeRangeDurationMinutes(normalizedStart, normalizedEnd);
-    if (duration < 15 || duration > 12 * 60) {
-      throw new BadRequestException(RESPONSE_MESSAGES.SHIFTS.DURATION_INVALID);
+    if (duration < 15 || duration > MAX_SHIFT_SLOT_DURATION_MINUTES) {
+      throw new BadRequestException('Thời lượng khung ca phải từ 15 phút đến 24 giờ.');
     }
   }
 
