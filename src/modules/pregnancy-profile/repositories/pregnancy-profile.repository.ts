@@ -50,19 +50,55 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
   }
 
   async findById(id: string): Promise<PregnancyProfile | null> {
-    const profile = await this.repository.findOne({
-      where: { id },
-      relations: this.detailRelations,
-      order: {
-        medicalRecords: {
-          createdAt: 'DESC',
-        },
-      },
-    });
+    const profile = await this.findDetailById(id);
     if (!profile) {
       throw new NotFoundException(RESPONSE_MESSAGES.PREGNANCY_PROFILES.NOT_FOUND);
     }
     return profile;
+  }
+
+  private async findDetailById(id: string): Promise<PregnancyProfile | null> {
+    try {
+      return await this.repository.findOne({
+        where: { id },
+        relations: this.detailRelations,
+        order: {
+          medicalRecords: {
+            createdAt: 'DESC',
+          },
+        },
+      });
+    } catch (error) {
+      if (!this.isMedicalRecordSchemaError(error)) {
+        throw error;
+      }
+
+      const profile = await this.repository.findOne({
+        where: { id },
+        relations: { user: true },
+      });
+
+      if (profile) {
+        profile.medicalRecords = [];
+      }
+
+      return profile;
+    }
+  }
+
+  private isMedicalRecordSchemaError(error: unknown): boolean {
+    const databaseError = error as { code?: string; errno?: number; message?: string };
+    const message = databaseError?.message ?? '';
+
+    return (
+      databaseError?.code === 'ER_BAD_FIELD_ERROR' ||
+      databaseError?.code === 'ER_NO_SUCH_TABLE' ||
+      databaseError?.errno === 1054 ||
+      databaseError?.errno === 1146 ||
+      /medical_records|medicalRecord|is_public|published_at|published_by|Unknown column|doesn't exist/i.test(
+        message,
+      )
+    );
   }
 
   async findByCode(code: string): Promise<PregnancyProfile | null> {

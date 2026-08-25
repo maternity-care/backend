@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { MessagingChannelAccount } from '../messaging/entities/messaging-channel-account.entity';
 import { MessagingConversation } from '../messaging/entities/messaging-conversation.entity';
 import { MessagingCustomerIdentity } from '../messaging/entities/messaging-customer-identity.entity';
@@ -49,6 +49,7 @@ export class ChatbotService {
     private readonly customerIdentityRepository: Repository<MessagingCustomerIdentity>,
     @InjectRepository(MessagingMessage)
     private readonly messageRepository: Repository<MessagingMessage>,
+    private readonly dataSource: DataSource,
     private readonly uploadsService: UploadsService,
     private readonly geminiChatbotService: GeminiChatbotService,
     private readonly events: MessagingEventsService,
@@ -156,6 +157,7 @@ export class ChatbotService {
       shouldNotifyStaff = !conversation.assignedStaffId;
     } else if (content || geminiReadableFiles.length > 0) {
       const recentMessages = await this.getLatestMessageEntities(conversation.id, 8);
+      const systemContext = await this.buildSystemLookupContext(content ?? '', payload.requester);
       const geminiReply = await this.geminiChatbotService.generateReplyWithFiles(
         content ?? '',
         recentMessages.map((message) => this.mapMessageForPrompt(message)),
@@ -164,6 +166,7 @@ export class ChatbotService {
           channel: 'web_chat',
           supportsButtons: true,
           supportsLinks: true,
+          systemContext,
         },
       );
       await this.createMessage(
@@ -595,6 +598,171 @@ export class ChatbotService {
       claimExpiresAt: null,
     };
     return this.conversationRepository.save(conversation);
+  }
+
+  private async buildSystemLookupContext(message: string, requester?: ChatbotRequester): Promise<string | null> {
+    const normalized = this.normalizeSearchText(message);
+    const wantsFacility = this.includesAny(normalized, [
+      'co so',
+      'phong kham',
+      'dia chi',
+      'hotline',
+      'so dien thoai',
+      'sdt',
+      'email',
+      'lien he',
+    ]);
+    const wantsAppointment = this.includesAny(normalized, [
+      'lich',
+      'hen',
+      'bac si',
+      'bsi',
+      'bs ',
+      'ca kham',
+      'dat lich',
+    ]);
+
+    if (!wantsFacility && !wantsAppointment) return null;
+
+    const scopedFacilityIds = this.resolveRequesterFacilityIds(requester);
+    const sections: string[] = [];
+
+    if (wantsFacility) {
+      const facilities = await this.loadFacilityContext(scopedFacilityIds);
+      sections.push(
+        [
+          'Cơ sở/phòng khám:',
+          facilities.length > 0
+            ? facilities.map((facility, index) => {
+              const address = [facility.address, facility.ward, facility.province].filter(Boolean).join(', ');
+              return `${index + 1}. ${facility.name} (${facility.code}) - Địa chỉ: ${address || 'chưa có'}; SĐT/Hotline: ${facility.phone || 'chưa có'}; Email: ${facility.email || 'chưa có'}.`;
+            }).join('\n')
+            : 'Chưa có cơ sở/phòng khám phù hợp trong hệ thống.',
+        ].join('\n'),
+      );
+    }
+
+    if (wantsAppointment) {
+      const appointments = await this.loadAppointmentContext(scopedFacilityIds);
+      sections.push(
+        [
+          'Lịch hẹn gần đây/sắp tới:',
+          appointments.length > 0
+            ? appointments.map((appointment, index) => {
+              const doctor = [appointment.doctorTitle, appointment.doctorName].filter(Boolean).join(' ');
+              return `${index + 1}. Lịch #${appointment.id} - ${appointment.date} ${appointment.startTime}-${appointment.endTime}; Bác sĩ: ${doctor || 'chưa gắn'}; Dịch vụ: ${appointment.serviceName || 'chưa có'}; Cơ sở: ${appointment.facilityName || 'chưa có'}; Phòng: ${appointment.roomName || 'chưa có'}; Trạng thái: ${appointment.status || 'chưa rõ'}.`;
+            }).join('\n')
+            : 'Chưa tìm thấy lịch hẹn phù hợp trong hệ thống.',
+        ].join('\n'),
+      );
+    }
+
+    return sections.join('\n\n').slice(0, 6000);
+  }
+
+  private resolveRequesterFacilityIds(requester?: ChatbotRequester): string[] {
+    const ids = [
+      requester?.activeFacilityId,
+      ...(requester?.facilities?.map((facility) => facility.id) ?? []),
+    ]
+      .map((value) => String(value ?? '').trim())
+      .filter((value) => /^\d+$/.test(value));
+    return Array.from(new Set(ids));
+  }
+
+  private async loadFacilityContext(scopedFacilityIds: string[]): Promise<Array<{
+    id: string;
+    code: string;
+    name: string;
+    phone: string | null;
+    email: string | null;
+    address: string | null;
+    province: string | null;
+    ward: string | null;
+  }>> {
+    const params: unknown[] = [];
+    let scopeSql = '';
+    if (scopedFacilityIds.length > 0) {
+      scopeSql = `AND facility.id IN (${scopedFacilityIds.map(() => '?').join(',')})`;
+      params.push(...scopedFacilityIds);
+    }
+
+    return this.dataSource.query(
+      `
+        SELECT
+          CAST(facility.id AS CHAR) AS id,
+          facility.code AS code,
+          facility.name AS name,
+          facility.phone AS phone,
+          facility.email AS email,
+          facility.address AS address,
+          facility.province AS province,
+          facility.ward AS ward
+        FROM facilities facility
+        WHERE facility.deleted_at IS NULL
+          ${scopeSql}
+        ORDER BY facility.name ASC
+        LIMIT 20
+      `,
+      params,
+    );
+  }
+
+  private async loadAppointmentContext(scopedFacilityIds: string[]): Promise<Array<{
+    id: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    status: string;
+    facilityName: string | null;
+    serviceName: string | null;
+    roomName: string | null;
+    doctorTitle: string | null;
+    doctorName: string | null;
+  }>> {
+    const params: unknown[] = [];
+    let scopeSql = '';
+    if (scopedFacilityIds.length > 0) {
+      scopeSql = `AND appointment.facility_id IN (${scopedFacilityIds.map(() => '?').join(',')})`;
+      params.push(...scopedFacilityIds);
+    }
+
+    return this.dataSource.query(
+      `
+        SELECT
+          CAST(appointment.id AS CHAR) AS id,
+          DATE_FORMAT(appointment.scheduled_start, '%d/%m/%Y') AS date,
+          DATE_FORMAT(appointment.scheduled_start, '%H:%i') AS startTime,
+          DATE_FORMAT(appointment.scheduled_end, '%H:%i') AS endTime,
+          appointment.status AS status,
+          facility.name AS facilityName,
+          service.name AS serviceName,
+          room.name AS roomName,
+          doctor.title AS doctorTitle,
+          staff.name AS doctorName
+        FROM appointments appointment
+        LEFT JOIN facilities facility ON facility.id = appointment.facility_id
+        LEFT JOIN services service ON service.id = appointment.service_id
+        LEFT JOIN rooms room ON room.id = appointment.room_id
+        LEFT JOIN staffs staff ON staff.id = appointment.doctor_id
+        LEFT JOIN doctors doctor ON doctor.staff_id = staff.id
+        WHERE appointment.scheduled_start >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+          AND appointment.scheduled_start < DATE_ADD(CURDATE(), INTERVAL 31 DAY)
+          ${scopeSql}
+        ORDER BY appointment.scheduled_start ASC
+        LIMIT 30
+      `,
+      params,
+    );
+  }
+
+  private normalizeSearchText(value: string): string {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .toLowerCase();
   }
 
   private getGeminiReadableFiles(payload: ChatbotMessagePayload): Array<{ url: string; mimeType: string }> {

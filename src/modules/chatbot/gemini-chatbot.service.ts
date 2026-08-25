@@ -13,6 +13,7 @@ export type GeminiReplyOptions = {
   channel?: GeminiReplyChannel;
   supportsButtons?: boolean;
   supportsLinks?: boolean;
+  systemContext?: string | null;
 };
 
 @Injectable()
@@ -123,6 +124,9 @@ export class GeminiChatbotService {
       this.knowledge,
       '## Lịch sử chat gần đây',
       recentHistory || '(Chưa có lịch sử)',
+      options.systemContext
+        ? ['## Dữ liệu hệ thống có thể dùng để trả lời', options.systemContext].join('\n')
+        : '',
       '## Câu hỏi hiện tại của user',
       userMessage || (hasFiles ? 'User vừa gửi ảnh/file và muốn được hỗ trợ.' : ''),
       '## Kênh trả lời',
@@ -141,6 +145,9 @@ export class GeminiChatbotService {
         : '- Với câu hỏi cần bác sĩ nhưng không phải cấp cứu, không nhắc bấm nút. Hãy nói khách trả lời "gặp tư vấn viên" để được chuyển cho tư vấn viên/bác sĩ.',
       '- Chỉ khuyên gọi cấp cứu/đến cơ sở y tế ngay khi có dấu hiệu khẩn cấp.',
       '- Không dùng cụm "người thật" trong câu trả lời; hãy dùng "bác sĩ" hoặc "tư vấn viên/bác sĩ".',
+      options.systemContext
+        ? '- Khi user hỏi lịch hẹn, bác sĩ, cơ sở/phòng khám, chỉ dùng dữ liệu ở mục "Dữ liệu hệ thống có thể dùng để trả lời"; nếu không có dữ liệu khớp thì nói chưa tìm thấy trong hệ thống.'
+        : '',
       hasFiles
         ? supportsButtons
           ? '- Nếu có ảnh/file y tế như siêu âm, xét nghiệm, toa thuốc, triệu chứng cơ thể: chỉ mô tả quan sát chung/giải thích khả năng đọc được ở mức tham khảo, không chẩn đoán; có thể khuyên chọn nút "Gặp tư vấn viên/bác sĩ" để bác sĩ xem.'
