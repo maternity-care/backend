@@ -87,7 +87,7 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
   async findByPatientId(patientId: string): Promise<PregnancyProfile[]> {
     const profile = await this.repository.find({
       where: { patientId },
-      relations: this.detailRelations,
+      relations: { user: true },
       order: { id: 'DESC' },
     });
     if (!profile) {

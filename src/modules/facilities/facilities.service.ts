@@ -65,7 +65,6 @@ export class FacilitiesService {
   }
 
   async findDetailsById(id: string): Promise<FacilityWithDetails> {
-    await this.reactivateExpiredFacilityById(id);
     const facility = await this.facilitiesRepository.findDetailsById(id);
     if (!facility) {
       throw new NotFoundException(RESPONSE_MESSAGES.FACILITIES.NOT_FOUND);

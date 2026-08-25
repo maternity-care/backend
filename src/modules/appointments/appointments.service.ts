@@ -1158,9 +1158,6 @@ export class AppointmentsService {
       .addSelect('medicalRecord.conclusion', 'conclusion')
       .addSelect('medicalRecord.recommendation', 'recommendation')
       .addSelect('medicalRecord.next_appointment_suggested_at', 'nextAppointmentSuggestedAt')
-      .addSelect('medicalRecord.is_public', 'medicalRecordIsPublic')
-      .addSelect('medicalRecord.published_at', 'medicalRecordPublishedAt')
-      .addSelect('medicalRecord.published_by', 'medicalRecordPublishedBy')
       .from('appointment_service_items', 'item')
       .leftJoin('appointments', 'appointment', 'appointment.id = item.appointment_id')
       .leftJoin('users', 'patient', 'patient.id = appointment.patient_id')
@@ -1196,6 +1193,13 @@ export class AppointmentsService {
       )
       .orderBy('item.sequence', 'ASC')
       .addOrderBy('item.id', 'ASC');
+
+    if (publicOnlyRecords) {
+      query
+        .addSelect('medicalRecord.is_public', 'medicalRecordIsPublic')
+        .addSelect('medicalRecord.published_at', 'medicalRecordPublishedAt')
+        .addSelect('medicalRecord.published_by', 'medicalRecordPublishedBy');
+    }
 
     if (appointmentId) {
       query.where('item.appointment_id = :appointmentId', { appointmentId });
