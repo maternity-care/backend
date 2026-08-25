@@ -43,6 +43,7 @@ export class MedicalRecordRepository implements IMedicalRecordRepository {
       where: { id },
       relations: {
         appointment: true,
+        appointmentServiceItem: true,
         doctor: true,
         pregnancyProfile: true,
         files: true,

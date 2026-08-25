@@ -79,6 +79,16 @@ export class MedicalRecordsController {
     };
   }
 
+  @Patch(':id/publish')
+  @Roles(RoleEnum.DOCTOR)
+  @ApiOperation({ summary: 'Publish a medical record to the patient' })
+  async publish(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return {
+      message: MEDICAL_RECORD_MESSAGES.PUBLISHED,
+      data: await this.service.publish(id, user),
+    };
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a medical record without attached files' })
   async remove(@Param('id') id: string) {

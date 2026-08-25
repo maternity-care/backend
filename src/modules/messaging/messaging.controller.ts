@@ -22,6 +22,8 @@ import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.in
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RESPONSE_MESSAGES } from '../../common/constants/response-message.constant';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ChatbotRealtimeService } from '../chatbot/chatbot-realtime.service';
+import { ChatbotService } from '../chatbot/chatbot.service';
 import { FacebookPageRuntimeService } from './adapters/facebook-page-runtime.service';
 import { ZaloPersonalRuntimeService } from './adapters/zalo-personal-runtime.service';
 import { CreateMessagingAccountDto } from './dto/create-messaging-account.dto';
@@ -44,6 +46,8 @@ export class MessagingController {
     private readonly messagingService: MessagingService,
     private readonly zaloRuntime: ZaloPersonalRuntimeService,
     private readonly facebookRuntime: FacebookPageRuntimeService,
+    private readonly chatbotService: ChatbotService,
+    private readonly chatbotRealtime: ChatbotRealtimeService,
   ) {}
 
   @Get('accounts')
@@ -303,6 +307,19 @@ export class MessagingController {
       content,
       attachment,
     );
+    if (conversation.channel === MessagingChannel.WEB_CHAT) {
+      await this.messagingService.markWebChatStaffJoined(conversationId, {
+        id: user?.id,
+        name: user?.name ?? user?.email,
+      });
+      const saved = await this.messagingService.updateOutboundDelivery(message.id, 'sent', null, {
+        channel: MessagingChannel.WEB_CHAT,
+        delivered: true,
+      });
+      const chatbotConversation = await this.chatbotService.getConversation(conversationId);
+      this.chatbotRealtime.emitConversation(conversationId, chatbotConversation);
+      return saved;
+    }
     try {
       const providerResponse = conversation.channel === MessagingChannel.FACEBOOK_PAGE
         ? await this.facebookRuntime.sendMessage(
@@ -344,6 +361,16 @@ export class MessagingController {
           size: this.readMetadataNumber(message.metadata, 'attachmentSize'),
         }
       : null;
+    if (conversation.channel === MessagingChannel.WEB_CHAT) {
+      const saved = await this.messagingService.updateOutboundDelivery(message.id, 'sent', null, {
+        channel: MessagingChannel.WEB_CHAT,
+        delivered: true,
+        retry: true,
+      });
+      const chatbotConversation = await this.chatbotService.getConversation(conversationId);
+      this.chatbotRealtime.emitConversation(conversationId, chatbotConversation);
+      return saved;
+    }
     try {
       const providerResponse = conversation.channel === MessagingChannel.FACEBOOK_PAGE
         ? await this.facebookRuntime.sendMessage(
@@ -371,6 +398,13 @@ export class MessagingController {
     @Param('conversationId') conversationId: string,
     @Param('messageId') messageId: string,
   ) {
+    const retryable = await this.messagingService.getOutboundMessageForRetry(
+      conversationId,
+      messageId,
+    );
+    if (retryable.conversation.channel === MessagingChannel.WEB_CHAT) {
+      throw new BadRequestException('Web chat không hỗ trợ thu hồi tin nhắn.');
+    }
     const { conversation, message, payload } = await this.messagingService.getOutboundMessageForUndo(
       conversationId,
       messageId,

@@ -751,6 +751,28 @@ export class MessagingService {
     return { conversation: hydratedConversation, message };
   }
 
+  async markWebChatStaffJoined(
+    conversationId: string,
+    staff: { id?: string; name?: string },
+  ): Promise<MessagingConversation> {
+    const conversation = await this.getConversationEntity(conversationId);
+    if (conversation.channel !== MessagingChannel.WEB_CHAT) return conversation;
+
+    conversation.assignedStaffId = staff.id ?? conversation.assignedStaffId ?? null;
+    conversation.assignedStaffName = staff.name ?? conversation.assignedStaffName ?? null;
+    conversation.metadata = {
+      ...(conversation.metadata ?? {}),
+      chatbotStatus: 'staff_joined',
+      claimExpiresAt: null,
+    };
+
+    const [saved] = await this.hydrateConversationTags([
+      await this.conversationRepository.save(conversation),
+    ]);
+    this.events.emitToStaff('messages:conversation.updated', saved);
+    return saved;
+  }
+
   async shouldAutoReply(conversationId: string): Promise<boolean> {
     await this.getConversationEntity(conversationId);
     const outboundMessages = await this.messageRepository.find({

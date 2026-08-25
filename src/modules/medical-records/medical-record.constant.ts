@@ -1,6 +1,7 @@
 export const MEDICAL_RECORD_MESSAGES = {
   CREATED: 'Tạo kết quả khám thành công',
   UPDATED: 'Cập nhật kết quả khám thành công',
+  PUBLISHED: 'Công khai kết quả khám thành công',
   DELETED: 'Xóa kết quả khám thành công',
   FOUND: 'Lấy danh sách kết quả khám thành công',
   DETAIL_FOUND: 'Lấy chi tiết kết quả khám thành công',
@@ -10,4 +11,6 @@ export const MEDICAL_RECORD_MESSAGES = {
   APPOINTMENT_DATA_MISMATCH: 'Bác sĩ hoặc hồ sơ thai không khớp với thông tin của lịch hẹn',
   DATE_RANGE_INVALID: 'createdFrom phải nhỏ hơn hoặc bằng createdTo',
   HAS_FILES: 'Không thể xóa kết quả khám đang có tệp y tế',
+  PUBLISH_ONLY_OWNER: 'Chỉ bác sĩ đọc kết quả được công khai kết quả khám',
+  PUBLISH_ONLY_TODAY: 'Chỉ được công khai kết quả của lịch hẹn trong ngày hôm nay',
 } as const;

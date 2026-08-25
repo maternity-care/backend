@@ -73,6 +73,18 @@ export class MedicalRecord {
   @Column({ name: 'next_appointment_suggested_at', type: 'timestamp', nullable: true })
   nextAppointmentSuggestedAt: Date | null;
 
+  @ApiProperty({ type: Boolean })
+  @Column({ name: 'is_public', type: 'boolean', default: false })
+  isPublic: boolean;
+
+  @ApiPropertyOptional({ type: Date, nullable: true, required: false })
+  @Column({ name: 'published_at', type: 'timestamp', nullable: true })
+  publishedAt: Date | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @Column({ name: 'published_by', type: 'bigint', nullable: true })
+  publishedBy: string | null;
+
   @OneToMany(() => MedicalFile, (file) => file.medicalRecord, { nullable: true })
   files: MedicalFile[];
 

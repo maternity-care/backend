@@ -21,7 +21,10 @@ export class PregnancyProfileController {
   @ApiResponse({ status: 200, type: [PregnancyProfileResponseDto] })
   async findMine(@CurrentUser() user: AuthenticatedUser) {
     const profiles = await this.pregnancyProfileService.findMyProfile(user.id);
-    return { message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.GET_SUCCESS, data: profiles };
+    return {
+      message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.GET_SUCCESS,
+      data: profiles.map((profile) => this.hidePrivateMedicalRecords(profile)),
+    };
   }
 
   @Post()
@@ -37,7 +40,10 @@ export class PregnancyProfileController {
   @ApiResponse({ status: 200, type: PregnancyProfileResponseDto })
   async findMineById(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     const profile = await this.pregnancyProfileService.findById(id);
-    return { message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.GET_SUCCESS, data: profile };
+    return {
+      message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.GET_SUCCESS,
+      data: this.hidePrivateMedicalRecords(profile),
+    };
   }
 
   @Patch(':id')
@@ -70,5 +76,18 @@ export class PregnancyProfileController {
   ) {
     const profile = await this.pregnancyProfileService.confirmSoftDelete(user.id, id, confirmed);
     return { message: RESPONSE_MESSAGES.PREGNANCY_PROFILES.DELETED, data: profile };
+  }
+
+  private hidePrivateMedicalRecords<T extends { medicalRecords?: unknown[] | null }>(profile: T): T {
+    return {
+      ...profile,
+      medicalRecords:
+        profile.medicalRecords?.filter((record) => {
+          if (typeof record !== 'object' || record === null) {
+            return true;
+          }
+          return (record as { isPublic?: boolean }).isPublic === true;
+        }) ?? profile.medicalRecords,
+    };
   }
 }
