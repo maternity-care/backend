@@ -287,17 +287,10 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       .addSelect('facility.address', 'address')
       .addSelect('facility.province', 'province')
       .addSelect('facility.ward', 'ward')
-      .addSelect('facility.floorCount', 'floorCount')
+      .addSelect('1', 'floorCount')
       .addSelect('facility.latitude', 'latitude')
       .addSelect('facility.longitude', 'longitude')
       .addSelect('facility.status', 'status')
-      .addSelect('facility.inactiveFrom', 'inactiveFrom')
-      .addSelect('facility.inactiveUntil', 'inactiveUntil')
-      .addSelect('facility.inactiveReason', 'inactiveReason')
-      .addSelect('facility.inactiveSource', 'inactiveSource')
-      .addSelect('facility.inactiveBy', 'inactiveBy')
-      .addSelect('facility.reactivatedAt', 'reactivatedAt')
-      .addSelect('facility.reactivatedBy', 'reactivatedBy')
       .addSelect('facility.createdAt', 'createdAt')
       .addSelect('facility.updatedAt', 'updatedAt');
 
