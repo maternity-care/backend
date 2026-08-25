@@ -71,6 +71,7 @@ const DEFAULT_ZALO_WEB_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
 const ZALO_LOGIN_TIMEOUT_MS = 120000;
 const ZALO_TEXT_CHUNK_SIZE = 1800;
+const ZALO_SEND_TIMEOUT_MS = 15000;
 
 @Injectable()
 export class ZaloPersonalRuntimeService implements OnModuleInit {
@@ -200,21 +201,29 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
       return value;
     };
     try {
-      const chunks = this.splitText(content.trim(), ZALO_TEXT_CHUNK_SIZE);
+      const chunks = this.splitText(this.normalizeExternalText(content), ZALO_TEXT_CHUNK_SIZE);
       const responses: unknown[] = [];
       for (const [index, chunk] of chunks.entries()) {
         const isLastTextChunk = index === chunks.length - 1;
-        responses.push(await session.api.sendMessage(
-          source && isLastTextChunk ? { msg: chunk, attachments: source } : { msg: chunk },
-          externalThreadId,
-          externalThreadType === 'group' ? 1 : 0,
+        responses.push(await this.withTimeout(
+          session.api.sendMessage(
+            source && isLastTextChunk ? { msg: chunk, attachments: source } : { msg: chunk },
+            externalThreadId,
+            externalThreadType === 'group' ? 1 : 0,
+          ),
+          ZALO_SEND_TIMEOUT_MS,
+          'Gửi tin nhắn Zalo quá thời gian chờ.',
         ));
       }
       if (source && chunks.length === 0) {
-        responses.push(await session.api.sendMessage(
-          { msg: '', attachments: source },
-          externalThreadId,
-          externalThreadType === 'group' ? 1 : 0,
+        responses.push(await this.withTimeout(
+          session.api.sendMessage(
+            { msg: '', attachments: source },
+            externalThreadId,
+            externalThreadType === 'group' ? 1 : 0,
+          ),
+          ZALO_SEND_TIMEOUT_MS,
+          'Gửi tin nhắn Zalo quá thời gian chờ.',
         ));
       }
       const response = responses.length === 1 ? responses[0] : { responses };
@@ -242,6 +251,23 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
     }
     if (remaining.trim()) chunks.push(remaining.trim());
     return chunks;
+  }
+
+  private normalizeExternalText(content: string): string {
+    return content
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label: string, url: string) => {
+        const cleanLabel = this.readString(label);
+        const cleanUrl = this.readString(url);
+        if (!cleanUrl) return cleanLabel;
+        return cleanLabel ? `${cleanLabel}: ${cleanUrl}` : cleanUrl;
+      })
+      .replace(/[;,\s]*Email\s*:\s*[^;\n.]+(?:\.[^;\n.]+)+\.?/gi, '')
+      .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/[ \t]{2,}/g, ' ')
+      .replace(/\s+([;,.])/g, '$1')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
   }
 
   async undoMessage(
