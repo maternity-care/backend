@@ -46,6 +46,7 @@ const GRAPH_VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v20.0';
 const GRAPH_BASE_URL = `https://graph.facebook.com/${GRAPH_VERSION}`;
 const OAUTH_SESSION_TTL_MS = 10 * 60 * 1000;
 const FACEBOOK_TEXT_CHUNK_SIZE = 1800;
+const FACEBOOK_SEND_TIMEOUT_MS = 15000;
 
 @Injectable()
 export class FacebookPageRuntimeService implements OnModuleInit {
@@ -213,7 +214,7 @@ export class FacebookPageRuntimeService implements OnModuleInit {
     const account = await this.messagingService.getAccountForRuntime(accountId);
     const credentials = this.readCredentials(account.credentials);
     const responses: unknown[] = [];
-    const cleanContent = content.trim();
+    const cleanContent = this.normalizeExternalText(content);
 
     if (cleanContent) {
       const chunks = this.splitText(cleanContent, FACEBOOK_TEXT_CHUNK_SIZE);
@@ -427,6 +428,7 @@ export class FacebookPageRuntimeService implements OnModuleInit {
         'content-type': 'application/json',
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(FACEBOOK_SEND_TIMEOUT_MS),
     });
     const data = await response.json().catch(() => null);
     if (!response.ok) {
@@ -449,6 +451,23 @@ export class FacebookPageRuntimeService implements OnModuleInit {
     }
     if (remaining) chunks.push(remaining);
     return chunks;
+  }
+
+  private normalizeExternalText(content: string): string {
+    return content
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label: string, url: string) => {
+        const cleanLabel = this.readString(label);
+        const cleanUrl = this.readString(url);
+        if (!cleanUrl) return cleanLabel;
+        return cleanLabel ? `${cleanLabel}: ${cleanUrl}` : cleanUrl;
+      })
+      .replace(/[;,\s]*Email\s*:\s*[^;\n.]+(?:\.[^;\n.]+)+\.?/gi, '')
+      .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/[ \t]{2,}/g, ' ')
+      .replace(/\s+([;,.])/g, '$1')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
   }
 
   private async subscribePage(credentials: FacebookPageCredentials): Promise<void> {
