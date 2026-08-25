@@ -150,7 +150,7 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
     query: SearchProfileQueryDto,
   ): Promise<{ data: PregnancyProfile[]; total: number }> {
     query.limit =
-      query.limit && Number(query.limit) > 0 && Number(query.limit) <= 50
+      query.limit && Number(query.limit) > 0 && Number(query.limit) <= 500
         ? Number(query.limit)
         : 10;
     const where: FindOptionsWhere<PregnancyProfile> = {};
@@ -182,7 +182,7 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
     }
 
     const [data, total] = await this.repository.findAndCount({
-      relations: this.detailRelations,
+      relations: { user: true },
       where: {
         ...where,
         user: {
