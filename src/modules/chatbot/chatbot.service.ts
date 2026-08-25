@@ -624,8 +624,16 @@ export class ChatbotService {
       'ca kham',
       'dat lich',
     ]);
+    const wantsDoctor = this.includesAny(normalized, [
+      'bac si',
+      'bsi',
+      'bs ',
+      'doctor',
+      'chuyen khoa',
+      'nhan vien y te',
+    ]);
 
-    if (!wantsFacility && !wantsAppointment) return null;
+    if (!wantsFacility && !wantsAppointment && !wantsDoctor) return null;
 
     const scopedFacilityIds = this.resolveRequesterFacilityIds(requester);
     const sections: string[] = [];
@@ -641,6 +649,25 @@ export class ChatbotService {
               return `${index + 1}. ${facility.name} (${facility.code}) - Địa chỉ: ${address || 'chưa có'}; SĐT/Hotline: ${facility.phone || 'chưa có'}; Email: ${facility.email || 'chưa có'}.`;
             }).join('\n')
             : 'Chưa có cơ sở/phòng khám phù hợp trong hệ thống.',
+        ].join('\n'),
+      );
+    }
+
+    if (wantsDoctor) {
+      const doctors = await this.loadDoctorContext(scopedFacilityIds);
+      sections.push(
+        [
+          'Bác sĩ trong hệ thống:',
+          doctors.length > 0
+            ? doctors.map((doctor, index) => {
+              const fullName = [doctor.title, doctor.name].filter(Boolean).join(' ');
+              const contact = [
+                doctor.phone ? `SĐT: ${doctor.phone}` : null,
+                doctor.email ? `Email: ${doctor.email}` : null,
+              ].filter(Boolean).join('; ');
+              return `${index + 1}. ${fullName || doctor.name || `Bác sĩ #${doctor.id}`} - Chuyên khoa: ${doctor.specialty || 'chưa cập nhật'}; Cơ sở: ${doctor.facilityName || 'chưa có'}; ${contact || 'Liên hệ: chưa có'}.`;
+            }).join('\n')
+            : 'Chưa tìm thấy bác sĩ phù hợp trong hệ thống.',
         ].join('\n'),
       );
     }
@@ -753,6 +780,45 @@ export class ChatbotService {
           AND appointment.scheduled_start < DATE_ADD(CURDATE(), INTERVAL 31 DAY)
           ${scopeSql}
         ORDER BY appointment.scheduled_start ASC
+        LIMIT 30
+      `,
+      params,
+    );
+  }
+
+  private async loadDoctorContext(scopedFacilityIds: string[]): Promise<Array<{
+    id: string;
+    name: string | null;
+    title: string | null;
+    specialty: string | null;
+    phone: string | null;
+    email: string | null;
+    facilityName: string | null;
+  }>> {
+    const params: unknown[] = [];
+    let scopeSql = '';
+    if (scopedFacilityIds.length > 0) {
+      scopeSql = `AND staff.facility_id IN (${scopedFacilityIds.map(() => '?').join(',')})`;
+      params.push(...scopedFacilityIds);
+    }
+
+    return this.dataSource.query(
+      `
+        SELECT
+          CAST(doctor.id AS CHAR) AS id,
+          staff.name AS name,
+          doctor.title AS title,
+          doctor.specialty AS specialty,
+          staff.phone AS phone,
+          staff.email AS email,
+          facility.name AS facilityName
+        FROM doctors doctor
+        INNER JOIN staffs staff ON staff.id = doctor.staff_id
+        LEFT JOIN facilities facility ON facility.id = staff.facility_id
+        WHERE LOWER(doctor.status) = 'active'
+          AND LOWER(staff.status) = 'active'
+          ${scopeSql}
+        ORDER BY staff.name ASC
         LIMIT 30
       `,
       params,
