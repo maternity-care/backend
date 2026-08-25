@@ -821,9 +821,10 @@ export class MessagingService {
       autoReplyReason: input.reason ?? 'last_reply_gt_60m_or_none',
     };
     const saved = await this.messageRepository.save(result.message);
+    const conversation = await this.emitConversationSummary(saved.conversationId);
     this.events.emitConversation(saved.conversationId, 'messages:message.updated', saved);
     this.events.emitToStaff('messages:message.updated', saved);
-    return { conversation: result.conversation, message: saved };
+    return { conversation: conversation ?? result.conversation, message: saved };
   }
 
   async updateOutboundDelivery(
@@ -875,6 +876,7 @@ export class MessagingService {
     if (status === 'sent' && facebookMessageId) message.externalMessageId = facebookMessageId;
     message.metadata = metadata;
     const saved = await this.messageRepository.save(message);
+    await this.emitConversationSummary(saved.conversationId);
     this.events.emitConversation(saved.conversationId, 'messages:message.updated', saved);
     this.events.emitToStaff('messages:message.updated', saved);
     return saved;
@@ -1141,6 +1143,19 @@ export class MessagingService {
     if (messageType === MessagingMessageType.STICKER) return '[Sticker]';
     if (messageType === MessagingMessageType.FILE) return '[Tệp đính kèm]';
     return '[Nội dung chưa hỗ trợ]';
+  }
+
+  private async emitConversationSummary(conversationId: string): Promise<MessagingConversation | null> {
+    const conversation = await this.conversationRepository.findOne({
+      where: { id: conversationId },
+      relations: { account: true },
+    });
+    if (!conversation) return null;
+
+    const [hydrated] = await this.hydrateConversationTags([conversation]);
+    this.events.emitToStaff('messages:conversation.updated', hydrated);
+    this.events.emitConversation(conversationId, 'messages:conversation.updated', hydrated);
+    return hydrated;
   }
 
   private toChatbotHistoryMessage(message: MessagingMessage): ChatbotMessage {
