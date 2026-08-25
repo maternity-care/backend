@@ -23,7 +23,8 @@ export const SEND_EXAM_RESULT_NOTIFICATION_JOB = 'send-exam-result-notification'
 export interface ExamResultNotificationJobData {
   patientId: string;
   appointmentId: string;
-  appointmentServiceItemId: string;
+  appointmentServiceItemId?: string | null;
+  medicalRecordId?: string | null;
 }
 
 export interface SendLockAccountEmailJobData {

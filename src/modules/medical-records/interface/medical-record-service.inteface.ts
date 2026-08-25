@@ -3,6 +3,7 @@ import { CreateMedicalRecordDto } from '../dto/requests/create-medical-record.dt
 import { SearchMedicalRecordDto } from '../dto/requests/search-medical-record.dto';
 import { UpdateMedicalRecordDto } from '../dto/requests/update-medical-record.dto';
 import { MedicalRecord } from '../entities/medical-record.entity';
+import { AuthenticatedUser } from '../../auth/interfaces/authenticated-user.interface';
 
 export const MEDICAL_RECORD_SERVICE = Symbol('MEDICAL_RECORD_SERVICE');
 
@@ -12,5 +13,6 @@ export interface IMedicalRecordService {
   findAllPaginated(filters?: SearchMedicalRecordDto): Promise<PaginationResult<MedicalRecord>>;
   findById(id: string): Promise<MedicalRecord>;
   update(id: string, dto: UpdateMedicalRecordDto): Promise<MedicalRecord>;
+  publish(id: string, user: AuthenticatedUser): Promise<MedicalRecord>;
   remove(id: string): Promise<void>;
 }

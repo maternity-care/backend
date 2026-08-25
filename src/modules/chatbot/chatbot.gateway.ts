@@ -16,6 +16,7 @@ import { RoleEnum } from '../../common/constants/role.enum';
 import { AccountStatus } from '../../common/constants/status.enum';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { Staff } from '../staffs/entities/staff.entity';
+import { ChatbotRealtimeService } from './chatbot-realtime.service';
 import { ChatbotService } from './chatbot.service';
 import {
   ChatbotConversationPayload,
@@ -42,10 +43,15 @@ export class ChatbotGateway implements OnGatewayConnection, OnGatewayDisconnect 
 
   constructor(
     private readonly chatbotService: ChatbotService,
+    private readonly chatbotRealtime: ChatbotRealtimeService,
     private readonly jwtService: JwtService,
     @InjectRepository(Staff)
     private readonly staffRepository: Repository<Staff>,
   ) {}
+
+  afterInit(server: Server): void {
+    this.chatbotRealtime.bindServer(server);
+  }
 
   async handleConnection(client: Socket): Promise<void> {
     if (this.getClientMode(client) === 'staff') {

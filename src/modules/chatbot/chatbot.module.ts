@@ -9,6 +9,7 @@ import { MessagingMessage } from '../messaging/entities/messaging-message.entity
 import { Staff } from '../staffs/entities/staff.entity';
 import { UploadsModule } from '../uploads/uploads.module';
 import { ChatbotGateway } from './chatbot.gateway';
+import { ChatbotRealtimeService } from './chatbot-realtime.service';
 import { ChatbotService } from './chatbot.service';
 import { GeminiChatbotService } from './gemini-chatbot.service';
 
@@ -19,7 +20,7 @@ import { GeminiChatbotService } from './gemini-chatbot.service';
     TypeOrmModule.forFeature([MessagingChannelAccount, MessagingConversation, MessagingCustomerIdentity, MessagingMessage, Staff]),
     UploadsModule,
   ],
-  providers: [ChatbotGateway, ChatbotService, GeminiChatbotService],
-  exports: [ChatbotService, GeminiChatbotService],
+  providers: [ChatbotGateway, ChatbotRealtimeService, ChatbotService, GeminiChatbotService],
+  exports: [ChatbotRealtimeService, ChatbotService, GeminiChatbotService],
 })
 export class ChatbotModule {}

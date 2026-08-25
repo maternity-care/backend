@@ -31,23 +31,36 @@ export class NotificationProcessor extends WorkerHost {
         return;
       }
 
-      const { patientId, appointmentId, appointmentServiceItemId } = job.data;
-      const title = 'Đã có kết quả dịch vụ';
-      const content = `Kết quả của một chỉ định trong lịch hẹn #${appointmentId} đã được cập nhật.`;
+      const { patientId, appointmentId, appointmentServiceItemId, medicalRecordId } = job.data;
+      const isServiceResult = Boolean(appointmentServiceItemId);
+      const referenceType = isServiceResult
+        ? NotificationReferenceType.APPOINTMENT_SERVICE_ITEM
+        : NotificationReferenceType.APPOINTMENT;
+      const referenceId = isServiceResult ? appointmentServiceItemId! : appointmentId;
+      const title = isServiceResult ? 'Đã có kết quả dịch vụ' : 'Đã có kết quả khám';
+      const content = isServiceResult
+        ? `Kết quả của một chỉ định trong lịch hẹn #${appointmentId} đã được công khai.`
+        : `Kết quả khám của lịch hẹn #${appointmentId} đã được công khai.`;
+      const reference = medicalRecordId
+        ? `exam_result:medical_record:${medicalRecordId}`
+        : isServiceResult
+        ? `exam_result:appointment_service_item:${appointmentServiceItemId}`
+        : `exam_result:appointment:${appointmentId}`;
 
       await this.notificationsService.createForUserIfMissing(patientId, {
-        reference: `exam_result:appointment_service_item:${appointmentServiceItemId}`,
+        reference,
         type: NotificationType.EXAM_RESULT,
         title,
         content,
-        referenceType: NotificationReferenceType.APPOINTMENT_SERVICE_ITEM,
-        referenceId: appointmentServiceItemId,
+        referenceType,
+        referenceId,
       });
 
       await this.messagingService.notifyUserByPreferredChannel(patientId, content, {
-        referenceType: 'appointment_service_item',
-        referenceId: appointmentServiceItemId,
+        referenceType: isServiceResult ? 'appointment_service_item' : 'appointment',
+        referenceId,
         appointmentId,
+        medicalRecordId,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown notification queue error';

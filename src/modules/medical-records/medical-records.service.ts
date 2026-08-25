@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -14,6 +15,7 @@ import { RegisterPendingMedicalFileDto } from './dto/requests/pending-medical-fi
 import { SearchMedicalRecordDto } from './dto/requests/search-medical-record.dto';
 import { UpdateMedicalRecordDto } from './dto/requests/update-medical-record.dto';
 import { MedicalRecord } from './entities/medical-record.entity';
+import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import {
   IMedicalRecordRepository,
   MEDICAL_RECORD_REPOSITORY,
@@ -25,6 +27,7 @@ import { MEDICAL_RECORD_MESSAGES } from './medical-record.constant';
 export class MedicalRecordsService implements IMedicalRecordService {
   private readonly logger = new Logger(MedicalRecordsService.name);
   private readonly pendingFileTtlSeconds = 24 * 60 * 60;
+  private readonly vietnamTimeZone = 'Asia/Ho_Chi_Minh';
 
   constructor(
     @Inject(MEDICAL_RECORD_REPOSITORY)
@@ -56,15 +59,7 @@ export class MedicalRecordsService implements IMedicalRecordService {
         );
         await this.clearPendingFiles(dto.appointmentId);
         if (dto.appointmentServiceItemId) {
-          const appointment = await this.repository.findAppointmentById(dto.appointmentId);
-          if (appointment) {
-            await this.markServiceItemResultUploaded(dto.appointmentServiceItemId);
-            await this.enqueueExamResultNotification(
-              appointment.patientId,
-              dto.appointmentId,
-              dto.appointmentServiceItemId,
-            );
-          }
+          await this.markServiceItemResultUploaded(dto.appointmentServiceItemId);
         }
       }
 
@@ -97,11 +92,6 @@ export class MedicalRecordsService implements IMedicalRecordService {
     }
     if (dto.appointmentServiceItemId) {
       await this.markServiceItemResultUploaded(dto.appointmentServiceItemId);
-      await this.enqueueExamResultNotification(
-        appointment.patientId,
-        dto.appointmentId,
-        dto.appointmentServiceItemId,
-      );
     }
     // TODO: đặt lịch và thông báo cho bệnh nhân
     if (dto?.nextAppointmentSuggestedAt) {
@@ -161,6 +151,37 @@ export class MedicalRecordsService implements IMedicalRecordService {
           }),
     });
     await this.repository.save(record);
+    return this.findById(record.id);
+  }
+
+  async publish(id: string, user: AuthenticatedUser): Promise<MedicalRecord> {
+    const record = await this.findById(id);
+
+    if (record.doctorId !== user.id) {
+      throw new ForbiddenException(MEDICAL_RECORD_MESSAGES.PUBLISH_ONLY_OWNER);
+    }
+
+    if (!this.isAppointmentToday(record.appointment?.scheduledStart)) {
+      throw new BadRequestException(MEDICAL_RECORD_MESSAGES.PUBLISH_ONLY_TODAY);
+    }
+
+    if (!record.isPublic) {
+      record.isPublic = true;
+      record.publishedAt = new Date();
+      record.publishedBy = user.id;
+      await this.repository.save(record);
+    }
+
+    const appointment = record.appointment ?? (await this.repository.findAppointmentById(record.appointmentId));
+    if (appointment?.patientId) {
+      await this.enqueueExamResultNotification(
+        appointment.patientId,
+        record.appointmentId,
+        record.appointmentServiceItemId,
+        record.id,
+      );
+    }
+
     return this.findById(record.id);
   }
 
@@ -265,20 +286,36 @@ export class MedicalRecordsService implements IMedicalRecordService {
   private async enqueueExamResultNotification(
     patientId: string,
     appointmentId: string,
-    appointmentServiceItemId: string,
+    appointmentServiceItemId?: string | null,
+    medicalRecordId?: string | null,
   ) {
     try {
       await this.jobsService.enqueueExamResultNotification({
         patientId,
         appointmentId,
         appointmentServiceItemId,
+        medicalRecordId,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown queue error';
       this.logger.warn(
-        `Không enqueue được job thông báo kết quả cho chỉ định ${appointmentServiceItemId}: ${message}`,
+        `Không enqueue được job thông báo kết quả cho lịch ${appointmentId}: ${message}`,
       );
     }
+  }
+
+  private isAppointmentToday(value?: Date | string | null): boolean {
+    if (!value) return false;
+    return this.formatDateKey(value) === this.formatDateKey(new Date());
+  }
+
+  private formatDateKey(value: Date | string): string {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: this.vietnamTimeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date(value));
   }
 
   private validateDateRange(filters?: SearchMedicalRecordDto): void {

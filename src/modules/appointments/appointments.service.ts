@@ -709,7 +709,7 @@ export class AppointmentsService {
 
   async findPatientServiceResults(appointmentId: string, patientId: string) {
     await this.findPatientAppointmentOrFail(appointmentId, patientId);
-    return this.buildServiceItemsQuery(appointmentId).getRawMany();
+    return this.buildServiceItemsQuery(appointmentId, true).getRawMany();
   }
 
   async getPatientServiceQueue(appointmentId: string, itemId: string, patientId: string) {
@@ -1109,7 +1109,7 @@ export class AppointmentsService {
     }
   }
 
-  private buildServiceItemsQuery(appointmentId?: string) {
+  private buildServiceItemsQuery(appointmentId?: string, publicOnlyRecords = false) {
     const query = this.dataSource
       .createQueryBuilder()
       .select('item.id', 'id')
@@ -1158,6 +1158,9 @@ export class AppointmentsService {
       .addSelect('medicalRecord.conclusion', 'conclusion')
       .addSelect('medicalRecord.recommendation', 'recommendation')
       .addSelect('medicalRecord.next_appointment_suggested_at', 'nextAppointmentSuggestedAt')
+      .addSelect('medicalRecord.is_public', 'medicalRecordIsPublic')
+      .addSelect('medicalRecord.published_at', 'medicalRecordPublishedAt')
+      .addSelect('medicalRecord.published_by', 'medicalRecordPublishedBy')
       .from('appointment_service_items', 'item')
       .leftJoin('appointments', 'appointment', 'appointment.id = item.appointment_id')
       .leftJoin('users', 'patient', 'patient.id = appointment.patient_id')
@@ -1181,6 +1184,7 @@ export class AppointmentsService {
             .addSelect('MAX(latestRecord.id)', 'medical_record_id')
             .from('medical_records', 'latestRecord')
             .where('latestRecord.appointment_service_item_id IS NOT NULL')
+            .andWhere(publicOnlyRecords ? 'latestRecord.is_public = true' : '1 = 1')
             .groupBy('latestRecord.appointment_service_item_id'),
         'latestMedicalRecord',
         'latestMedicalRecord.appointment_service_item_id = item.id',
