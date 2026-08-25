@@ -524,6 +524,8 @@ export class StaffManagementService {
         ? [
             {
               facilityId: String(staff.facilityId),
+              facilityName: staff.facility?.name ?? null,
+              facilityCode: staff.facility?.code ?? null,
               roles: (staff.roles ?? []).map((role) => role.name),
             },
           ]
@@ -572,7 +574,12 @@ interface StaffProfileSummary {
   personalEmail: string;
   employeeCode: string;
   status: AccountStatus;
-  facilityAssignments: Array<{ facilityId: string; roles: string[] }>;
+  facilityAssignments: Array<{
+    facilityId: string;
+    facilityName?: string | null;
+    facilityCode?: string | null;
+    roles: string[];
+  }>;
   doctor: DoctorSummary | null;
 }
 

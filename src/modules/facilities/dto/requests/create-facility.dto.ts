@@ -30,6 +30,12 @@ import { FacilityOperatingHourGroupDto } from './facility-schedule.dto';
 
 export const POSITIVE_ID_PATTERN = /^[1-9]\d*$/;
 
+const normalizeOptionalId = (value: unknown): string | undefined => {
+  if (value === null || value === undefined) return undefined;
+  const normalized = String(value).trim();
+  return normalized.length > 0 ? normalized : undefined;
+};
+
 export class CreateFacilityDto {
   @ApiProperty({ example: 'Maternity Care Ha Noi' })
   @Transform(({ value }) => trimText(value))
@@ -40,6 +46,7 @@ export class CreateFacilityDto {
   name: string;
 
   @ApiPropertyOptional({ example: '1', nullable: true, description: 'Staff id cua nguoi phu trach/chu co so' })
+  @Transform(({ value }) => normalizeOptionalId(value))
   @IsOptional()
   @IsString()
   @Matches(POSITIVE_ID_PATTERN, { message: RESPONSE_MESSAGES.FACILITIES.OWNER_ID_INVALID })
