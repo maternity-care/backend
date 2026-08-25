@@ -671,6 +671,7 @@ export class MessagingService {
     conversation.lastMessageAt = input.sentAt ?? new Date();
     conversation.unreadCount = Number(conversation.unreadCount ?? 0) + 1;
     conversation = await this.conversationRepository.save(conversation);
+    conversation = await this.syncIncomingCustomerIdentity(account, conversation, input);
 
     const message = await this.messageRepository.save(
       this.messageRepository.create({
@@ -1443,10 +1444,63 @@ export class MessagingService {
     await this.customerIdentityRepository.save(identity);
   }
 
+  private async syncIncomingCustomerIdentity(
+    account: MessagingChannelAccount,
+    conversation: MessagingConversation,
+    input: IncomingMessageInput,
+  ): Promise<MessagingConversation> {
+    const externalUserId = input.senderId ?? input.externalThreadId;
+    if (!externalUserId) return conversation;
+
+    const metadata = input.metadata ?? {};
+    const avatarUrl = this.readString(metadata.customerAvatarUrl);
+    const source = this.readString(metadata.source);
+    const displayName = this.readString(input.senderName);
+
+    let identity = await this.customerIdentityRepository.findOne({
+      where: {
+        channel: account.channel,
+        accountId: account.id,
+        externalUserId,
+      },
+    });
+    if (!identity) {
+      identity = this.customerIdentityRepository.create({
+        channel: account.channel,
+        accountId: account.id,
+        externalUserId,
+      });
+    }
+
+    identity.displayName = displayName || identity.displayName;
+    identity.metadata = {
+      ...(identity.metadata ?? {}),
+      ...(avatarUrl ? { customerAvatarUrl: avatarUrl } : {}),
+      ...(metadata.facebookProfile ? { facebookProfile: metadata.facebookProfile } : {}),
+      ...(metadata.zaloProfile ? { zaloProfile: metadata.zaloProfile } : {}),
+      ...(source ? { source } : {}),
+    };
+    identity = await this.customerIdentityRepository.save(identity);
+
+    const identityAvatarUrl = this.readString(identity.metadata?.customerAvatarUrl);
+    conversation.customerName = identity.displayName || conversation.customerName;
+    conversation.metadata = {
+      ...(conversation.metadata ?? {}),
+      customerIdentityId: identity.id,
+      customerAvatarUrl:
+        avatarUrl ||
+        identityAvatarUrl ||
+        this.readString(conversation.metadata?.customerAvatarUrl) ||
+        null,
+    };
+    return this.conversationRepository.save(conversation);
+  }
+
   private async syncConversationCustomerMetadata(
     conversation: MessagingConversation,
     identity: MessagingCustomerIdentity,
   ): Promise<void> {
+    const avatarUrl = this.readString(identity.metadata?.customerAvatarUrl);
     conversation.customerName = identity.displayName || conversation.customerName;
     conversation.metadata = {
       ...(conversation.metadata ?? {}),
@@ -1455,6 +1509,10 @@ export class MessagingService {
       customerPhone: identity.phone,
       customerEmail: identity.email,
       customerAddress: identity.address,
+      customerAvatarUrl:
+        avatarUrl ||
+        this.readString(conversation.metadata?.customerAvatarUrl) ||
+        null,
     };
     const saved = await this.conversationRepository.save(conversation);
     this.events.emitToStaff('messages:conversation.updated', saved);

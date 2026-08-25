@@ -310,6 +310,11 @@ export class FacebookPageRuntimeService implements OnModuleInit {
         text?: unknown;
         is_echo?: unknown;
         attachments?: unknown;
+        quick_reply?: { payload?: unknown };
+      };
+      postback?: {
+        title?: unknown;
+        payload?: unknown;
       };
     };
     if (event.message?.is_echo) return;
@@ -322,7 +327,13 @@ export class FacebookPageRuntimeService implements OnModuleInit {
     const firstAttachment = attachments[0] as { type?: unknown; payload?: { url?: unknown } } | undefined;
     const attachmentUrl = this.readString(firstAttachment?.payload?.url) || null;
     const attachmentType = this.readString(firstAttachment?.type);
-    const text = this.readString(event.message?.text);
+    const quickReplyPayload = this.readString(event.message?.quick_reply?.payload);
+    const postbackPayload = this.readString(event.postback?.payload);
+    const actionPayload = quickReplyPayload || postbackPayload || null;
+    const text =
+      this.readString(event.message?.text) ||
+      this.readString(event.postback?.title) ||
+      (actionPayload === 'REQUEST_STAFF_SUPPORT' ? 'Gặp tư vấn viên' : null);
     const messageType = attachmentUrl
       ? (attachmentType === 'image' ? MessagingMessageType.IMAGE : MessagingMessageType.FILE)
       : MessagingMessageType.TEXT;
@@ -345,6 +356,7 @@ export class FacebookPageRuntimeService implements OnModuleInit {
         attachmentUrl,
         attachmentType: attachmentType || null,
         imageUrl: messageType === MessagingMessageType.IMAGE ? attachmentUrl : null,
+        actionPayload,
         rawEvent: event,
       },
     });
@@ -389,9 +401,7 @@ export class FacebookPageRuntimeService implements OnModuleInit {
     }
   }
 
-  private buildAiQuickReplies(reply: string): FacebookQuickReplyInput[] {
-    const normalized = reply.toLowerCase();
-    if (!normalized.includes('tư vấn viên') && !normalized.includes('bác sĩ')) return [];
+  private buildAiQuickReplies(_reply: string): FacebookQuickReplyInput[] {
     return [
       {
         title: 'Gặp tư vấn viên',
@@ -456,7 +466,7 @@ export class FacebookPageRuntimeService implements OnModuleInit {
   ): Promise<{ name: string | null; avatarUrl: string | null; raw: unknown }> {
     try {
       const params = new URLSearchParams({
-        fields: 'first_name,last_name,profile_pic',
+        fields: 'name,first_name,last_name,profile_pic,picture',
         access_token: credentials.pageAccessToken,
       });
       const response = await fetch(`${GRAPH_BASE_URL}/${encodeURIComponent(userId)}?${params.toString()}`);
@@ -466,18 +476,25 @@ export class FacebookPageRuntimeService implements OnModuleInit {
         this.logger.warn(`Cannot fetch Facebook user profile ${userId}: ${message}`);
         return { name: null, avatarUrl: null, raw: data };
       }
-      const name = [this.readString(data.first_name), this.readString(data.last_name)]
+      const name = this.readString(data.name) || [this.readString(data.first_name), this.readString(data.last_name)]
         .filter(Boolean)
         .join(' ') || null;
       return {
         name,
-        avatarUrl: this.readString(data.profile_pic) || null,
+        avatarUrl: this.readString(data.profile_pic) || this.readFacebookPictureUrl(data.picture) || null,
         raw: data,
       };
     } catch (error) {
       this.logger.warn(`Cannot fetch Facebook user profile ${userId}: ${this.getErrorMessage(error)}`);
       return { name: null, avatarUrl: null, raw: null };
     }
+  }
+
+  private readFacebookPictureUrl(value: unknown): string | null {
+    if (!value || typeof value !== 'object') return null;
+    const data = (value as { data?: unknown }).data;
+    if (!data || typeof data !== 'object') return null;
+    return this.readString((data as { url?: unknown }).url) || null;
   }
 
   private readCredentials(credentials: Record<string, unknown> | null): FacebookPageCredentials {
