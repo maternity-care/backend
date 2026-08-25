@@ -69,6 +69,7 @@ type ProxyAgentConstructor = new (proxy: string) => unknown;
 
 const DEFAULT_ZALO_WEB_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
+const ZALO_LOGIN_TIMEOUT_MS = 120000;
 
 @Injectable()
 export class ZaloPersonalRuntimeService implements OnModuleInit {
@@ -112,7 +113,11 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
       };
       const zalo = new Zalo(options as never);
 
-      const api = await zalo.login(account.credentials as never) as ZcaApi;
+      const api = await this.withTimeout(
+        zalo.login(account.credentials as never) as Promise<ZcaApi>,
+        ZALO_LOGIN_TIMEOUT_MS,
+        'Đăng nhập Zalo quá thời gian chờ, vui lòng thử lại.',
+      );
       this.sessions.set(accountId, { api, accountId });
       this.bindListener(accountId, api);
       await this.startListener(accountId, api);
@@ -319,9 +324,10 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
     const userAgent = this.readUserAgent(account.credentials) ?? DEFAULT_ZALO_WEB_USER_AGENT;
     let capturedCredentials: ZaloRuntimeCredentials | null = null;
 
-    const api = await zalo.loginQR(
-      { userAgent, language: 'vi' },
-      (event: any) => {
+    const api = await this.withTimeout(
+      zalo.loginQR(
+        { userAgent, language: 'vi' },
+        (event: any) => {
         const eventType = this.normalizeQrEventType(event?.type);
 
         if (eventType === 0) {
@@ -362,8 +368,11 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
             message: 'Đã lấy được session Zalo, đang lưu account.',
           });
         }
-      },
-    ) as ZcaApi;
+        },
+      ) as Promise<ZcaApi>,
+      ZALO_LOGIN_TIMEOUT_MS,
+      'Đăng nhập QR Zalo quá thời gian chờ, vui lòng tạo QR mới.',
+    );
 
     capturedCredentials ??= this.credentialsFromApiContext(api, userAgent);
 
@@ -371,7 +380,7 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
       await this.messagingService.setAccountAutoStart(accountId, true);
       await this.messagingService.completeZaloQrLogin(accountId, capturedCredentials);
     } else {
-      this.logger.warn(`Zalo QR login returned api without credentials for account ${accountId}`);
+      throw new Error('Không lấy được session Zalo sau khi quét QR, vui lòng thử lại.');
     }
 
     this.sessions.set(accountId, { api, accountId });
@@ -582,6 +591,20 @@ export class ZaloPersonalRuntimeService implements OnModuleInit {
     // proxy-agent publishes modern exports that this project TS config cannot type-resolve.
     // Runtime require works in the current CommonJS Nest build.
     return require('proxy-agent').ProxyAgent as ProxyAgentConstructor;
+  }
+
+  private async withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<T>((_resolve, reject) => {
+          timer = setTimeout(() => reject(new Error(message)), ms);
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   private normalizeQrImage(value: unknown): string | null {

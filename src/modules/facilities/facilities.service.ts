@@ -33,12 +33,13 @@ export class FacilitiesService {
   ) {}
 
   async create(dto: CreateFacilityDto): Promise<FacilityWithDetails> {
-    await this.ensureOwnerCanManageFacility(dto.ownerId);
+    const ownerId = dto.ownerId?.trim() || null;
+    await this.ensureOwnerCanManageFacility(ownerId);
     await this.ensureUniqueFacilityIdentity(dto);
     const code = await this.generateFacilityCode(dto.province);
 
     const { id: _ignoredId, schedules: _ignoredSchedules, ...createPayload } = dto as CreateFacilityDto & { id?: string };
-    const facility = this.facilitiesRepository.create({ ...createPayload, code });
+    const facility = this.facilitiesRepository.create({ ...createPayload, ownerId, code });
     const saved = await this.facilitiesRepository.save(facility);
     await this.facilityOperatingHoursService.initializeOperatingHours(saved.id, dto.schedules);
     return this.findDetailsById(saved.id);

@@ -605,6 +605,9 @@ export class ChatbotService {
     const wantsFacility = this.includesAny(normalized, [
       'co so',
       'phong kham',
+      'clinic',
+      'facility',
+      'chi nhanh',
       'dia chi',
       'hotline',
       'so dien thoai',
