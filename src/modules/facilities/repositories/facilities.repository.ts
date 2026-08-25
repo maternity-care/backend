@@ -287,7 +287,7 @@ export class FacilitiesRepository implements IFacilitiesRepository {
       .addSelect('facility.address', 'address')
       .addSelect('facility.province', 'province')
       .addSelect('facility.ward', 'ward')
-      .addSelect('facility.floorCount', 'floorCount')
+      .addSelect('1', 'floorCount')
       .addSelect('facility.latitude', 'latitude')
       .addSelect('facility.longitude', 'longitude')
       .addSelect('facility.status', 'status')

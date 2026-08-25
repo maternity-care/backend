@@ -134,7 +134,7 @@ export class FacilityOperatingHoursService {
   }
 
   private async getOperatingHoursOrDefault(facilityId: string): Promise<FacilityOperatingHourLike[]> {
-    const operatingHours = await this.operatingHoursRepository.findOperatingHoursByFacilityId(facilityId);
+    const operatingHours = await this.findOperatingHoursSafely(facilityId);
     if (operatingHours.length > 0) {
       return operatingHours.map(item => ({
         ...item,
@@ -143,6 +143,32 @@ export class FacilityOperatingHoursService {
       }));
     }
     return buildDefaultOperatingHours();
+  }
+
+  private async findOperatingHoursSafely(
+    facilityId: string,
+  ): Promise<Array<{ dayOfWeek: string; openTime: string | null; closeTime: string | null; isClosed: boolean }>> {
+    try {
+      return await this.operatingHoursRepository.findOperatingHoursByFacilityId(facilityId);
+    } catch (error) {
+      if (this.isOptionalOperatingHoursSchemaError(error)) {
+        return [];
+      }
+      throw error;
+    }
+  }
+
+  private isOptionalOperatingHoursSchemaError(error: unknown): boolean {
+    const databaseError = error as { code?: string; errno?: number; message?: string };
+    const code = databaseError.code ?? '';
+    const errno = Number(databaseError.errno ?? 0);
+    const message = databaseError.message ?? '';
+
+    return (
+      ['ER_NO_SUCH_TABLE', 'ER_BAD_FIELD_ERROR'].includes(code)
+      || [1054, 1146].includes(errno)
+      || /facility_operating_hours|Unknown column|doesn't exist/i.test(message)
+    );
   }
 
   private buildOperatingHoursFromGroupedInput(dto: UpdateFacilityOperatingHoursDto): FacilityOperatingHourLike[] {
