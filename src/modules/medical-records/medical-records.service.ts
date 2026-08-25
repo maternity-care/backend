@@ -156,8 +156,12 @@ export class MedicalRecordsService implements IMedicalRecordService {
 
   async publish(id: string, user: AuthenticatedUser): Promise<MedicalRecord> {
     const record = await this.findById(id);
+    const publishDoctorId =
+      record.appointmentServiceItemId && record.appointmentServiceItem?.doctorId
+        ? record.appointmentServiceItem.doctorId
+        : (record.appointment?.doctorId ?? record.doctorId);
 
-    if (record.doctorId !== user.id) {
+    if (String(publishDoctorId) !== String(user.id)) {
       throw new ForbiddenException(MEDICAL_RECORD_MESSAGES.PUBLISH_ONLY_OWNER);
     }
 
