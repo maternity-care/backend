@@ -188,9 +188,11 @@ export class MedicalRecordsService implements IMedicalRecordService {
   }
 
   private getPublishAllowedDoctorIds(record: MedicalRecord): Set<string> {
-    const ids = record.appointmentServiceItemId
-      ? [record.appointmentServiceItem?.doctorId, record.doctorId]
-      : [record.appointment?.doctorId, record.doctorId];
+    const ids = [
+      record.appointment?.doctorId,
+      record.appointmentServiceItem?.doctorId,
+      record.doctorId,
+    ];
 
     return new Set(ids.filter((id): id is string => Boolean(id)).map(String));
   }
