@@ -156,12 +156,10 @@ export class MedicalRecordsService implements IMedicalRecordService {
 
   async publish(id: string, user: AuthenticatedUser): Promise<MedicalRecord> {
     const record = await this.findById(id);
-    const publishDoctorId =
-      record.appointmentServiceItemId && record.appointmentServiceItem?.doctorId
-        ? record.appointmentServiceItem.doctorId
-        : (record.appointment?.doctorId ?? record.doctorId);
+    const allowedDoctorIds = this.getPublishAllowedDoctorIds(record);
+    const actorDoctorIds = this.getActorDoctorIds(user);
 
-    if (String(publishDoctorId) !== String(user.id)) {
+    if (!actorDoctorIds.some((doctorId) => allowedDoctorIds.has(doctorId))) {
       throw new ForbiddenException(MEDICAL_RECORD_MESSAGES.PUBLISH_ONLY_OWNER);
     }
 
@@ -187,6 +185,18 @@ export class MedicalRecordsService implements IMedicalRecordService {
     }
 
     return this.findById(record.id);
+  }
+
+  private getPublishAllowedDoctorIds(record: MedicalRecord): Set<string> {
+    const ids = record.appointmentServiceItemId
+      ? [record.appointmentServiceItem?.doctorId, record.doctorId]
+      : [record.appointment?.doctorId, record.doctorId];
+
+    return new Set(ids.filter((id): id is string => Boolean(id)).map(String));
+  }
+
+  private getActorDoctorIds(user: AuthenticatedUser): string[] {
+    return [user.id, user.doctor?.id].filter((id): id is string => Boolean(id)).map(String);
   }
 
   async remove(id: string): Promise<void> {
