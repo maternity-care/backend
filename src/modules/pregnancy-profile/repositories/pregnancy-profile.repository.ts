@@ -121,15 +121,36 @@ export class PregnancyProfileRepository implements IPregnancyProfileRepository {
   }
 
   async findByPatientId(patientId: string): Promise<PregnancyProfile[]> {
-    const profile = await this.repository.find({
-      where: { patientId },
-      relations: { user: true },
-      order: { id: 'DESC' },
-    });
-    if (!profile) {
+    let profiles: PregnancyProfile[];
+    try {
+      profiles = await this.repository.find({
+        where: { patientId },
+        relations: this.detailRelations,
+        order: {
+          id: 'DESC',
+          medicalRecords: {
+            createdAt: 'DESC',
+          },
+        },
+      });
+    } catch (error) {
+      if (!this.isMedicalRecordSchemaError(error)) {
+        throw error;
+      }
+
+      profiles = await this.repository.find({
+        where: { patientId },
+        relations: { user: true },
+        order: { id: 'DESC' },
+      });
+      profiles.forEach((profile) => {
+        profile.medicalRecords = [];
+      });
+    }
+    if (!profiles) {
       throw new NotFoundException(RESPONSE_MESSAGES.PREGNANCY_PROFILES.NOT_FOUND);
     }
-    return profile;
+    return profiles;
   }
 
   async softDelete(userId: string, id: string, reason: string): Promise<void> {

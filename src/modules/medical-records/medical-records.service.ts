@@ -176,6 +176,19 @@ export class MedicalRecordsService implements IMedicalRecordService {
     return this.findById(record.id);
   }
 
+  async unpublish(id: string): Promise<MedicalRecord> {
+    const record = await this.findById(id);
+
+    if (record.isPublic) {
+      record.isPublic = false;
+      record.publishedAt = null;
+      record.publishedBy = null;
+      await this.repository.save(record);
+    }
+
+    return this.findById(record.id);
+  }
+
   async remove(id: string): Promise<void> {
     const record = await this.findById(id);
     if ((await this.repository.countFiles(id)) > 0) {
