@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -156,18 +155,6 @@ export class MedicalRecordsService implements IMedicalRecordService {
 
   async publish(id: string, user: AuthenticatedUser): Promise<MedicalRecord> {
     const record = await this.findById(id);
-    const publishDoctorId =
-      record.appointmentServiceItemId && record.appointmentServiceItem?.doctorId
-        ? record.appointmentServiceItem.doctorId
-        : (record.appointment?.doctorId ?? record.doctorId);
-
-    if (String(publishDoctorId) !== String(user.id)) {
-      throw new ForbiddenException(MEDICAL_RECORD_MESSAGES.PUBLISH_ONLY_OWNER);
-    }
-
-    if (!this.isAppointmentToday(record.appointment?.scheduledStart)) {
-      throw new BadRequestException(MEDICAL_RECORD_MESSAGES.PUBLISH_ONLY_TODAY);
-    }
 
     if (!record.isPublic) {
       record.isPublic = true;
@@ -184,6 +171,19 @@ export class MedicalRecordsService implements IMedicalRecordService {
         record.appointmentServiceItemId,
         record.id,
       );
+    }
+
+    return this.findById(record.id);
+  }
+
+  async unpublish(id: string): Promise<MedicalRecord> {
+    const record = await this.findById(id);
+
+    if (record.isPublic) {
+      record.isPublic = false;
+      record.publishedAt = null;
+      record.publishedBy = null;
+      await this.repository.save(record);
     }
 
     return this.findById(record.id);

@@ -14,5 +14,6 @@ export interface IMedicalRecordService {
   findById(id: string): Promise<MedicalRecord>;
   update(id: string, dto: UpdateMedicalRecordDto): Promise<MedicalRecord>;
   publish(id: string, user: AuthenticatedUser): Promise<MedicalRecord>;
+  unpublish(id: string): Promise<MedicalRecord>;
   remove(id: string): Promise<void>;
 }

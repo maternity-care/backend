@@ -2,6 +2,7 @@ export const MEDICAL_RECORD_MESSAGES = {
   CREATED: 'Tạo kết quả khám thành công',
   UPDATED: 'Cập nhật kết quả khám thành công',
   PUBLISHED: 'Công khai kết quả khám thành công',
+  UNPUBLISHED: 'Thu hồi công khai kết quả khám thành công',
   DELETED: 'Xóa kết quả khám thành công',
   FOUND: 'Lấy danh sách kết quả khám thành công',
   DETAIL_FOUND: 'Lấy chi tiết kết quả khám thành công',
